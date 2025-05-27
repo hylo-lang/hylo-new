@@ -804,10 +804,33 @@ public struct Parser {
     in file: inout Module.SourceContainer
   ) throws -> [StatementIdentity]? {
     if next(is: .leftBrace) {
-      return try entering(.default, { (me) in try me.parseBracedStatementList(in: &file) })
+      return try parseCallableBody(in: &file)
     } else {
       return nil
     }
+  }
+
+  /// Parses the body of a callable abstraction.
+  ///
+  /// The body is parsed as a sequence of statements enclosed in braces. If the sequence is empty,
+  /// the result is a list containing one return statement having no return value. If the sequence
+  /// contains a single expression, the result is a list containing one return statement having
+  /// that expression as a return value. Otherwise, the result contains the parsed statements.
+  private mutating func parseCallableBody(
+    in file: inout Module.SourceContainer
+  ) throws -> [StatementIdentity] {
+    var ss = try entering(.default, { (me) in try me.parseBracedStatementList(in: &file) })
+
+    if ss.isEmpty {
+      let r = file.insert(Return(introducer: nil, value: nil, site: .empty(at: position)))
+      ss.append(.init(r))
+    } else if let s = ss.uniqueElement, file.tag(of: s).value is any Expression.Type {
+      let e = ExpressionIdentity(uncheckedFrom: s.erased)
+      let r = file.insert(Return(introducer: nil, value: e, site: file[s].site))
+      ss[0] = .init(r)
+    }
+
+    return ss
   }
 
   private mutating func parseBundleBody(

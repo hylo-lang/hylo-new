@@ -1,5 +1,5 @@
 negative/static-call.hylo:7.26-27: error: T expects 1 type argument(s)
-fun f2<T :: * -> *>() -> T {}
+fun f2<T :: * -> *>() -> T { Builtin.halt() }
                          ^
 negative/static-call.hylo:10.3-5: error: 'f0' takes no compile-time arguments
   f0<Void>(x: ())

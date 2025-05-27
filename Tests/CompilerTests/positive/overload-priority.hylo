@@ -25,4 +25,5 @@ fun main() {
 
   // Members inherited by conformance can be selected with an expected type.
   let y: {a: {}} = a.f()
+  let z = a.f() as {a: {}}
 }

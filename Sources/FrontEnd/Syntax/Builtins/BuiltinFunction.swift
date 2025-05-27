@@ -30,6 +30,9 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   // MARK: Functions unique to Hylo
 
+  /// Stops execution.
+  case halt
+
   /// `Builtin.address<T>(of v: T) -> Builtin.ptr`
   ///
   /// Returns a pointer to the storage of the argument.
@@ -392,6 +395,9 @@ extension BuiltinFunction {
     let i1 = s.demand(MachineType.i(1))
 
     switch self {
+    case .halt:
+      return s.demand(Arrow(inputs: [], output: .never))
+
     case .addressOf:
       let t0 = s.fresh().erased
       let t1 = s.demand(RemoteType(projectee: t0, access: .let)).erased
@@ -740,6 +746,8 @@ extension BuiltinFunction: Showable {
   /// Returns the part of the name of this function that comes before the parentheses.
   public func show(using printer: inout TreePrinter) -> String {
     switch self {
+    case .halt:
+      return "halt"
     case .addressOf:
       return "address"
     case .markUninitialized:
@@ -1083,6 +1091,8 @@ extension BuiltinFunction {
     // The first token is the LLVM instruction name.
     guard let head = tokens.popFirst() else { return nil }
     switch head {
+    case "halt":
+      self = .halt
     case "address":
       if !tokens.isEmpty { return nil }
       self = .addressOf

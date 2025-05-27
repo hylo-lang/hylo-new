@@ -5,8 +5,8 @@ struct A<T> {
   public memberwise init
 }
 
-fun f<T :: * -> *, U>() -> T<U> {}
-fun g<T :: * -> *, U>(_ x: T<U>) -> T<A<U>> {}
+fun f<T :: * -> *, U>() -> T<U> { Builtin.halt() }
+fun g<T :: * -> *, U>(_ x: T<U>) -> T<A<U>> { Builtin.halt() }
 
 fun check<T>(_ x: T) {}
 

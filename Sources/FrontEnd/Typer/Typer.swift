@@ -470,8 +470,8 @@ public struct Typer {
   ) {
     if let b = body {
       // Is the function single-expression bodied?
-      if let e = b.uniqueElement.flatMap(program.castToExpression(_:)) {
-        check(e, requiring: r)
+      if let s = singleReturn(of: b) {
+        check(s, requiring: r)
       } else {
         for s in b { check(s) }
       }
@@ -806,18 +806,17 @@ public struct Typer {
   private mutating func check(
     _ e: ExpressionIdentity, requiring r: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    let u = check(e, inContextExpecting: r)
+    var c = InferenceContext(expectedType: r)
+    let t = program[e.module].type(assignedTo: e) ?? inferredType(of: e, in: &c)
 
-    // Fast path: `e` has the expected type or never returns.
-    if equal(u, r) || equal(u, .never) { return u }
+    // Make sure `e` can be coerced to the required type unless it is trivially equal or type
+    // inference already failed.
+    if !equal(t, r) && !c.obligations.isUnsatisfiable {
+      c.obligations.assume(CoercionConstraint(on: e, from: t, to: r, at: program[e].site))
+    }
 
-    // Bail out if `e` has errors; those must have been reported already.
-    if u[.hasError] { return u }
-
-    // Slow path: can we coerce `e`?
-    let k = CoercionConstraint(on: e, from: u, to: r, reason: .return, at: program[e].site)
-    discharge(Obligations([k]), relatedTo: e)
-    return u
+    discharge(c.obligations, relatedTo: e)
+    return r
   }
 
   /// Type checks `e`, which occurs as a statement.
@@ -862,14 +861,18 @@ public struct Typer {
 
   /// Type checks `s`.
   private mutating func check(_ s: Return.ID) {
-    let u = expectedOutputType(in: program.parent(containing: s)) ?? .error
+    if let u = expectedOutputType(in: program.parent(containing: s)) {
+      check(s, requiring: u)
+    } else if let v = program[s].value {
+      check(v)
+      program[module].setType(.void, for: s)
+    }
+  }
 
+  /// Type checks `s`, expecting that it returns a value of type `u`.
+  private mutating func check(_ s: Return.ID, requiring u: AnyTypeIdentity) {
     if let v = program[s].value {
-      if u != .error {
-        check(v, requiring: u)
-      } else {
-        check(v)
-      }
+      check(v, requiring: u)
     } else if !equal(u, .void) {
       let m = program.format("expected value of type '%T'", [u])
       let s = program.spanForDiagnostic(about: s)
@@ -1624,9 +1627,10 @@ public struct Typer {
       i.append(.init(label: a.label?.value, type: t))
     }
 
-    let o = context.expectedType ?? fresh().erased
-    let k = CallConstraint(
-      callee: f, arguments: i, output: o, origin: e, site: program[e].site)
+    // We cannot use the expected type to constrain the result of the callee. It would make the
+    // solver to commit prematurely in the presence of overloads.
+    let o = fresh().erased
+    let k = CallConstraint(callee: f, arguments: i, output: o, origin: e, site: program[e].site)
 
     context.obligations.assume(k)
     return context.obligations.assume(e, hasType: o, at: program[e].site)
@@ -1726,7 +1730,7 @@ public struct Typer {
     of e: Conversion.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
     let h = context.expectedType.map({ (m) in demand(Metatype(inhabitant: m)).erased })
-    let target = context.withSubcontext(expectedType: h) { (ctx) in
+    let target = context.withSubcontext(expectedType: h, role: .ascription) { (ctx) in
       inferredType(of: program[e].target, in: &ctx)
     }
 
@@ -1981,7 +1985,7 @@ public struct Typer {
     let site = program.spanForDiagnostic(about: e)
 
     // Is the case single-expression bodied?
-    if let b = program[e].body.uniqueElement.flatMap(program.castToExpression(_:)) {
+    if let b = singleExpression(of: program[e].body) {
       let t = inferredType(of: b, in: &context)
       if let u = r {
         context.obligations.assume(CoercionConstraint(on: b, from: t, to: u, at: program[b].site))
@@ -2171,7 +2175,7 @@ public struct Typer {
   private mutating func inferredType(
     of b: Block.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    if let e = program[b].statements.uniqueElement.flatMap(program.castToExpression(_:)) {
+    if let e = singleExpression(of: b) {
       let t = inferredType(of: e, in: &context)
       return context.obligations.assume(b, hasType: t, at: program[b].site)
     } else {
@@ -3983,10 +3987,22 @@ public struct Typer {
     }
   }
 
+  /// If `b`, which is the body of a routine, contains exactly one return statement, return that
+  /// statemenr. Otherwise, returns `nil`.
+  private func singleReturn(of b: [StatementIdentity]) -> Return.ID? {
+    b.uniqueElement.flatMap({ (s) in program.cast(s, to: Return.self) })
+  }
+
+  /// If `b` contains exactly one statement that is an expression, returns that expression.
+  /// Otherwise, returns `nil`.
+  private func singleExpression(of b: [StatementIdentity]) -> ExpressionIdentity? {
+    b.uniqueElement.flatMap(program.castToExpression(_:))
+  }
+
   /// If `b` contains exactly one statement that is an expression, returns that expression.
   /// Otherwise, returns `nil`.
   private func singleExpression(of b: Block.ID) -> ExpressionIdentity? {
-    program[b].statements.uniqueElement.flatMap(program.castToExpression(_:))
+    singleExpression(of: program[b].statements)
   }
 
   /// Returns `b` if it is an if-expression or `singleExpression(of: b)` if it is a block.

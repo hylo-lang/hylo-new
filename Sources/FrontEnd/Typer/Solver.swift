@@ -170,6 +170,7 @@ internal struct Solver {
       return postpone(g)
     }
 
+    // Summon a coercion.
     let es = typer.coerced(k.origin, withType: k.lhs, toMatch: k.rhs)
 
     // Coercion succeeded?
@@ -183,7 +184,19 @@ internal struct Solver {
       return .success
     }
 
-    // Coercion failed but it may succeeded with more context?
+    // Coercion failed but there exists a built-in conversion?
+    else if program.types.dealiased(k.lhs) == .never {
+      let t = program.types.demand(EqualityWitness(lhs: k.lhs, rhs: k.rhs)).erased
+      let w = WitnessExpression(
+        value: .termApplication(
+          .init(builtin: .coercion, type: t),
+          .init(value: .identity(k.origin), type: k.lhs)),
+        type: .never)
+      elaborations.append((k.origin, w))
+      return .success
+    }
+
+    // Coercion failed but it may succeed with more context?
     else if k.rhs[.hasVariable] {
       return postpone(g)
     }

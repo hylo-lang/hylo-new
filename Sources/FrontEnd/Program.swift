@@ -866,7 +866,7 @@ public struct Program: Sendable {
       return self[castUnchecked(n, to: PatternMatchCase.self)].introducer.site
 
     case Return.self:
-      return .empty(at: self[castUnchecked(n, to: Return.self)].introducer.site.start)
+      return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
 
     default:
       return self[n].site
@@ -879,6 +879,17 @@ public struct Program: Sendable {
       return spanForDiagnostic(about: self[n].witness)
     } else {
       return self[n].introducer.site
+    }
+  }
+
+  /// Returns a source span suitable to emit a disgnostic related to `n` as a whole.
+  public func spanForDiagnostic(about n: Return.ID) -> SourceSpan {
+    if let i = self[n].introducer {
+      return .empty(at: i.site.start)
+    } else if let e = self[n].value {
+      return spanForDiagnostic(about: e)
+    } else {
+      return self[n].site
     }
   }
 

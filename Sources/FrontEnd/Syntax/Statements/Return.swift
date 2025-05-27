@@ -4,8 +4,8 @@ import Archivist
 @Archivable
 public struct Return: Statement {
 
-  /// The introducer of this statement.
-  public let introducer: Token
+  /// The introducer of this statement, if any.
+  public let introducer: Token?
 
   /// The return value, if any.
   public let value: ExpressionIdentity?
@@ -14,7 +14,7 @@ public struct Return: Statement {
   public let site: SourceSpan
 
   /// Creates an instance with the given properties.
-  public init(introducer: Token, value: ExpressionIdentity?, site: SourceSpan) {
+  public init(introducer: Token?, value: ExpressionIdentity?, site: SourceSpan) {
     self.introducer = introducer
     self.value = value
     self.site = site
