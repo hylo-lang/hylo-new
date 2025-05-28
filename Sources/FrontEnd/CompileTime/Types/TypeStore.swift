@@ -36,6 +36,13 @@ public struct TypeStore: Sendable {
     return .init(uncheckedFrom: AnyTypeIdentity(variable: nextFreshIdentifier))
   }
 
+  /// Returns the identity of `Hylo.Never`, which is equivalent to `<T> T`.
+  public mutating func never() -> UniversalType.ID {
+    let p = demand(GenericParameter.nth(0, .proper))
+    let t = demand(UniversalType(parameters: [p], body: p.erased))
+    return t
+  }
+
   /// Inserts `t` in `self` it isn't already present and returns the identity of an equal tree.
   public mutating func demand<T: TypeTree>(_ t: T) -> T.ID {
     .init(uncheckedFrom: demand(any: t))
@@ -48,8 +55,6 @@ public struct TypeStore: Sendable {
       return AnyTypeIdentity.error
     case let u as Tuple where u.elements.isEmpty:
       return AnyTypeIdentity.void
-    case let u as Sum where u.elements.isEmpty:
-      return AnyTypeIdentity.never
     case let u as TypeVariable:
       return AnyTypeIdentity(variable: u.identifier)
     default:
@@ -378,7 +383,7 @@ public struct TypeStore: Sendable {
     /// The types of the adapted inputs.
     var inputs: [Parameter] = []
     /// The type of the adapted environment.
-    var environment: AnyTypeIdentity = .never
+    var environment: AnyTypeIdentity = .void
     /// The types of the values that appear in the return type of a non-mutating variant.
     var updates: [Tuple.Element] = []
 
@@ -456,8 +461,6 @@ public struct TypeStore: Sendable {
         yield ErrorType()
       case AnyTypeIdentity.void.offset:
         yield Tuple(elements: [])
-      case AnyTypeIdentity.never.offset:
-        yield Sum(elements: [])
       case let i where n.isVariable:
         yield TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
       case let i:

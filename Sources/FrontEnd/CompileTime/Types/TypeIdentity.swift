@@ -87,11 +87,6 @@ public struct AnyTypeIdentity: Hashable, Sendable {
     .init(rawValue: .init(bits >> 56))
   }
 
-  /// `true` iff `self` is the identity of `Hylo.Void` or `Hylo.Never`.
-  public var isVoidOrNever: Bool {
-    self == .void || self == .never
-  }
-
   /// `true` iff `self` is a type variable.
   public var isVariable: Bool {
     let m = UInt64(0b11) << 54

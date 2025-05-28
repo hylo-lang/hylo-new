@@ -3528,23 +3528,24 @@ public struct Typer {
     switch n.identifier {
     case "Self":
       if let t = typeOfSelf(in: scopeOfUse) {
-        let u = demand(Metatype(inhabitant: t)).erased
-        return [.init(reference: .builtin(.alias), type: u)]
+        let u = demand(Metatype(inhabitant: t))
+        return [.init(reference: .builtin(.alias), type: u.erased)]
       } else {
         return []
       }
 
     case "Never":
-      let t = demand(Metatype(inhabitant: .never)).erased
-      return [.init(reference: .builtin(.alias), type: t)]
+      let t = program.types.never()
+      let u = demand(Metatype(inhabitant: t.erased))
+      return [.init(reference: .builtin(.alias), type: u.erased)]
 
     case "Void":
-      let t = demand(Metatype(inhabitant: .void)).erased
-      return [.init(reference: .builtin(.alias), type: t)]
+      let t = demand(Metatype(inhabitant: .void))
+      return [.init(reference: .builtin(.alias), type: t.erased)]
 
     case "Builtin":
-      let t = demand(Namespace(identifier: .builtin)).erased
-      return [.init(reference: .builtin(.alias), type: t)]
+      let t = demand(Namespace(identifier: .builtin))
+      return [.init(reference: .builtin(.alias), type: t.erased)]
 
     default:
       return []

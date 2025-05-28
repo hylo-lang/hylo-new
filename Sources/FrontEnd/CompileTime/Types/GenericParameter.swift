@@ -11,7 +11,7 @@ public enum GenericParameter: TypeTree {
   /// A generic parameter declared in sources.
   case user(GenericParameterDeclaration.ID, Kind)
 
-  /// The `n`-th parameter of a higher-kinded type constructor.
+  /// The `n`-th parameter of a built-in type.
   case nth(Int, Kind)
 
   /// The kind of this parameter.

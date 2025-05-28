@@ -396,7 +396,8 @@ extension BuiltinFunction {
 
     switch self {
     case .halt:
-      return s.demand(Arrow(inputs: [], output: .never))
+      let t0 = s.never().erased
+      return s.demand(Arrow(inputs: [], output: t0))
 
     case .addressOf:
       let t0 = s.fresh().erased
