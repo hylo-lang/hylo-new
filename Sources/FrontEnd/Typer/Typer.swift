@@ -1542,7 +1542,7 @@ public struct Typer {
     /// obligations of `self`.
     mutating func withSubcontext<T>(
       expectedType: AnyTypeIdentity? = nil, role: SyntaxRole = .unspecified,
-      do action: (inout Self) -> T
+      _ action: (inout Self) -> T
     ) -> T {
       var s = InferenceContext(expectedType: expectedType, role: role)
       swap(&self.obligations, &s.obligations)
@@ -2276,7 +2276,7 @@ public struct Typer {
     // Slow path: infer a type from the ascription and (if necessary) the initializer.
     let (p, isPartial) = evaluatePartialTypeAscription(a, in: &context)
     if isPartial, let i = program[d].initializer {
-      let v = context.withSubcontext(expectedType: p, do: { (s) in inferredType(of: i, in: &s) })
+      let v = context.withSubcontext(expectedType: p, { (s) in inferredType(of: i, in: &s) })
       if v != .error {
         context.obligations.assume(CoercionConstraint(on: i, from: v, to: p, at: program[i].site))
       }
