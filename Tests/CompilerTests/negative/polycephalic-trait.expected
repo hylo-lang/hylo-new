@@ -1,4 +1,4 @@
-negative/polycephalic-trait.hylo:23.3-10: error: no coercion from 'P<A, A> ==> [Void](A) let -> Void' to '[Void](A) let -> Void'
+negative/polycephalic-trait.hylo:23.3-10: error: no coercion from 'P<A, A> ==> [Void](let A) let -> Void' to '[Void](let A) let -> Void'
   g<A, A>(A())
   ~~~~~~~
 negative/polycephalic-trait.hylo:23.3-10: note: no given instance of 'P<A, A>' in this scope

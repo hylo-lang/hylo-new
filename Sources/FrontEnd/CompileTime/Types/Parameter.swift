@@ -44,8 +44,11 @@ extension Parameter: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    let t = printer.show(type)
-    return if let l = label { "\(l): \(access) \(t)" } else { t }
+    if let l = label {
+      return "\(l): \(access) \(printer.show(type))"
+    } else {
+      return "\(access) \(printer.show(type))"
+    }
   }
 
 }
