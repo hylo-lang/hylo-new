@@ -12,6 +12,9 @@ internal struct Obligations {
   /// A table from name component to its declaration.
   internal private(set) var bindings: BindingTable
 
+  /// A set of callbacks to be applied once this set of obligations has been discharged.
+  internal private(set) var callbacks: [(inout Typer) -> Void]
+
   /// `true` iff a this set cannot be discharged because.
   internal private(set) var isUnsatisfiable: Bool
 
@@ -20,6 +23,7 @@ internal struct Obligations {
     self.constraints = []
     self.syntaxToType = [:]
     self.bindings = [:]
+    self.callbacks = []
     self.isUnsatisfiable = false
   }
 
@@ -59,14 +63,9 @@ internal struct Obligations {
     return t
   }
 
-  internal typealias PostCheck = (
-    _ s: Solution,
-    _ p: inout Program,
-    _ d: inout DiagnosticSet
-  ) -> Void
-
-  internal mutating func finally(_ callback: @escaping PostCheck) {
-
+  /// Registers `callback` to be applied after this set of obligations has been discharged.
+  internal mutating func finally(_ callback: @escaping (inout Typer) -> Void) {
+    callbacks.append(callback)
   }
 
 }

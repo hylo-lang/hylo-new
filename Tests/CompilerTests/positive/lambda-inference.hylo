@@ -1,0 +1,25 @@
+//! no-std
+
+fun check<T>(_ x: T) {}
+
+public fun main() {
+  // Lambda with a complete signature.
+  let f0 = fun(_ a: Void) { a }
+  check<[](let Void) -> Void>(f0)
+
+  // The type of the parameter gets inferred from the body of the lambda.
+  let f1 = fun(_ a) { check<Void>(a) }
+  check<[](let Void) -> Void>(f1)
+
+  // The type of the parameter gets inferred from an expected type.
+  let f2 = (fun(_ a) { a }) as [](sink Void) -> Void
+  check<[](sink Void) -> Void>(f2)
+  let f3: [](sink Void) -> Void = fun(_ a) { a }
+  check<[](sink Void) -> Void>(f3)
+
+  // The missing information from the ascription gets inferred.
+  let f4 = fun(_ a: sink _) { check<Void>(a) }
+  check<[](sink Void) -> Void>(f4)
+  let x0 = (fun(_ a: sink _) { a })(())
+  check<Void>(x0)
+}

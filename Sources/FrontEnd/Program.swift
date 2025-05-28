@@ -674,8 +674,8 @@ public struct Program: Sendable {
     Name(identifier: self[d].identifier.value)
   }
 
-  /// Returns the name of `d`.
-  public func name(of d: FunctionDeclaration.ID) -> Name {
+  /// Returns the name of `d` or `nil` if `d` declares a lambda.
+  public func name(of d: FunctionDeclaration.ID) -> Name? {
     switch self[d].identifier.value {
     case _ where self[d].introducer.value == .memberwiseinit:
       let s = parent(containing: d, as: StructDeclaration.self)!
@@ -693,6 +693,9 @@ public struct Program: Sendable {
 
     case .operator(let n, let x):
       return Name(identifier: x, notation: n)
+
+    case .lambda:
+      return nil
     }
   }
 
@@ -1081,7 +1084,7 @@ public indirect enum SyntaxFilter {
 
 }
 
-/// An syntax visitor that enumerates the immediate children of a node.
+/// A syntax visitor that enumerates the immediate children of a node.
 fileprivate struct ChildrenEnumerator: SyntaxVisitor {
 
   /// The children collected by the calls to `willEnter(_:in:)`.

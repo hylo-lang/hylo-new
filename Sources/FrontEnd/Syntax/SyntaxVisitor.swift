@@ -102,6 +102,8 @@ extension Program {
       break
     case KindExpression.self:
       traverse(castUnchecked(n, to: KindExpression.self), calling: &v)
+    case Lambda.self:
+      traverse(castUnchecked(n, to: Lambda.self), calling: &v)
     case NameExpression.self:
       traverse(castUnchecked(n, to: NameExpression.self), calling: &v)
     case New.self:
@@ -298,6 +300,11 @@ extension Program {
       visit(a, calling: &v)
       visit(b, calling: &v)
     }
+  }
+
+  /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
+  public func traverse<T: SyntaxVisitor>(_ n: Lambda.ID, calling v: inout T) {
+    visit(self[n].function, calling: &v)
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.

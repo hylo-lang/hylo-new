@@ -10,6 +10,9 @@ public enum FunctionIdentifier: Equatable, Sendable {
   /// An operator with its notation.
   case `operator`(OperatorNotation, String)
 
+  /// A lambda.
+  case lambda
+
 }
 
 extension FunctionIdentifier: CustomStringConvertible {
@@ -20,6 +23,8 @@ extension FunctionIdentifier: CustomStringConvertible {
       return s
     case .operator(let n, let s):
       return "\(n)\(s)"
+    case .lambda:
+      return ""
     }
   }
 

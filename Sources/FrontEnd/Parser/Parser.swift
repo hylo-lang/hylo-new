@@ -1269,6 +1269,8 @@ public struct Parser {
       return try .init(parseIf(in: &file))
     case .match:
       return try .init(parsePatternMatch(in: &file))
+    case .fun:
+      return try .init(parseLambda(in: &file))
     case .name:
       return try .init(parseUnqualifiedNameExpression(in: &file))
     case .auto, .inout, .let, .set, .sink:
@@ -1327,19 +1329,38 @@ public struct Parser {
     let label: Parsed<String>?
     let ascription: ExpressionIdentity
 
-    // If the next token is a name or a keyword, attempt to parse a label, reinterpreting it as an
-    // expression if it isn't followed by `:`. Otherwise, parse an expression.
-    if let n = take(if: { (t) in (t.tag == .name) || t.isKeyword }) {
+    // If the next token is an access effect, it is either a label and then following token is a
+    // colon, or it is the effect of a remote type expression.
+    if let k = parseOptionalAccessEffect() {
       if take(.colon) != nil {
-        label = Parsed(n)
+        label = Parsed(String(k.site.text), at: k.site)
         ascription = try parseExpression(in: &file)
       } else {
-        if n.isKeyword { report(.init("'\(n.text)' is not a valid identifier", at: n.site)) }
+        let e = try parseExpression(in: &file)
+        let a = file.insert(
+          RemoteTypeExpression(access: k, projectee: e, site: span(from: k.site.start)))
         label = nil
-        ascription = .init(
-          file.insert(NameExpression(Parsed(Name(identifier: String(n.text)), at: n.site))))
+        ascription = .init(a)
       }
-    } else {
+    }
+
+    // If the next token is a name or keyword, it is either a label and then following token is a
+    // colon, or it is part of an expression.
+    else if let n = take(if: \.isArgumentLabel) {
+      if take(.colon) != nil {
+        label = n.tag == .underscore ? nil : Parsed(n)
+        ascription = try parseExpression(in: &file)
+      } else if n.tag == .name {
+        let identifier = Name(identifier: String(n.text))
+        label = nil
+        ascription = .init(file.insert(NameExpression(Parsed(identifier, at: n.site))))
+      } else {
+        throw ParseError("'\(n.text)' is not a valid identifier", at: n.site)
+      }
+    }
+
+    // Otherwise, just parse a type expression.
+    else {
       label = nil
       ascription = try parseExpression(in: &file)
     }
@@ -1456,6 +1477,32 @@ public struct Parser {
 
     return file.insert(
       PatternMatchCase(introducer: i, pattern: p, body: b, site: span(from: i)))
+  }
+
+  /// Parses a lambda.
+  ///
+  ///     lambda ::=
+  ///       'fun' lambda-captures parameter-list ('->' expression)? callable-body
+  ///
+  private mutating func parseLambda(in file: inout Module.SourceContainer) throws -> Lambda.ID {
+    let introducer = try take(.fun) ?? expected("'fun'")
+    let parameters = try parseParenthesizedParameterList(in: &file)
+    let effect = parseOptionalAccessEffect() ?? .init(.let, at: .empty(at: position))
+    let output = try parseOptionalReturnTypeAscription(in: &file)
+    let body = try parseCallableBody(in: &file)
+
+    let f = file.insert(
+      FunctionDeclaration(
+        annotations: [],
+        modifiers: [],
+        introducer: .init(.fun, at: introducer.site),
+        identifier: .init(.lambda, at: introducer.site),
+        staticParameters: .empty(at: .empty(at: introducer.site.end)),
+        parameters: parameters,
+        effect: effect,
+        output: output, body: body,
+        site: span(from: introducer)))
+    return file.insert(Lambda(function: f, site: span(from: introducer)))
   }
 
   /// Parses a remote type expression.
