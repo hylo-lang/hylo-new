@@ -802,6 +802,7 @@ public struct TypeStore: Sendable {
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
     (lhs.label == rhs.label)
+      && (lhs.access == rhs.access)
       && unifiable(lhs.type, rhs.type, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
