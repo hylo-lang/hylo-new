@@ -1149,17 +1149,17 @@ public struct Parser {
   ) throws -> ExpressionIdentity {
     var h = head
     while true {
-      // The period separating nominal components binds more tightly than mutation markers.
+      // Qualifications and bracketed calls bind more tightly than mutation markers.
       if let n = try appendNominalComponent(to: h, in: &file) {
+        h = n
+      } else if let n = try appendBracketedArguments(to: h, in: &file) {
         h = n
       } else if let m = marker.take() {
         h = .init(file.insert(InoutExpression(marker: m, lvalue: h, site: span(from: m))))
       } else if let n = try appendParenthesizedArguments(to: h, in: &file) {
         h = n
-      } else if let n = try appendBracketedArguments(to: h, in: &file) {
-        h = n; continue
       } else if let n = try appendAngledArguments(to: h, in: &file) {
-        h = n; continue
+        h = n
       } else {
         break
       }
