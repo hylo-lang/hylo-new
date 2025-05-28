@@ -306,7 +306,7 @@ public struct Parser {
   ) throws -> EnumDeclaration.ID {
     let introducer = try take(.enum) ?? expected("'enum'")
     let identifier = parseSimpleIdentifier()
-    let parameters = try parseOptionalCompileTimeParameters(in: &file)
+    let parameters = try parseOptionalContextClause(in: &file)
     let representation = try next(is: .leftParenthesis) ? parseExpression(in: &file) : nil
     let conformances = try parseOptionalAdjunctConformanceList(until: .leftBrace, in: &file)
     let members = try parseTypeBody(in: &file, accepting: \.isValidEnumMember)
@@ -334,7 +334,7 @@ public struct Parser {
     after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
   ) throws -> ExtensionDeclaration.ID {
     let introducer = try take(.extension) ?? expected("'extension'")
-    var parameters = try parseOptionalCompileTimeParameters(in: &file)
+    var parameters = try parseOptionalContextClause(in: &file)
     let extendee = try parseExpression(in: &file)
 
     // Are we parsing a trait extension?
@@ -398,7 +398,7 @@ public struct Parser {
 
     // Expect a conformance declaration.
     else {
-      let parameters = try parseOptionalCompileTimeParameters(in: &file)
+      let parameters = try parseOptionalContextClause(in: &file)
       let conformer = try parseExpression(in: &file)
       _ = try take(contextual: "is") ?? expected("'is'")
       let concept = try parseExpression(in: &file)
@@ -565,23 +565,22 @@ public struct Parser {
   /// Parses the parameter clauses of a callable declaration.
   ///
   ///     parameter-clauses ::=
-  ///       compile-time-parameters? run-time-parameters
+  ///       context-clause? parameter-list
   ///
   private mutating func parseParameterClauses(
     in file: inout Module.SourceContainer
   ) throws -> (StaticParameters, [ParameterDeclaration.ID]) {
-    let s = try parseOptionalCompileTimeParameters(in: &file)
+    let s = try parseOptionalContextClause(in: &file)
     let r = try parseParenthesizedParameterList(in: &file)
     return (s, r)
   }
 
-  /// Parses a compile-time parameter list iff the next token is a left angle bracket. Otherwise,
-  /// returns an empty list.
+  /// Parses a context clause iff the next token is a left angle bracket.
   ///
-  ///     compile-time-parameters ::=
+  ///     context-clause ::=
   ///       '<' generic-parameters where-clause? '>'
   ///
-  private mutating func parseOptionalCompileTimeParameters(
+  private mutating func parseOptionalContextClause(
     in file: inout Module.SourceContainer
   ) throws -> StaticParameters {
     if !next(is: .leftAngle) { return .empty(at: .empty(at: position)) }
@@ -871,7 +870,7 @@ public struct Parser {
   ) throws -> StructDeclaration.ID {
     let introducer = try take(.struct) ?? expected("'struct'")
     let identifier = parseSimpleIdentifier()
-    let parameters = try parseOptionalCompileTimeParameters(in: &file)
+    let parameters = try parseOptionalContextClause(in: &file)
     let conformances = try parseOptionalAdjunctConformanceList(until: .leftBrace, in: &file)
     let members = try parseTypeBody(in: &file, accepting: \.isValidStructMember)
 
@@ -897,7 +896,7 @@ public struct Parser {
   ) throws -> TraitDeclaration.ID {
     let introducer = try take(.trait) ?? expected("'trait'")
     let identifier = parseSimpleIdentifier()
-    let parameters = try parseOptionalCompileTimeParameters(in: &file)
+    let parameters = try parseOptionalContextClause(in: &file)
 
     // Base traits are desugared as given requirements before other members.
     var members = try parseOptionalRefinementList(of: identifier.value,  in: &file)
