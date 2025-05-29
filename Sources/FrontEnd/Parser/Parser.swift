@@ -569,7 +569,7 @@ public struct Parser {
   ///
   private mutating func parseParameterClauses(
     in file: inout Module.SourceContainer
-  ) throws -> (StaticParameters, [ParameterDeclaration.ID]) {
+  ) throws -> (ContextParameters, [ParameterDeclaration.ID]) {
     let s = try parseOptionalContextClause(in: &file)
     let r = try parseParenthesizedParameterList(in: &file)
     return (s, r)
@@ -582,7 +582,7 @@ public struct Parser {
   ///
   private mutating func parseOptionalContextClause(
     in file: inout Module.SourceContainer
-  ) throws -> StaticParameters {
+  ) throws -> ContextParameters {
     if !next(is: .leftAngle) { return .empty(at: .empty(at: position)) }
     let start = nextTokenStart()
 
@@ -600,7 +600,7 @@ public struct Parser {
 
       // Parse other usings.
       try usings.append(contentsOf: me.parseOptionalWhereClause(in: &file))
-      return StaticParameters(explicit: types, implicit: usings, site: me.span(from: start))
+      return ContextParameters(explicit: types, implicit: usings, site: me.span(from: start))
     }
   }
 
@@ -744,7 +744,7 @@ public struct Parser {
     return .init(d)
   }
 
-  /// Parses a comma-separated listof parameter declarations.
+  /// Parses a comma-separated list of parameter declarations.
   private mutating func parseParenthesizedParameterList(
     in file: inout Module.SourceContainer
   ) throws -> [ParameterDeclaration.ID] {

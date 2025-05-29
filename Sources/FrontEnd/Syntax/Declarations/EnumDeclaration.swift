@@ -17,7 +17,7 @@ public struct EnumDeclaration: TypeDeclaration, ModifiableDeclaration, Annotatab
   public let identifier: Parsed<String>
 
   /// The compile-time parameters of the struct.
-  public let staticParameters: StaticParameters
+  public let staticParameters: ContextParameters
 
   /// The raw representation of the enumeration, if any.
   public let representation: ExpressionIdentity?
@@ -37,7 +37,7 @@ public struct EnumDeclaration: TypeDeclaration, ModifiableDeclaration, Annotatab
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Token,
     identifier: Parsed<String>,
-    staticParameters: StaticParameters,
+    staticParameters: ContextParameters,
     representation: ExpressionIdentity?,
     conformances: [ConformanceDeclaration.ID],
     members: [DeclarationIdentity],

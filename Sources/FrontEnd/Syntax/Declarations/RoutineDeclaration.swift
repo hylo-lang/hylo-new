@@ -2,7 +2,7 @@
 public protocol RoutineDeclaration: ModifiableDeclaration {
 
   /// The compile-time parameters of the entity.
-  var staticParameters: StaticParameters { get }
+  var staticParameters: ContextParameters { get }
 
   /// The run-time parameters of the entity.
   var parameters: [ParameterDeclaration.ID] { get }

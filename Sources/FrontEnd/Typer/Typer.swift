@@ -566,7 +566,7 @@ public struct Typer {
   }
 
   /// Type checks `ps`.
-  private mutating func check(_ ps: StaticParameters) {
+  private mutating func check(_ ps: ContextParameters) {
     for p in ps.explicit { check(p) }
     for p in ps.implicit { check(p) }
   }
@@ -1390,7 +1390,7 @@ public struct Typer {
   }
 
   /// Computes the types of the given context parameters, introducing them in order.
-  private mutating func initializeContext(_ parameters: StaticParameters) {
+  private mutating func initializeContext(_ parameters: ContextParameters) {
     declarationsOnStack.formUnion(parameters.implicit)
     for p in parameters.implicit {
       _ = declaredType(of: p)
@@ -1401,7 +1401,7 @@ public struct Typer {
 
   /// Returns `t` as the head of a universal type and/or implication introducing `parameters`.
   private mutating func introduce(
-    _ parameters: StaticParameters, into t: AnyTypeIdentity
+    _ parameters: ContextParameters, into t: AnyTypeIdentity
   ) -> AnyTypeIdentity {
     if parameters.isEmpty { return t }
 

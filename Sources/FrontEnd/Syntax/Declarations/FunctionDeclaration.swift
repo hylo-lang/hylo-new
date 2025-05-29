@@ -33,7 +33,7 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
   public let identifier: Parsed<FunctionIdentifier>
 
   /// The compile-time parameters of the function.
-  public let staticParameters: StaticParameters
+  public let staticParameters: ContextParameters
 
   /// The run-time parameters of the function.
   public let parameters: [ParameterDeclaration.ID]
@@ -56,7 +56,7 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Parsed<Introducer>,
     identifier: Parsed<FunctionIdentifier>,
-    staticParameters: StaticParameters,
+    staticParameters: ContextParameters,
     parameters: [ParameterDeclaration.ID],
     effect: Parsed<AccessEffect>,
     output: ExpressionIdentity?,

@@ -17,7 +17,7 @@ public struct StructDeclaration: TypeDeclaration, ModifiableDeclaration, Annotat
   public let identifier: Parsed<String>
 
   /// The compile-time parameters of the struct.
-  public let staticParameters: StaticParameters
+  public let staticParameters: ContextParameters
 
   /// The conformances declared along with the struct.
   public let conformances: [ConformanceDeclaration.ID]
@@ -34,7 +34,7 @@ public struct StructDeclaration: TypeDeclaration, ModifiableDeclaration, Annotat
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Token,
     identifier: Parsed<String>,
-    staticParameters: StaticParameters,
+    staticParameters: ContextParameters,
     conformances: [ConformanceDeclaration.ID],
     members: [DeclarationIdentity],
     site: SourceSpan

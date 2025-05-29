@@ -18,7 +18,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
   public let identifier: Parsed<String>
 
   /// The compile-time parameters of the bundle.
-  public let staticParameters: StaticParameters
+  public let staticParameters: ContextParameters
 
   /// The run-time parameters of the bundle.
   public let parameters: [ParameterDeclaration.ID]
@@ -41,7 +41,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Parsed<Token>,
     identifier: Parsed<String>,
-    staticParameters: StaticParameters,
+    staticParameters: ContextParameters,
     parameters: [ParameterDeclaration.ID],
     effect: Parsed<AccessEffect>,
     output: ExpressionIdentity?,

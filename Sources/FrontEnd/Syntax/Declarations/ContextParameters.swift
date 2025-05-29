@@ -2,7 +2,7 @@ import Archivist
 
 /// A clause describing contextual parameters and contextual constraints taken at compile-time.
 @Archivable
-public struct StaticParameters: Equatable, Sendable {
+public struct ContextParameters: Equatable, Sendable {
 
   /// The explicit parameters of the list.
   public let explicit: [GenericParameterDeclaration.ID]
@@ -30,13 +30,13 @@ public struct StaticParameters: Equatable, Sendable {
   }
 
   /// Returns an empty clause anchored at `site`.
-  public static func empty(at site: SourceSpan) -> StaticParameters {
+  public static func empty(at site: SourceSpan) -> ContextParameters {
     .init(explicit: [], implicit: [], site: site)
   }
 
 }
 
-extension StaticParameters: Showable {
+extension ContextParameters: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {

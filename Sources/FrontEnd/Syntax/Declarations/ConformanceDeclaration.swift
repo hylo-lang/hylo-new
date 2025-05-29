@@ -15,7 +15,7 @@ public struct ConformanceDeclaration: TypeExtendingDeclaration {
   public let introducer: Token
 
   /// The compile-time parameters of the conformance.
-  public let staticParameters: StaticParameters
+  public let staticParameters: ContextParameters
 
   /// The expression of the witness defined by the declaration.
   public let witness: StaticCall.ID
@@ -30,7 +30,7 @@ public struct ConformanceDeclaration: TypeExtendingDeclaration {
   public init(
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Token,
-    staticParameters: StaticParameters,
+    staticParameters: ContextParameters,
     witness: StaticCall.ID,
     members: [DeclarationIdentity]?,
     site: SourceSpan

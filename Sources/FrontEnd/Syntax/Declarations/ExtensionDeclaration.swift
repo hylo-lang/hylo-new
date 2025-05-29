@@ -8,7 +8,7 @@ public struct ExtensionDeclaration: TypeExtendingDeclaration {
   public let introducer: Token
 
   /// The compile-time parameters of the extension.
-  public let staticParameters: StaticParameters
+  public let staticParameters: ContextParameters
 
   /// The type being extended.
   public let extendee: ExpressionIdentity
@@ -22,7 +22,7 @@ public struct ExtensionDeclaration: TypeExtendingDeclaration {
   /// Creates an instance with the given properties.
   public init(
     introducer: Token,
-    staticParameters: StaticParameters,
+    staticParameters: ContextParameters,
     extendee: ExpressionIdentity,
     members: [DeclarationIdentity],
     site: SourceSpan

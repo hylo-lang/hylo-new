@@ -166,7 +166,7 @@ extension Program {
   }
 
   /// Visits `ps` and their children in pre-order, calling back `v` when a node is entered or left.
-  public func visit<T: SyntaxVisitor>(_ ps: StaticParameters, calling v: inout T) {
+  public func visit<T: SyntaxVisitor>(_ ps: ContextParameters, calling v: inout T) {
     visit(ps.explicit, calling: &v)
     visit(ps.implicit, calling: &v)
   }
