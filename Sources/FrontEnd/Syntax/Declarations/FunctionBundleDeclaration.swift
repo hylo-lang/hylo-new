@@ -20,6 +20,9 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
   /// The compile-time parameters of the bundle.
   public let staticParameters: ContextParameters
 
+  /// The capture-list of the function.
+  public let captures: CaptureList
+
   /// The run-time parameters of the bundle.
   public let parameters: [ParameterDeclaration.ID]
 
@@ -42,6 +45,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
     introducer: Parsed<Token>,
     identifier: Parsed<String>,
     staticParameters: ContextParameters,
+    captures: CaptureList,
     parameters: [ParameterDeclaration.ID],
     effect: Parsed<AccessEffect>,
     output: ExpressionIdentity?,
@@ -53,6 +57,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
     self.introducer = introducer
     self.identifier = identifier
     self.staticParameters = staticParameters
+    self.captures = captures
     self.parameters = parameters
     self.effect = effect
     self.output = output
@@ -75,6 +80,7 @@ extension FunctionBundleDeclaration: Showable {
       result.append(printer.show(staticParameters))
     }
 
+    result.append(printer.show(captures))
     result.append("(")
     result.append(printer.show(parameters))
     result.append(") \(effect.value) -> ")

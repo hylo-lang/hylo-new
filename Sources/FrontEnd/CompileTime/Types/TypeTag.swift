@@ -40,6 +40,7 @@ public struct TypeTag: Sendable {
     Metakind.self,
     Metatype.self,
     Namespace.self,
+    OpaqueType.self,
     RemoteType.self,
     Struct.self,
     Sum.self,

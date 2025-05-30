@@ -245,9 +245,9 @@ public struct Lexer: IteratorProtocol, Sequence {
     case ")": tag = .rightParenthesis
     case "@": tag = .at
     case ",": tag = .comma
-    case ".": tag = .dot
     case ";": tag = .semicolon
     case ":": tag = take(":") == nil ? .colon : .doubleColon
+    case ".": tag = take("..") == nil ? .dot : .ellipsis
     default: tag = .error
     }
     return .init(tag: tag, site: span(start ..< position))

@@ -116,6 +116,11 @@ extension Program {
     .init(.error, "expression does not denote a type", at: spanForDiagnostic(about: e))
   }
 
+  /// Returns an error diagnosing an illegal non-empty capture list.
+  internal func illegalCaptureList(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "declaration cannot have a non-empty capture list", at: site)
+  }
+
   /// Returns an error diagnosing incompatible labels in a function or subscript application.
   internal func incompatibleLabels<S1: Sequence<String?>, S2: Sequence<String?>>(
     found: S1, expected: S2, at site: SourceSpan, as level: Diagnostic.Level = .error

@@ -145,7 +145,7 @@ public struct Program: Sendable {
 
   /// Returns the nodes that are immediate children of `n`.
   public func children<T: SyntaxIdentity>(_ n: T) -> [AnySyntaxIdentity] {
-    var enumerator = ChildrenEnumerator()
+    var enumerator = ChildrenEnumerator(parent: n.erased)
     visit(n, calling: &enumerator)
     return enumerator.children
   }
@@ -195,6 +195,20 @@ public struct Program: Sendable {
   /// `true` iff `f` has gone through scoping.
   public func isScoped(_ f: SourceFileIdentity) -> Bool {
     self[f].syntaxToParent.count == self[f].syntax.count
+  }
+
+  /// Returns `true` iff `s` contains the innermost scope that strictly contains `n`.
+  public func isContained<T: SyntaxIdentity>(_ n: T, in s: ScopeIdentity) -> Bool {
+    // If `s` is a file, just look if `n` is in that file too.
+    guard let q = s.node else { return n.file == s.file }
+
+    // Otherwise, walk the scope hierarchy.
+    var next = parent(containing: n)
+    while let p = next.node {
+      if p == q { return true }
+      next = parent(containing: p)
+    }
+    return false
   }
 
   /// Returns `true` iff `n` denotes a declaration.
@@ -308,6 +322,34 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `true` iff `n` is defined in the context of a function.
+  public func isLocal<T: SyntaxIdentity>(_ n: T) -> Bool {
+    var s = parent(containing: n)
+    while let p = s.node {
+      switch tag(of: p) {
+      case FunctionDeclaration.self, VariantDeclaration.self:
+        return true
+      case _ where isTypeDeclaration(n) || isTypeExtendingDeclaration(n):
+        return false
+      default:
+         s = parent(containing: p)
+      }
+    }
+
+    // Top-level functions aren't local.
+    return false
+  }
+
+  /// Returns `true` iff `n` defines a symbol that is captured if referred to.
+  public func isCapturable<T: SyntaxIdentity>(_ n: T) -> Bool {
+    switch tag(of: n) {
+    case ExtensionDeclaration.self:
+      return false
+    default:
+      return !isTypeDeclaration(n) && isLocal(n)
+    }
+  }
+
   /// Returns `true` iff `n` is a an interface for a function written in another language.
   public func isForeign(_ n: FunctionDeclaration.ID) -> Bool {
     self[n].annotations.contains(where: { (a) in a.identifier.value == "foreign" })
@@ -324,7 +366,7 @@ public struct Program: Sendable {
   }
 
   /// Returns `true` iff `n` is the expression of a value marked for mutation.
-  public func isMarkedMutating(_ n: ExpressionIdentity) -> Bool {
+  public func isMarkedForMutation(_ n: ExpressionIdentity) -> Bool {
     var q = n
     while true {
       if tag(of: q) == InoutExpression.self {
@@ -341,8 +383,8 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `n` is modifying its callee and/or one of its arguments in place.
   public func isMutating(_ n: Call.ID) -> Bool {
-    isMarkedMutating(self[n].callee)
-      || self[n].arguments.contains(where: { (a) in isMarkedMutating(a.value) })
+    isMarkedForMutation(self[n].callee)
+      || self[n].arguments.contains(where: { (a) in isMarkedForMutation(a.value) })
   }
 
   /// Returns `true` iff `n` is a name expression of the form  `.new` or `q.new`, where `q` is any
@@ -1087,12 +1129,15 @@ public indirect enum SyntaxFilter {
 /// A syntax visitor that enumerates the immediate children of a node.
 fileprivate struct ChildrenEnumerator: SyntaxVisitor {
 
+  /// The node whose children are being enumerated.
+  fileprivate var parent: AnySyntaxIdentity
+
   /// The children collected by the calls to `willEnter(_:in:)`.
   fileprivate var children: [AnySyntaxIdentity] = []
 
   fileprivate mutating func willEnter(_ n: AnySyntaxIdentity, in program: Program) -> Bool {
-    children.append(n)
-    return false
+    if n != parent { children.append(n) }
+    return n == parent
   }
 
 }

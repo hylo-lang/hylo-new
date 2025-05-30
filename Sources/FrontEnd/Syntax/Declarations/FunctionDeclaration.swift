@@ -5,7 +5,7 @@ import Utilities
 @Archivable
 public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
 
-  /// The introducer of an initializer declaration.
+  /// The introducer of a function declaration.
   @Archivable
   public enum Introducer: UInt8, Sendable {
 
@@ -35,6 +35,9 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
   /// The compile-time parameters of the function.
   public let staticParameters: ContextParameters
 
+  /// The capture-list of the function.
+  public let captures: CaptureList
+
   /// The run-time parameters of the function.
   public let parameters: [ParameterDeclaration.ID]
 
@@ -57,6 +60,7 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
     introducer: Parsed<Introducer>,
     identifier: Parsed<FunctionIdentifier>,
     staticParameters: ContextParameters,
+    captures: CaptureList,
     parameters: [ParameterDeclaration.ID],
     effect: Parsed<AccessEffect>,
     output: ExpressionIdentity?,
@@ -68,6 +72,7 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
     self.introducer = introducer
     self.identifier = identifier
     self.staticParameters = staticParameters
+    self.captures = captures
     self.parameters = parameters
     self.effect = effect
     self.output = output
@@ -100,6 +105,7 @@ extension FunctionDeclaration: Showable {
       result.append(printer.show(staticParameters))
     }
 
+    result.append(printer.show(captures))
     result.append("(")
     result.append(printer.show(parameters))
     result.append(")")

@@ -171,6 +171,11 @@ extension Program {
     visit(ps.implicit, calling: &v)
   }
 
+  /// Visits `cs` and their children in pre-order, calling back `v` when a node is entered or left.
+  public func visit<T: SyntaxVisitor>(_ cs: CaptureList, calling v: inout T) {
+    visit(cs.explicit, calling: &v)
+  }
+
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: AssociatedTypeDeclaration.ID, calling v: inout T) {}
 
@@ -211,6 +216,7 @@ extension Program {
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: FunctionBundleDeclaration.ID, calling v: inout T) {
     visit(self[n].staticParameters, calling: &v)
+    visit(self[n].captures, calling: &v)
     visit(self[n].parameters, calling: &v)
     visit(self[n].output, calling: &v)
     visit(self[n].variants, calling: &v)
@@ -219,6 +225,7 @@ extension Program {
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: FunctionDeclaration.ID, calling v: inout T) {
     visit(self[n].staticParameters, calling: &v)
+    visit(self[n].captures, calling: &v)
     visit(self[n].parameters, calling: &v)
     visit(self[n].output, calling: &v)
     if let b = self[n].body { visit(b, calling: &v) }

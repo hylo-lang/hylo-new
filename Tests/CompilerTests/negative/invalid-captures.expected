@@ -1,0 +1,18 @@
+negative/invalid-captures.hylo:10.12-15: error: declaration cannot have a non-empty capture list
+fun global[...]() {}
+           ~~~
+negative/invalid-captures.hylo:30.6-7: error: illegal mutating capture
+    &a.x = ()
+     ^
+negative/invalid-captures.hylo:38.5-6: error: illegal implicit capture
+    g()
+    ^
+negative/invalid-captures.hylo:39.6-7: error: illegal implicit capture
+    &a.x = ()
+     ^
+negative/invalid-captures.hylo:48.5-6: error: illegal implicit capture
+    g()
+    ^
+negative/invalid-captures.hylo:49.6-7: error: illegal implicit capture
+    &a.x = ()
+     ^

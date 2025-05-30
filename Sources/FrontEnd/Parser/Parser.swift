@@ -439,7 +439,8 @@ public struct Parser {
   ) throws -> DeclarationIdentity {
     let introducer = try take(.fun) ?? expected("'fun'")
     let identifier = try parseFunctionIdentifier()
-    let parameters = try parseParameterClauses(in: &file)
+    let captures = try parseOptionalCaptureList(in: &file) ?? .empty(at: position)
+    let (contextParameters, parameters) = try parseParameterClauses(in: &file)
     let effect = parseOptionalAccessEffect() ?? .init(.let, at: .empty(at: position))
 
     // Insert the self-parameter of non-static member declarations.
@@ -447,10 +448,10 @@ public struct Parser {
     var p: [ParameterDeclaration.ID] = []
     if (context == .typeBody) && !prologue.contains(.static) {
       isMember = true
-      p = [synthesizeSelfParameter(effect: effect, in: &file)] + parameters.1
+      p = [synthesizeSelfParameter(effect: effect, in: &file)] + parameters
     } else {
       isMember = false
-      p = parameters.1
+      p = parameters
     }
 
     let output = try parseOptionalReturnTypeAscription(in: &file)
@@ -465,7 +466,8 @@ public struct Parser {
           modifiers: prologue.modifiers,
           introducer: .init(introducer, at: introducer.site),
           identifier: i,
-          staticParameters: parameters.0,
+          staticParameters: contextParameters,
+          captures: captures,
           parameters: p,
           effect: effect,
           output: output,
@@ -484,7 +486,8 @@ public struct Parser {
           modifiers: prologue.modifiers,
           introducer: f,
           identifier: identifier,
-          staticParameters: parameters.0,
+          staticParameters: contextParameters,
+          captures: captures,
           parameters: p,
           effect: isMember ? .init(.let, at: effect.site) : effect,
           output: output,
@@ -508,7 +511,7 @@ public struct Parser {
 
     // Are we parsing a custom initializer?
     if introducer.value == .`init` {
-      let parameters = try parseParameterClauses(in: &file)
+      let (contextParameters, parameters) = try parseParameterClauses(in: &file)
       let b = try parseOptionalCallableBody(in: &file)
 
       return file.insert(
@@ -517,8 +520,9 @@ public struct Parser {
           modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToInitializer),
           introducer: introducer,
           identifier: .init(.simple("init"), at: introducer.site),
-          staticParameters: parameters.0,
-          parameters: [receiver] + parameters.1,
+          staticParameters: contextParameters,
+          captures: .empty(at: introducer.site.end),
+          parameters: [receiver] + parameters,
           effect: .init(.let, at: introducer.site),
           output: nil,
           body: b,
@@ -534,6 +538,7 @@ public struct Parser {
           introducer: introducer,
           identifier: .init(.simple("init"), at: introducer.site),
           staticParameters: .empty(at: .empty(at: position)),
+          captures: .empty(at: introducer.site.end),
           parameters: [receiver],
           effect: .init(.let, at: introducer.site),
           output: nil,
@@ -650,6 +655,39 @@ public struct Parser {
     let lhs = ExpressionIdentity(file.insert(NameExpression(.init(conformer))))
     let witness = ExpressionIdentity(desugaredConformance(of: lhs, to: rhs, in: &file))
     return file.insert(UsingDeclaration(witness: witness, site: file[rhs].site))
+  }
+
+  /// Parses a capture list.
+  ///
+  ///     capture-list ::=
+  ///       '[' binding-declaration (',' binding-declaration)* (',' '...'?)? ']'
+  ///
+  private mutating func parseOptionalCaptureList(
+    in file: inout Module.SourceContainer
+  ) throws -> CaptureList? {
+    if !next(is: .leftBracket) { return nil }
+
+    return try inBrackets { (m0) in
+      // Are we parsing `[...]`?
+      if let t = m0.take(.ellipsis) {
+        return .init(explicit: [], allowsInferredCaptures: true, site: t.site)
+      }
+
+      // Parse a comma-separated list of binding declarations.
+      let s = m0.position
+      let (ds, lastComma) = try m0.commaSeparated(until: Token.hasTag(.rightBracket)) { (m1) in
+        try m1.parseBindingDeclaration(after: .none(), in: &file)
+      }
+
+      // Is there a trailing ellipsis?
+      if let t = m0.take(.ellipsis) {
+        if lastComma == nil { m0.report(m0.expected("','", at: .empty(at: t.site.start))) }
+        return .init(explicit: ds, allowsInferredCaptures: true, site: .empty(at: s))
+      } else {
+        return .init(explicit: ds, allowsInferredCaptures: false, site: .empty(at: s))
+      }
+
+    }
   }
 
   /// Parses a list of adjunct conformance declarations iff the next token is `.is`.
@@ -1486,6 +1524,7 @@ public struct Parser {
   ///
   private mutating func parseLambda(in file: inout Module.SourceContainer) throws -> Lambda.ID {
     let introducer = try take(.fun) ?? expected("'fun'")
+    let captures = try parseOptionalCaptureList(in: &file) ?? .inferred(at: position)
     let parameters = try parseParenthesizedParameterList(in: &file)
     let effect = parseOptionalAccessEffect() ?? .init(.let, at: .empty(at: position))
     let output = try parseOptionalReturnTypeAscription(in: &file)
@@ -1498,6 +1537,7 @@ public struct Parser {
         introducer: .init(.fun, at: introducer.site),
         identifier: .init(.lambda, at: introducer.site),
         staticParameters: .empty(at: .empty(at: introducer.site.end)),
+        captures: captures,
         parameters: parameters,
         effect: effect,
         output: output, body: body,

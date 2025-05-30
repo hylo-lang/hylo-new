@@ -1,0 +1,51 @@
+//! no-std
+
+struct S {
+  var x: {}
+  public memberwise init
+  public fun m() {}
+}
+
+// Non-local functions cannot have non-empty capture list.
+fun global[...]() {}
+
+public fun main() {
+  var a = S(x: ())
+
+  // Implicit captures are allowed.
+  fun g[...]() { a.m() }
+
+  // Implcit captures are allowed and the lambda is mutating; everything it allowed.
+  let f0 = fun() inout {
+    g()
+    a.m()
+    &a.x = ()
+  }
+
+  // Implcit captures are allowed but the lambda is `let`; no mutating capture is allowed.
+  let f1 = fun() {
+    g()
+    a.m()
+
+    &a.x = ()
+  }
+
+  // Capture-list is explicit; no implicit capture is allowed.
+  let f2 = fun[inout b = &a](){
+    b.m()
+    &b.x = ()
+
+    g()
+    &a.x = ()
+  }
+
+  // Capture-list is explicitly empty; no capture is allowed.
+  let f3 = fun[]() {
+    var b = S(x: ())
+    b.m()
+    &b.x = ()
+
+    g()
+    &a.x = ()
+  }
+}

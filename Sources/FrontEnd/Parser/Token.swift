@@ -69,6 +69,7 @@ public struct Token: Hashable, Sendable {
     case colon
     case doubleColon
     case semicolon
+    case ellipsis
     case at
 
     // Delimiters

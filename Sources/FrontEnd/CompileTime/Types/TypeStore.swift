@@ -705,6 +705,8 @@ public struct TypeStore: Sendable {
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (_ as Namespace, _ as Namespace):
       result = false
+    case (let t as OpaqueType, let u as OpaqueType):
+      result = false
     case (let t as RemoteType, let u as RemoteType):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (_ as Struct, _ as Struct):

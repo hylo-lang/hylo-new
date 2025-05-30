@@ -4,6 +4,9 @@ public protocol RoutineDeclaration: ModifiableDeclaration {
   /// The compile-time parameters of the entity.
   var staticParameters: ContextParameters { get }
 
+  /// The capture-list of the entity.
+  var captures: CaptureList { get }
+
   /// The run-time parameters of the entity.
   var parameters: [ParameterDeclaration.ID] { get }
 

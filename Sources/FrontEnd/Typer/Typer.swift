@@ -186,6 +186,75 @@ public struct Typer {
     }
   }
 
+  /// The occurrences of a particular capture in a local definition.
+  private struct CaptureOccurrenceSet {
+
+    /// A table from each occurrence to its site and a flag indicating whether it is mutating.
+    private(set) var elements: [(site: SourceSpan, isMarkedForMutation: Bool)] = []
+
+    /// `true` iff one of the occurrences is mutating.
+    private(set) var containsMutatingOccurrence: Bool = false
+
+    /// Creates an empty instance.
+    init() {}
+
+    /// Appends the given occurrence to this set.
+    mutating func append(_ site: SourceSpan, mutating isMarkedForMutation: Bool) {
+      elements.append((site, isMarkedForMutation))
+      if isMarkedForMutation { containsMutatingOccurrence = true }
+    }
+
+  }
+
+  /// Returns a map from the declarations of the captures in `d` to a but indicating whether they
+  /// are captured mutabley.
+  ///
+  /// - Requires: `d` is a local function.
+  private mutating func implicitCaptures(
+    of d: FunctionDeclaration.ID
+  ) -> OrderedDictionary<DeclarationIdentity, CaptureOccurrenceSet> {
+    assert(program.isLocal(d))
+    var captures: OrderedDictionary<DeclarationIdentity, CaptureOccurrenceSet> = [:]
+
+    /// Records a capture if `n` refers to a local entity whose declaration is not in `d`.
+    func recordOccurrence(of n: NameExpression.ID, mutating isMarkedForMutation: Bool) {
+      switch program[n.module].declaration(referredToBy: n) {
+      case .some(.direct(let c)):
+        if !program.isContained(c, in: .init(node: d)) && program.isCapturable(c) {
+          captures[c, default: .init()].append(program[n].site, mutating: isMarkedForMutation)
+        }
+
+      default:
+        break
+      }
+    }
+
+    // Visit the syntax tree to collect all captures.
+    var work = program[d].body!.reversed().map({ (s) in (s.erased, false) })
+    while let (n, isMarkedForMutation) = work.popLast() {
+      switch program.tag(of: n) {
+      case InoutExpression.self:
+        let e = program.castUnchecked(n, to: InoutExpression.self)
+        work.append((program[e].lvalue.erased, true))
+
+      case NameExpression.self:
+        let e = program.castUnchecked(n, to: NameExpression.self)
+        if let q = program[e].qualification {
+          // Focus on the qualification, remembering whether the whole expression is mutating.
+          work.append((q.erased, isMarkedForMutation))
+          continue
+        } else {
+          recordOccurrence(of: e, mutating: isMarkedForMutation)
+        }
+
+      default:
+        work.append(contentsOf: program.children(n).map({ (s) in (s, false) }))
+      }
+    }
+
+    return captures
+  }
+
   // MARK: Type checking
 
   /// Type checks `d`.
@@ -443,19 +512,28 @@ public struct Typer {
     check(program[d].parameters)
     for v in program[d].variants { check(v) }
 
+    // TODO: Check captures
     // TODO: Redeclarations
   }
 
   /// Type checks `d`.
+  ///
+  /// If `d` is the declaration of a lambda's underlying function, this method can only be called
+  /// once the type of `d` has been committed, after running type inference for the expression of
+  /// which the lambda is a part.
   private mutating func check(_ d: FunctionDeclaration.ID) {
     let t = declaredType(of: d)
 
     // Nothing more to do if the declaration doesn't have an arrow type.
-    if let a = program.types[program.types.head(t)] as? Arrow {
-      check(program[d].staticParameters)
-      check(program[d].parameters)
-      check(body: program[d].body, of: .init(d), expectingOutputType: a.output)
+    guard let a = program.types[program.types.head(t)] as? Arrow else {
+      assert(program.diagnostics.contains(where: { (e) in e.site.intersects(program[d].site) }))
+      return
     }
+
+    check(program[d].staticParameters)
+    check(program[d].parameters)
+    check(body: program[d].body, of: .init(d), expectingOutputType: a.output)
+    checkCaptures(of: d)
 
     // TODO: Redeclarations
   }
@@ -483,6 +561,37 @@ public struct Typer {
       // Only requirements, FFIs, and external functions can be without a body.
       let s = program.spanForDiagnostic(about: d)
       report(.init(.error, "declaration requires a body", at: s))
+    }
+  }
+
+  /// Type checks the capture list of `d` and records the precise type of its environment.
+  private mutating func checkCaptures(of d: FunctionDeclaration.ID) {
+    let list = program[d].captures
+
+    // Are we looking at a non-local definition?
+    if !program.isLocal(d) {
+      // Non-local definitions cannot have captures. Illegal captures, if any, have already been
+      // diagnosed during the checking of the definition's body.
+      if !list.isEmpty { report(program.illegalCaptureList(at: list.site)) }
+      return
+    }
+
+    // Are implicit captures allowed? If so, ensure there is no invalid mutating capture.
+    if list.allowsInferredCaptures && (program[d].effect.value == .let) {
+      for os in implicitCaptures(of: d).values where os.containsMutatingOccurrence {
+        for (o, m) in os.elements where m {
+          report(.init(.error, "illegal mutating capture", at: o))
+        }
+      }
+    }
+
+    // Are implicit captures disallowed?
+    else if !list.allowsInferredCaptures {
+      for os in implicitCaptures(of: d).values {
+        for (o, _) in os.elements {
+          report(.init(.error, "illegal implicit capture", at: o))
+        }
+      }
     }
   }
 
@@ -1246,14 +1355,35 @@ public struct Typer {
     }
   }
 
-  /// Returns the declared type of `d`, which introduces a function that accepts `inputs`.
+  /// Returns the declared type of `d`, which introduces a function capturing `captures` in its
+  /// environment and taking `inputs` as parameters.
   private mutating func declaredArrowType<T: RoutineDeclaration>(
     of d: T.ID, taking inputs: [Parameter],
   ) -> AnyTypeIdentity {
+    let e = declaredEnvironmentType(of: d)
     let o = program[d].output.map({ (a) in evaluateTypeAscription(a) }) ?? .void
-    let a = demand(
-      Arrow(effect: program[d].effect.value, environment: .void, inputs: inputs, output: o))
+    let k = program[d].effect.value
+    let a = demand(Arrow(effect: k, environment: e, inputs: inputs, output: o))
     return introduce(program[d].staticParameters, into: a.erased)
+  }
+
+  /// Returns the type of the environment of `d`.
+  private mutating func declaredEnvironmentType<T: RoutineDeclaration>(
+    of d: T.ID
+  ) -> AnyTypeIdentity {
+    let list = program[d].captures
+
+    var elements = list.explicit.map { (d) in
+      let e = declaredType(of: d)
+      return Tuple.Element(label: nil, type: e)
+    }
+
+    if list.allowsInferredCaptures {
+      let e = demand(OpaqueType.environment(.init(d))).erased
+      elements.append(.init(label: nil, type: e))
+    }
+
+    return demand(Tuple(elements: elements)).erased
   }
 
   /// Returns the declared type of `g` without checking.
@@ -1945,22 +2075,25 @@ public struct Typer {
       demand(RemoteType(projectee: q.type, access: q.access)).erased
     }
 
+    let environment = declaredEnvironmentType(of: underlying)
     let inputs = program[underlying].parameters.enumerated().map { (i, p) in
       let expected = qs?.dropFirst(i).first
       return context.withSubcontext(expectedType: expected, role: .ascription) { (sc) in
         inferredType(of: p, in: &sc)
       }
     }
-
     let output = inferredType(returnValueOf: e, hint: hint?.head.output, in: &context)
+    let inferred = demand(
+      Arrow(
+        effect: program[underlying].effect.value, environment: environment,
+        inputs: inputs, output: output))
 
-    let t = demand(Arrow(inputs: inputs, output: output)).erased
-    context.obligations.assume(underlying, hasType: t, at: site)
+    context.obligations.assume(underlying, hasType: inferred.erased, at: site)
     context.obligations.finally { (me) in
       me.check(underlying)
     }
 
-    return context.obligations.assume(e, hasType: t, at: site)
+    return context.obligations.assume(e, hasType: inferred.erased, at: site)
   }
 
   /// Returns the inferred type of `e`'s return value, using `hint` to provide context to

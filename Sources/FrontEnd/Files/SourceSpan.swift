@@ -32,6 +32,28 @@ public struct SourceSpan: Hashable, Sendable {
   /// The source text covered by this span.
   public var text: Substring { source.text[region] }
 
+  /// Returns `true` iff `self` covers a region in commen with `other`.
+  public func intersects(_ other: SourceSpan) -> Bool { !intersection(other).region.isEmpty }
+
+  /// Returns a range covering the region that `self` and `other` cover in common.
+  ///
+  /// If `self` and `other` do not overlap, the returned value is an empty range whose first
+  /// position is the en position of `self`.
+  public func intersection(_ other: SourceSpan) -> SourceSpan {
+    let lhs = self.region
+    let rhs = other.region
+
+    if self.source == other.source {
+      if (lhs.upperBound > rhs.lowerBound) && (lhs.lowerBound < rhs.upperBound) {
+        let x = Swift.max(lhs.lowerBound, rhs.lowerBound)
+        let y = Swift.min(lhs.upperBound, rhs.upperBound)
+        return .init(.init(uncheckedBounds: (x, y)), in: source)
+      }
+    }
+
+    return .empty(at: self.end)
+  }
+
   /// Returns a copy of `self` extended to cover `other`.
   public func extended(toCover other: SourceSpan) -> SourceSpan {
     precondition(self.source == other.source, "incompatible spans")

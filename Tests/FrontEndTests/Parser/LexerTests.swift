@@ -214,13 +214,14 @@ final class LexerTests: XCTestCase {
   }
 
   func testPunctuation() throws {
-    var scanner = Lexer(tokenizing: "@,.: :: ; (+")
+    var scanner = Lexer(tokenizing: "@,.: :: ; ... (+")
     try assertNext(from: &scanner, is: .at)
     try assertNext(from: &scanner, is: .comma)
     try assertNext(from: &scanner, is: .dot)
     try assertNext(from: &scanner, is: .colon)
     try assertNext(from: &scanner, is: .doubleColon)
     try assertNext(from: &scanner, is: .semicolon)
+    try assertNext(from: &scanner, is: .ellipsis)
     try assertNext(from: &scanner, is: .leftParenthesis)
     try assertNext(from: &scanner, is: .operator)
     XCTAssertNil(scanner.next())
