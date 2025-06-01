@@ -1358,7 +1358,7 @@ public struct Typer {
   /// Returns the declared type of `d`, which introduces a function capturing `captures` in its
   /// environment and taking `inputs` as parameters.
   private mutating func declaredArrowType<T: RoutineDeclaration>(
-    of d: T.ID, taking inputs: [Parameter],
+    of d: T.ID, taking inputs: [Parameter]
   ) -> AnyTypeIdentity {
     let e = declaredEnvironmentType(of: d)
     let o = program[d].output.map({ (a) in evaluateTypeAscription(a) }) ?? .void
@@ -3813,7 +3813,7 @@ public struct Typer {
   private mutating func resolve<S: Sequence<ExtensionDeclaration.ID>>(
     _ n: Name,
     declaredIn extensions: S, applyingTo q: AnyTypeIdentity, in scopeOfUse: ScopeIdentity,
-    statically selectionIsStatic: Bool,
+    statically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
     var candidates: [NameResolutionCandidate] = []
     for e in extensions where !declarationsOnStack.contains(.init(e)) {
