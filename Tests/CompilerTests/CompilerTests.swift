@@ -74,7 +74,7 @@ final class CompilerTests: XCTestCase {
       }
 
       // Try to read the manifest's properties from the first line.
-      else if let s = try? String(contentsOf: root).firstLine, s.starts(with: "//!") {
+      else if let s = firstLine(of: root), s.starts(with: "//!") {
         return .init(options: s.split(separator: " ").dropFirst().map(String.init(_:)))
       }
 
