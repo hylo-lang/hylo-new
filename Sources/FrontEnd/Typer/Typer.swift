@@ -875,15 +875,18 @@ public struct Typer {
   /// Reports a diagnostic iff `d` is not the first declaration of `identifier` in its scope.
   private mutating func checkUniqueDeclaration<T: Declaration>(_ d: T.ID, of identifier: String) {
     let parent = program.parent(containing: d)
-    let ts = if parent.isFile {
+    var ts = if parent.isFile {
       lookup(.init(identifier: identifier), atTopLevelOf: parent.module)
     } else {
       lookup(.init(identifier: identifier), lexicallyIn: parent)
     }
 
-    if (ts.count > 1) && (ts[0].erased != d.erased) && program.occurInOrder(ts[0], d) {
+    if ts.count <= 1 { return }
+
+    ts.sort(by: { (a, b) in program.occurInOrder(a, b) })
+    for t in ts[1...] {
       let e = program.invalidRedeclaration(
-        of: .init(identifier: identifier), at: program.spanForDiagnostic(about: d),
+        of: .init(identifier: identifier), at: program.spanForDiagnostic(about: t),
         previousDeclarations: [program.spanForDiagnostic(about: ts[0])])
       report(e)
     }
