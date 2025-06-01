@@ -35,7 +35,7 @@ final class CompilerTests: XCTestCase {
 
       if root.pathExtension == "package" {
         self.manifest = (try? Self.manifest(root)) ?? .init(options: [])
-      } else if let s = try? String(contentsOf: root).firstLine, s.starts(with: "//!") {
+      } else if let s = Self.firstLine(of: root), s.starts(with: "//!") {
         self.manifest = .init(options: s.split(separator: " ").dropFirst().map(String.init(_:)))
       } else {
         self.manifest = .init(options: [])
@@ -82,6 +82,12 @@ final class CompilerTests: XCTestCase {
       else {
         return .init(options: [])
       }
+    }
+
+    /// Returns the first line of the file at `url`, which is encoded in UTF-8, or `nil`if that
+    /// this file could not be read.
+    private static func firstLine(of url: URL) -> Substring? {
+      (try? String(contentsOf: url, encoding: .utf8))?.firstLine
     }
 
   }
