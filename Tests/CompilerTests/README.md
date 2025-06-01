@@ -7,15 +7,11 @@ A use case is either a single Hylo source file or a directory representing a pac
 A single-file test is compiled to a binary executable, just as if it was passed as an argument to `hc`.
 A package test is built according to the configuration specified by its manifest.
 
-## Generating Swift tests
+## Generating Swift tests manually
 
-You can use the following script to generate a XCTest method for each compiler test.
-
-```bash
-./Tools/generate-compiler-tests.swift
-``` 
-
-The script will go over each file or sub-directory under `negative` and `positive` and create a corresponding method to invoke `CompilerTests.compile(_:)`.
+Test cases are generated automatically as part of SPM's build sequence.
+You can also use `hc-tests` to generate test cases manually.
+The tool goes over each file or sub-directory under `negative` and `positive` and create a corresponding method to invoke `CompilerTests.compile(_:)`.
 
 ## Testing without the standard library
 

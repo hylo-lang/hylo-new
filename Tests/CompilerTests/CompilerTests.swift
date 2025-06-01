@@ -5,6 +5,11 @@ import StandardLibrary
 import Utilities
 import XCTest
 
+/// The driver for generated compiler tests.
+///
+/// This class is used as a driver to run the negative and positive tests. Its test cases are meant
+/// to be defined in an extension that is generated either automatically as part of the build or by
+/// manually invoking `hc-tests`.
 final class CompilerTests: XCTestCase {
 
   /// The input of a compiler test.

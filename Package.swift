@@ -42,6 +42,12 @@ let package = Package(
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ]),
 
+    .executableTarget(
+      name: "hc-tests",
+      dependencies: [
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ]),
+
     .target(
       name: "Driver",
       dependencies: [
@@ -63,7 +69,6 @@ let package = Package(
 
     .target(
       name: "StandardLibrary",
-      // dependencies: ["FrontEnd", "Utils"],
       path: "StandardLibrary",
       resources: [.copy("Sources")]),
 
@@ -80,7 +85,8 @@ let package = Package(
         .target(name: "FrontEnd"),
         .target(name: "Utilities"),
       ],
-      exclude: ["negative", "positive"]),
+      exclude: ["negative", "positive", "README.md"],
+      plugins: ["CompilerTestsPlugin"]),
 
     .testTarget(
       name: "FrontEndTests",
@@ -92,5 +98,12 @@ let package = Package(
       name: "UtilitiesTests",
       dependencies: [
         .target(name: "Utilities"),
+      ]),
+
+    .plugin(
+      name: "CompilerTestsPlugin",
+      capability: .buildTool(),
+      dependencies: [
+        .target(name: "hc-tests")
       ]),
   ])
