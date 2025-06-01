@@ -24,7 +24,7 @@ public struct SourceFile: Hashable, Sendable {
 
   /// Creates a source file with the contents of the file at `path`.
   public init(contentsOf path: URL) throws {
-    try self.init(name: .local(path), contents: .init(contentsOf: path))
+    try self.init(name: .local(path), contents: .init(contentsOf: path, encoding: .utf8))
   }
 
   /// Creates a virtual source file with the given contents.
