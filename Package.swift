@@ -20,9 +20,6 @@ let package = Package(
       url: "https://github.com/kyouko-taiga/archivist.git",
       branch: "main"),
     .package(
-      url: "https://github.com/kyouko-taiga/more-swift-collections.git",
-      from: "0.6.1"),
-    .package(
       url: "https://github.com/apple/swift-algorithms.git",
       from: "1.2.0"),
     .package(
@@ -61,11 +58,14 @@ let package = Package(
       name: "FrontEnd",
       dependencies: [
         .target(name: "Utilities"),
+        .target(name: "StableCollections"),
         .product(name: "Archivist", package: "archivist"),
         .product(name: "Algorithms", package: "swift-algorithms"),
         .product(name: "Collections", package: "swift-collections"),
-        .product(name: "MoreCollections", package: "more-swift-collections")
       ]),
+
+    .target(
+      name: "StableCollections"),
 
     .target(
       name: "StandardLibrary",

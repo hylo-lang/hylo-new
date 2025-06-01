@@ -1,4 +1,4 @@
-import MoreCollections
+import StableCollections
 import Utilities
 
 /// A collection of types.
