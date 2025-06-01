@@ -27,4 +27,3 @@ extension Trait: Showable {
   }
 
 }
-

@@ -147,7 +147,6 @@ extension CoercionConstraint: Showable {
 
 }
 
-
 /// A constraint stating that there exists a compiler-known conversion from values a type to values
 /// of another (wider) type.
 internal struct WideningConstraint: Constraint {

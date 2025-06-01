@@ -53,7 +53,7 @@ final class SourceFileTests: XCTestCase {
     let p1 = SourcePosition(f.startIndex, in: f)
     XCTAssertEqual(p1.lineAndColumn.line, 1)
     XCTAssertEqual(p1.lineAndColumn.column, 1)
-    
+
     let p2 = SourcePosition(f.endIndex, in: f)
     XCTAssertEqual(p2.lineAndColumn.line, 2)
     XCTAssertEqual(p2.lineAndColumn.column, 7)

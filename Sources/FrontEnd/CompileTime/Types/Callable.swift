@@ -30,7 +30,9 @@ public struct Callable {
       }
 
       // Arguments do not match.
-      else { return false }
+      else {
+        return false
+      }
     }
 
     return i == labels.endIndex

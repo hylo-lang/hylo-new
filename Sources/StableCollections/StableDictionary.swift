@@ -113,7 +113,8 @@ public struct StableDictionary<Key: Hashable, Value> {
       let q = UnsafeMutableRawPointer(mutating: p)
       return (
         (q + Int(o.key)).assumingMemoryBound(to: Key.self).move(),
-        (q + Int(o.value)).assumingMemoryBound(to: Value.self).move())
+        (q + Int(o.value)).assumingMemoryBound(to: Value.self).move()
+      )
     }
 
   }
@@ -399,7 +400,7 @@ public struct StableDictionary<Key: Hashable, Value> {
         to: .init(key: key, value: value, truncatedHash: UInt8(hash & 0xff) | 0x80))
       head.pointee.assign(position: p, forHash: hash)
       head.pointee.count += 1
-      if (p == head.pointee.end) { head.pointee.end = p + 1 }
+      if p == head.pointee.end { head.pointee.end = p + 1 }
     }
   }
 
@@ -492,9 +493,8 @@ extension StableDictionary: Equatable where Value: Equatable {
 
   /// Returns `true` iff `l` is equal to `r`.
   public static func == (l: Self, r: Self) -> Bool {
-    (l.contents === r.contents) || l.elementsEqual(r) { (a, b) in
-      (a.key == b.key) && (a.value == b.value)
-    }
+    (l.contents === r.contents)
+      || l.elementsEqual(r, by: { (a, b) in (a.key == b.key) && (a.value == b.value) })
   }
 
 }
@@ -515,7 +515,7 @@ extension StableDictionary: CustomStringConvertible {
 
   /// A textual description of `self`.
   public var description: String {
-    let pairs = self.map({ (k, v) in "\(k): \(v)"}).joined(separator: ", ")
+    let pairs = self.map({ (k, v) in "\(k): \(v)" }).joined(separator: ", ")
     return "[\(pairs)]"
   }
 

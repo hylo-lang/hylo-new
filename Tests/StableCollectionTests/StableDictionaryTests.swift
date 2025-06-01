@@ -1,5 +1,5 @@
-import XCTest
 import MoreCollections
+import XCTest
 
 class StableDictionaryTests: XCTestCase {
 
@@ -42,13 +42,13 @@ class StableDictionaryTests: XCTestCase {
 
   func testKeySubscript() {
     var s = StableDictionary<String, Int>()
-    s["a"] = 100 // insert
+    s["a"] = 100  // insert
     XCTAssertEqual(s["a"], 100)
-    s["a"] = 200 // update
+    s["a"] = 200  // update
     XCTAssertEqual(s["a"], 200)
-    s["a"] = nil // delete
+    s["a"] = nil  // delete
     XCTAssertEqual(s["a"], nil)
-    s["a"] = nil // no-op
+    s["a"] = nil  // no-op
     XCTAssertEqual(s["a"], nil)
   }
 

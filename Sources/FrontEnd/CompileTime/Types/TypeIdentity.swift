@@ -152,7 +152,6 @@ extension AnyTypeIdentity: Archivable {
 
 }
 
-
 extension AnyTypeIdentity: CustomStringConvertible {
 
   public var description: String { bits.description }

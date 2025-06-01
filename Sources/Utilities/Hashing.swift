@@ -2,11 +2,11 @@
 public struct FNV {
 
   #if arch(x86_64) || arch(arm64)
-  public static let basis = Int(bitPattern: 0xcbf29ce484222325)
-  public static let prime = Int(bitPattern: 0x100000001b3)
+    public static let basis = Int(bitPattern: 0xcbf29ce484222325)
+    public static let prime = Int(bitPattern: 0x100000001b3)
   #elseif arch(i386) || arch(arm)
-  public static let basis = Int(bitPattern: 0x811c9dc5)
-  public static let prime = Int(bitPattern: 0x1000193)
+    public static let basis = Int(bitPattern: 0x811c9dc5)
+    public static let prime = Int(bitPattern: 0x1000193)
   #endif
 
   /// The current hashed value.

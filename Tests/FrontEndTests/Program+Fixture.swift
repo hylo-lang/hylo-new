@@ -7,22 +7,26 @@ extension Program {
     var p = Program()
 
     let m0 = p.demandModule(.init("M0"))
-    _ = p[m0].addSource("""
+    _ = p[m0].addSource(
+      """
       trait P { type X }
       """)
-    _ = p[m0].addSource("""
+    _ = p[m0].addSource(
+      """
       trait Q { type Y }
       """)
 
     let m1 = p.demandModule(.init("M1"))
     p[m1].addDependency(p[m0].name)
-    _ = p[m1].addSource("""
+    _ = p[m1].addSource(
+      """
       trait R { type Z }
       """)
 
     let m2 = p.demandModule(.init("M2"))
     p[m2].addDependency(p[m0].name)
-    _ = p[m2].addSource("""
+    _ = p[m2].addSource(
+      """
       trait R { type Z }
       """)
 

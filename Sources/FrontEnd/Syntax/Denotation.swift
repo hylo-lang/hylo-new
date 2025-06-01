@@ -1,8 +1,8 @@
 /// The description of the value denoted by an expression.
-public enum Denotation: Hashable, Sendable {
+public indirect enum Denotation: Hashable, Sendable {
 
   /// A reference to an entity.
-  indirect case reference(Denotation?, DeclarationReference, AnyTypeIdentity)
+  case reference(Denotation?, DeclarationReference, AnyTypeIdentity)
 
 }
 

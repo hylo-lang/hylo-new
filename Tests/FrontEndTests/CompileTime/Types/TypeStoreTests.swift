@@ -1,5 +1,6 @@
-@testable import FrontEnd
 import XCTest
+
+@testable import FrontEnd
 
 final class TypeStoreTests: XCTestCase {
 

@@ -16,7 +16,9 @@ final class DiagnosticTests: XCTestCase {
 
     var rendered = ""
     e.render(into: &rendered, style: .unstyled)
-    XCTAssertEqual(rendered, """
+    XCTAssertEqual(
+      rendered,
+      """
       virtual://1ssiyy33rbj6z:1.1-3: error: bang
       Hello.
       ~~
@@ -28,14 +30,17 @@ final class DiagnosticTests: XCTestCase {
     let f: SourceFile = "Hello."
     let s = SourceSpan(f.startIndex ..< f.index(f.startIndex, offsetBy: 2), in: f)
     let e = Diagnostic(
-      .error, "bang", at: s, notes: [
+      .error, "bang", at: s,
+      notes: [
         .init(.note, "see this", at: .empty(at: .init(f.startIndex, in: f))),
         .init(.note, "and that", at: .empty(at: .init(f.index(after: f.startIndex), in: f))),
       ])
 
     var rendered = ""
     e.render(into: &rendered, style: .unstyled)
-    XCTAssertEqual(rendered, """
+    XCTAssertEqual(
+      rendered,
+      """
       virtual://1ssiyy33rbj6z:1.1-3: error: bang
       Hello.
       ~~
@@ -56,7 +61,9 @@ final class DiagnosticTests: XCTestCase {
 
     var rendered = ""
     e.render(into: &rendered, style: .styled)
-    XCTAssertEqual(rendered, """
+    XCTAssertEqual(
+      rendered,
+      """
       \u{001B}[1mvirtual://1ssiyy33rbj6z:1.1-3\u{001B}[0m: \u{001B}[1m\u{001B}[31merror\u{001B}[0m: \u{001B}[1mbang\u{001B}[0m
       Hello.
       ~~

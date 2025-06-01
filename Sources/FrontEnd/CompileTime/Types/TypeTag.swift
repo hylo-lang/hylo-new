@@ -85,7 +85,6 @@ extension TypeTag: Archivable {
 
 }
 
-
 extension TypeTag: CustomStringConvertible {
 
   public var description: String {

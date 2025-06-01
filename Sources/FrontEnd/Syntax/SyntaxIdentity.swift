@@ -97,7 +97,7 @@ public struct AnySyntaxIdentity {
 
   /// The file offset of the node represented by `self` in its containing collection.
   public var file: Program.SourceFileIdentity {
-    .init(rawValue: UInt32(bits & 0xffffffff))
+    .init(rawValue: UInt32(bits & 0xffff_ffff))
   }
 
   /// The offset of the node represented by `self` in its containing collection.
@@ -269,7 +269,7 @@ public struct StatementIdentity: SyntaxIdentity {
 
 /// The identity of an expression or binding declaration in the conditions of an if-expression,
 /// match-expression, or while loop.
-public struct ConditionIdentity: SyntaxIdentity{
+public struct ConditionIdentity: SyntaxIdentity {
 
   /// The type-erased value of this identity.
   public let erased: AnySyntaxIdentity

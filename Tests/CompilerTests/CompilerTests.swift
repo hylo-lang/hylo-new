@@ -79,7 +79,9 @@ final class CompilerTests: XCTestCase {
       }
 
       // Return a default manifest.
-      else { return .init(options: []) }
+      else {
+        return .init(options: [])
+      }
     }
 
   }
@@ -88,7 +90,7 @@ final class CompilerTests: XCTestCase {
   ///
   /// An new directory is generated every time this property is initialized and removed once all
   /// tests have run.
-  private static let moduleCachePath: (url: URL, delete: @Sendable () -> ()) = {
+  private static let moduleCachePath: (url: URL, delete: @Sendable () -> Void) = {
     let m = FileManager.default
     let u = try! m.url(
       for: .itemReplacementDirectory,

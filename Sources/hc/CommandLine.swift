@@ -94,7 +94,9 @@ import Utilities
     await perform("typing", { await driver.assignTypes(of: module) })
 
     let c = treePrinterConfiguration(for: treePrinterFlags)
-    for d in driver.program.select(from: module, .satisfies({ driver.program.parent(containing: $0).isFile })) {
+    for d in driver.program.select(
+      from: module, .satisfies({ driver.program.parent(containing: $0).isFile }))
+    {
       print(driver.program.show(d, configuration: c))
     }
 

@@ -260,8 +260,7 @@ public struct TypeStore: Sendable {
   public func seenAsTraitApplication<T: TypeIdentity>(
     _ n: T
   ) -> (concept: Trait.ID, arguments: TypeArguments)? {
-    if
-      let t = cast(n, to: TypeApplication.self),
+    if let t = cast(n, to: TypeApplication.self),
       let u = cast(self[t].abstraction, to: Trait.self),
       !self[t].arguments.isEmpty
     {
@@ -312,7 +311,9 @@ public struct TypeStore: Sendable {
     }
 
     // `n` is not a member function.
-    else { return nil }
+    else {
+      return nil
+    }
   }
 
   /// Returns `[{self: k T}](A...) k -> B` iff `n` has the form `[Void](self: k T, A...) x -> B`.
@@ -660,7 +661,9 @@ public struct TypeStore: Sendable {
     let b = ss[rhs]
 
     // The two types are trivially equal?
-    if a == b { return true }
+    if a == b {
+      return true
+    }
 
     // There are type variables?
     else if a.isVariable {

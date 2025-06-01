@@ -5,7 +5,7 @@ import Archivist
 public struct If: Expression, Scope {
 
   /// The identity of the else-branch of an if-expression.
-  public struct ElseIdentity : SyntaxIdentity{
+  public struct ElseIdentity: SyntaxIdentity {
 
     /// The type-erased value of this identity.
     public let erased: AnySyntaxIdentity
@@ -26,7 +26,6 @@ public struct If: Expression, Scope {
     }
 
   }
-
 
   /// The introducer of this expression.
   public let introducer: Token

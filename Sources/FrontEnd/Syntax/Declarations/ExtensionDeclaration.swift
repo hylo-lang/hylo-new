@@ -44,10 +44,10 @@ extension ExtensionDeclaration: Showable {
     let w = staticParameters.isEmpty ? "" : " \(printer.show(staticParameters))"
     let m = members.map({ (m) in printer.show(m).indented }).joined(separator: "\n")
     return """
-    extension\(w) \(e) {
-    \(m)
-    }
-    """
+      extension\(w) \(e) {
+      \(m)
+      }
+      """
   }
 
 }

@@ -31,5 +31,4 @@ final class HashingTests: XCTestCase {
     XCTAssertNotEqual(h1.state, h2.state)
   }
 
-
 }

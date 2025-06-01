@@ -1,5 +1,5 @@
-import XCTest
 import MoreCollections
+import XCTest
 
 class StableSetTests: XCTestCase {
 
@@ -58,18 +58,16 @@ class StableSetTests: XCTestCase {
     XCTAssertEqual(s.firstIndex(of: "c"), 2)
   }
 
-
   func testContains() {
     var s = StableSet<String>()
     XCTAssertFalse(s.contains("a"))
-    s.insert("a") // insert
+    s.insert("a")  // insert
     XCTAssert(s.contains("a"))
-    s.remove("a") // delete
+    s.remove("a")  // delete
     XCTAssertFalse(s.contains("a"))
-    s.remove("a") // no-op
+    s.remove("a")  // no-op
     XCTAssertFalse(s.contains("a"))
   }
-
 
   func testInsert() {
     var s = StableSet<String>()

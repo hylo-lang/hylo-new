@@ -18,10 +18,10 @@ import Foundation
   @Argument(transform: URL.init(fileURLWithPath:))
   private var root: URL =
     URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .appending(components: "Tests", "CompilerTests")
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appending(components: "Tests", "CompilerTests")
 
   /// The root of the directory containing negative tests.
   private var negative: URL {
@@ -56,22 +56,22 @@ import Foundation
       let i = testCaseIdentifier(u)
       result += """
 
-        func test_negative_\(i)() async throws {
-          try await negative(.init("\(u.absoluteURL.path())"))
-        }
+          func test_negative_\(i)() async throws {
+            try await negative(.init("\(u.absoluteURL.path())"))
+          }
 
-      """
+        """
     }
 
     for u in try testCases(positive) {
       let i = testCaseIdentifier(u)
       result += """
 
-        func test_positive_\(i)() async throws {
-          try await positive(.init("\(u.absoluteURL.path())"))
-        }
+          func test_positive_\(i)() async throws {
+            try await positive(.init("\(u.absoluteURL.path())"))
+          }
 
-      """
+        """
     }
 
     result.append("\n}")

@@ -14,7 +14,6 @@ public struct ImplicitQualification: Expression {
 
 }
 
-
 extension ImplicitQualification: Showable {
 
   /// Returns a textual representation of `self` using `printer`.

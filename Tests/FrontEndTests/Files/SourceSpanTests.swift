@@ -30,8 +30,8 @@ final class SourceSpanTests: XCTestCase {
     let i2 = f.index(i0, offsetBy: 4)
     let i3 = f.index(i0, offsetBy: 6)
 
-    let s0 = SourceSpan(i0 ..< i1, in: f) // He
-    let s1 = SourceSpan(i2 ..< i3, in: f) // o.
+    let s0 = SourceSpan(i0 ..< i1, in: f)  // He
+    let s1 = SourceSpan(i2 ..< i3, in: f)  // o.
 
     XCTAssert(s0.intersects(f.span))
     XCTAssert(s1.intersects(f.span))
@@ -50,9 +50,9 @@ final class SourceSpanTests: XCTestCase {
     let i2 = f.index(i0, offsetBy: 4)
     let i3 = f.index(i0, offsetBy: 6)
 
-    let s0 = SourceSpan(i0 ..< i2, in: f) // Hell
-    let s1 = SourceSpan(i1 ..< i2, in: f) // ll
-    let s2 = SourceSpan(i1 ..< i3, in: f) // llo.
+    let s0 = SourceSpan(i0 ..< i2, in: f)  // Hell
+    let s1 = SourceSpan(i1 ..< i2, in: f)  // ll
+    let s2 = SourceSpan(i1 ..< i3, in: f)  // llo.
 
     XCTAssertEqual(s0.intersection(s0), s0)
     XCTAssertEqual(s0.intersection(s1), s1)
@@ -69,8 +69,8 @@ final class SourceSpanTests: XCTestCase {
     XCTAssertEqual(s2.intersection(s2), s2)
     XCTAssertEqual(s2.intersection(g.span), .empty(at: s2.end))
 
-    let s3 = SourceSpan(i0 ..< i1, in: f) // He
-    let s4 = SourceSpan(i2 ..< i3, in: f) // o.
+    let s3 = SourceSpan(i0 ..< i1, in: f)  // He
+    let s4 = SourceSpan(i2 ..< i3, in: f)  // o.
 
     XCTAssertEqual(s3.intersection(s4), .empty(at: s3.end))
   }
