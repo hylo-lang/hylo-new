@@ -2,7 +2,7 @@ extension StringProtocol {
 
   /// Returns `self` indented by two spaces.
   public var indented: String {
-    (self.split(separator: "\n") as [SubSequence]).lazy
+    (self.split(whereSeparator: \.isNewline) as [SubSequence])
       .map({ (line) in "  " + line })
       .joined(separator: "\n")
   }

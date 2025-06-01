@@ -1,4 +1,6 @@
-import Foundation
+// See https://github.com/swiftlang/swift/issues/75601
+@preconcurrency import var Foundation.stderr
+@preconcurrency import func Foundation.putc
 
 /// A handle to the standard error.
 internal struct StandardError: TextOutputStream, Sendable {

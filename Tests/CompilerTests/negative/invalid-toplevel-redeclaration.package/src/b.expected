@@ -1,0 +1,6 @@
+negative/invalid-toplevel-redeclaration.package/src/b.hylo:1.14-15: error: invalid redeclaration of 'A'
+public trait A {}
+             ^
+negative/invalid-toplevel-redeclaration.package/src/a.hylo:1.14-15: note: previous declaration here
+public trait A {}
+             ^

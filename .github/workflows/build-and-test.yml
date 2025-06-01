@@ -1,0 +1,28 @@
+name: Build and Test
+on: push
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Note: all combinations of the following will be run independently
+        os: [macos-14, ubuntu-24.04]
+        swift: ["6.0"]
+        config: [release, debug]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }}
+        uses: SwiftyLab/setup-swift@latest
+        with:
+          swift-version: ${{ matrix.swift }}
+
+      # We disabled the separate build step, as it consumes extra CI time - building for testing apparently doesn't
+      # reuse the build cache from here, doubling the CI time.
+
+      - name: Build and test for ${{ matrix.swift }} on ${{ matrix.os }} in ${{ matrix.config }} mode
+        run: swift test -c ${{ matrix.config }}
+
+    runs-on: ${{ matrix.os }}

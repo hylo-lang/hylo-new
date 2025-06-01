@@ -170,18 +170,28 @@ final class CompilerTests: XCTestCase {
     let observations: [FileName: [Diagnostic]] = .init(
       grouping: diagnostics, by: \.site.source.name)
 
+    var report = ""
     for (n, e) in expectations {
       var o = ""
       for d in observations[n, default: []].sorted() {
         d.render(into: &o, showingPaths: .relative(to: root), style: .unstyled)
       }
 
-      if o != e {
-        XCTFail("output does not match expected result")
+      let lhs = e.split(whereSeparator: \.isNewline)
+      let rhs = o.split(whereSeparator: \.isNewline)
+      let delta = lhs.difference(from: rhs).inferringMoves()
+
+      if !delta.isEmpty {
+        report.write(Self.explain(difference: delta, relativeTo: lhs, named: n))
+
         guard case .local(let u) = n else { continue }
         let v = u.deletingPathExtension().appendingPathExtension("observed")
         try? o.write(to: v, atomically: true, encoding: .utf8)
       }
+    }
+
+    if !report.isEmpty {
+      XCTFail("observed output does match expecation:" + report)
     }
   }
 
@@ -204,6 +214,38 @@ final class CompilerTests: XCTestCase {
         try? o.write(to: v, atomically: true, encoding: .utf8)
       }
     }
+  }
+
+  /// Returns a message explaining `delta`, which is the result of comparing `expectation` to some
+  /// observed result.
+  private static func explain(
+    difference delta: CollectionDifference<String.SubSequence>,
+    relativeTo expectation: [Substring], named name: FileName
+  ) -> String {
+    var patch: [[(Character, Substring)]] = []
+
+    for change in delta {
+      switch change {
+      case .insert(let i, let line, _):
+        while patch.count <= i { patch.append([]) }
+        patch[i].append(("+", line))
+      case .remove(let i, let line, _):
+        while patch.count <= i { patch.append([]) }
+        patch[i].append(("-", line))
+      }
+    }
+
+    var report = "\n> \(name)"
+
+    for i in patch.indices {
+      if patch[i].isEmpty && (i < expectation.count) {
+        report.write("\n \(expectation[i])")
+      } else {
+        for (m, line) in patch[i] { report.write("\n\(m)\(line)") }
+      }
+    }
+
+    return report
   }
 
 }

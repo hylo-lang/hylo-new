@@ -552,15 +552,22 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `m` is considered to occur before `n` in diagnostics.
   ///
-  /// If `m` and `n` are in the same scope, they are ordered by the start of their source span.
-  /// Otherwise, they are ordered by an arbitrary (but consistent and stable) order.
+  /// If `m` and `n` are in the same file, they are ordered by the start of their source span. If
+  /// they in different source files belonging to the same module, they are ordered by the names of
+  /// these files. Otherwise, they are in ordered by the names of their containing modules.
   public func occurInOrder<T: SyntaxIdentity, U: SyntaxIdentity>(
     _ m: T, _ n: U
   ) -> Bool {
-    if parent(containing: m) == parent(containing: n) {
-      return StrictOrdering(between: self[m].site.end, and: self[n].site.start) == .ascending
+    if m.erased == n.erased {
+      return false
+    } else if m.file == n.file {
+      let l = self[m].site.start
+      let r = self[n].site.start
+      return (l != r) ? (l < r) : (m.erased.bits < n.erased.bits)
+    } else if m.module == n.module {
+      return self[m.file].source.name.lexicographicallyPrecedes(self[n.file].source.name)
     } else {
-      return m.erased.bits < n.erased.bits
+      return self[m.module].name.lexicographicallyPrecedes(self[n.module].name)
     }
   }
 

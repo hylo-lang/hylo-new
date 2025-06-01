@@ -7,7 +7,7 @@ public struct Module: Sendable {
 
   /// The name of a module.
   @Archivable
-  public struct Name: Hashable, CustomStringConvertible, Sendable {
+  public struct Name: Hashable, Sendable, CustomStringConvertible {
 
     /// The raw value of this name.
     public let rawValue: String
@@ -20,6 +20,11 @@ public struct Module: Sendable {
     /// A textual description of this name.
     public var description: String {
       rawValue
+    }
+
+    /// Returns `true` iff `self` lexicographicaly precedes `other`.
+    public func lexicographicallyPrecedes(_ other: Self) -> Bool {
+      rawValue.lexicographicallyPrecedes(other.rawValue)
     }
 
     /// The name of Hylo's standard library.
