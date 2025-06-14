@@ -198,21 +198,23 @@ final class CompilerTests: XCTestCase {
   private func assertSansError(_ program: Program) {
     if !program.containsError { return }
 
-    print(Array(program.diagnostics))
-
-    XCTFail("program contains one or more errors")
     let root = URL(filePath: #filePath).deletingLastPathComponent()
     let observations: [FileName: [Diagnostic]] = .init(
       grouping: program.diagnostics, by: \.site.source.name)
 
-    for case (.local(let u), let ds) in observations {
+    var report = "program contains one or more errors:\n"
+    for (n, e) in observations.sorted(by: { (a, b) in a.key.lexicographicallyPrecedes(b.key) }) {
       var o = ""
-      for d in ds.sorted() {
+      for d in e.sorted() {
         d.render(into: &o, showingPaths: .relative(to: root), style: .unstyled)
-        let v = u.deletingPathExtension().appendingPathExtension("observed")
-        try? o.write(to: v, atomically: true, encoding: .utf8)
+        if case .local(let u) = n {
+          let v = u.deletingPathExtension().appendingPathExtension("observed")
+          try? o.write(to: v, atomically: true, encoding: .utf8)
+        }
       }
+      report.write(o)
     }
+    XCTFail(report)
   }
 
   /// Returns a message explaining `delta`, which is the result of comparing `expectation` to some
