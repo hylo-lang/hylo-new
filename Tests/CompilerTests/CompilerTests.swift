@@ -158,11 +158,10 @@ final class CompilerTests: XCTestCase {
     return (driver.program, expectations)
   }
 
-  /// Asserts that the expected diagnostics of each source file in `expectations` matches those
+  /// Asserts that the expected `diagnostics` of each source file in `expectations` match those
   /// obtained during compilation.
   private func assertExpectations<T: Collection<Diagnostic>>(
-    _ expectations: [FileName: String],
-    _ diagnostics: T
+    _ expectations: [FileName: String], _ diagnostics: T
   ) {
     if expectations.isEmpty { return }
 

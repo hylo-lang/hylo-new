@@ -1,6 +1,6 @@
 import Archivist
 
-/// A pattern matching expression.
+/// A case in a pattern matching expression.
 @Archivable
 public struct PatternMatchCase: Expression, Scope {
 
@@ -10,7 +10,7 @@ public struct PatternMatchCase: Expression, Scope {
   /// The expression being compared with each pattern.
   public let pattern: PatternIdentity
 
-  /// The body of the function.
+  /// The body of the case.
   public let body: [StatementIdentity]
 
   /// The site from which `self` was parsed.

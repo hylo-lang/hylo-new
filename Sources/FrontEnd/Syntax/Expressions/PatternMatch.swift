@@ -1,6 +1,6 @@
 import Archivist
 
-/// A case in a pattern matching expression.
+/// A pattern matching expression.
 @Archivable
 public struct PatternMatch: Expression {
 
