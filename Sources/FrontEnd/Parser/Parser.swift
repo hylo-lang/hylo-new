@@ -2447,15 +2447,19 @@ public struct Parser {
   ) throws -> ([T], lastComma: Token?) {
     var xs: [T] = []
     var lastComma: Token? = nil
-    while let head = peek() {
-      if isRightDelimiter(head) { break }
+    while let head = peek(), !isRightDelimiter(head) {
+      if !xs.isEmpty && (lastComma == nil) {
+        report(expected("','"))
+      }
       do {
         try xs.append(parse(&self))
       } catch let e as ParseError {
         report(e)
         recover(at: { (t) in isRightDelimiter(t) || t.tag == .comma })
       }
-      if let c = take(.comma) { lastComma = c }
+      if let c = take(.comma) {
+        lastComma = c
+      }
     }
     return (xs, lastComma)
   }

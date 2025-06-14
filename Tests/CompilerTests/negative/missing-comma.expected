@@ -1,0 +1,4 @@
+negative/missing-comma.hylo:3.8: error: expected ','
+fun f<T U>(_ x: T, _ y: U) {}
+       ^
+
