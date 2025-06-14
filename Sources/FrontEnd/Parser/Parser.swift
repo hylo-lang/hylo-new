@@ -638,7 +638,7 @@ public struct Parser {
   private mutating func parseOptionalContextBoundList(
     on conformer: Token, in file: inout Module.SourceContainer
   ) throws -> [UsingDeclaration.ID] {
-    guard take(.colon) != nil else { return [] }
+    guard take(contextual: "is") != nil else { return [] }
     let bs = try ampersandSeparated(until: Token.oneOf([.comma, .where, .rightAngle])) { (me) in
       try me.parseContextBound(on: conformer, in: &file)
     }

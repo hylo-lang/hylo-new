@@ -6,10 +6,10 @@ struct A<T> {
   var x: T
 }
 
-given <T: P> A<T> is P {
+given <T is P> A<T> is P {
   fun f() { self.x.f() }
 }
 
-fun g<T: P>(_ x: T) {
+fun g<T is P>(_ x: T) {
   x.f()
 }

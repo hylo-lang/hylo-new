@@ -10,4 +10,4 @@ public enum Optional<T> {
 
 }
 
-public given <T: Deinitializable> Optional<T> is Deinitializable {}
+public given <T is Deinitializable> Optional<T> is Deinitializable {}
