@@ -74,7 +74,7 @@ extension EnumDeclaration: Showable {
 
     if !conformances.isEmpty {
       result.append(" is ")
-      result.append(printer.showAdjunct(conformances))
+      result.append(printer.show(adjunct: conformances))
     }
 
     result.append(" {\n")

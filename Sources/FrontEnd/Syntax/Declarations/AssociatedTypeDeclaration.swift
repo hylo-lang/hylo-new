@@ -1,6 +1,7 @@
 import Archivist
 
 /// The declaration of an associated type.
+@Archivable
 public struct AssociatedTypeDeclaration: TypeDeclaration {
 
   /// The introducer of this declaration.
@@ -12,6 +13,13 @@ public struct AssociatedTypeDeclaration: TypeDeclaration {
   /// The site from which `self` was parsed.
   public let site: SourceSpan
 
+  /// Creates an instance with the given properties.
+  public init(introducer: Token, identifier: Parsed<String>, site: SourceSpan) {
+    self.introducer = introducer
+    self.identifier = identifier
+    self.site = site
+  }
+
 }
 
 extension AssociatedTypeDeclaration: Showable {
@@ -19,22 +27,6 @@ extension AssociatedTypeDeclaration: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     "type \(identifier.value)"
-  }
-
-}
-
-extension AssociatedTypeDeclaration: Archivable {
-
-  public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
-    self.introducer = try archive.read(Token.self, in: &context)
-    self.identifier = try archive.read(Parsed<String>.self, in: &context)
-    self.site = try archive.read(SourceSpan.self, in: &context)
-  }
-
-  public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
-    try archive.write(introducer, in: &context)
-    try archive.write(identifier, in: &context)
-    try archive.write(site, in: &context)
   }
 
 }

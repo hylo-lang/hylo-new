@@ -302,7 +302,6 @@ public struct Typer {
   /// Type checks `d`.
   private mutating func check(_ d: AssociatedTypeDeclaration.ID) {
     _ = declaredType(of: d)
-    // TODO: Bounds
     checkUniqueDeclaration(d, of: program[d].identifier.value)
   }
 
@@ -2746,7 +2745,7 @@ public struct Typer {
   /// Returns the type of an instance of `Self` in `s`.
   private mutating func typeOfSelf(in d: ConformanceDeclaration.ID) -> AnyTypeIdentity {
     if program[d].isAdjunct {
-      // `Self` refers to the struct to which `d` is adjunct.
+      // `Self` refers to the type to which `d` is adjunct.
       return typeOfSelf(in: program.parent(containing: d))!
     } else {
       let t = declaredType(of: d)
@@ -3430,12 +3429,8 @@ public struct Typer {
         for n in givens(lexicallyIn: .init(node: t)) where !n.isSelfRecursive {
           gs.append(.nested(t, n))
         }
-      } else if let t = program.cast(d, to: StructDeclaration.self) {
-        for d in program[t].conformances {
-          gs.append(.user(.init(d)))
-        }
-      } else if let t = program.cast(d, to: EnumDeclaration.self) {
-        for d in program[t].conformances {
+      } else if let cs = program.adjuncts(of: d) {
+        for d in cs {
           gs.append(.user(.init(d)))
         }
       }

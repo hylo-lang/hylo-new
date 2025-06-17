@@ -62,7 +62,7 @@ public struct TreePrinter {
   }
 
   /// Returns a textual representation of the adjunct conformance.
-  public mutating func showAdjunct(_ conformances: [ConformanceDeclaration.ID]) -> String {
+  public mutating func show(adjunct conformances: [ConformanceDeclaration.ID]) -> String {
     var result = ""
     var first = true
     for c in conformances {

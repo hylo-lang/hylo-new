@@ -64,7 +64,7 @@ extension StructDeclaration: Showable {
     }
 
     if !conformances.isEmpty {
-      result.append(" is \(printer.showAdjunct(conformances))")
+      result.append(" is \(printer.show(adjunct: conformances))")
     }
 
     result.append(" {\n")

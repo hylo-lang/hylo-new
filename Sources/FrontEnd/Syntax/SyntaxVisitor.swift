@@ -46,7 +46,7 @@ extension Program {
     if !v.willEnter(n, in: self) { return }
     switch tag(of: n) {
     case AssociatedTypeDeclaration.self:
-      traverse(castUnchecked(n, to: AssociatedTypeDeclaration.self), calling: &v)
+      break
     case BindingDeclaration.self:
       traverse(castUnchecked(n, to: BindingDeclaration.self), calling: &v)
     case ConformanceDeclaration.self:
@@ -175,9 +175,6 @@ extension Program {
   public func visit<T: SyntaxVisitor>(_ cs: CaptureList, calling v: inout T) {
     visit(cs.explicit, calling: &v)
   }
-
-  /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
-  public func traverse<T: SyntaxVisitor>(_ n: AssociatedTypeDeclaration.ID, calling v: inout T) {}
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: BindingDeclaration.ID, calling v: inout T) {
