@@ -275,7 +275,7 @@ public struct Parser {
   ) throws -> EnumDeclaration.ID {
     let introducer = try take(.enum) ?? expected("'enum'")
     let identifier = parseSimpleIdentifier()
-    let parameters = try parseOptionalContextClause(in: &file)
+    let parameters = try parseOptionalTypeParameterClause(in: &file)
     let representation = try next(is: .leftParenthesis) ? parseExpression(in: &file) : nil
     let conformances = try parseOptionalAdjunctConformanceList(until: .leftBrace, in: &file)
     let members = try parseTypeBody(in: &file, accepting: \.isValidEnumMember)
@@ -286,7 +286,7 @@ public struct Parser {
         modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToTypeDeclaration),
         introducer: introducer,
         identifier: identifier,
-        staticParameters: parameters,
+        parameters: parameters,
         representation: representation,
         conformances: conformances,
         members: members,
@@ -303,14 +303,14 @@ public struct Parser {
     after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
   ) throws -> ExtensionDeclaration.ID {
     let introducer = try take(.extension) ?? expected("'extension'")
-    var parameters = try parseOptionalContextClause(in: &file)
+    var contextParameters = try parseOptionalContextClause(in: &file)
     let extendee = try parseExpression(in: &file)
 
     // Are we parsing a trait extension?
     if let colon = take(.colon) {
       if
         let n = file[extendee] as? NameExpression,
-        n.isUnqualifiedIdentifier && parameters.isEmpty
+        n.isUnqualifiedIdentifier && contextParameters.isEmpty
       {
         let r = try parseExpression(in: &file)
         let l = file.insert(n)
@@ -322,8 +322,8 @@ public struct Parser {
             ascription: nil,
             site: n.site))
 
-        parameters = .init(
-          explicit: [p], implicit: [.init(u)], site: n.site.extended(upTo: position.index))
+        contextParameters = .init(
+          types: [p], usings: [.init(u)], site: n.site.extended(upTo: position.index))
       } else {
         report(.init("'unexpected context bound'", at: colon.site))
         recover(at: Token.hasTag(.leftBrace))
@@ -339,7 +339,7 @@ public struct Parser {
     return file.insert(
       ExtensionDeclaration(
         introducer: introducer,
-        staticParameters: parameters,
+        contextParameters: contextParameters,
         extendee: extendee,
         members: members,
         site: span(from: introducer)))
@@ -431,7 +431,7 @@ public struct Parser {
           modifiers: prologue.modifiers,
           introducer: .init(introducer, at: introducer.site),
           identifier: i,
-          staticParameters: contextParameters,
+          contextParameters: contextParameters,
           captures: captures,
           parameters: p,
           effect: effect,
@@ -451,7 +451,7 @@ public struct Parser {
           modifiers: prologue.modifiers,
           introducer: f,
           identifier: identifier,
-          staticParameters: contextParameters,
+          contextParameters: contextParameters,
           captures: captures,
           parameters: p,
           effect: isMember ? .init(.let, at: effect.site) : effect,
@@ -485,7 +485,7 @@ public struct Parser {
           modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToInitializer),
           introducer: introducer,
           identifier: .init(.simple("init"), at: introducer.site),
-          staticParameters: contextParameters,
+          contextParameters: contextParameters,
           captures: .empty(at: introducer.site.end),
           parameters: [receiver] + parameters,
           effect: .init(.let, at: introducer.site),
@@ -502,7 +502,7 @@ public struct Parser {
           modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToInitializer),
           introducer: introducer,
           identifier: .init(.simple("init"), at: introducer.site),
-          staticParameters: .empty(at: .empty(at: position)),
+          contextParameters: .empty(at: .empty(at: position)),
           captures: .empty(at: introducer.site.end),
           parameters: [receiver],
           effect: .init(.let, at: introducer.site),
@@ -545,6 +545,26 @@ public struct Parser {
     return (s, r)
   }
 
+  /// Parses a type parameter clause iff the next token is a left angle bracket.
+  ///
+  ///     type-parameter-clause ::=
+  ///       '<' generic-parameter (',' generic-parameter)* ','? '>'
+  ///
+  /// Unlike a context clause, a type parameter clause does not admit using declarations.
+  private mutating func parseOptionalTypeParameterClause(
+    in file: inout Module.SourceContainer
+  ) throws -> [GenericParameterDeclaration.ID] {
+    if !next(is: .leftAngle) { return [] }
+    return try inAngles { (me) in
+      let ps = try me.parseCommaSeparatedGenericParameters(admittingUsings: false, in: &file)
+      if let h = me.take(.where) {
+        me.report(.init("where clause is not allowed here", at: .empty(at: h.site.start)))
+        me.recover(at: Token.hasTag(.rightAngle))
+      }
+      return ps.map(\.0)
+    }
+  }
+
   /// Parses a context clause iff the next token is a left angle bracket.
   ///
   ///     context-clause ::=
@@ -558,9 +578,10 @@ public struct Parser {
 
     return try inAngles { (me) in
       // Parse the type parameters and their context bounds.
-      let typesAndBounds = try me.parseCommaSeparatedGenericParameters(in: &file)
+      let typesAndBounds = try me.parseCommaSeparatedGenericParameters(
+        admittingUsings: true, in: &file)
 
-      // Insert desugared context bounds before explicit usings.
+      // Insert desugared context bounds before usings explicitly declared.
       var types = [GenericParameterDeclaration.ID](minimumCapacity: typesAndBounds.count)
       var usings: [DeclarationIdentity] = []
       for (t, bs) in typesAndBounds {
@@ -570,16 +591,17 @@ public struct Parser {
 
       // Parse other usings.
       try usings.append(contentsOf: me.parseOptionalWhereClause(in: &file))
-      return ContextParameters(explicit: types, implicit: usings, site: me.span(from: start))
+      return ContextParameters(types: types, usings: usings, site: me.span(from: start))
     }
   }
 
   /// Parses the generic parameter declarations of a context clause.
   private mutating func parseCommaSeparatedGenericParameters(
+    admittingUsings admitUsings: Bool,
     in file: inout Module.SourceContainer
   ) throws -> [(GenericParameterDeclaration.ID, [UsingDeclaration.ID])] {
     let (ps, _) = try commaSeparated(until: Token.oneOf([.rightAngle, .where])) { (me) in
-      try me.parseGenericParameterDeclaration(in: &file)
+      try me.parseGenericParameterDeclaration(admittingUsings: admitUsings, in: &file)
     }
     return ps
   }
@@ -590,11 +612,17 @@ public struct Parser {
   ///       identifier kind-ascription?
   ///
   private mutating func parseGenericParameterDeclaration(
+    admittingUsings admitUsings: Bool,
     in file: inout Module.SourceContainer
   ) throws -> (GenericParameterDeclaration.ID, [UsingDeclaration.ID]) {
     let n = try take(.name) ?? expected("identifier")
     let a = try parseOptionalKindAscription(in: &file)
+
     let b = try parseOptionalContextBoundList(on: n, in: &file)
+    if let c = b.first, !admitUsings {
+      report(.init("context bound is not allowed here", at: .empty(at: file[c].site.start)))
+    }
+
     let p = file.insert(
       GenericParameterDeclaration(identifier: .init(n), ascription: a, site: n.site))
     return (p, b)
@@ -873,7 +901,7 @@ public struct Parser {
   ) throws -> StructDeclaration.ID {
     let introducer = try take(.struct) ?? expected("'struct'")
     let identifier = parseSimpleIdentifier()
-    let parameters = try parseOptionalContextClause(in: &file)
+    let parameters = try parseOptionalTypeParameterClause(in: &file)
     let conformances = try parseOptionalAdjunctConformanceList(until: .leftBrace, in: &file)
     let members = try parseTypeBody(in: &file, accepting: \.isValidStructMember)
 
@@ -883,7 +911,7 @@ public struct Parser {
         modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToTypeDeclaration),
         introducer: introducer,
         identifier: identifier,
-        staticParameters: parameters,
+        parameters: parameters,
         conformances: conformances,
         members: members,
         site: span(from: introducer)))
@@ -905,7 +933,7 @@ public struct Parser {
     var members = try parseOptionalRefinementList(of: identifier.value,  in: &file)
     try members.append(contentsOf: parseTypeBody(in: &file, accepting: \.isValidTraitMember))
 
-    if let p = parameters.implicit.first {
+    if let p = parameters.usings.first {
       report(.init("constraints on trait parameters are not supported yet", at: file[p].site))
     }
 
@@ -915,7 +943,7 @@ public struct Parser {
         modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToTypeDeclaration),
         introducer: introducer,
         identifier: identifier,
-        parameters: parameters.explicit,
+        parameters: parameters.types,
         members: members,
         site: span(from: introducer)))
   }
@@ -1529,7 +1557,7 @@ public struct Parser {
         modifiers: [],
         introducer: .init(.fun, at: introducer.site),
         identifier: .init(.lambda, at: introducer.site),
-        staticParameters: .empty(at: .empty(at: introducer.site.end)),
+        contextParameters: .empty(at: .empty(at: introducer.site.end)),
         captures: captures,
         parameters: parameters,
         effect: effect,

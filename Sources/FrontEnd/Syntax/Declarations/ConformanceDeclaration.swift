@@ -14,8 +14,8 @@ public struct ConformanceDeclaration: TypeExtendingDeclaration {
   /// and no members; those belong to the struct declaration.
   public let introducer: Token
 
-  /// The compile-time parameters of the conformance.
-  public let staticParameters: ContextParameters
+  /// The type parameters and usings of the conformance.
+  public let contextParameters: ContextParameters
 
   /// The expression of the witness defined by the declaration.
   public let witness: StaticCall.ID
@@ -37,7 +37,7 @@ public struct ConformanceDeclaration: TypeExtendingDeclaration {
   ) {
     self.modifiers = modifiers
     self.introducer = introducer
-    self.staticParameters = staticParameters
+    self.contextParameters = staticParameters
     self.witness = witness
     self.members = members
     self.site = site
@@ -57,8 +57,8 @@ extension ConformanceDeclaration: Showable {
     let sugared = printer.program.seenAsConformanceTypeExpression(witness)!
 
     var result = "given"
-    if !staticParameters.isEmpty {
-      result.append(" " + printer.show(staticParameters))
+    if !contextParameters.isEmpty {
+      result.append(" " + printer.show(contextParameters))
     }
 
     result.append(" \(printer.show(sugared.conformer)) is \(printer.show(sugared.concept))")

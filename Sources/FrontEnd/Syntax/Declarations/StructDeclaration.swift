@@ -16,8 +16,8 @@ public struct StructDeclaration: TypeDeclaration, ModifiableDeclaration, Annotat
   /// The name of the declared struct.
   public let identifier: Parsed<String>
 
-  /// The compile-time parameters of the struct.
-  public let staticParameters: ContextParameters
+  /// The type parameters of the struct.
+  public let parameters: [GenericParameterDeclaration.ID]
 
   /// The conformances declared along with the struct.
   public let conformances: [ConformanceDeclaration.ID]
@@ -34,7 +34,7 @@ public struct StructDeclaration: TypeDeclaration, ModifiableDeclaration, Annotat
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Token,
     identifier: Parsed<String>,
-    staticParameters: ContextParameters,
+    parameters: [GenericParameterDeclaration.ID],
     conformances: [ConformanceDeclaration.ID],
     members: [DeclarationIdentity],
     site: SourceSpan
@@ -43,7 +43,7 @@ public struct StructDeclaration: TypeDeclaration, ModifiableDeclaration, Annotat
     self.modifiers = modifiers
     self.introducer = introducer
     self.identifier = identifier
-    self.staticParameters = staticParameters
+    self.parameters = parameters
     self.conformances = conformances
     self.members = members
     self.site = site
@@ -59,8 +59,8 @@ extension StructDeclaration: Showable {
     for m in modifiers { result.append("\(m) ") }
     result.append("struct \(identifier.value)")
 
-    if !staticParameters.isEmpty {
-      result.append(printer.show(staticParameters))
+    if !parameters.isEmpty {
+      result.append("<\(printer.show(parameters))>")
     }
 
     if !conformances.isEmpty {

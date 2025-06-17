@@ -1,37 +1,37 @@
 import Archivist
 
-/// A clause describing contextual parameters and contextual constraints taken at compile-time.
+/// A clause describing context parameters and contextual constraints (aka usings).
 @Archivable
 public struct ContextParameters: Equatable, Sendable {
 
-  /// The explicit parameters of the list.
-  public let explicit: [GenericParameterDeclaration.ID]
+  /// The type parameters of the list.
+  public let types: [GenericParameterDeclaration.ID]
 
   /// The constraints in the clause.
-  public let implicit: [DeclarationIdentity]
+  public let usings: [DeclarationIdentity]
 
   /// The site from which `self` was parsed.
   public let site: SourceSpan
 
   /// Creates an instance with the given properties.
   public init(
-    explicit: [GenericParameterDeclaration.ID],
-    implicit: [DeclarationIdentity],
+    types: [GenericParameterDeclaration.ID],
+    usings: [DeclarationIdentity],
     site: SourceSpan
   ) {
-    self.explicit = explicit
-    self.implicit = implicit
+    self.types = types
+    self.usings = usings
     self.site = site
   }
 
   /// `true` iff `self` doesn't contain any parameter or constraint.
   public var isEmpty: Bool {
-    explicit.isEmpty && implicit.isEmpty
+    types.isEmpty && usings.isEmpty
   }
 
   /// Returns an empty clause anchored at `site`.
   public static func empty(at site: SourceSpan) -> ContextParameters {
-    .init(explicit: [], implicit: [], site: site)
+    .init(types: [], usings: [], site: site)
   }
 
 }
@@ -40,10 +40,10 @@ extension ContextParameters: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    if implicit.isEmpty {
-      return "<\(printer.show(explicit))>"
+    if usings.isEmpty {
+      return "<\(printer.show(types))>"
     } else {
-      return "<\(printer.show(explicit)) where \(printer.show(implicit))>"
+      return "<\(printer.show(types)) where \(printer.show(usings))>"
     }
   }
 

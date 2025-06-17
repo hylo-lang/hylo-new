@@ -343,7 +343,7 @@ public struct Typer {
   private mutating func check(_ d: ConformanceDeclaration.ID) {
     let t = declaredType(of: d)
 
-    check(program[d].staticParameters)
+    check(program[d].contextParameters)
 
     // Abstract conformance declarations can only occur in traits.
     guard let members = program[d].members else {
@@ -511,7 +511,7 @@ public struct Typer {
   private mutating func check(_ d: FunctionBundleDeclaration.ID) {
     _ = declaredType(of: d)
 
-    check(program[d].staticParameters)
+    check(program[d].contextParameters)
     check(program[d].parameters)
     for v in program[d].variants { check(v) }
 
@@ -533,7 +533,7 @@ public struct Typer {
       return
     }
 
-    check(program[d].staticParameters)
+    check(program[d].contextParameters)
     check(program[d].parameters)
     check(body: program[d].body, of: .init(d), expectingOutputType: a.output)
     checkCaptures(of: d)
@@ -679,8 +679,8 @@ public struct Typer {
 
   /// Type checks `ps`.
   private mutating func check(_ ps: ContextParameters) {
-    for p in ps.explicit { check(p) }
-    for p in ps.implicit { check(p) }
+    for p in ps.types { check(p) }
+    for p in ps.usings { check(p) }
   }
 
   /// Type checks `n`.
@@ -1088,9 +1088,9 @@ public struct Typer {
     if declarationsOnStack.insert(.init(d)).inserted {
       defer { declarationsOnStack.remove(.init(d)) }
 
-      initializeContext(program[d].staticParameters)
+      initializeContext(program[d].contextParameters)
       let t = evaluateTypeAscription(.init(program[d].witness))
-      let u = introduce(program[d].staticParameters, into: t)
+      let u = introduce(program[d].contextParameters, into: t)
       program[module].setType(u, for: d)
       return u
     }
@@ -1121,11 +1121,7 @@ public struct Typer {
     if let memoized = program[d.module].type(assignedTo: d) { return memoized }
     assert(d.module == module, "dependency is not typed")
 
-    let ps = declaredTypes(of: program[d].staticParameters.explicit)
-    if let i = program[d].staticParameters.implicit.first {
-      let s = program.spanForDiagnostic(about: i)
-      report(.init(.error, "context parameters in type definitions are not supported yet", at: s))
-    }
+    let ps = declaredTypes(of: program[d].parameters)
 
     var s = demand(Enum(declaration: d)).erased
     if !ps.isEmpty {
@@ -1144,7 +1140,7 @@ public struct Typer {
     if let memoized = program[d.module].type(assignedTo: d) { return memoized }
     assert(d.module == module, "dependency is not typed")
 
-    initializeContext(program[d].staticParameters)
+    initializeContext(program[d].contextParameters)
     let variants = AccessEffectSet(program[d].variants.map(program.read(\.effect.value)))
     let inputs = declaredTypes(of: program[d].parameters)
     let shape = declaredArrowType(of: d, taking: inputs)
@@ -1162,7 +1158,7 @@ public struct Typer {
     if let memoized = program[d.module].type(assignedTo: d) { return memoized }
     assert(d.module == module, "dependency is not typed")
 
-    initializeContext(program[d].staticParameters)
+    initializeContext(program[d].contextParameters)
     var inputs: [Parameter] = []
 
     // Do we have to synthesize the parameter list of a memberwise initializer?
@@ -1229,11 +1225,7 @@ public struct Typer {
     if let memoized = program[d.module].type(assignedTo: d) { return memoized }
     assert(d.module == module, "dependency is not typed")
 
-    let ps = declaredTypes(of: program[d].staticParameters.explicit)
-    if let i = program[d].staticParameters.implicit.first {
-      let s = program.spanForDiagnostic(about: i)
-      report(.init(.error, "context parameters in type definitions are not supported yet", at: s))
-    }
+    let ps = declaredTypes(of: program[d].parameters)
 
     var s = demand(Struct(declaration: d)).erased
     if !ps.isEmpty {
@@ -1370,7 +1362,7 @@ public struct Typer {
     let o = program[d].output.map({ (a) in evaluateTypeAscription(a) }) ?? .void
     let k = program[d].effect.value
     let a = demand(Arrow(effect: k, environment: e, inputs: inputs, output: o))
-    return introduce(program[d].staticParameters, into: a.erased)
+    return introduce(program[d].contextParameters, into: a.erased)
   }
 
   /// Returns the type of the environment of `d`.
@@ -1497,9 +1489,9 @@ public struct Typer {
     if let memoized = program[d.module].type(assignedTo: d) { return memoized }
     assert(d.module == module, "dependency is not typed")
 
-    initializeContext(program[d].staticParameters)
+    initializeContext(program[d].contextParameters)
     let t = ignoring(d, { (me) in me.evaluateTypeAscription(me.program[d].extendee) })
-    let u = introduce(program[d].staticParameters, into: t)
+    let u = introduce(program[d].contextParameters, into: t)
     program[module].setType(u, for: d)
     return u
   }
@@ -1527,8 +1519,8 @@ public struct Typer {
 
   /// Computes the types of the given context parameters, introducing them in order.
   private mutating func initializeContext(_ parameters: ContextParameters) {
-    declarationsOnStack.formUnion(parameters.implicit)
-    for p in parameters.implicit {
+    declarationsOnStack.formUnion(parameters.usings)
+    for p in parameters.usings {
       _ = declaredType(of: p)
       let q = declarationsOnStack.remove(p)
       assert(q != nil)
@@ -1541,8 +1533,8 @@ public struct Typer {
   ) -> AnyTypeIdentity {
     if parameters.isEmpty { return t }
 
-    let ps = declaredTypes(of: parameters.explicit)
-    let us = parameters.implicit.map({ (p) in declaredType(of: p) })
+    let ps = declaredTypes(of: parameters.types)
+    let us = parameters.usings.map({ (p) in declaredType(of: p) })
     return program.types.introduce(.init(parameters: ps, usings: us), into: t)
   }
 
@@ -2065,7 +2057,7 @@ public struct Typer {
     // infer the types of the parameters and/or return value from the context, unlike in standard
     // function declarations.
 
-    assert(program[underlying].staticParameters.isEmpty)
+    assert(program[underlying].contextParameters.isEmpty)
     assert(program[underlying].body != nil)
 
     let hint = context.expectedType.flatMap { (h) -> (context: ContextClause, head: Arrow)? in

@@ -17,8 +17,8 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
   /// The name of the declared function.
   public let identifier: Parsed<String>
 
-  /// The compile-time parameters of the bundle.
-  public let staticParameters: ContextParameters
+  /// The type parameters and usings of the function.
+  public let contextParameters: ContextParameters
 
   /// The capture-list of the function.
   public let captures: CaptureList
@@ -44,7 +44,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Parsed<Token>,
     identifier: Parsed<String>,
-    staticParameters: ContextParameters,
+    contextParameters: ContextParameters,
     captures: CaptureList,
     parameters: [ParameterDeclaration.ID],
     effect: Parsed<AccessEffect>,
@@ -56,7 +56,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
     self.modifiers = modifiers
     self.introducer = introducer
     self.identifier = identifier
-    self.staticParameters = staticParameters
+    self.contextParameters = contextParameters
     self.captures = captures
     self.parameters = parameters
     self.effect = effect
@@ -76,8 +76,8 @@ extension FunctionBundleDeclaration: Showable {
 
     result.append("fun \(identifier.value)")
 
-    if !staticParameters.isEmpty {
-      result.append(printer.show(staticParameters))
+    if !contextParameters.isEmpty {
+      result.append(printer.show(contextParameters))
     }
 
     result.append(printer.show(captures))

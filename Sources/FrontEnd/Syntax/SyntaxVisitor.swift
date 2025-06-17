@@ -167,8 +167,8 @@ extension Program {
 
   /// Visits `ps` and their children in pre-order, calling back `v` when a node is entered or left.
   public func visit<T: SyntaxVisitor>(_ ps: ContextParameters, calling v: inout T) {
-    visit(ps.explicit, calling: &v)
-    visit(ps.implicit, calling: &v)
+    visit(ps.types, calling: &v)
+    visit(ps.usings, calling: &v)
   }
 
   /// Visits `cs` and their children in pre-order, calling back `v` when a node is entered or left.
@@ -184,7 +184,7 @@ extension Program {
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: ConformanceDeclaration.ID, calling v: inout T) {
-    visit(self[n].staticParameters, calling: &v)
+    visit(self[n].contextParameters, calling: &v)
     visit(self[n].witness, calling: &v)
     if let b = self[n].members { visit(b, calling: &v) }
   }
@@ -197,7 +197,7 @@ extension Program {
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: EnumDeclaration.ID, calling v: inout T) {
-    visit(self[n].staticParameters, calling: &v)
+    visit(self[n].parameters, calling: &v)
     visit(self[n].representation, calling: &v)
     visit(self[n].conformances, calling: &v)
     visit(self[n].members, calling: &v)
@@ -205,14 +205,14 @@ extension Program {
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: ExtensionDeclaration.ID, calling v: inout T) {
-    visit(self[n].staticParameters, calling: &v)
+    visit(self[n].contextParameters, calling: &v)
     visit(self[n].extendee, calling: &v)
     visit(self[n].members, calling: &v)
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: FunctionBundleDeclaration.ID, calling v: inout T) {
-    visit(self[n].staticParameters, calling: &v)
+    visit(self[n].contextParameters, calling: &v)
     visit(self[n].captures, calling: &v)
     visit(self[n].parameters, calling: &v)
     visit(self[n].output, calling: &v)
@@ -221,7 +221,7 @@ extension Program {
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: FunctionDeclaration.ID, calling v: inout T) {
-    visit(self[n].staticParameters, calling: &v)
+    visit(self[n].contextParameters, calling: &v)
     visit(self[n].captures, calling: &v)
     visit(self[n].parameters, calling: &v)
     visit(self[n].output, calling: &v)
@@ -241,7 +241,7 @@ extension Program {
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: StructDeclaration.ID, calling v: inout T) {
-    visit(self[n].staticParameters, calling: &v)
+    visit(self[n].parameters, calling: &v)
     visit(self[n].conformances, calling: &v)
     visit(self[n].members, calling: &v)
   }

@@ -16,8 +16,8 @@ public struct EnumDeclaration: TypeDeclaration, ModifiableDeclaration, Annotatab
   /// The name of the declared struct.
   public let identifier: Parsed<String>
 
-  /// The compile-time parameters of the struct.
-  public let staticParameters: ContextParameters
+  /// The type parameters of the struct.
+  public let parameters: [GenericParameterDeclaration.ID]
 
   /// The raw representation of the enumeration, if any.
   public let representation: ExpressionIdentity?
@@ -37,7 +37,7 @@ public struct EnumDeclaration: TypeDeclaration, ModifiableDeclaration, Annotatab
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Token,
     identifier: Parsed<String>,
-    staticParameters: ContextParameters,
+    parameters: [GenericParameterDeclaration.ID],
     representation: ExpressionIdentity?,
     conformances: [ConformanceDeclaration.ID],
     members: [DeclarationIdentity],
@@ -47,7 +47,7 @@ public struct EnumDeclaration: TypeDeclaration, ModifiableDeclaration, Annotatab
     self.modifiers = modifiers
     self.introducer = introducer
     self.identifier = identifier
-    self.staticParameters = staticParameters
+    self.parameters = parameters
     self.representation = representation
     self.conformances = conformances
     self.members = members
@@ -64,8 +64,8 @@ extension EnumDeclaration: Showable {
     for m in modifiers { result.append("\(m) ") }
     result.append("enum \(identifier.value)")
 
-    if !staticParameters.isEmpty {
-      result.append(printer.show(staticParameters))
+    if !parameters.isEmpty {
+      result.append("<\(printer.show(parameters))>")
     }
 
     if let r = representation {

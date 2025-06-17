@@ -32,8 +32,8 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
   /// The name of the declared function.
   public let identifier: Parsed<FunctionIdentifier>
 
-  /// The compile-time parameters of the function.
-  public let staticParameters: ContextParameters
+  /// The type parameters and usings of the function.
+  public let contextParameters: ContextParameters
 
   /// The capture-list of the function.
   public let captures: CaptureList
@@ -59,7 +59,7 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Parsed<Introducer>,
     identifier: Parsed<FunctionIdentifier>,
-    staticParameters: ContextParameters,
+    contextParameters: ContextParameters,
     captures: CaptureList,
     parameters: [ParameterDeclaration.ID],
     effect: Parsed<AccessEffect>,
@@ -71,7 +71,7 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
     self.modifiers = modifiers
     self.introducer = introducer
     self.identifier = identifier
-    self.staticParameters = staticParameters
+    self.contextParameters = contextParameters
     self.captures = captures
     self.parameters = parameters
     self.effect = effect
@@ -101,8 +101,8 @@ extension FunctionDeclaration: Showable {
     case .memberwiseinit: result.append("memberwise init")
     }
 
-    if !staticParameters.isEmpty {
-      result.append(printer.show(staticParameters))
+    if !contextParameters.isEmpty {
+      result.append(printer.show(contextParameters))
     }
 
     result.append(printer.show(captures))

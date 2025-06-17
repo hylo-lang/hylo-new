@@ -1,8 +1,8 @@
 /// The declaration of a callable entity.
 public protocol RoutineDeclaration: ModifiableDeclaration {
 
-  /// The compile-time parameters of the entity.
-  var staticParameters: ContextParameters { get }
+  /// The type parameters and usings of the entity.
+  var contextParameters: ContextParameters { get }
 
   /// The capture-list of the entity.
   var captures: CaptureList { get }

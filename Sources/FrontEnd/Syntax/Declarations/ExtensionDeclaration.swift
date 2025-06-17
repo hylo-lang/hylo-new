@@ -7,8 +7,8 @@ public struct ExtensionDeclaration: TypeExtendingDeclaration {
   /// The introducer of this declaration.
   public let introducer: Token
 
-  /// The compile-time parameters of the extension.
-  public let staticParameters: ContextParameters
+  /// The type parameters and usings of the extension.
+  public let contextParameters: ContextParameters
 
   /// The type being extended.
   public let extendee: ExpressionIdentity
@@ -22,13 +22,13 @@ public struct ExtensionDeclaration: TypeExtendingDeclaration {
   /// Creates an instance with the given properties.
   public init(
     introducer: Token,
-    staticParameters: ContextParameters,
+    contextParameters: ContextParameters,
     extendee: ExpressionIdentity,
     members: [DeclarationIdentity],
     site: SourceSpan
   ) {
     self.introducer = introducer
-    self.staticParameters = staticParameters
+    self.contextParameters = contextParameters
     self.extendee = extendee
     self.members = members
     self.site = site
@@ -41,7 +41,7 @@ extension ExtensionDeclaration: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     let e = printer.show(extendee)
-    let w = staticParameters.isEmpty ? "" : " \(printer.show(staticParameters))"
+    let w = contextParameters.isEmpty ? "" : " \(printer.show(contextParameters))"
     let m = members.map({ (m) in printer.show(m).indented }).joined(separator: "\n")
     return """
       extension\(w) \(e) {
