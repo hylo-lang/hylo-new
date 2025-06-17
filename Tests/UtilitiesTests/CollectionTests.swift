@@ -24,6 +24,14 @@ final class CollectionTests: XCTestCase {
     XCTAssertEqual(Array(t2), [2, 3])
   }
 
+  func testWithUnsafeTemporaryView() throws {
+    let a = [1, 2, 3, 4]
+    let n = a.withUnsafeTemporaryView(applying: { (x) in x * x }) { (b) in
+      b.filter({ (x) in x > 6 })
+    }
+    XCTAssertEqual(n, [9, 16])
+  }
+
   func testRemoveDuplicates() {
     var a0 = [1, 2, 1, 1, 3, 3, 3, 4, 5, 4]
     a0.removeDuplicates()
