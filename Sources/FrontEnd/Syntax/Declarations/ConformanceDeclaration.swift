@@ -43,11 +43,6 @@ public struct ConformanceDeclaration: TypeExtendingDeclaration {
     self.site = site
   }
 
-  /// Returns `true` iff `self` is a trait requirement without a definition.
-  public var isAbstract: Bool {
-    members == nil
-  }
-
   /// Returns `true` iff `self` is adjunct to a type declaration.
   public var isAdjunct: Bool {
     introducer.text == "is"

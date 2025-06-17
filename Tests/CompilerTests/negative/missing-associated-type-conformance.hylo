@@ -1,0 +1,21 @@
+//! no-std
+
+trait P {
+  type X ; given X is P
+  fun x() -> X
+}
+
+given {a: Void} is P {
+  typealias X = {a: Void}
+  public fun x() -> X { (a: ()) }
+}
+
+given {b: Void} is P {
+  typealias X = {c: Void}
+  public fun x() -> X { (c: ()) }
+}
+
+fun f<T where T is P>(_ t: T) {
+  let x: T.X = t.x()
+  f(x)
+}

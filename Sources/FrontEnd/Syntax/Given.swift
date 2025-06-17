@@ -7,8 +7,8 @@ public enum Given: Hashable {
   /// The built-in given of a coercion.
   case coercion(EqualityProperty)
 
-  /// A given implied by a constraint defined in a trait.
-  case abstract(AnyTypeIdentity)
+  /// A given defining the conformance of `P.Self` to `P` in the declaration of `P`.
+  case recursive(AnyTypeIdentity)
 
   /// A given that is assumed during implicit resolution.
   case assumed(Int, AnyTypeIdentity)
@@ -16,9 +16,9 @@ public enum Given: Hashable {
   /// A given nested in a trait.
   indirect case nested(TraitDeclaration.ID, Given)
 
-  /// Returns `true` iff `self` is `.abstract`.
-  public var isAbstract: Bool {
-    if case .abstract = self { true } else { false }
+  /// Returns `true` iff `self` is `.recursive`.
+  public var isSelfRecursive: Bool {
+    if case .recursive = self { true } else { false }
   }
 
 }

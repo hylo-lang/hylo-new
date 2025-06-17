@@ -698,8 +698,8 @@ public struct TypeStore: Sendable {
     switch (self[a], self[b]) {
     case (let t as Arrow, let u as Arrow):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
-    case (_ as AssociatedType, _ as AssociatedType):
-      result = false
+    case (let t as AssociatedType, let u as AssociatedType):
+      result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as Bundle, let u as Bundle):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as EqualityWitness, let u as EqualityWitness):
@@ -758,6 +758,21 @@ public struct TypeStore: Sendable {
         by: { (a, b, s) in unifiable(a, b, extending: &s, handlingCoercionsWith: areCoercible) })
       && unifiable(
         lhs.output, rhs.output, extending: &ss, handlingCoercionsWith: areCoercible)
+  }
+
+  /// Returns `true` if `lhs` and `rhs` are unifiable.
+  private func unifiable(
+    _ lhs: AssociatedType, _ rhs: AssociatedType, extending ss: inout SubstitutionTable,
+    handlingCoercionsWith areCoercible: CoercionHandler
+  ) -> Bool {
+    if lhs.declaration == rhs.declaration {
+      let a = lhs.qualification
+      let b = rhs.qualification
+      return ((a.value == .abstract) || (b.value == .abstract))
+        && unifiable(a.type, b.type, extending: &ss, handlingCoercionsWith: areCoercible)
+    } else {
+      return false
+    }
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.

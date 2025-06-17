@@ -128,12 +128,16 @@ public struct Typer {
 
   /// Returns `true` iff `t` and `u` are equal modulo α-conversion.
   public mutating func unifiable(_ t: AnyTypeIdentity, _ u: AnyTypeIdentity) -> Bool {
+    // Ignore aliases.
+    let t1 = program.types.dealiased(t)
+    let u1 = program.types.dealiased(u)
+
     // Fast path: types are trivially equal.
-    if t == u { return true }
+    if t1 == u1 { return true }
 
     // Slow path: unify the types.
-    let lhs = program.types.contextAndHead(t)
-    let rhs = program.types.contextAndHead(u)
+    let lhs = program.types.contextAndHead(t1)
+    let rhs = program.types.contextAndHead(u1)
 
     // Map the type parameters on the RHS to those on the LHS.
     if lhs.context.parameters.count != rhs.context.parameters.count { return false }
@@ -1404,7 +1408,7 @@ public struct Typer {
       let u = program.types.introduce(c, into: t)
       return u
 
-    case .abstract(let t):
+    case .recursive(let t):
       return t
 
     case .assumed(_, let t):
@@ -3385,7 +3389,7 @@ public struct Typer {
     appendGivens(in: program.declarations(lexicallyIn: s), to: &gs)
 
     if let d = s.node, let c = program.cast(d, to: TraitDeclaration.self) {
-      gs.append(.abstract(typeOfTraitSelf(in: c).erased))
+      gs.append(.recursive(typeOfTraitSelf(in: c).erased))
     }
 
     cache.scopeToGivens[s] = gs
@@ -3423,7 +3427,7 @@ public struct Typer {
 
       // Collect given definitions nested in traits and adjunct conformances.
       else if let t = program.cast(d, to: TraitDeclaration.self) {
-        for n in givens(lexicallyIn: .init(node: t)) where !n.isAbstract {
+        for n in givens(lexicallyIn: .init(node: t)) where !n.isSelfRecursive {
           gs.append(.nested(t, n))
         }
       } else if let t = program.cast(d, to: StructDeclaration.self) {
@@ -3444,7 +3448,7 @@ public struct Typer {
     switch g {
     case .coercion:
       return .init(value: .reference(.builtin(.coercion)), type: t)
-    case .abstract:
+    case .recursive:
       return .init(value: .abstract, type: t)
     case .assumed(let i, _):
       return .init(value: .assumed(i), type: t)

@@ -1,4 +1,7 @@
+import Archivist
+
 /// The selection of the associated type of some type.
+@Archivable
 public struct AssociatedType: TypeTree {
 
   /// The declaration of the type.
@@ -6,6 +9,12 @@ public struct AssociatedType: TypeTree {
 
   /// The qualification of the type.
   public let qualification: WitnessExpression
+
+  /// Creates an instance with the given properties.
+  public init(declaration: AssociatedTypeDeclaration.ID, qualification: WitnessExpression) {
+    self.declaration = declaration
+    self.qualification = qualification
+  }
 
   /// Properties about `self` and its children.
   public var properties: ValueProperties {
