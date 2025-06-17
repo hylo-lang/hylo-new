@@ -3163,15 +3163,7 @@ public struct Typer {
     }
 
     // Givens visible from `scopeOfUse`.
-    for s in program.scopes(from: scopeOfUse) {
-      gs.append(givens(lexicallyIn: s).filter(notOnStack(_:)))
-    }
-    for f in program[scopeOfUse.module].sourceFileIdentities where f != scopeOfUse.file {
-      gs.append(givens(lexicallyIn: .init(file: f)).filter(notOnStack(_:)))
-    }
-    for i in imports(of: scopeOfUse.file) {
-      gs.append(givens(atTopLevelOf: i).filter(notOnStack(_:)))
-    }
+    gs.append(contentsOf: givens(visibleFrom: scopeOfUse))
 
     // Built-in givens.
     gs.append([
@@ -3274,14 +3266,13 @@ public struct Typer {
       return threadContinuation(appending: r, to: thread, in: scopeOfUse)
     }
 
-    // Resolution failed if nothing matches structurally.
-    else if let (x, y) = coercions.uniqueElement, (x == a), (y == b) {
+    // Can coercions be derived in the current context?
+    else if !canDeriveCoercions(in: scopeOfUse, where: thread.environment) {
       return .next([])
     }
 
-    // Properties of equality are encoded as axioms so there is no need to assume non-syntactic
-    // equalities between parts of equality witnesses.
-    else if program.types.isEquality(a) || program.types.isEquality(b) {
+    // Resolution failed if nothing matches structurally.
+    else if let (x, y) = coercions.uniqueElement, (x == a), (y == b) {
       return .next([])
     }
 
@@ -3401,6 +3392,26 @@ public struct Typer {
     return gs
   }
 
+  /// Returns the givens whose definitions are visible from `scopeOfUse`, excluding those whose
+  /// type is being computed.
+  ///
+  /// The result does not include built-in givens.
+  private mutating func givens(visibleFrom scopeOfUse: ScopeIdentity) -> [[Given]] {
+    var gs: [[Given]] = []
+
+    for s in program.scopes(from: scopeOfUse) {
+      gs.append(givens(lexicallyIn: s).filter(notOnStack(_:)))
+    }
+    for f in program[scopeOfUse.module].sourceFileIdentities where f != scopeOfUse.file {
+      gs.append(givens(lexicallyIn: .init(file: f)).filter(notOnStack(_:)))
+    }
+    for i in imports(of: scopeOfUse.file) {
+      gs.append(givens(atTopLevelOf: i).filter(notOnStack(_:)))
+    }
+
+    return gs
+  }
+
   /// Appends the declarations of compile-time givens in `ds` to `gs`.
   private mutating func appendGivens<S: Sequence<DeclarationIdentity>>(
     in ds: S, to gs: inout [Given]
@@ -3449,23 +3460,37 @@ public struct Typer {
     _ e: ExpressionIdentity, withType a: AnyTypeIdentity, toMatch b: AnyTypeIdentity
   ) -> [SummonResult] {
     // Fast path: types are unifiable without any coercion.
-    if !b.isVariable, let subs = program.types.unifiable(a, b) {
+    if let subs = program.types.unifiable(a, b) {
       return [SummonResult(witness: .init(value: .identity(e), type: a), substitutions: subs)]
     }
 
     // Slow path: compute an elaboration.
-    let sansCoercion = formThread(
-      matching: .init(value: .identity(e), type: a), to: b, in: .empty, delayedBy: 0)
-
-    // Either the type of the elaborated witness is unifiable with the queried type or we need to
-    // assume a coercion. Implicit resolution will figure out the "cheapest" alternative.
-    let (environment, coercion) = sansCoercion.environment.assuming(
-      given: demand(EqualityWitness(lhs: sansCoercion.witness.type, rhs: b)).erased)
-    let w = WitnessExpression(value: .termApplication(coercion, sansCoercion.witness), type: b)
-    let withCoercion = sansCoercion.copy(matching: w, to: b, in: environment)
-
     let scopeOfUse = program.parent(containing: e)
-    return takeSummonResults(from: [sansCoercion, withCoercion], in: scopeOfUse)
+    let root = WitnessExpression(value: .identity(e), type: a)
+    var threads = [formThread(matching: root, to: b, in: .empty, delayedBy: 0)]
+
+    if canDeriveCoercions(in: scopeOfUse, where: .empty) {
+      // Either the type of the elaborated witness is unifiable with the queried type or we need to
+      // assume a coercion. Implicit resolution will figure out the "cheapest" alternative.
+      let (environment, coercion) = ResolutionThread.Environment.empty.assuming(
+        given: demand(EqualityWitness(lhs: root.type, rhs: b)).erased)
+      let w = WitnessExpression(value: .termApplication(coercion, root), type: b)
+      threads.append(formThread(matching: w, to: b, in: environment, delayedBy: 0))
+    }
+
+    return takeSummonResults(from: threads, in: scopeOfUse)
+  }
+
+  /// Returns `true` iff a coercion may be derived using the givens visible from `scopeOfUse` and
+  /// those assumed in `environment`.
+  private mutating func canDeriveCoercions(
+    in scopeOfUse: ScopeIdentity, where environment: ResolutionThread.Environment
+  ) -> Bool {
+    chain(environment.givens, givens(visibleFrom: scopeOfUse).joined()).contains { (g) in
+      let t = declaredType(of: g)
+      let (c, u) = program.types.contextAndHead(t)
+      return program.types.isEquality(u) || c.parameters.contains(where: { (p) in p == u })
+    }
   }
 
   // MARK: Name resolution

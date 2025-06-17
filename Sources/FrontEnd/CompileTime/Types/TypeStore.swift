@@ -69,6 +69,11 @@ public struct TypeStore: Sendable {
     .init(type(of: self[n]))
   }
 
+  /// Returns `true` iff `n` identifies a generic type parameter.
+  public func isParameter<T: TypeIdentity>(_ n: T) -> Bool {
+    tag(of: n) == GenericParameter.self
+  }
+
   /// Returns `true` iff `n` identifies the type of an equality witness.
   public func isEquality<T: TypeIdentity>(_ n: T) -> Bool {
     tag(of: n) == EqualityWitness.self
@@ -167,8 +172,7 @@ public struct TypeStore: Sendable {
     while true {
       switch self[h] {
       case let t as UniversalType:
-        let a = open(t.parameters)
-        h = substitute(a, in: t.body)
+        h = open(t.parameters, in: t.body)
       case let t as Implication:
         u.append(contentsOf: t.usings)
         h = t.body
@@ -176,6 +180,14 @@ public struct TypeStore: Sendable {
         return (u, h)
       }
     }
+  }
+
+  /// Returns `n` with each occurrence the parameters in `ps` substituted for a fresh variable.
+  public mutating func open(
+    _ ps: [GenericParameter.ID], in n: AnyTypeIdentity
+  ) -> AnyTypeIdentity {
+    let a = open(ps)
+    return substitute(a, in: n)
   }
 
   /// Returns a table mapping each parameter in `ps` to a fresh unification variable.
