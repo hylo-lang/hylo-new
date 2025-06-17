@@ -6,12 +6,12 @@ trait P {
 }
 
 given {a: Void} is P {
-  typealias X = {a: Void}
+  type X = {a: Void}
   public fun x() -> X { (a: ()) }
 }
 
 given {b: Void} is P {
-  typealias X = {c: Void}
+  type X = {c: Void}
   public fun x() -> X { (c: ()) }
 }
 

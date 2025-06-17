@@ -8,7 +8,7 @@ negative/invalid-modifier-1.hylo:9.1-7: error: declaration cannot be marked 'sta
 static struct A {
 ~~~~~~
 negative/invalid-modifier-1.hylo:11.3-9: error: declaration cannot be marked 'static'
-  static typealias Z = A
+  static type Z = A
   ~~~~~~
 negative/invalid-modifier-1.hylo:15.1-7: error: declaration cannot be marked 'public'
 public extension A {

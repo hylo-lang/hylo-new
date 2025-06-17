@@ -95,9 +95,7 @@ public struct Parser {
     case .trait:
       return try .init(parseTraitDeclaration(after: prologue, in: &file))
     case .type:
-      return try .init(parseAssociatedTypeDeclaration(after: prologue, in: &file))
-    case .typealias:
-      return try .init(parseTypeAliasDeclaration(after: prologue, in: &file))
+      return try parseTypeAliasOrAssociatedTypeDeclaration(after: prologue, in: &file)
     case .name where head.text == "memberwise":
       return try .init(parseInitializerDeclaration(after: prologue, in: &file))
     default:
@@ -215,31 +213,6 @@ public struct Parser {
     }
   }
 
-  /// Parses an associated type declaration.
-  ///
-  ///     associated-type-declaration ::=
-  ///       'type' identifier
-  ///
-  private mutating func parseAssociatedTypeDeclaration(
-    after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
-  ) throws -> AssociatedTypeDeclaration.ID {
-    let introducer = try take(.type) ?? expected("'type'")
-    let identifier = parseSimpleIdentifier()
-
-    if let a = prologue.annotations.first {
-      report(.init("invalid annotation", at: a.site))
-    }
-
-    // No modifiers allowed on associated types.
-    _ = sanitize(prologue.modifiers, accepting: { _ in false })
-
-    return file.insert(
-      AssociatedTypeDeclaration(
-        introducer: introducer,
-        identifier: identifier,
-        site: span(from: introducer)))
-  }
-
   /// Parses a binding declaration.
   ///
   ///     binding-declaration ::=
@@ -252,9 +225,8 @@ public struct Parser {
     let b = try parseBindingPattern(in: &file)
     let i = try parseOptionalInitializerExpression(in: &file)
 
-    if let a = prologue.annotations.first {
-      report(.init("invalid annotation", at: a.site))
-    }
+    // No annotations allowed on binding declarations.
+    _ = sanitize(prologue.annotations, accepting: { _ in false })
 
     return file.insert(
       BindingDeclaration(
@@ -284,11 +256,8 @@ public struct Parser {
       body = nil
     }
 
-    if let a = prologue.annotations.first {
-      report(.init("invalid annotation", at: a.site))
-    }
-
-    // No modifiers allowed on enum cases.
+    // No modifiers or annotations allowed on enum cases.
+    _ = sanitize(prologue.annotations, accepting: { _ in false })
     _ = sanitize(prologue.modifiers, accepting: { _ in false })
 
     return file.insert(
@@ -363,11 +332,8 @@ public struct Parser {
 
     let members = try parseTypeBody(in: &file, accepting: \.isValidStructMember)
 
-    if let a = prologue.annotations.first {
-      report(.init("invalid annotation", at: a.site))
-    }
-
-    // No modifiers allowed on extensions.
+    // No modifiers or annotations allowed on extensions.
+    _ = sanitize(prologue.annotations, accepting: { _ in false })
     _ = sanitize(prologue.modifiers, accepting: { _ in false })
 
     return file.insert(
@@ -407,9 +373,8 @@ public struct Parser {
         ? try parseTypeBody(in: &file, accepting: \.isValidStructMember)
         : nil
 
-      if let a = prologue.annotations.first {
-        report(.init("invalid annotation", at: a.site))
-      }
+      // No annotations allowed on given declarations.
+      _ = sanitize(prologue.annotations, accepting: { _ in false })
 
       let d = file.insert(
         ConformanceDeclaration(
@@ -1006,38 +971,52 @@ public struct Parser {
     }
   }
 
-  /// Parses a type alias declaration.
-  ///
-  ///     type-alias-declaration ::=
-  ///       'typealias' identifier '=' expression
-  ///
-  private mutating func parseTypeAliasDeclaration(
-    after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
-  ) throws -> TypeAliasDeclaration.ID {
-    let introducer = try take(.typealias) ?? expected("'typealias'")
-    let identifier = parseSimpleIdentifier()
-    _ = try take(.assign) ?? expected("'='")
-    let aliasee = try parseExpression(in: &file)
-
-    if let a = prologue.annotations.first {
-      report(.init("invalid annotation", at: a.site))
-    }
-
-    return file.insert(
-      TypeAliasDeclaration(
-        modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToTypeDeclaration),
-        introducer: introducer,
-        identifier: identifier,
-        aliasee: aliasee,
-        site: introducer.site.extended(upTo: position.index)))
-  }
-
   /// Parses a variable declaration.
   private mutating func parseVariableDeclaration(
     in file: inout Module.SourceContainer
   ) throws -> VariableDeclaration.ID {
     let n = try take(.name) ?? expected("identifier")
     return file.insert(VariableDeclaration(identifier: .init(n)))
+  }
+
+  /// Parses a type alias or associated type declaration.
+  private mutating func parseTypeAliasOrAssociatedTypeDeclaration(
+    after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
+  ) throws -> DeclarationIdentity {
+    let introducer = try take(.type) ?? expected("'type'")
+    let identifier = parseSimpleIdentifier()
+
+    // If the next token is `<` or `=`, commit to a type alias declaration.
+    if next(is: .leftAngle) || next(is: .assign) {
+      _ = try take(.assign) ?? expected("'='")
+      let aliasee = try parseExpression(in: &file)
+
+      // No annotations allowed on type aliases.
+      _ = sanitize(prologue.annotations, accepting: { _ in false })
+
+      let d = file.insert(
+        TypeAliasDeclaration(
+          modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToTypeDeclaration),
+          introducer: introducer,
+          identifier: identifier,
+          aliasee: aliasee,
+          site: introducer.site.extended(upTo: position.index)))
+      return .init(d)
+    }
+
+    // Otherwise, commit to an associated type declaration.
+    else {
+      // No modifiers or annotations allowed on associated types.
+      _ = sanitize(prologue.annotations, accepting: { _ in false })
+      _ = sanitize(prologue.modifiers, accepting: { _ in false })
+
+      let d = file.insert(
+        AssociatedTypeDeclaration(
+          introducer: introducer,
+          identifier: identifier,
+          site: span(from: introducer)))
+      return .init(d)
+    }
   }
 
   /// Parses an initializer/default expression iff the next token an equal sign.
@@ -1067,6 +1046,20 @@ public struct Parser {
       end -= 1
     }
     return .init(modifiers.prefix(upTo: end))
+  }
+
+  /// Returns `annotations` sans those that do not satisfy `isValid`.
+  private mutating func sanitize(
+    _ annotations: consuming [Annotation],
+    accepting isValid: (Annotation) -> Bool
+  ) -> [Annotation] {
+    var end = annotations.count
+    for i in (0 ..< annotations.count).reversed() where !isValid(annotations[i]) {
+      report(.init("invalid annotation", at: annotations[i].site))
+      annotations.swapAt(i, end - 1)
+      end -= 1
+    }
+    return .init(annotations.prefix(upTo: end))
   }
 
   // MARK: Expressions

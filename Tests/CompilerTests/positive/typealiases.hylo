@@ -5,17 +5,17 @@ struct A {
 }
 
 extension A.B {
-  typealias C = A
+  type C = A
 }
 
-typealias D = A.B.C.B
+type D = A.B.C.B
 
 trait P {
   type X
 }
 
 given A is P {
-  typealias X = A
+  type X = A
 }
 
-typealias E = A.X
+type E = A.X

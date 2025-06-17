@@ -8,7 +8,7 @@ static trait P {
 
 static struct A {
 
-  static typealias Z = A
+  static type Z = A
 
 }
 

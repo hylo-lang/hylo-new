@@ -179,7 +179,6 @@ public struct Lexer: IteratorProtocol, Sequence {
     case "trait": tag = .trait
     case "true": tag = .true
     case "type": tag = .type
-    case "typealias": tag = .typealias
     case "var": tag = .var
     case "where": tag = .where
     default: tag = .name

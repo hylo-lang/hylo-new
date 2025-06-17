@@ -41,7 +41,6 @@ public struct Token: Hashable, Sendable {
     case trait
     case `true`
     case type
-    case `typealias`
     case `var`
     case `where`
 
@@ -122,7 +121,7 @@ public struct Token: Hashable, Sendable {
   /// `true` iff `self` may be at the beginning of a declaration.
   public var isDeclarationHead: Bool {
     switch tag {
-    case .at, .case, .fun, .given, .import, .struct, .subscript, .trait, .type, .typealias:
+    case .at, .case, .fun, .given, .import, .struct, .subscript, .trait, .type:
       return true
     default:
       return isBindingIntroducer || isDeclarationModifier

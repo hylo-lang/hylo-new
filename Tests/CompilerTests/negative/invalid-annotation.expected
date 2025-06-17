@@ -5,7 +5,7 @@ negative/invalid-annotation.hylo:7.3-8: error: invalid annotation
   @blah let x: Void
   ~~~~~
 negative/invalid-annotation.hylo:8.3-8: error: invalid annotation
-  @blah typealias T = Void
+  @blah type T = Void
   ~~~~~
 negative/invalid-annotation.hylo:12.3-8: error: invalid annotation
   @blah type X

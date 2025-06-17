@@ -5,7 +5,7 @@ fun f() {}
 
 struct A {
   @blah let x: Void
-  @blah typealias T = Void
+  @blah type T = Void
 }
 
 trait P {

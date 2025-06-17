@@ -2,7 +2,7 @@
 
 trait P { type X }
 
-given Void is P { typealias X = Void }
+given Void is P { type X = Void }
 
 fun check<T>(_ x: T) {}
 

@@ -27,7 +27,7 @@ extension TypeAliasDeclaration: Showable {
   public func show(using printer: inout TreePrinter) -> String {
     var result = ""
     for m in modifiers { result.append("\(m) ") }
-    result.append("typealias \(identifier.value) = \(printer.show(aliasee))")
+    result.append("type \(identifier.value) = \(printer.show(aliasee))")
     return result
   }
 
