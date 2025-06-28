@@ -1,0 +1,6 @@
+negative/no-given-3.hylo:14.3-4: error: no coercion from 'Void ==> [Void]() let -> Void' to '[Void]() let -> Void'
+  f()
+  ^
+negative/no-given-3.hylo:14.3-4: note: no given instance of 'Void' in this scope
+  f()
+  ^

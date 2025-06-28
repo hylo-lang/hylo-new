@@ -1,0 +1,20 @@
+//! no-std
+
+fun check<T>(_ x: T) {}
+
+fun f<where let u: Void>() {
+  g()
+}
+
+fun g<where let u: Void>() {
+  check<Void>(u)
+}
+
+fun h() {
+  f()
+}
+
+public fun main() {
+  given Void = ()
+  f()
+}
