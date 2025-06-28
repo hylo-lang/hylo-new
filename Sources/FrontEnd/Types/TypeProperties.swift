@@ -1,5 +1,5 @@
-/// Properties about the representation of a type or term.
-public struct ValueProperties: Hashable, OptionSet, Sendable {
+/// Properties about the representation of a type.
+public struct TypeProperties: Hashable, OptionSet, Sendable {
 
   /// The raw value of these properties.
   public let rawValue: UInt8
@@ -15,12 +15,12 @@ public struct ValueProperties: Hashable, OptionSet, Sendable {
   }
 
   /// The value contains one or more errors.
-  public static let hasError = ValueProperties(rawValue: 1 << 0)
+  public static let hasError = TypeProperties(rawValue: 1 << 0)
 
   /// The value contains open variables.
-  public static let hasVariable = ValueProperties(rawValue: 1 << 1)
+  public static let hasVariable = TypeProperties(rawValue: 1 << 1)
 
   /// The value contains type aliasess.
-  public static let hasAliases = ValueProperties(rawValue: 1 << 2)
+  public static let hasAliases = TypeProperties(rawValue: 1 << 2)
 
 }

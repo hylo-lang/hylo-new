@@ -28,7 +28,7 @@ public enum GenericParameter: TypeTree {
   }
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .init()
   }
 

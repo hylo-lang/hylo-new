@@ -4,7 +4,7 @@ import Archivist
 public protocol TypeTree: Hashable, Showable, Archivable, Sendable {
 
   /// Properties about `self` and its children, which are types in `program`.
-  var properties: ValueProperties { get }
+  var properties: TypeProperties { get }
 
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
   func modified(

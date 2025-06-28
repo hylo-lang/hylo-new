@@ -13,7 +13,7 @@ public struct Trait: TypeTree {
   }
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .init()
   }
 

@@ -25,7 +25,7 @@ public struct Namespace: TypeTree {
   }
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .init()
   }
 

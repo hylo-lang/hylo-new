@@ -5,7 +5,7 @@ public struct Metakind: TypeTree {
   public let inhabitant: Kind
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .init()
   }
 

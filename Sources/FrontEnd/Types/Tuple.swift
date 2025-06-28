@@ -45,7 +45,7 @@ public struct Tuple: TypeTree {
   }
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     elements.reduce([], { (a, e) in a.union(e.type.properties) })
   }
 

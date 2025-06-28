@@ -18,7 +18,7 @@ public struct Bundle: TypeTree {
   }
 
   /// Properties about `self` and its children.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     shape.properties
   }
 

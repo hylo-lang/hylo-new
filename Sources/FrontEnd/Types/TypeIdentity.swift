@@ -15,7 +15,7 @@ public protocol TypeIdentity: Hashable, Showable, Archivable, Sendable {
 extension TypeIdentity {
 
   /// Properties of the identified type.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     erased.properties
   }
 
@@ -60,7 +60,7 @@ public struct AnyTypeIdentity: Hashable, Sendable {
   }
 
   /// Creates an instance identifying a tree at offset `n`, having properties `ps`.
-  public init(offset n: Int, properties ps: ValueProperties) {
+  public init(offset n: Int, properties ps: TypeProperties) {
     assert(n >> 56 == 0)
     self.bits = (UInt64(ps.rawValue) << 56) | UInt64(n)
   }
@@ -68,11 +68,11 @@ public struct AnyTypeIdentity: Hashable, Sendable {
   /// Creates an instance identifying a type variable with the given identifier.
   public init(variable n: Int) {
     assert(n >> 54 == 0)
-    self.bits = (UInt64(ValueProperties.hasVariable.rawValue) << 56) | (0b11 << 54) | UInt64(n)
+    self.bits = (UInt64(TypeProperties.hasVariable.rawValue) << 56) | (0b11 << 54) | UInt64(n)
   }
 
   /// Creates an instance identifying the predifined type `n`, having properties `ps`.
-  private init(predefined n: UInt64, properties ps: ValueProperties) {
+  private init(predefined n: UInt64, properties ps: TypeProperties) {
     assert(n >> 54 == 0)
     self.bits = (UInt64(ps.rawValue) << 56) | (0b10 << 54) | n
   }
@@ -83,7 +83,7 @@ public struct AnyTypeIdentity: Hashable, Sendable {
   }
 
   /// Properties of the identified type.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .init(rawValue: .init(bits >> 56))
   }
 
@@ -99,7 +99,7 @@ public struct AnyTypeIdentity: Hashable, Sendable {
   }
 
   /// Returns whether the specified flags are raised for `self`.
-  public subscript(f: ValueProperties) -> Bool {
+  public subscript(f: TypeProperties) -> Bool {
     properties.contains(f)
   }
 

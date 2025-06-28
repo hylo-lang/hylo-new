@@ -19,7 +19,7 @@ public struct Implication: TypeTree {
   }
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     usings.reduce(body.properties, { (a, i) in a.union(i.properties) })
   }
 

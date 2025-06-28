@@ -8,7 +8,7 @@ public struct ErrorType: TypeTree {
   public init() {}
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .hasError
   }
 

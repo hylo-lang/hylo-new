@@ -39,7 +39,7 @@ public struct Arrow: TypeTree {
   }
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     inputs.reduce(output.properties, { (a, i) in a.union(i.type.properties) })
   }
 

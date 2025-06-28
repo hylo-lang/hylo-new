@@ -8,7 +8,7 @@ public enum OpaqueType: TypeTree {
   case environment(DeclarationIdentity)
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .init()
   }
 

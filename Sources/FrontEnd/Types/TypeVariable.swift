@@ -5,7 +5,7 @@ public struct TypeVariable: TypeTree {
   public let identifier: Int
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .hasVariable
   }
 

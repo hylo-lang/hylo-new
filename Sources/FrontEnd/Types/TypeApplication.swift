@@ -13,7 +13,7 @@ public struct TypeApplication: TypeTree {
   public var arguments: TypeArguments
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     arguments.values.reduce(abstraction.properties, { (a, i) in a.union(i.properties) })
   }
 

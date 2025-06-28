@@ -17,7 +17,7 @@ public struct TypeAlias: TypeTree {
   }
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .hasAliases
   }
 

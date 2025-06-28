@@ -18,7 +18,7 @@ public struct UniversalType: TypeTree {
   }
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     parameters.reduce(body.properties, { (a, i) in a.union(i.properties) })
   }
 

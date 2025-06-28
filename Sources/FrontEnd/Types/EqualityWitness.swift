@@ -8,7 +8,7 @@ public struct EqualityWitness: TypeTree {
   public let rhs: AnyTypeIdentity
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     lhs.properties | rhs.properties
   }
 

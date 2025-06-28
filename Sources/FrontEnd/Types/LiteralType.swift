@@ -11,7 +11,7 @@ public enum LiteralType: TypeTree {
   case float
 
   /// Properties about `self`.
-  public var properties: ValueProperties {
+  public var properties: TypeProperties {
     .init()
   }
 
