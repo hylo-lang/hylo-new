@@ -15,12 +15,12 @@ public protocol SyntaxIdentity: Comparable, Hashable, Showable, Archivable, Send
 extension SyntaxIdentity {
 
   /// The module offset of the node represented by `self` in its containing collection.
-  public var module: Program.ModuleIdentity {
+  public var module: Module.ID {
     erased.module
   }
 
   /// The file offset of the node represented by `self` in its containing collection.
-  public var file: Program.SourceFileIdentity {
+  public var file: SourceFile.ID {
     erased.file
   }
 
@@ -80,7 +80,7 @@ public struct AnySyntaxIdentity {
   }
 
   /// Creates an instance identifying the node at offset `n` in file `f`.
-  public init(file f: Program.SourceFileIdentity, offset n: Int) {
+  public init(file f: SourceFile.ID, offset n: Int) {
     precondition(n < UInt32.max)
     self.bits = UInt64(f.rawValue) | (UInt64(n) << 32)
   }
@@ -91,12 +91,12 @@ public struct AnySyntaxIdentity {
   }
 
   /// The module offset of the node represented by `self` in its containing collection.
-  public var module: Program.ModuleIdentity {
+  public var module: Module.ID {
     .init(bits & 0xffff)
   }
 
   /// The file offset of the node represented by `self` in its containing collection.
-  public var file: Program.SourceFileIdentity {
+  public var file: SourceFile.ID {
     .init(rawValue: UInt32(bits & 0xffff_ffff))
   }
 
@@ -106,7 +106,7 @@ public struct AnySyntaxIdentity {
   }
 
   /// Returns the identity representing the lexical scope of formed by `f`.
-  internal static func scope(of f: Program.SourceFileIdentity) -> Self {
+  internal static func scope(of f: SourceFile.ID) -> Self {
     .init(bits: UInt64(f.rawValue) | UInt64(UInt32.max) << 32)
   }
 

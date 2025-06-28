@@ -5,54 +5,6 @@ import Utilities
 /// A Hylo program.
 public struct Program: Sendable {
 
-  /// The identity of a module in loaded in a program.
-  public typealias ModuleIdentity = Int
-
-  /// The identity of a file added to a module.
-  public struct SourceFileIdentity: Comparable, Hashable, RawRepresentable, Showable, Sendable {
-
-    /// The raw value of this identity.
-    public let rawValue: UInt32
-
-    /// Creates an instance from its raw value.
-    public init(rawValue: UInt32) {
-      self.rawValue = rawValue
-    }
-
-    /// Creates an instance identifying the file at offset `f` in module `m`.
-    public init(module m: Program.ModuleIdentity, offset f: Int) {
-      precondition(m < (1 << 16))
-      precondition(f < (1 << 16))
-      self.rawValue = UInt32(m & 0xffff) + (UInt32(f & 0xffff) << 16)
-    }
-
-    /// Creates an instance identifying the file containing `n`.
-    public init<T: SyntaxIdentity>(containing n: T) {
-      self.rawValue = UInt32(truncatingIfNeeded: n.erased.bits)
-    }
-
-    /// The module offset of the node represented by `self` in its containing collection.
-    public var module: Program.ModuleIdentity {
-      .init(rawValue & 0xffff)
-    }
-
-    /// The file offset of the node represented by `self` in its containing collection.
-    public var offset: Int {
-      .init((rawValue & 0xffff0000) >> 16)
-    }
-
-    /// Returns the contents of `self`.
-    public func show(using printer: inout TreePrinter) -> String {
-      printer.program[self].source.text
-    }
-
-    /// Returns `true` iff `l` is ordered before `r` when iterating over the sources of a module.
-    public static func < (l: Self, r: Self) -> Bool {
-      l.rawValue < r.rawValue
-    }
-
-  }
-
   /// The modules loaded in this program.
   public private(set) var modules = OrderedDictionary<Module.Name, Module>()
 
@@ -73,7 +25,7 @@ public struct Program: Sendable {
   }
 
   /// Returns the identities of the modules in `self`.
-  public var moduleIdentities: Range<ModuleIdentity> {
+  public var moduleIdentities: Range<Module.ID> {
     modules.values.indices
   }
 
@@ -87,7 +39,7 @@ public struct Program: Sendable {
   }
 
   /// Returns the identity of the module named `moduleName`.
-  public mutating func demandModule(_ moduleName: Module.Name) -> ModuleIdentity {
+  public mutating func demandModule(_ moduleName: Module.Name) -> Module.ID {
     if let m = modules.index(forKey: moduleName) {
       return m
     } else {
@@ -98,12 +50,12 @@ public struct Program: Sendable {
   }
 
   /// Returns the identity of the module named `moduleName` or `nil` if no such module exists.
-  public func identity(module moduleName: Module.Name) -> ModuleIdentity? {
+  public func identity(module moduleName: Module.Name) -> Module.ID? {
     modules.index(forKey: moduleName)
   }
 
   /// Computes the scoping relationships in `m`.
-  public mutating func assignScopes(_ m: ModuleIdentity) async {
+  public mutating func assignScopes(_ m: Module.ID) async {
     await Scoper().visit(m, of: &self)
   }
 
@@ -115,20 +67,20 @@ public struct Program: Sendable {
   }
 
   /// Assigns types to the syntax trees of `m`.
-  public mutating func assignTypes(_ m: ModuleIdentity) {
+  public mutating func assignTypes(_ m: Module.ID) {
     var typer = Typer(typing: m, of: consume self)
     typer.apply()
     self = typer.release()
   }
 
   /// Projects the module identified by `m`.
-  public subscript(m: ModuleIdentity) -> Module {
+  public subscript(m: Module.ID) -> Module {
     _read { yield modules.values[m] }
     _modify { yield &modules.values[m] }
   }
 
   /// Projects the source file identified by `f`.
-  internal subscript(f: Program.SourceFileIdentity) -> Module.SourceContainer {
+  internal subscript(f: SourceFile.ID) -> Module.SourceContainer {
     _read { yield modules.values[f.module][f] }
     _modify { yield &modules.values[f.module][f] }
   }
@@ -164,7 +116,7 @@ public struct Program: Sendable {
 
   /// Returns the top level declarations of `m` that are of type `T`.
   public func collectTopLevel<T: Syntax>(
-    _ t: T.Type, of m: ModuleIdentity
+    _ t: T.Type, of m: Module.ID
   ) -> (some Sequence<ConcreteSyntaxIdentity<T>>) {
     collect(t, in: self[m].topLevelDeclarations)
   }
@@ -193,7 +145,7 @@ public struct Program: Sendable {
   }
 
   /// `true` iff `f` has gone through scoping.
-  public func isScoped(_ f: SourceFileIdentity) -> Bool {
+  public func isScoped(_ f: SourceFile.ID) -> Bool {
     self[f].syntaxToParent.count == self[f].syntax.count
   }
 
@@ -1024,10 +976,10 @@ public struct Program: Sendable {
 extension Program {
 
   /// The type of a table mapping module names to their identity in a program.
-  internal typealias ModuleIdentityMap = [Module.Name: ModuleIdentity]
+  internal typealias ModuleIdentityMap = [Module.Name: Module.ID]
 
   /// Serializes `m` to `archive`.
-  public func write<A>(module m: ModuleIdentity, to archive: inout WriteableArchive<A>) throws {
+  public func write<A>(module m: Module.ID, to archive: inout WriteableArchive<A>) throws {
     // Configure the serialization context.
     let c = Module.SerializationContext(
       identities: .init(uniqueKeysWithValues: modules.values.map({ (m) in (m.name, m.identity) })),
@@ -1039,7 +991,7 @@ extension Program {
   }
 
   /// Serializes `m`.
-  public func archive(module m: ModuleIdentity) throws -> BinaryBuffer {
+  public func archive(module m: Module.ID) throws -> BinaryBuffer {
     var w = WriteableArchive(BinaryBuffer())
     try write(module: m, to: &w)
     return w.finalize()
@@ -1052,7 +1004,7 @@ extension Program {
   @discardableResult
   public mutating func load<A>(
     module moduleName: Module.Name, from archive: inout ReadableArchive<A>
-  ) throws -> (loaded: Bool, identity: ModuleIdentity) {
+  ) throws -> (loaded: Bool, identity: Module.ID) {
     // Nothing to do if the module is already loaded.
     if let m = modules.index(forKey: moduleName) { return (false, m) }
 
@@ -1081,7 +1033,7 @@ extension Program {
   @discardableResult
   public mutating func load(
     module moduleName: Module.Name, from archive: BinaryBuffer
-  ) throws -> (loaded: Bool, identity: ModuleIdentity) {
+  ) throws -> (loaded: Bool, identity: Module.ID) {
     var r = ReadableArchive(archive)
     return try load(module: moduleName, from: &r)
   }
@@ -1095,7 +1047,7 @@ extension Program {
   }
 
   public func select(
-    from m: Program.ModuleIdentity, _ filter: SyntaxFilter
+    from m: Module.ID, _ filter: SyntaxFilter
   ) -> some Collection<AnySyntaxIdentity> {
     modules.values[m].syntax.filter({ (n) in filter(n, in: self) })
   }

@@ -5,6 +5,9 @@ import Utilities
 /// A collection of declarations in one or more source files.
 public struct Module: Sendable {
 
+  /// The identity of a module loaded in a program.
+  public typealias ID = Int
+
   /// The name of a module.
   @Archivable
   public struct Name: Hashable, Sendable, CustomStringConvertible {
@@ -39,7 +42,7 @@ public struct Module: Sendable {
   internal struct SourceContainer: Sendable {
 
     /// The position of `self` in the containing module.
-    internal let identity: Program.SourceFileIdentity
+    internal let identity: SourceFile.ID
 
     /// The source file contained in `self`.
     internal let source: SourceFile
@@ -140,7 +143,7 @@ public struct Module: Sendable {
   public let name: Name
 
   /// The position of `self` in the containing program.
-  public let identity: Program.ModuleIdentity
+  public let identity: Module.ID
 
   /// The dependencies of the module.
   public private(set) var dependencies: [Module.Name] = []
@@ -149,7 +152,7 @@ public struct Module: Sendable {
   internal private(set) var sources = SourceTable()
 
   /// Creates an empty module with the given name and identity.
-  public init(name: Name, identity: Program.ModuleIdentity) {
+  public init(name: Name, identity: Module.ID) {
     self.name = name
     self.identity = identity
   }
@@ -190,9 +193,7 @@ public struct Module: Sendable {
 
   /// Adds a source file to this module.
   @discardableResult
-  public mutating func addSource(
-    _ s: SourceFile
-  ) -> (inserted: Bool, identity: Program.SourceFileIdentity) {
+  public mutating func addSource(_ s: SourceFile) -> (inserted: Bool, identity: SourceFile.ID) {
     if let f = sources.index(forKey: s.name) {
       return (inserted: false, identity: .init(module: identity, offset: f))
     } else {
@@ -206,7 +207,7 @@ public struct Module: Sendable {
   }
 
   /// Inserts `child` into `self` in the bucket of `file`.
-  public mutating func insert<T: Syntax>(_ child: T, in file: Program.SourceFileIdentity) -> T.ID {
+  public mutating func insert<T: Syntax>(_ child: T, in file: SourceFile.ID) -> T.ID {
     sources.values[file.offset].insert(child)
   }
 
@@ -253,8 +254,8 @@ public struct Module: Sendable {
   }
 
   /// The identities of the source files in `self`.
-  public var sourceFileIdentities: [Program.SourceFileIdentity] {
-    (0 ..< sources.count).map({ (s) in Program.SourceFileIdentity(module: identity, offset: s) })
+  public var sourceFileIdentities: [SourceFile.ID] {
+    (0 ..< sources.count).map({ (s) in SourceFile.ID(module: identity, offset: s) })
   }
 
   /// The top-level declarations in `self`.
@@ -263,7 +264,7 @@ public struct Module: Sendable {
   }
 
   /// Projects the source file identified by `f`.
-  internal subscript(f: Program.SourceFileIdentity) -> SourceContainer {
+  internal subscript(f: SourceFile.ID) -> SourceContainer {
     _read {
       assert(f.module == identity)
       yield sources.values[f.offset]
@@ -377,7 +378,7 @@ extension Module: Archivable {
     internal var types: TypeStore
 
     /// A mapping from archived module identity to its new value.
-    internal var modules = OrderedDictionary<Program.ModuleIdentity, Program.ModuleIdentity>()
+    internal var modules = OrderedDictionary<Module.ID, Module.ID>()
 
     /// A mapping from file name to its contents.
     internal var sources = OrderedDictionary<FileName, SourceFile>()
@@ -418,7 +419,7 @@ extension Module: Archivable {
       for i in 0 ..< dependencyCount {
         let d = try ctx.withWrapped({ (c) in try archive.read(Name.self, in: &c) })
         dependencies.append(d)
-        ctx.modules[Program.ModuleIdentity(i + 1)] = ctx.identities[d]
+        ctx.modules[Module.ID(i + 1)] = ctx.identities[d]
       }
 
       var me = Self(name: name, identity: ctx.identities[name]!)
@@ -426,7 +427,7 @@ extension Module: Archivable {
       // <source count> <identity> <contents> ...
       let count = try Int(archive.readUnsignedLEB128())
       for _ in 0 ..< count {
-        let i = try archive.read(rawValueOf: Program.SourceFileIdentity.self)!
+        let i = try archive.read(rawValueOf: SourceFile.ID.self)!
         let s = try archive.read(SourceFile.self)
         ctx.sources[s.name] = s
         me.sources[s.name] = .init(identity: i, source: s)

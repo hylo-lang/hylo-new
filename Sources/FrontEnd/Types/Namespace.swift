@@ -12,7 +12,7 @@ public struct Namespace: TypeTree {
     case builtin
 
     /// A module.
-    case module(Program.ModuleIdentity)
+    case module(Module.ID)
 
   }
 

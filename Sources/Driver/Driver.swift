@@ -27,7 +27,7 @@ public struct Driver {
   /// Parses the source files in `inputs` and adds them to `module`.
   @discardableResult
   public mutating func parse(
-    _ sources: [SourceFile], into module: Program.ModuleIdentity
+    _ sources: [SourceFile], into module: Module.ID
   ) async -> (elapsed: Duration, containsError: Bool) {
     let clock = ContinuousClock()
     let elapsed = clock.measure {
@@ -41,7 +41,7 @@ public struct Driver {
   /// Assignes the trees in `module` to their scopes, exiting if an error occurred.
   @discardableResult
   public mutating func assignScopes(
-    of module: Program.ModuleIdentity
+    of module: Module.ID
   ) async -> (elapsed: Duration, containsError: Bool) {
     let clock = ContinuousClock()
     let elapsed = await clock.measure {
@@ -53,7 +53,7 @@ public struct Driver {
   /// Assigns the trees in `module` to their types, exiting if an error occured.
   @discardableResult
   public mutating func assignTypes(
-    of module: Program.ModuleIdentity
+    of module: Module.ID
   ) async -> (elapsed: Duration, containsError: Bool) {
     let clock = ContinuousClock()
     let elapsed = clock.measure {
@@ -123,7 +123,7 @@ public struct Driver {
     }
   }
 
-  private func throwIfContainsError(_ m: Program.ModuleIdentity) throws {
+  private func throwIfContainsError(_ m: Module.ID) throws {
     if program[m].containsError {
       throw CompilationError(diagnostics: .init(program[m].diagnostics))
     }

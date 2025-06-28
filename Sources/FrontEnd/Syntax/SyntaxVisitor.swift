@@ -32,10 +32,10 @@ extension SyntaxVisitor {
 extension Program {
 
   /// Calls `visit(_:calling:)` on the abstract syntax tree of `m`.
-  public func visit<T: SyntaxVisitor>(_ m: ModuleIdentity, calling v: inout T) {
+  public func visit<T: SyntaxVisitor>(_ m: Module.ID, calling v: inout T) {
     for (i, s) in self[m].sources.values.enumerated() {
       for o in s.syntax.indices {
-        let f = Program.SourceFileIdentity(module: m, offset: i)
+        let f = SourceFile.ID(module: m, offset: i)
         visit(AnySyntaxIdentity(file: f, offset: o), calling: &v)
       }
     }

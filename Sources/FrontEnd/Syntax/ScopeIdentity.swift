@@ -5,7 +5,7 @@ public struct ScopeIdentity: Hashable {
   private var representation: AnySyntaxIdentity
 
   /// Creates an instance representing the scope formed by `file`.
-  public init(file: Program.SourceFileIdentity) {
+  public init(file: SourceFile.ID) {
     self.representation = .scope(of: file)
   }
 
@@ -20,12 +20,12 @@ public struct ScopeIdentity: Hashable {
   }
 
   /// The module containing this scope.
-  public var module: Program.ModuleIdentity {
+  public var module: Module.ID {
     representation.module
   }
 
   /// The source file containing this scope.
-  public var file: Program.SourceFileIdentity {
+  public var file: SourceFile.ID {
     representation.file
   }
 

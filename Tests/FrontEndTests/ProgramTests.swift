@@ -66,7 +66,7 @@ final class ProgramTests: XCTestCase {
   func testSerializationWithDependencies() throws {
     let p = Program.test
 
-    var archives: [(identity: Program.ModuleIdentity, data: BinaryBuffer)] = []
+    var archives: [(identity: Module.ID, data: BinaryBuffer)] = []
     for m in p.moduleIdentities {
       try archives.append((m, p.archive(module: m)))
     }

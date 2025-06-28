@@ -7,10 +7,10 @@ public struct Scoper {
   public init() {}
 
   /// Computes the scoping relationships in `m`, which is in `p`.
-  public func visit(_ m: Program.ModuleIdentity, of p: inout Program) async {
+  public func visit(_ m: Module.ID, of p: inout Program) async {
     let ts = p[m].sources.values.indices.map { (i) in
       Task.detached { [p] in
-        let f = Program.SourceFileIdentity(module: m, offset: i)
+        let f = SourceFile.ID(module: m, offset: i)
         var v = Visitor(p[f])
         for n in p[f].roots {
           p.visit(n, calling: &v)
@@ -20,7 +20,7 @@ public struct Scoper {
     }
 
     for (i, t) in ts.enumerated() {
-      let f = Program.SourceFileIdentity(module: m, offset: i)
+      let f = SourceFile.ID(module: m, offset: i)
       var v = await t.value
       modify(&p[f]) { (w) in
         swap(&w.topLevelDeclarations, &v.topLevelDeclarations)

@@ -6,7 +6,7 @@ import Utilities
 public struct Typer {
 
   /// The module being typed.
-  public let module: Program.ModuleIdentity
+  public let module: Module.ID
 
   /// The program containing the module being typed.
   public internal(set) var program: Program
@@ -25,7 +25,7 @@ public struct Typer {
 
   /// Creates an instance assigning types to syntax trees in `m`, which is a module in `p`.
   public init(
-    typing m: Program.ModuleIdentity, of p: consuming Program,
+    typing m: Module.ID, of p: consuming Program,
     loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)? = nil
   ) {
     self.module = m
@@ -60,7 +60,7 @@ public struct Typer {
     var moduleToGivens: [[Given]?]
 
     /// The cache of `Typer.imports(of:in:)`.
-    var sourceToImports: [[Program.ModuleIdentity]?]
+    var sourceToImports: [[Module.ID]?]
 
     /// The cache of `Typer.extensions(visibleAtTopLevelOf:)`.
     var sourceToExtensions: [[ExtensionDeclaration.ID]?]
@@ -96,7 +96,7 @@ public struct Typer {
     var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity]
 
     /// Creates an instance for typing `m`, which is a module in `p`.
-    init(typing m: Program.ModuleIdentity, in p: Program) {
+    init(typing m: Module.ID, in p: Program) {
       self.moduleToIdentifierToDeclaration = .init(repeating: nil, count: p.modules.count)
       self.moduleToGivens = .init(repeating: nil, count: p.modules.count)
       self.sourceToImports = .init(repeating: nil, count: p[m].sources.count)
@@ -3345,7 +3345,7 @@ public struct Typer {
   }
 
   /// Returns the givens whose definitions are at the top-level of `m`.
-  private mutating func givens(atTopLevelOf m: Program.ModuleIdentity) -> [Given] {
+  private mutating func givens(atTopLevelOf m: Module.ID) -> [Given] {
     if let memoized = cache.moduleToGivens[m] { return memoized }
 
     var gs: [Given] = []
@@ -3932,7 +3932,7 @@ public struct Typer {
 
   /// Returns the top-level declarations of `m` introducing `name`.
   private mutating func lookup(
-    _ name: Name, atTopLevelOf m: Program.ModuleIdentity
+    _ name: Name, atTopLevelOf m: Module.ID
   ) -> [DeclarationIdentity] {
     var ds: [DeclarationIdentity] = []
 
@@ -4045,7 +4045,7 @@ public struct Typer {
 
   /// Returns the extensions that are at the top level of `f` or its imports.
   private mutating func extensions(
-    visibleAtTopLevelOf f: Program.SourceFileIdentity
+    visibleAtTopLevelOf f: SourceFile.ID
   ) -> [ExtensionDeclaration.ID] {
     if let ds = cache.sourceToExtensions[f.offset] {
       return ds
@@ -4080,13 +4080,11 @@ public struct Typer {
   }
 
   /// Returns the modules that are imported by `f`, which is in the module being typed.
-  private mutating func imports(
-    of f: Program.SourceFileIdentity
-  ) -> [Program.ModuleIdentity] {
+  private mutating func imports(of f: SourceFile.ID) -> [Module.ID] {
     if let table = cache.sourceToImports[f.offset] {
       return table
     } else {
-      var table: [Program.ModuleIdentity] = []
+      var table: [Module.ID] = []
 
       // Standard library is imported implicitly.
       if program[f.module].dependencies.contains(.standardLibrary) {
