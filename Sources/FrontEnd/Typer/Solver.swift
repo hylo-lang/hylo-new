@@ -313,7 +313,7 @@ internal struct Solver {
     let coercion: GoalIdentity
     let callee: AnyTypeIdentity
 
-    // Compile-time implicits missing?
+    // Are there context parameters to elaborate?
     if context.isEmpty {
       coercion = -1
       callee = head
