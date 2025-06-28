@@ -77,7 +77,7 @@ extension Program {
   public func show(_ t: SubstitutionTable) -> String {
     let ss = t.optimized()
     let ts = ss.types.sorted(by: \.key.erased.bits).map { (k, v) in
-      format("%T: %T", [k.erased, v])
+      "\(show(k)): \(show(v))),"
     }
     return "SubstitutionTable(types: [\(list: ts)])"
   }
