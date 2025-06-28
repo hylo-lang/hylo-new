@@ -2992,14 +2992,21 @@ public struct Typer {
 
     }
 
-    /// A part of a thread continuation.
-    enum ContinuationItem {
+    /// A part of a thread continuation representing the substitution of an assumed given by its a
+    /// term in some elaboration.
+    struct ContinuationItem {
 
-      /// Either the result of a thread or an operand to a thread continuation.
-      case done(SummonResult)
+      /// The identity of the assumed given.
+      let assumed: Int
 
-      /// A continuation substituting assumed witnesses of the given type by a summoned witness.
-      case substitute(Int)
+      /// The witness in which the the given was assumed.
+      let elaboration: SummonResult
+
+      /// Creates an instance with the given properties.
+      init(_ assumed: Int, in elaboration: SummonResult) {
+        self.assumed = assumed
+        self.elaboration = elaboration
+      }
 
     }
 
@@ -3024,6 +3031,8 @@ public struct Typer {
         return e
       }
 
+      /// Returns `(e, w)` where `e` is copy of `self` in which `t` is assumed and `w` is a
+      /// placheloder for a term of type `t`.
       func assuming(given t: AnyTypeIdentity) -> (Environment, WitnessExpression) {
         let i = nextGivenIdentifier
         let g = Given.assumed(i, t)
@@ -3276,8 +3285,7 @@ public struct Typer {
         substitutions: operand.substitutions, givens: thread.environment.givens.dropLast(),
         nextGivenIdentifier: thread.environment.nextGivenIdentifier)
       var t = thread.tail
-      t.append(.done(operand))
-      t.append(.substitute(i))
+      t.append(.init(i, in: operand))
       return .next(summon(assumed, in: scopeOfUse, where: e, then: t))
     }
 
@@ -3292,32 +3300,16 @@ public struct Typer {
   private mutating func applyContinuation(
     _ continuation: ArraySlice<ResolutionThread.ContinuationItem>, to operand: SummonResult
   ) -> SummonResult {
-    switch continuation.last {
-    case .some(.substitute(let i)):
-      let r = executeContinuation(continuation.dropLast())
-      let x = r.witness.substituting(assumed: i, for: operand.witness.value)
+    if let last = continuation.last {
+      let r = applyContinuation(continuation.dropLast(), to: last.elaboration)
+      let x = r.witness.substituting(assumed: last.assumed, for: operand.witness.value)
       let e = operand.substitutions.union(r.substitutions)
       return .init(
         witness: program.types.reify(x, applying: e, withVariables: .kept), substitutions: e)
-
-    case .some(.done):
-      unreachable("ill-formed continuation")
-
-    case .none:
+    } else {
       let w = program.types.reify(
         operand.witness, applying: operand.substitutions, withVariables: .kept)
       return .init(witness: w, substitutions: operand.substitutions)
-    }
-  }
-
-  /// Returns the result of the given thread continuation.
-  private mutating func executeContinuation(
-    _ continuation: ArraySlice<ResolutionThread.ContinuationItem>
-  ) -> SummonResult {
-    if case .some(.done(let a)) = continuation.last {
-      applyContinuation(continuation.dropLast(), to: a)
-    } else {
-      unreachable("ill-formed continuation")
     }
   }
 
