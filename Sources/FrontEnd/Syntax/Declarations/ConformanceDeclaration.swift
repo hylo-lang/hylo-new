@@ -14,6 +14,9 @@ public struct ConformanceDeclaration: TypeExtendingDeclaration {
   /// and no members; those belong to the struct declaration.
   public let introducer: Token
 
+  /// The name of the declared conformance, if any.
+  public let identifier: Parsed<String>?
+
   /// The type parameters and usings of the conformance.
   public let contextParameters: ContextParameters
 
@@ -30,14 +33,16 @@ public struct ConformanceDeclaration: TypeExtendingDeclaration {
   public init(
     modifiers: [Parsed<DeclarationModifier>],
     introducer: Token,
-    staticParameters: ContextParameters,
+    identifier: Parsed<String>?,
+    contextParameters: ContextParameters,
     witness: StaticCall.ID,
     members: [DeclarationIdentity]?,
     site: SourceSpan
   ) {
     self.modifiers = modifiers
     self.introducer = introducer
-    self.contextParameters = staticParameters
+    self.identifier = identifier
+    self.contextParameters = contextParameters
     self.witness = witness
     self.members = members
     self.site = site
@@ -57,8 +62,11 @@ extension ConformanceDeclaration: Showable {
     let sugared = printer.program.seenAsConformanceTypeExpression(witness)!
 
     var result = "given"
+    if let i = identifier {
+      result.append(" \(i.value):")
+    }
     if !contextParameters.isEmpty {
-      result.append(" " + printer.show(contextParameters))
+      result.append(" \(printer.show(contextParameters))")
     }
 
     result.append(" \(printer.show(sugared.conformer)) is \(printer.show(sugared.concept))")

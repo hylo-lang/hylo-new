@@ -248,7 +248,7 @@ public struct Program: Sendable {
     traitRequiring(n) != nil
   }
 
-  /// Returns `true` iff `n` introduces entities in the implicit scope.
+  /// Returns `true` iff `n` introduces entities in the implicit context.
   public func isGiven<T: SyntaxIdentity>(_ n: T) -> Bool {
     switch tag(of: n) {
     case BindingDeclaration.self:

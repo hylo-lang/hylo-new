@@ -329,12 +329,12 @@ public struct Typer {
       checkUniqueDeclaration(v, of: program[v].identifier.value)
     }
 
-    if program[d].role == .given, let p = program.parent(containing: d).node {
-      switch program.tag(of: p) {
-      case ConformanceDeclaration.self, TraitDeclaration.self:
-        break
-      default:
-        report(.error, "givens type definitions are not supported yet", about: d)
+    // Given declarations can only introduce a single binding.
+    if program[d].role == .given {
+      let p = program[program[d].pattern].pattern
+      let t = program.tag(of: p).value
+      if (t != VariableDeclaration.self) && (t != WildcardLiteral.self) {
+        report(.error, "given declaration cannot introduce more than one binding", about: p)
       }
     }
   }
@@ -1504,11 +1504,36 @@ public struct Typer {
 
   /// Computes the types of the given context parameters, introducing them in order.
   private mutating func initializeContext(_ parameters: ContextParameters) {
+    // Parameters are pushed onto the stack and removed after they have been processed so that,
+    // given two parameters `p` and `q` such that `q` occurs after `p`, resolution can't "see" `q`
+    // while we're computing the type of `p`.
     declarationsOnStack.formUnion(parameters.usings)
+
     for p in parameters.usings {
-      _ = declaredType(of: p)
+      if let d = program.cast(p, to: BindingDeclaration.self) {
+        initializeContextParameter(d)
+      } else {
+        _ = declaredType(of: p)
+      }
+
       let q = declarationsOnStack.remove(p)
       assert(q != nil)
+    }
+  }
+
+  /// Computes the declared type of `d`, which is a context parameter in a where clause.
+  ///
+  /// This method operates similarly as `declaredType(of:)` but requiring that the declaration be
+  /// ascribed in a way that lets us compute a type without looking at the initializer.
+  private mutating func initializeContextParameter(_ d: BindingDeclaration.ID) {
+    assert(program[d.module].type(assignedTo: d) == nil, "declaration already initialized")
+    if let a = program[program[d].pattern].ascription {
+      let t = evaluateTypeAscription(a)
+      ascribe(.let, t, to: program[d].pattern)
+      program[module].setType(t, for: d)
+    } else {
+      report(.error, "binding declaration requires an ascription", about: d)
+      program[module].setType(.error, for: d)
     }
   }
 
@@ -3389,6 +3414,7 @@ public struct Typer {
     in ds: S, to gs: inout [Given]
   ) {
     for d in ds {
+      // Collect conformance declarations and anonymous context parameters.
       if program.isGiven(d) {
         gs.append(.user(d))
       }
@@ -3406,7 +3432,7 @@ public struct Typer {
     }
   }
 
-  /// Returns the expression of a witness referring directly to `g`.
+  /// Returns the expression of a witness referring to `g`.
   private mutating func expression(referringTo g: Given) -> WitnessExpression {
     let t = declaredType(of: g)
     switch g {
@@ -3417,9 +3443,20 @@ public struct Typer {
     case .assumed(let i, _):
       return .init(value: .assumed(i), type: t)
     case .user(let d):
-      return .init(value: .reference(.direct(d)), type: t)
+      return .init(value: expression(referringTo: d), type: t)
     case .nested(_, let h):
       return .init(value: .nested(expression(referringTo: h)), type: t)
+    }
+  }
+
+  /// Returns the value of a witness expression referring directly to`d`.
+  private func expression(referringTo d: DeclarationIdentity) -> WitnessExpression.Value {
+    if let b = program.cast(d, to: BindingDeclaration.self),
+      let v = program.cast(program[program[b].pattern].pattern, to: VariableDeclaration.self)
+    {
+      return .reference(.direct(.init(v)))
+    } else {
+      return .reference(.direct(d))
     }
   }
 

@@ -356,19 +356,59 @@ public struct Parser {
   ) throws -> DeclarationIdentity {
     let introducer = try take(.given) ?? expected("'given'")
 
-    // Is the next token a binding introducer?
-    let next = try peek() ?? expected("'declaration'")
-    if next.isBindingIntroducer {
+    // Are we parsing a given binding declaration?
+    if next(satisfies: \.isBindingIntroducer) {
       return try .init(parseBindingDeclaration(as: .given, after: prologue, in: &file))
     }
 
-    // Expect a conformance declaration.
+    // Catch common errors.
+    if let u = take(.underscore) {
+      report(expected("binding introducer", at: u.site))
+    }
+
+    // If the next tokens are `<name> <colon>`, we're parsing a named given. Otherwise, the name
+    // name we might have parsed is part of a compound expression.
+    var backup = self
+    var identifier = take(.name)
+    if take(.colon) == nil {
+      swap(&self, &backup)
+      identifier = nil
+    }
+
+    // Parse the context parameters and conformer of a conformance declaration.
+    let parameters = try parseOptionalContextClause(in: &file)
+    let lhs = try parseExpression(in: &file)
+
+    // If the next token is `=`, we're parsing a given binding declaration whose `let` introducer
+    // was left implicit (e.g., `given Int = 1`).
+    if let e = try parseOptionalInitializerExpression(in: &file) {
+      let s = SourceSpan.empty(at: introducer.site.end)
+      let p: PatternIdentity = if let i = identifier {
+        .init(file.insert(VariableDeclaration(identifier: .init(i))))
+      } else {
+        .init(file.insert(WildcardLiteral(site: s)))
+      }
+
+      if !parameters.isEmpty {
+        report(.init("arbitrary given functions are not supported yet", at: parameters.site))
+      }
+
+      let b = file.insert(
+        BindingPattern(
+          introducer: .init(.let, at: s), pattern: p, ascription: lhs,
+          site: span(from: introducer)))
+      let d = file.insert(
+        BindingDeclaration(
+          modifiers: [], role: .given, pattern: b, initializer: e,
+          site: span(from: introducer)))
+      return .init(d)
+    }
+
+    // Otherwise, expect a conformance declaration.
     else {
-      let parameters = try parseOptionalContextClause(in: &file)
-      let conformer = try parseExpression(in: &file)
       _ = try take(contextual: "is") ?? expected("'is'")
       let concept = try parseExpression(in: &file)
-      let witness = desugaredConformance(of: conformer, to: concept, in: &file)
+      let witness = desugaredConformance(of: lhs, to: concept, in: &file)
       let members = self.next(is: .leftBrace)
         ? try parseTypeBody(in: &file, accepting: \.isValidStructMember)
         : nil
@@ -380,7 +420,8 @@ public struct Parser {
         ConformanceDeclaration(
           modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToConformance),
           introducer: introducer,
-          staticParameters: parameters,
+          identifier: identifier.map(Parsed.init(_:)),
+          contextParameters: parameters,
           witness: witness,
           members: members,
           site: span(from: introducer)))
@@ -576,7 +617,7 @@ public struct Parser {
     if !next(is: .leftAngle) { return .empty(at: .empty(at: position)) }
     let start = nextTokenStart()
 
-    return try inAngles { (me) in
+    let (ts, us) = try inAngles { (me) in
       // Parse the type parameters and their context bounds.
       let typesAndBounds = try me.parseCommaSeparatedGenericParameters(
         admittingUsings: true, in: &file)
@@ -591,8 +632,10 @@ public struct Parser {
 
       // Parse other usings.
       try usings.append(contentsOf: me.parseOptionalWhereClause(in: &file))
-      return ContextParameters(types: types, usings: usings, site: me.span(from: start))
+      return (types, usings)
     }
+
+    return ContextParameters(types: ts, usings: us, site: span(from: start))
   }
 
   /// Parses the generic parameter declarations of a context clause.
@@ -669,7 +712,7 @@ public struct Parser {
       // Parse a comma-separated list of binding declarations.
       let s = m0.position
       let (ds, lastComma) = try m0.commaSeparated(until: Token.hasTag(.rightBracket)) { (m1) in
-        try m1.parseBindingDeclaration(after: .none(), in: &file)
+        try m1.parseBindingDeclaration(after: .empty, in: &file)
       }
 
       // Is there a trailing ellipsis?
@@ -718,7 +761,8 @@ public struct Parser {
       ConformanceDeclaration(
         modifiers: [],
         introducer: introducer,
-        staticParameters: .empty(at: s),
+        identifier: nil,
+        contextParameters: .empty(at: s),
         witness: w,
         members: [],
         site: s))
@@ -754,8 +798,26 @@ public struct Parser {
     return ps
   }
 
-  /// Parses an implicit compile-time context parameter.
+  /// Parses a context parameter.
   private mutating func parseContextParameter(
+    in file: inout Module.SourceContainer
+  ) throws -> DeclarationIdentity {
+    if next(satisfies: \.isBindingIntroducer) {
+      return try parseNamedContextParameter(in: &file)
+    } else {
+      return try parseAnonymousContextParameter(in: &file)
+    }
+  }
+
+  /// Parses a context parameter introduced as a binding declaration.
+  private mutating func parseNamedContextParameter(
+    in file: inout Module.SourceContainer
+  ) throws -> DeclarationIdentity {
+    .init(try parseBindingDeclaration(as: .given, after: .empty, in: &file))
+  }
+
+  /// Parses a context parameter introduced without a name.
+  private mutating func parseAnonymousContextParameter(
     in file: inout Module.SourceContainer
   ) throws -> DeclarationIdentity {
     let l = try parseCompoundExpression(in: &file)
@@ -968,7 +1030,8 @@ public struct Parser {
         ConformanceDeclaration(
           modifiers: [],
           introducer: introducer,
-          staticParameters: .empty(at: span),
+          identifier: nil,
+          contextParameters: .empty(at: span),
           witness: t2,
           members: nil,
           site: file[t0].site))
@@ -1465,7 +1528,7 @@ public struct Parser {
     let head = try peek() ?? expected("expression")
     switch head.tag {
     case .inout, .let, .set, .sink, .var:
-      return try .init(parseBindingDeclaration(as: .condition, after: .none(), in: &file))
+      return try .init(parseBindingDeclaration(as: .condition, after: .empty, in: &file))
     default:
       return try .init(parseExpression(in: &file))
     }
@@ -2733,7 +2796,7 @@ fileprivate struct DeclarationPrologue {
   }
 
   /// Returns a prologue containing no annotation and no modifier.
-  fileprivate static func none() -> Self {
+  fileprivate static var empty: Self {
     .init(annotations: [], modifiers: [])
   }
 

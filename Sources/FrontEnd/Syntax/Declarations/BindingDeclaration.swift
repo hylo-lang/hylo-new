@@ -11,7 +11,7 @@ public struct BindingDeclaration: ModifiableDeclaration {
     /// The declaration is used to introduce new bindings unconditionally.
     case unconditional
 
-    /// The declaration is used to introduce new values in the implicit scope.
+    /// The declaration is used to introduce a binding in the implicit context.
     case given
 
     /// The declaration is used to introduce new bindings iff its pattern matches the value of its
