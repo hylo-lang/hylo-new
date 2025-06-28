@@ -14,6 +14,18 @@ import Foundation
     transform: URL.init(fileURLWithPath:))
   private var output: URL?
 
+  /// Whether the command should just list test cases.
+  @Flag(
+    name: [.customShort("l"), .customLong("list")],
+    help: ArgumentHelp("Only list test cases without generating them."))
+  private var shouldOnlyList: Bool = false
+
+  /// Whether the command should just list test cases.
+  @Flag(
+    name: [.customShort("c"), .customLong("clean")],
+    help: ArgumentHelp("Remove '*.observed' files."))
+  private var shouldCleanObservations: Bool = false
+
   /// The root path of the compiler test target.
   @Argument(transform: URL.init(fileURLWithPath:))
   private var root: URL =
@@ -49,7 +61,42 @@ import Foundation
   public init() {}
 
   /// Executes the command.
-  public mutating func run() async throws {
+  public func run() async throws {
+    if shouldCleanObservations {
+      try cleanObservations()
+    }
+
+    if shouldOnlyList {
+      try dumpTestCaseNames()
+    } else {
+      try generateSwiftSourceFile()
+    }
+  }
+
+  /// Removes all '.observed' files under the root path.
+  private func cleanObservations() throws {
+    let items = FileManager.default.enumerator(
+      at: root,
+      includingPropertiesForKeys: [.isRegularFileKey],
+      options: [.skipsHiddenFiles, .skipsPackageDescendants])!
+    for case let u as URL in items where u.pathExtension == "observed" {
+      try FileManager.default.removeItem(at: u)
+    }
+  }
+
+  /// Dumps a list of all test cases to the standard output.
+  private func dumpTestCaseNames() throws {
+    var result = ""
+    for u in try testCases(negative) { print(u.path(), to: &result) }
+    for u in try testCases(positive) { print(u.path(), to: &result) }
+    if result.isEmpty {
+      throw CommandError.noTestFound
+    }
+    print(result, terminator: "")
+  }
+
+  /// Generates a Swift source defining all test cases.
+  private func generateSwiftSourceFile() throws {
     var result = "extension CompilerTests {\n"
 
     for u in try testCases(negative) {
@@ -78,6 +125,22 @@ import Foundation
     try result.write(
       to: output ?? root.appending(component: "CompilerTests+GeneratedTests.swift"),
       atomically: true, encoding: .utf8)
+  }
+
+}
+
+/// An error that occurred during the execution of `CommandLine`.
+public enum CommandError: Error, CustomStringConvertible {
+
+  /// Not test case was found.
+  case noTestFound
+
+  /// Returns a textual description of `self`.
+  public var description: String {
+    switch self {
+    case .noTestFound:
+      return "No tests were found."
+    }
   }
 
 }
