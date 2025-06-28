@@ -21,14 +21,6 @@ public struct TypeAlias: TypeTree {
     .hasAliases
   }
 
-  /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
-  public func modified(
-    in store: inout TypeStore,
-    by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
-  ) -> TypeAlias {
-    .init(declaration: declaration, aliasee: store.map(aliasee, transform))
-  }
-
 }
 
 extension TypeAlias: Showable {
