@@ -314,8 +314,8 @@ public struct Parser {
       {
         let r = try parseExpression(in: &file)
         let l = file.insert(n)
-        let w = ExpressionIdentity(desugaredConformance(of: .init(l), to: r, in: &file))
-        let u = file.insert(UsingDeclaration(witness: w, site: file[r].site))
+        let w = file.desugaredConformance(of: .init(l), to: r)
+        let u = file.synthesizeUsingDeclaration(.init(w))
         let p = file.insert(
           GenericParameterDeclaration(
             identifier: .init(n.name.value.identifier, at: n.site),
@@ -382,25 +382,13 @@ public struct Parser {
     // If the next token is `=`, we're parsing a given binding declaration whose `let` introducer
     // was left implicit (e.g., `given Int = 1`).
     if let e = try parseOptionalInitializerExpression(in: &file) {
-      let s = SourceSpan.empty(at: introducer.site.end)
-      let p: PatternIdentity = if let i = identifier {
-        .init(file.insert(VariableDeclaration(identifier: .init(i))))
-      } else {
-        .init(file.insert(WildcardLiteral(site: s)))
-      }
-
       if !parameters.isEmpty {
         report(.init("arbitrary given functions are not supported yet", at: parameters.site))
       }
 
-      let b = file.insert(
-        BindingPattern(
-          introducer: .init(.let, at: s), pattern: p, ascription: lhs,
-          site: span(from: introducer)))
-      let d = file.insert(
-        BindingDeclaration(
-          modifiers: [], role: .given, pattern: b, initializer: e,
-          site: span(from: introducer)))
+      let d = file.synthesizeBindingDeclaration(
+        role: .given, identifier: identifier, ascription: lhs, initializer: e,
+        at: span(from: introducer))
       return .init(d)
     }
 
@@ -408,7 +396,7 @@ public struct Parser {
     else {
       _ = try take(contextual: "is") ?? expected("'is'")
       let concept = try parseExpression(in: &file)
-      let witness = desugaredConformance(of: lhs, to: concept, in: &file)
+      let witness = file.desugaredConformance(of: lhs, to: concept)
       let members = self.next(is: .leftBrace)
         ? try parseTypeBody(in: &file, accepting: \.isValidStructMember)
         : nil
@@ -454,7 +442,7 @@ public struct Parser {
     var p: [ParameterDeclaration.ID] = []
     if (context == .typeBody) && !prologue.contains(.static) {
       isMember = true
-      p = [synthesizeSelfParameter(effect: effect, in: &file)] + parameters
+      p = [file.synthesizeSelfParameter(effect: effect)] + parameters
     } else {
       isMember = false
       p = parameters
@@ -513,7 +501,7 @@ public struct Parser {
     after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
   ) throws -> FunctionDeclaration.ID {
     let introducer = try parseInitializerIntroducer()
-    let receiver = synthesizeSelfParameter(effect: .init(.set, at: introducer.site), in: &file)
+    let receiver = file.synthesizeSelfParameter(effect: .init(.set, at: introducer.site))
 
     // Are we parsing a custom initializer?
     if introducer.value == .`init` {
@@ -642,7 +630,7 @@ public struct Parser {
   private mutating func parseCommaSeparatedGenericParameters(
     admittingUsings admitUsings: Bool,
     in file: inout Module.SourceContainer
-  ) throws -> [(GenericParameterDeclaration.ID, [UsingDeclaration.ID])] {
+  ) throws -> [(GenericParameterDeclaration.ID, bounds: [BindingDeclaration.ID])] {
     let (ps, _) = try commaSeparated(until: Token.oneOf([.rightAngle, .where])) { (me) in
       try me.parseGenericParameterDeclaration(admittingUsings: admitUsings, in: &file)
     }
@@ -657,7 +645,7 @@ public struct Parser {
   private mutating func parseGenericParameterDeclaration(
     admittingUsings admitUsings: Bool,
     in file: inout Module.SourceContainer
-  ) throws -> (GenericParameterDeclaration.ID, [UsingDeclaration.ID]) {
+  ) throws -> (GenericParameterDeclaration.ID, bounds: [BindingDeclaration.ID]) {
     let n = try take(.name) ?? expected("identifier")
     let a = try parseOptionalKindAscription(in: &file)
 
@@ -673,7 +661,7 @@ public struct Parser {
 
   private mutating func parseOptionalContextBoundList(
     on conformer: Token, in file: inout Module.SourceContainer
-  ) throws -> [UsingDeclaration.ID] {
+  ) throws -> [BindingDeclaration.ID] {
     guard take(contextual: "is") != nil else { return [] }
     let bs = try ampersandSeparated(until: Token.oneOf([.comma, .where, .rightAngle])) { (me) in
       try me.parseContextBound(on: conformer, in: &file)
@@ -686,11 +674,11 @@ public struct Parser {
 
   private mutating func parseContextBound(
     on conformer: Token, in file: inout Module.SourceContainer
-  ) throws -> UsingDeclaration.ID {
-    let rhs = try parseCompoundExpression(in: &file)
-    let lhs = ExpressionIdentity(file.insert(NameExpression(.init(conformer))))
-    let witness = ExpressionIdentity(desugaredConformance(of: lhs, to: rhs, in: &file))
-    return file.insert(UsingDeclaration(witness: witness, site: file[rhs].site))
+  ) throws -> BindingDeclaration.ID {
+    let r = try parseCompoundExpression(in: &file)
+    let l = ExpressionIdentity(file.insert(NameExpression(.init(conformer))))
+    let t = file.desugaredConformance(of: l, to: r)
+    return file.synthesizeUsingDeclaration(.init(t))
   }
 
   /// Parses a capture list.
@@ -824,17 +812,15 @@ public struct Parser {
     let s = try take(contextual: "is") ?? take(.equal) ?? expected("'is' or '=='")
     let r = try parseCompoundExpression(in: &file)
 
-    let witness: ExpressionIdentity
     if s.tag == .equal {
       let w = EqualityWitnessExpression(
         lhs: l, rhs: r, site: file[l].site.extended(toCover: file[r].site))
-      witness = .init(file.insert(w))
+      let t = file.insert(w)
+      return .init(file.synthesizeUsingDeclaration(.init(t)))
     } else {
-      witness = .init(desugaredConformance(of: l, to: r, in: &file))
+      let t = file.desugaredConformance(of: l, to: r)
+      return .init(file.synthesizeUsingDeclaration(.init(t)))
     }
-
-    let d = file.insert(UsingDeclaration(witness: witness, site: file[witness].site))
-    return .init(d)
   }
 
   /// Parses a comma-separated list of parameter declarations.
@@ -1024,8 +1010,8 @@ public struct Parser {
     return try ampersandSeparated(until: Token.hasTag(.rightBrace)) { (me) in
       let span = SourceSpan.empty(at: me.nextTokenStart())
       let t0 = try me.parseCompoundExpression(in: &file)
-      let t1 = me.synthesizeNameExpression([refined, "Self"], at: span, in: &file)
-      let t2 = me.desugaredConformance(of: .init(t1), to: t0, in: &file)
+      let t1 = file.synthesizeNameExpression([refined, "Self"], at: span)
+      let t2 = file.desugaredConformance(of: .init(t1), to: t0)
       let t3 = file.insert(
         ConformanceDeclaration(
           modifiers: [],
@@ -1489,7 +1475,7 @@ public struct Parser {
       ascription = try parseExpression(in: &file)
     }
 
-    let a = desugaredParameterAscription(ascription, in: &file)
+    let a = file.desugaredParameterAscription(ascription)
     return .init(label: label, ascription: a)
   }
 
@@ -1818,7 +1804,7 @@ public struct Parser {
     if take(.colon) != nil {
       let m = take(contextual: "lazy")
       let e = try parseExpression(in: &file)
-      let a = desugaredParameterAscription(e, in: &file)
+      let a = file.desugaredParameterAscription(e)
       return (m, a)
     } else {
       return nil
@@ -2229,73 +2215,6 @@ public struct Parser {
     } else {
       return nil
     }
-  }
-
-  // MARK: Desugarings
-
-  /// Returns the desugaring of a sugared conformance type.
-  ///
-  /// A sugared conformance type is parsed as `expression ':' expression`. If the RHS is a static
-  /// call, this method modifies it in-place to add the LHS as its first argument. Otherwise, a new
-  /// static call is created to apply the RHS on the LHS.
-  private func desugaredConformance(
-    of conformer: ExpressionIdentity, to concept: ExpressionIdentity,
-    in file: inout Module.SourceContainer
-  ) -> StaticCall.ID {
-    if let rhs = file[concept] as? StaticCall {
-      let desugared = StaticCall(
-        callee: rhs.callee, arguments: [conformer] + rhs.arguments,
-        site: file[concept].site)
-      return file.replace(concept, for: desugared)
-    } else {
-      return file.insert(
-        StaticCall(callee: concept, arguments: [conformer], site: file[concept].site))
-    }
-  }
-
-  /// Returns `ascription` if it is a remote type expression. Otherwise, returns a remote type
-  /// expression with a synthesized `let` effect.
-  private func desugaredParameterAscription(
-    _ ascription: ExpressionIdentity, in file: inout Module.SourceContainer
-  ) -> RemoteTypeExpression.ID {
-    if file.tag(of: ascription) == RemoteTypeExpression.self {
-      return RemoteTypeExpression.ID(uncheckedFrom: ascription.erased)
-    } else {
-      let s = file[ascription].site
-      let k = Parsed<AccessEffect>(.let, at: .empty(at: s.start))
-      return file.insert(RemoteTypeExpression(access: k, projectee: ascription, site: s))
-    }
-  }
-
-  /// Returns a tree expressing the declaration of a self-parameter with the given `effect`.
-  private mutating func synthesizeSelfParameter(
-    effect: Parsed<AccessEffect>, in file: inout Module.SourceContainer
-  ) -> ParameterDeclaration.ID {
-    let t0 = Parsed("self", at: effect.site)
-    let t1 = file.insert(
-      NameExpression(.init("Self", at: effect.site)))
-    let t2 = file.insert(
-      RemoteTypeExpression(access: effect, projectee: .init(t1), site: effect.site))
-    let x3 = file.insert(
-      ParameterDeclaration(
-        label: t0, identifier: t0, ascription: t2,
-        defaultValue: nil, lazyModifier: nil, site: effect.site))
-    return x3
-  }
-
-  /// Returns a name expression with the given components.
-  private func synthesizeNameExpression(
-    _ components: [String], at site: SourceSpan, in file: inout Module.SourceContainer
-  ) -> NameExpression.ID {
-    var q: NameExpression.ID? = nil
-    for n in components {
-      q = file.insert(
-        NameExpression(
-          qualification: q.map(ExpressionIdentity.init(_:)),
-          name: Parsed(Name(identifier: String(n)), at: site),
-          site: site))
-    }
-    return q!
   }
 
   // MARK: Helpers
@@ -2798,6 +2717,102 @@ fileprivate struct DeclarationPrologue {
   /// Returns a prologue containing no annotation and no modifier.
   fileprivate static var empty: Self {
     .init(annotations: [], modifiers: [])
+  }
+
+}
+
+extension Module.SourceContainer {
+
+  /// Returns the desugaring of a sugared conformance type.
+  ///
+  /// A sugared conformance type is parsed as `expression ':' expression`. If the RHS is a static
+  /// call, this method modifies it in-place to add the LHS as its first argument. Otherwise, a new
+  /// static call is created to apply the RHS on the LHS.
+  fileprivate mutating func desugaredConformance(
+    of conformer: ExpressionIdentity, to concept: ExpressionIdentity
+  ) -> StaticCall.ID {
+    if let rhs = self[concept] as? StaticCall {
+      let desugared = StaticCall(
+        callee: rhs.callee, arguments: [conformer] + rhs.arguments, site: self[concept].site)
+      return replace(concept, for: desugared)
+    } else {
+      return insert(StaticCall(callee: concept, arguments: [conformer], site: self[concept].site))
+    }
+  }
+
+  /// Returns `ascription` if it is a remote type expression. Otherwise, returns a remote type
+  /// expression with a synthesized `let` effect.
+  fileprivate mutating func desugaredParameterAscription(
+    _ ascription: ExpressionIdentity
+  ) -> RemoteTypeExpression.ID {
+    if tag(of: ascription) == RemoteTypeExpression.self {
+      return RemoteTypeExpression.ID(uncheckedFrom: ascription.erased)
+    } else {
+      let s = self[ascription].site
+      let k = Parsed<AccessEffect>(.let, at: .empty(at: s.start))
+      return insert(RemoteTypeExpression(access: k, projectee: ascription, site: s))
+    }
+  }
+
+  /// Returns a tree expressing the declaration of a self-parameter with the given `effect`.
+  fileprivate mutating func synthesizeSelfParameter(
+    effect: Parsed<AccessEffect>
+  ) -> ParameterDeclaration.ID {
+    let t0 = Parsed("self", at: effect.site)
+    let t1 = insert(
+      NameExpression(.init("Self", at: effect.site)))
+    let t2 = insert(
+      RemoteTypeExpression(access: effect, projectee: .init(t1), site: effect.site))
+    let t3 = insert(
+      ParameterDeclaration(
+        label: t0, identifier: t0, ascription: t2,
+        defaultValue: nil, lazyModifier: nil, site: effect.site))
+    return t3
+  }
+
+  /// Returns a name expression with the given components.
+  fileprivate mutating func synthesizeNameExpression(
+    _ components: [String], at site: SourceSpan
+  ) -> NameExpression.ID {
+    var qualification: NameExpression.ID? = nil
+    for n in components {
+      qualification = insert(
+        NameExpression(
+          qualification: qualification.map(ExpressionIdentity.init(_:)),
+          name: Parsed(Name(identifier: String(n)), at: site),
+          site: site))
+    }
+    return qualification!
+  }
+
+  /// Returns a binding declaration with the given properties.
+  fileprivate mutating func synthesizeBindingDeclaration(
+    role: BindingDeclaration.Role, identifier: Token?,
+    ascription a: ExpressionIdentity, initializer i: ExpressionIdentity?,
+    at site: SourceSpan
+  ) -> BindingDeclaration.ID {
+    let s = SourceSpan.empty(at: site.start)
+
+    let p: PatternIdentity = if let i = identifier {
+      .init(insert(VariableDeclaration(identifier: .init(i))))
+    } else {
+      .init(insert(WildcardLiteral(site: s)))
+    }
+
+    let b = insert(
+      BindingPattern(introducer: .init(.let, at: s), pattern: p, ascription: a, site: s))
+    let d = insert(
+      BindingDeclaration(modifiers: [], role: role, pattern: b, initializer: i, site: s))
+
+    return d
+  }
+
+  /// Returns a using declaration with the given properties.
+  fileprivate mutating func synthesizeUsingDeclaration(
+    _ t: ExpressionIdentity
+  ) -> BindingDeclaration.ID {
+    synthesizeBindingDeclaration(
+      role: .using, identifier: nil, ascription: t, initializer: nil, at: self[t].site)
   }
 
 }

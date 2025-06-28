@@ -290,8 +290,6 @@ public struct Typer {
       check(castUnchecked(d, to: TraitDeclaration.self))
     case TypeAliasDeclaration.self:
       check(castUnchecked(d, to: TypeAliasDeclaration.self))
-    case UsingDeclaration.self:
-      check(castUnchecked(d, to: UsingDeclaration.self))
     case VariableDeclaration.self:
       break
     default:
@@ -319,7 +317,7 @@ public struct Typer {
         report(.error, "binding declaration requires an initializer", about: d)
       }
 
-    case .given, .unconditional:
+    case .using, .given, .unconditional:
       if let i = program[d].initializer {
         check(i, requiring: t)
       }
@@ -638,11 +636,6 @@ public struct Typer {
     _ = declaredType(of: d)
     // TODO
     checkUniqueDeclaration(d, of: program[d].identifier.value)
-  }
-
-  /// Type checks `d`.
-  private mutating func check(_ d: UsingDeclaration.ID) {
-    _ = declaredType(of: d)
   }
 
   /// Type checks `d`.
@@ -1030,8 +1023,6 @@ public struct Typer {
       return declaredType(of: castUnchecked(d, to: TypeAliasDeclaration.self))
     case VariableDeclaration.self:
       return declaredType(of: castUnchecked(d, to: VariableDeclaration.self))
-    case UsingDeclaration.self:
-      return declaredType(of: castUnchecked(d, to: UsingDeclaration.self))
     case VariantDeclaration.self:
       return declaredType(of: castUnchecked(d, to: VariantDeclaration.self))
     default:
@@ -1278,16 +1269,6 @@ public struct Typer {
     let b = program.bindingDeclaration(containing: d) ?? unreachable("pattern is not typed")
     _ = declaredType(of: b)
     return program[module].type(assignedTo: d) ?? .error
-  }
-
-  /// Returns the declared type of `d` without checking.
-  private mutating func declaredType(of d: UsingDeclaration.ID) -> AnyTypeIdentity {
-    if let memoized = program[d.module].type(assignedTo: d) { return memoized }
-    assert(d.module == module, "dependency is not typed")
-
-    let t = evaluateTypeAscription(program[d].witness)
-    program[module].setType(t, for: d)
-    return t
   }
 
   /// Returns the declared type of `d` without checking.
@@ -3148,7 +3129,7 @@ public struct Typer {
     }
 
     // Do not memoize the result if it has been computed while givens were on stack.
-    if !t[.hasVariable] && !declarationsOnStack.contains(where: program.isGiven) {
+    if !t[.hasVariable] && !declarationsOnStack.contains(where: program.isImplicit) {
       cache.scopeToSummoned[scopeOfUse, default: [:]][t] = result
     }
 
@@ -3415,7 +3396,7 @@ public struct Typer {
   ) {
     for d in ds {
       // Collect conformance declarations and anonymous context parameters.
-      if program.isGiven(d) {
+      if program.isImplicit(d) {
         gs.append(.user(d))
       }
 
@@ -4014,8 +3995,10 @@ public struct Typer {
   /// Returns `true` if `m` can be resolved with a qualified name expression.
   private func resolvableWithQualification(_ m: DeclarationIdentity) -> Bool {
     switch program.tag(of: m) {
-    case GenericParameterDeclaration.self, UsingDeclaration.self:
+    case GenericParameterDeclaration.self:
       return false
+    case BindingDeclaration.self:
+      return program[program.castUnchecked(m, to: BindingDeclaration.self)].role != .using
     default:
       return true
     }

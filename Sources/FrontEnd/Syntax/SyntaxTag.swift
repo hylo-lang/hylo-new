@@ -42,7 +42,6 @@ public struct SyntaxTag: Sendable {
     StructDeclaration.self,
     TraitDeclaration.self,
     TypeAliasDeclaration.self,
-    UsingDeclaration.self,
     VariableDeclaration.self,
     VariantDeclaration.self,
 

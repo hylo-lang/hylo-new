@@ -73,14 +73,10 @@ extension Program {
       traverse(castUnchecked(n, to: TraitDeclaration.self), calling: &v)
     case TypeAliasDeclaration.self:
       traverse(castUnchecked(n, to: TypeAliasDeclaration.self), calling: &v)
-    case UsingDeclaration.self:
-      traverse(castUnchecked(n, to: UsingDeclaration.self), calling: &v)
     case VariableDeclaration.self:
       break
     case VariantDeclaration.self:
       traverse(castUnchecked(n, to: VariantDeclaration.self), calling: &v)
-    case UsingDeclaration.self:
-      traverse(castUnchecked(n, to: UsingDeclaration.self), calling: &v)
 
     case ArrowExpression.self:
       traverse(castUnchecked(n, to: ArrowExpression.self), calling: &v)
@@ -256,11 +252,6 @@ extension Program {
   public func traverse<T: SyntaxVisitor>(_ n: TypeAliasDeclaration.ID, calling v: inout T) {
     visit(self[n].parameters, calling: &v)
     visit(self[n].aliasee, calling: &v)
-  }
-
-  /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
-  public func traverse<T: SyntaxVisitor>(_ n: UsingDeclaration.ID, calling v: inout T) {
-    visit(self[n].witness, calling: &v)
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.

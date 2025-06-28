@@ -249,13 +249,11 @@ public struct Program: Sendable {
   }
 
   /// Returns `true` iff `n` introduces entities in the implicit context.
-  public func isGiven<T: SyntaxIdentity>(_ n: T) -> Bool {
+  public func isImplicit<T: SyntaxIdentity>(_ n: T) -> Bool {
     switch tag(of: n) {
     case BindingDeclaration.self:
-      return self[castUnchecked(n, to: BindingDeclaration.self)].role == .given
+      return self[castUnchecked(n, to: BindingDeclaration.self)].isImplicit
     case ConformanceDeclaration.self:
-      return true
-    case UsingDeclaration.self:
       return true
     default:
       return false
