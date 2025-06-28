@@ -254,6 +254,7 @@ extension Program {
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: TypeAliasDeclaration.ID, calling v: inout T) {
+    visit(self[n].parameters, calling: &v)
     visit(self[n].aliasee, calling: &v)
   }
 

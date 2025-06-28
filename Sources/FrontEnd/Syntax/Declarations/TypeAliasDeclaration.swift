@@ -2,6 +2,7 @@ import Archivist
 import Utilities
 
 /// The declaration of a type alias.
+@Archivable
 public struct TypeAliasDeclaration: TypeDeclaration, ModifiableDeclaration, Scope {
 
   /// The modifiers applied to this declaration.
@@ -13,11 +14,31 @@ public struct TypeAliasDeclaration: TypeDeclaration, ModifiableDeclaration, Scop
   /// The name of the declared alias.
   public let identifier: Parsed<String>
 
+  /// The type parameters of the struct.
+  public let parameters: [GenericParameterDeclaration.ID]
+
   /// The expression of the aliased type.
   public let aliasee: ExpressionIdentity
 
   /// The site from which `self` was parsed.
   public let site: SourceSpan
+
+  /// Creates an instance with the given properties.
+  public init(
+    modifiers: [Parsed<DeclarationModifier>],
+    introducer: Token,
+    identifier: Parsed<String>,
+    parameters: [GenericParameterDeclaration.ID],
+    aliasee: ExpressionIdentity,
+    site: SourceSpan
+  ) {
+    self.modifiers = modifiers
+    self.introducer = introducer
+    self.identifier = identifier
+    self.parameters = parameters
+    self.aliasee = aliasee
+    self.site = site
+  }
 
 }
 
@@ -28,27 +49,12 @@ extension TypeAliasDeclaration: Showable {
     var result = ""
     for m in modifiers { result.append("\(m) ") }
     result.append("type \(identifier.value) = \(printer.show(aliasee))")
+
+    if !parameters.isEmpty {
+      result.append("<\(printer.show(parameters))>")
+    }
+
     return result
-  }
-
-}
-
-extension TypeAliasDeclaration: Archivable {
-
-  public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
-    self.modifiers = try archive.read([Parsed<DeclarationModifier>].self, in: &context)
-    self.introducer = try archive.read(Token.self, in: &context)
-    self.identifier = try archive.read(Parsed<String>.self, in: &context)
-    self.aliasee = try archive.read(ExpressionIdentity.self, in: &context)
-    self.site = try archive.read(SourceSpan.self, in: &context)
-  }
-
-  public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
-    try archive.write(modifiers, in: &context)
-    try archive.write(introducer, in: &context)
-    try archive.write(identifier, in: &context)
-    try archive.write(aliasee, in: &context)
-    try archive.write(site, in: &context)
   }
 
 }

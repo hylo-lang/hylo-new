@@ -1016,6 +1016,7 @@ public struct Parser {
 
     // If the next token is `<` or `=`, commit to a type alias declaration.
     if next(is: .leftAngle) || next(is: .assign) {
+      let parameters = try parseOptionalTypeParameterClause(in: &file)
       _ = try take(.assign) ?? expected("'='")
       let aliasee = try parseExpression(in: &file)
 
@@ -1027,6 +1028,7 @@ public struct Parser {
           modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToTypeDeclaration),
           introducer: introducer,
           identifier: identifier,
+          parameters: parameters,
           aliasee: aliasee,
           site: introducer.site.extended(upTo: position.index)))
       return .init(d)
