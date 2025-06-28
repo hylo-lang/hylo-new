@@ -153,7 +153,7 @@ public struct Typer {
 
   /// Returns the types of stored parts of `t`.
   private mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
-    let u = program.types.reduced(t)
+    let u = program.types.dealiased(t)
     switch program.types.tag(of: u) {
     case Enum.self:
       return storage(of: program.types.castUnchecked(t, to: Enum.self))

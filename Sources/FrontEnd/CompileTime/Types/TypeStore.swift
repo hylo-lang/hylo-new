@@ -559,23 +559,12 @@ public struct TypeStore: Sendable {
   /// Returns `n` without any type alias.
   public mutating func dealiased(_ n: AnyTypeIdentity) -> AnyTypeIdentity {
     self.map(n) { (s, t) in
-      if let a = s[t] as? TypeAlias {
-        return .stepInto(a.aliasee)
-      } else if t[.hasAliases] {
-        return .stepInto(t)
-      } else {
+      if !t[.hasAliases] {
         return .stepOver(t)
-      }
-    }
-  }
-
-  /// Returns `n` with occurrences of applications of universal types β-reduced.
-  public mutating func reduced(_ n: AnyTypeIdentity) -> AnyTypeIdentity {
-    self.map(n) { (s, t) in
-      if let a = s[t] as? TypeApplication, let u = s[a.abstraction] as? UniversalType {
-        assert(a.arguments.count == u.parameters.count)
-        let ss = TypeArguments(mapping: u.parameters, to: a.arguments.values)
-        return .stepInto(s.substitute(ss, in: u.body))
+      } else if let a = s[t] as? TypeAlias {
+        return .stepInto(a.aliasee)
+      } else if let a = s[t] as? TypeApplication, let f = s[a.abstraction] as? TypeAlias {
+        return .stepInto(s.substitute(a.arguments, in: f.aliasee))
       } else {
         return .stepInto(t)
       }
@@ -589,15 +578,23 @@ public struct TypeStore: Sendable {
     applying substitutions: SubstitutionTable,
     withVariables substitutionPolicy: SubstitutionPolicy = .substitutedByError
   ) -> AnyTypeIdentity {
-    let reified = self.map(n) { (s, t) in
-      let u = substitutions[t]
-      if !u.isVariable || substitutionPolicy == .kept {
-        return u[.hasVariable] ? .stepInto(u) : .stepOver(u)
-      } else {
-        return .stepOver(.error)
+    // Nothing to do if there aren't any open type variable.
+    if !n[.hasVariable] { return n }
+
+    // Reduce type applications if the abstaction is a universal type.
+    var t = substitutions[n]
+    while let a = self[t] as? TypeApplication, let f = self[a.abstraction] as? UniversalType {
+      t = substitute(.init(mapping: f.parameters, to: a.arguments.values), in: f.body)
+    }
+
+    // Recurse if necessary.
+    if t.isVariable {
+      return (substitutionPolicy == .kept) ? t : .error
+    } else {
+      return self.modified(t) { (s, u) in
+        .stepOver(s.reify(u, applying: substitutions, withVariables: substitutionPolicy))
       }
     }
-    return reified == n ? n : reduced(reified)
   }
 
   /// Returns `r` with its open variables reified by `substitutions` and `substitutionPolicy`.
