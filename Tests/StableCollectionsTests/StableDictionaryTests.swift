@@ -1,4 +1,4 @@
-import MoreCollections
+import StableCollections
 import XCTest
 
 class StableDictionaryTests: XCTestCase {
@@ -6,6 +6,18 @@ class StableDictionaryTests: XCTestCase {
   func testInitWithMinimumCapacity() {
     let s = StableDictionary<String, Int>(minimumCapacity: 100)
     XCTAssertGreaterThanOrEqual(s.capacity, 100)
+  }
+
+  func testInitWithKeyValuePairs() {
+    let pairs = [("a", 1), ("b", 2)]
+    let s = StableDictionary<String, Int>(uniqueKeysAndValues: pairs)
+    XCTAssert(s.elementsEqual(pairs, by: { (a, b) in (a.0 == b.0) && (a.1 == b.1) }))
+  }
+
+  func testInitWithDictionaryLiteral() {
+    let pairs = [("a", 1), ("b", 2)]
+    let s: StableDictionary = ["a": 1, "b": 2]
+    XCTAssert(s.elementsEqual(pairs, by: { (a, b) in (a.0 == b.0) && (a.1 == b.1) }))
   }
 
   func testIsEmpty() {
@@ -26,18 +38,6 @@ class StableDictionaryTests: XCTestCase {
     XCTAssertEqual(s.count, 1)
     s["b"] = nil
     XCTAssertEqual(s.count, 0)
-  }
-
-  func testInitWithKeyValuePairs() {
-    let pairs = [("a", 1), ("b", 2)]
-    let s = StableDictionary<String, Int>(uniqueKeysAndValues: pairs)
-    XCTAssert(s.elementsEqual(pairs, by: { (a, b) in (a.0 == b.0) && (a.1 == b.1) }))
-  }
-
-  func testInitWithDictionaryLiteral() {
-    let pairs = [("a", 1), ("b", 2)]
-    let s: StableDictionary = ["a": 1, "b": 2]
-    XCTAssert(s.elementsEqual(pairs, by: { (a, b) in (a.0 == b.0) && (a.1 == b.1) }))
   }
 
   func testKeySubscript() {

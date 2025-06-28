@@ -1,4 +1,4 @@
-import MoreCollections
+import StableCollections
 import XCTest
 
 class StableSetTests: XCTestCase {
@@ -6,6 +6,17 @@ class StableSetTests: XCTestCase {
   func testInitWithMinimumCapacity() {
     let s = StableSet<String>(minimumCapacity: 100)
     XCTAssertGreaterThanOrEqual(s.capacity, 100)
+  }
+
+  func testInitWithSequence() {
+    let members = ["a", "b"]
+    let s = StableSet<String>(members)
+    XCTAssert(s.elementsEqual(members))
+  }
+
+  func testInitWithArrayLiteral() {
+    let s: StableSet = ["a", "b"]
+    XCTAssert(s.elementsEqual(["a", "b"]))
   }
 
   func testIsEmpty() {
@@ -26,17 +37,6 @@ class StableSetTests: XCTestCase {
     XCTAssertEqual(s.count, 1)
     s.remove("a")
     XCTAssertEqual(s.count, 0)
-  }
-
-  func testInitWithSequence() {
-    let members = ["a", "b"]
-    let s = StableSet<String>(members)
-    XCTAssert(s.elementsEqual(members))
-  }
-
-  func testInitWithArrayLiteral() {
-    let s: StableSet = ["a", "b"]
-    XCTAssert(s.elementsEqual(["a", "b"]))
   }
 
   func testFirstIndexOf() {

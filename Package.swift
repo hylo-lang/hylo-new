@@ -48,7 +48,7 @@ let package = Package(
     .executableTarget(
       name: "hc-tests",
       dependencies: [
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser")
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -74,7 +74,11 @@ let package = Package(
       swiftSettings: commonSwiftSettings),
 
     .target(
-      name: "StableCollections"),
+      name: "StableCollections",
+      dependencies: [
+        .target(name: "Utilities")
+      ],
+      swiftSettings: commonSwiftSettings),
 
     .target(
       name: "StandardLibrary",
@@ -85,7 +89,7 @@ let package = Package(
     .target(
       name: "Utilities",
       dependencies: [
-        .product(name: "Algorithms", package: "swift-algorithms"),
+        .product(name: "Algorithms", package: "swift-algorithms")
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -103,14 +107,21 @@ let package = Package(
     .testTarget(
       name: "FrontEndTests",
       dependencies: [
-        .target(name: "FrontEnd"),
+        .target(name: "FrontEnd")
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
+      name: "StableCollectionsTests",
+      dependencies: [
+        .target(name: "StableCollections")
       ],
       swiftSettings: commonSwiftSettings),
 
     .testTarget(
       name: "UtilitiesTests",
       dependencies: [
-        .target(name: "Utilities"),
+        .target(name: "Utilities")
       ],
       swiftSettings: commonSwiftSettings),
 
