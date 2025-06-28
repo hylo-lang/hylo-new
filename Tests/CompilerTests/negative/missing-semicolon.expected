@@ -1,3 +1,6 @@
 negative/missing-semicolon.hylo:4.9: error: consecutive statements on the same line must be separated by ';'
   return return
         ^
+negative/missing-semicolon.hylo:4.9: error: expected expression
+  return return
+        ^

@@ -1341,7 +1341,7 @@ public struct Parser {
     case .leftBracket:
       return try .init(parseArrowExpression(in: &file))
     case .leftParenthesis:
-      return try parseTupleLiteralOrParenthesizedExpression(in: &file)
+      return try parseTupleOrParenthesizedExpression(in: &file)
     default:
       throw expected("expression")
     }
@@ -1676,7 +1676,7 @@ public struct Parser {
   ///     tuple-literal-body ::=
   ///       labeled-expression (',' labeled-expression)*
   ///
-  private mutating func parseTupleLiteralOrParenthesizedExpression(
+  private mutating func parseTupleOrParenthesizedExpression(
     in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity {
     let start = nextTokenStart()
@@ -1810,7 +1810,7 @@ public struct Parser {
     case .dot:
       return try parseImplicitlyQualifiedDeconstructingPattern(in: &file)
     case .leftParenthesis:
-      return try parseTuplePatternOrParenthesizedExpression(in: &file)
+      return try parseTupleOrParenthesizedPattern(in: &file)
     case .underscore:
       return try .init(parseWildcardLiteral(in: &file))
     default:
@@ -1906,7 +1906,9 @@ public struct Parser {
         head = n
       } else if next(is: .leftParenthesis) && !whitespaceBeforeNextToken() {
         // Parse the last component as an unqualified deconstructing pattern.
-        let (e, _) = try inParentheses({ (me) in try me.parseLabeledPatternList(in: &file) })
+        let (e, _) = try inParentheses { (me) in try
+          me.parseLabeledPatternList(until: .rightParenthesis, in: &file)
+        }
         let s = span(from: start)
         let n = file.insert(ExtractorPattern(extractor: head, elements: e, site: s))
         return .init(n)
@@ -1924,25 +1926,18 @@ public struct Parser {
   ///     tuple-pattern-body ::=
   ///       labeled-pattern (',' labeled-pattern)*
   ///
-  private mutating func parseTuplePatternOrParenthesizedExpression(
+  private mutating func parseTupleOrParenthesizedPattern(
     in file: inout Module.SourceContainer
   ) throws -> PatternIdentity {
-    let start = peek()?.site.start ?? position
-    let tuple = try attemptOptional { (m0) -> PatternIdentity? in
-      let (elements, lastComma) = try m0.inParentheses { (m1) in
-        try m1.parseLabeledPatternList(in: &file)
-      }
-      if (elements.count == 1) && (elements[0].label == nil) && (lastComma == nil) {
-        return nil
-      } else {
-        return .init(file.insert(TuplePattern(elements: elements, site: m0.span(from: start))))
-      }
+    let start = nextTokenStart()
+    let (elements, lastComma) = try inParentheses { (me) in
+      try me.parseLabeledPatternList(until: .rightParenthesis, in: &file)
     }
 
-    if let p = tuple {
-      return p
+    if (elements.count == 1) && (elements[0].label == nil) && (lastComma == nil) {
+      return elements[0].value
     } else {
-      return try .init(parseExpression(in: &file))
+      return .init(file.insert(TuplePattern(elements: elements, site: span(from: start))))
     }
   }
 
@@ -1954,9 +1949,9 @@ public struct Parser {
   ///       (expression-label ':')? pattern
   ///
   private mutating func parseLabeledPatternList(
-    in file: inout Module.SourceContainer
+    until rightDelimiter: Token.Tag, in file: inout Module.SourceContainer
   ) throws -> ([LabeledPattern], lastComma: Token?) {
-    try labeledSyntaxList(until: .rightParenthesis) { (me) in
+    try labeledSyntaxList(until: rightDelimiter) { (me) in
       try me.parsePattern(in: &file)
     }
   }
@@ -2018,13 +2013,10 @@ public struct Parser {
 
     // The return value must be on the same line.
     let v: ExpressionIdentity?
-    if statementDelimiterBeforeNextToken() {
+    if statementDelimiterBeforeNextToken() || next(is: .rightBrace) {
       v = nil
-    } else if let w = attempt({ (me) in try me.parseExpression(in: &file) }) {
-      v = w
     } else {
-      report(missingSemicolon(at: .empty(at: position)))
-      v = nil
+      v = try parseExpression(in: &file)
     }
 
     return file.insert(Return(introducer: i, value: v, site: span(from: i)))
@@ -2378,22 +2370,6 @@ public struct Parser {
     swap(&ctx, &self.context)
     defer { swap(&ctx, &self.context) }
     return try parse(&self)
-  }
-
-  /// Parses an instance of `T` or restores `self` to its current state if that fails.
-  private mutating func attempt<T>(_ parse: (inout Self) throws -> T) -> T? {
-    attemptOptional({ (me) in try? parse(&me) })
-  }
-
-  /// Parses an instance of `T` or restores `self` to its current state if that fails.
-  private mutating func attemptOptional<T>(_ parse: (inout Self) throws -> T?) rethrows -> T? {
-    var backup = self
-    if let result = try parse(&self) {
-      return result
-    } else {
-      swap(&self, &backup)
-      return nil
-    }
   }
 
   /// Parses an instance of `T` with an optional argument label.
