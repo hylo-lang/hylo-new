@@ -1,0 +1,18 @@
+//! no-std
+
+struct S<T> { public memberwise init }
+
+type X<T> = T
+type Y<T> = S<T>
+type Z<T> = {T, T}
+
+let a: X<_> = ()
+let b: Y<_> = S<Void>()
+let c: Z<_> = (S<Void>(), S())
+
+fun f(x: X<Void>) {}
+fun g() { f(x: ()) }
+
+fun h(x: Z<Void>) {
+  f(x: x)
+}

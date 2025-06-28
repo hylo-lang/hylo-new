@@ -1121,16 +1121,7 @@ public struct Typer {
     if let memoized = program[d.module].type(assignedTo: d) { return memoized }
     assert(d.module == module, "dependency is not typed")
 
-    let ps = declaredTypes(of: program[d].parameters)
-
-    var s = demand(Enum(declaration: d)).erased
-    if !ps.isEmpty {
-      let a = TypeArguments(parametersWithValues: ps.map({ (p) in (p, p.erased) }))
-      let t = demand(TypeApplication(abstraction: s, arguments: a)).erased
-      s = demand(UniversalType(parameters: ps, body: t)).erased
-    }
-
-    let t = demand(Metatype(inhabitant: s)).erased
+    let t = metatype(of: Enum(declaration: d), parameterizedBy: program[d].parameters).erased
     program[module].setType(t, for: d)
     return t
   }
@@ -1225,16 +1216,7 @@ public struct Typer {
     if let memoized = program[d.module].type(assignedTo: d) { return memoized }
     assert(d.module == module, "dependency is not typed")
 
-    let ps = declaredTypes(of: program[d].parameters)
-
-    var s = demand(Struct(declaration: d)).erased
-    if !ps.isEmpty {
-      let a = TypeArguments(parametersWithValues: ps.map({ (p) in (p, p.erased) }))
-      let t = demand(TypeApplication(abstraction: s, arguments: a)).erased
-      s = demand(UniversalType(parameters: ps, body: t)).erased
-    }
-
-    let t = demand(Metatype(inhabitant: s)).erased
+    let t = metatype(of: Struct(declaration: d), parameterizedBy: program[d].parameters).erased
     program[module].setType(t, for: d)
     return t
   }
@@ -1268,10 +1250,13 @@ public struct Typer {
       case .error:
         program[module].setType(.error, for: d)
         return .error
+
       case let aliasee:
-        let t = metatype(of: TypeAlias(declaration: d, aliasee: aliasee)).erased
-        program[module].setType(t, for: d)
-        return t
+        let t = metatype(
+          of: TypeAlias(declaration: d, aliasee: aliasee),
+          parameterizedBy: program[d].parameters)
+        program[module].setType(t.erased, for: d)
+        return t.erased
       }
     }
 
@@ -3450,23 +3435,27 @@ public struct Typer {
   internal mutating func coerced(
     _ e: ExpressionIdentity, withType a: AnyTypeIdentity, toMatch b: AnyTypeIdentity
   ) -> [SummonResult] {
+    let head = program.types.dealiased(a)
+    let goal = program.types.dealiased(b)
+
     // Fast path: types are unifiable without any coercion.
-    if let subs = program.types.unifiable(a, b) {
-      return [SummonResult(witness: .init(value: .identity(e), type: a), substitutions: subs)]
+    if let subs = program.types.unifiable(head, goal) {
+      // FIXME: Should the witness have the typeof the goal?
+      return [SummonResult(witness: .init(value: .identity(e), type: head), substitutions: subs)]
     }
 
     // Slow path: compute an elaboration.
     let scopeOfUse = program.parent(containing: e)
-    let root = WitnessExpression(value: .identity(e), type: a)
-    var threads = [formThread(matching: root, to: b, in: .empty, delayedBy: 0)]
+    let root = WitnessExpression(value: .identity(e), type: head)
+    var threads = [formThread(matching: root, to: goal, in: .empty, delayedBy: 0)]
 
     if canDeriveCoercions(in: scopeOfUse, where: .empty) {
       // Either the type of the elaborated witness is unifiable with the queried type or we need to
       // assume a coercion. Implicit resolution will figure out the "cheapest" alternative.
       let (environment, coercion) = ResolutionThread.Environment.empty.assuming(
-        given: demand(EqualityWitness(lhs: root.type, rhs: b)).erased)
-      let w = WitnessExpression(value: .termApplication(coercion, root), type: b)
-      threads.append(formThread(matching: w, to: b, in: environment, delayedBy: 0))
+        given: demand(EqualityWitness(lhs: root.type, rhs: goal)).erased)
+      let w = WitnessExpression(value: .termApplication(coercion, root), type: goal)
+      threads.append(formThread(matching: w, to: goal, in: environment, delayedBy: 0))
     }
 
     return takeSummonResults(from: threads, in: scopeOfUse)
@@ -4281,6 +4270,23 @@ public struct Typer {
   private mutating func metatype<T: TypeTree>(of t: T) -> Metatype.ID {
     let n = demand(t).erased
     return demand(Metatype(inhabitant: n))
+  }
+
+  /// Returns the skolemized application of the nominal type `s`, which is a type constructor with
+  /// the given parameters.
+  private mutating func metatype<T: TypeTree>(
+    of t: T, parameterizedBy parameters: [GenericParameterDeclaration.ID]
+  ) -> Metatype.ID {
+    let ps = declaredTypes(of: parameters)
+
+    if ps.isEmpty {
+      return metatype(of: t)
+    } else {
+      let a = TypeArguments(parametersWithValues: ps.map({ (p) in (p, p.erased) }))
+      let u = demand(t).erased
+      let v = demand(TypeApplication(abstraction: u, arguments: a)).erased
+      return metatype(of: UniversalType(parameters: ps, body: v))
+    }
   }
 
   /// Returns a parameter with the given properties.
