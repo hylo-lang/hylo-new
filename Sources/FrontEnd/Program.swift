@@ -11,6 +11,12 @@ public struct Program: Sendable {
   /// The types in the program.
   public internal(set) var types = TypeStore()
 
+  /// The cache of `standardLibraryDeclaration(_:)`.
+  ///
+  /// This table is initialized either by `Typer.apply` before the standard library is type checked
+  /// or by `self.load(module:from:)` after the standard library has been deserialized.
+  internal var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
+
   /// Creates an empty program.
   public init() {}
 
@@ -29,8 +35,8 @@ public struct Program: Sendable {
     modules.values.indices
   }
 
-  /// Returns `true` iff the module containing the sources of the standard library are present.
-  public var containsStandardLibrarySources: Bool {
+  /// Returns `true` iff the module containing the the standard library is present.
+  public var containsStandardLibrary: Bool {
     if let i = identity(module: .standardLibrary) {
       return !self[i].sources.isEmpty
     } else {
@@ -975,6 +981,71 @@ public struct Program: Sendable {
 
 extension Program {
 
+  /// The value identifying an entity from the standard library.
+  public enum StandardLibraryEntity: String, CaseIterable, Hashable, Sendable {
+
+    /// `Hylo.Bool`.
+    case bool = "Bool"
+
+    /// `Hylo.Int`.
+    case int = "Int"
+
+    /// `Hylo.Int64`.
+    case int64 = "Int64"
+
+    /// `Hylo.Deinitializable`.
+    case deinitializable = "Deinitializable"
+
+    /// `Hylo.Equatable`.
+    case equatable = "Equatable"
+
+    /// `Hylo.Movable`.
+    case movable = "Movable"
+
+    /// `Hylo.ExpressibleByIntegerLiteral`.
+    case expressibleByIntegerLiteral = "ExpressibleByIntegerLiteral"
+
+    /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
+    case expressibyByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init"
+
+  }
+
+  /// Returns the type of the given standard library entity.
+  ///
+  /// The module containing the standard library must have been loaded.
+  public func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
+    let d = standardLibraryDeclaration(n)
+    let t = type(assignedTo: d, assuming: Metatype.self)
+    return types[t].inhabitant
+  }
+
+  /// Returns the declaration of the given standard library entity.
+  ///
+  /// The module containing the standard library must have been loaded.
+  public func standardLibraryDeclaration(
+    _ n: StandardLibraryEntity
+  ) -> DeclarationIdentity {
+    standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library")
+  }
+
+  /// Fills `program.standardLibraryDeclarations`.
+  ///
+  /// This method must be called before type checking the standard library.
+  internal mutating func initializeStandardLibraryCaches() {
+    for n in Program.StandardLibraryEntity.allCases {
+      guard
+        let a = identity(module: .standardLibrary),
+        let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
+        let d = castToDeclaration(b)
+      else { fatalError("missing or corrupt standard library") }
+      standardLibraryDeclarations[n] = d
+    }
+  }
+
+}
+
+extension Program {
+
   /// The type of a table mapping module names to their identity in a program.
   internal typealias ModuleIdentityMap = [Module.Name: Module.ID]
 
@@ -1023,6 +1094,12 @@ extension Program {
     let instance = try c.withWrapped({ (ctx) in try archive.read(Module.self, in: &ctx) })
     precondition(moduleName == instance.name)
     modules[moduleName] = instance
+
+    // Initialize the standard library cache if necessary.
+    if moduleName == .standardLibrary {
+      initializeStandardLibraryCaches()
+    }
+
     return (true, m)
   }
 

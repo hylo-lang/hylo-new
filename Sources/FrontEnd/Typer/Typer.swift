@@ -37,6 +37,9 @@ public struct Typer {
 
   /// Type checks the top-level declarations of `self.module`.
   public mutating func apply() {
+    if program[module].name == .standardLibrary {
+      program.initializeStandardLibraryCaches()
+    }
     for d in program[module].topLevelDeclarations { check(d) }
   }
 
@@ -92,9 +95,6 @@ public struct Typer {
     /// The cache of `Typer.declaredType(of:)` for predefined givens.
     var predefinedGivens: [Given: AnyTypeIdentity]
 
-    /// The cache of `Typer.standardLibraryDeclaration(_:)`.
-    var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity]
-
     /// Creates an instance for typing `m`, which is a module in `p`.
     init(typing m: Module.ID, in p: Program) {
       self.moduleToIdentifierToDeclaration = .init(repeating: nil, count: p.modules.count)
@@ -110,7 +110,6 @@ public struct Typer {
       self.witnessToAliases = [:]
       self.declarationToTentativeType = [:]
       self.predefinedGivens = [:]
-      self.standardLibraryDeclarations = [:]
     }
 
   }
@@ -750,13 +749,13 @@ public struct Typer {
   private mutating func isStructurallySynthesizable(
     conformanceTo concept: TraitDeclaration.ID
   ) -> Bool {
-    guard program.containsStandardLibrarySources else { return false }
+    guard program.containsStandardLibrary else { return false }
     switch concept {
-    case standardLibraryDeclaration(.deinitializable):
+    case program.standardLibraryDeclaration(.deinitializable):
       return true
-    case standardLibraryDeclaration(.equatable):
+    case program.standardLibraryDeclaration(.equatable):
       return true
-    case standardLibraryDeclaration(.movable):
+    case program.standardLibraryDeclaration(.movable):
       return true
     default:
       return false
@@ -767,9 +766,9 @@ public struct Typer {
   private mutating func isBuiltin(
     conformanceOf conformer: AnyTypeIdentity, to concept: TraitDeclaration.ID
   ) -> Bool {
-    guard program.containsStandardLibrarySources else { return false }
+    guard program.containsStandardLibrary else { return false }
     switch concept {
-    case standardLibraryDeclaration(.expressibleByIntegerLiteral):
+    case program.standardLibraryDeclaration(.expressibleByIntegerLiteral):
       return isStandardLibraryIntegerType(conformer)
     default:
       return false
@@ -2957,7 +2956,7 @@ public struct Typer {
     // Are we looking at `.new(integer_literal: i)`?
     if let n = program.cast(program[c].callee, to: New.self) {
       let r = program[e.module].declaration(referredToBy: program[n].target)
-      let d = standardLibraryDeclaration(.expressibyByIntegerLiteralInit)
+      let d = program.standardLibraryDeclaration(.expressibyByIntegerLiteralInit)
       if case .inherited(_, d) = r {
         let i = program.castUnchecked(program[c].arguments[0].value, to: IntegerLiteral.self)
         return Int(program[i].value)
@@ -4189,43 +4188,12 @@ public struct Typer {
 
   // MARK: Standard library
 
-  /// The value identifying an entity from the standard library.
-  private enum StandardLibraryEntity: String, Hashable {
-
-    /// `Hylo.Bool`.
-    case bool = "Bool"
-
-    /// `Hylo.Int`.
-    case int = "Int"
-
-    /// `Hylo.Int64`.
-    case int64 = "Int64"
-
-    /// `Hylo.Deinitializable`.
-    case deinitializable = "Deinitializable"
-
-    /// `Hylo.Equatable`.
-    case equatable = "Equatable"
-
-    /// `Hylo.Movable`.
-    case movable = "Movable"
-
-    /// `Hylo.ExpressibleByIntegerLiteral`.
-    case expressibleByIntegerLiteral = "ExpressibleByIntegerLiteral"
-
-    /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
-    case expressibyByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init"
-
-    /// Returns a selector for the declaration corresponding to `self`.
-    var filter: SyntaxFilter {
-      .symbol(rawValue)
-    }
-
-  }
-
   /// Returns `true` iff `t` is a standard library integer type (e.g., `Hylo.Int`).
+  ///
+  /// The module containing the standard library must have been loaded in the `self.progam`, or
+  /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
-    guard program.containsStandardLibrarySources else { return false }
+    guard program.containsStandardLibrary else { return false }
     switch program.types.dealiased(t) {
     case standardLibraryType(.int):
       return true
@@ -4238,40 +4206,24 @@ public struct Typer {
 
   /// Returns the type of the given standard library entity.
   ///
-  /// The module containing the sources of the standard library must be present in the program but
-  /// it does not have to be already type checked.
-  private mutating func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
-    let d = standardLibraryDeclaration(n)
-    let t = declaredType(of: d)
-    let m = (program.types[t] as? Metatype) ?? fatalError("missing corrupt standard library")
+  /// Unlike `Program.standardLibraryType(_:)`, this method may be called while `self` is typing
+  /// the standard library (i.e., when `self.module` is the standard library).
+  private mutating func standardLibraryType(
+    _ n: Program.StandardLibraryEntity
+  ) -> AnyTypeIdentity {
+    let d = program.standardLibraryDeclaration(n)
+
+    let t: AnyTypeIdentity
+    if let u = program[d.module].type(assignedTo: d) {
+      t = u
+    } else if d.module == self.module {
+      t = declaredType(of: d)
+    } else {
+      t = .error
+    }
+
+    let m = (program.types[t] as? Metatype) ?? fatalError("missing or corrupt standard library")
     return m.inhabitant
-  }
-
-  /// Returns the declaration of the given standard library entity.
-  ///
-  /// The module containing the sources of the standard library must be present in the program but
-  /// it does not have to be already type checked.
-  private mutating func standardLibraryDeclaration(
-    _ n: StandardLibraryEntity
-  ) -> DeclarationIdentity {
-    if let d = cache.standardLibraryDeclarations[n] { return d }
-
-    guard
-      let a = program.identity(module: .standardLibrary),
-      let b = program.select(from: a, n.filter).uniqueElement,
-      let d = program.castToDeclaration(b)
-    else { fatalError("missing or corrupt standard library") }
-
-    cache.standardLibraryDeclarations[n] = d
-    return d
-  }
-
-  /// Returns `standardLibraryDeclaration(n)` cast as a `T`.
-  private mutating func standardLibraryDeclaration<T: Declaration>(
-    _ n: StandardLibraryEntity, as: T.Type
-  ) -> T.ID {
-    let d = standardLibraryDeclaration(n)
-    return castUnchecked(d, to: T.self)
   }
 
   // MARK: Helpers
