@@ -326,11 +326,10 @@ public struct Typer {
       checkUniqueDeclaration(v, of: program[v].identifier.value)
     }
 
-    // Given declarations can only introduce a single binding.
-    if program[d].role == .given {
+    // Declarations of implicits can only introduce a single binding.
+    if program[d].isImplicit {
       let p = program[program[d].pattern].pattern
-      let t = program.tag(of: p).value
-      if (t != VariableDeclaration.self) && (t != WildcardLiteral.self) {
+      if program.tag(of: p).value != VariableDeclaration.self {
         report(.error, "given declaration cannot introduce more than one binding", about: p)
       }
     }

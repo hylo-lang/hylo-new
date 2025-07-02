@@ -12,7 +12,7 @@ public struct Parser {
     /// The parsing of member declarations.
     case typeBody
 
-    /// The parsing of the subpattern of binding pattern.
+    /// The parsing of the subpattern of a binding pattern.
     case bindingSubpattern
 
   }
@@ -222,7 +222,7 @@ public struct Parser {
     as role: BindingDeclaration.Role = .unconditional,
     after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
   ) throws -> BindingDeclaration.ID {
-    let b = try parseBindingPattern(in: &file)
+    let b = try parseBindingPattern(in: &file, role: role)
     let i = try parseOptionalInitializerExpression(in: &file)
 
     // No annotations allowed on binding declarations.
@@ -1853,7 +1853,7 @@ public struct Parser {
   ) throws -> PatternIdentity {
     switch peek()?.tag {
     case .inout, .let, .set, .sink:
-      return try .init(parseBindingPattern(in: &file))
+      return try .init(parseBindingPattern(in: &file, role: .unconditional))
     case .name:
       return try parseNameOrDeconstructingPattern(in: &file)
     case .dot:
@@ -1867,19 +1867,15 @@ public struct Parser {
     }
   }
 
-  /// Parses a binding pattern.
+  /// Parses a binding pattern occurring as `role`.
   private mutating func parseBindingPattern(
-    in file: inout Module.SourceContainer
+    in file: inout Module.SourceContainer, role: BindingDeclaration.Role
   ) throws -> BindingPattern.ID {
     let i = try parseBindingIntroducer()
-
-    // Identifiers occurring in binding subpatterns denote variable declarations.
-    return try entering(.bindingSubpattern) { (me) in
-      let p = try me.parsePattern(in: &file)
-      let a = try me.parseOptionalTypeAscription(in: &file)
-      let s = i.site.extended(upTo: me.position.index)
-      return file.insert(BindingPattern(introducer: i, pattern: p, ascription: a, site: s))
-    }
+    let p = try parseBindingSubpattern(in: &file, role: role)
+    let a = try parseOptionalTypeAscription(in: &file)
+    let s = i.site.extended(upTo: position.index)
+    return file.insert(BindingPattern(introducer: i, pattern: p, ascription: a, site: s))
   }
 
   /// Parses the introducer of a binding pattern.
@@ -1905,6 +1901,19 @@ public struct Parser {
       return Parsed(.sinklet, at: a.site.extended(toCover: b.site))
     default:
       throw expected("binding introducer")
+    }
+  }
+
+  /// Parses the subpattern of a binding pattern occurring as `role`.
+  private mutating func parseBindingSubpattern(
+    in file: inout Module.SourceContainer, role: BindingDeclaration.Role
+  ) throws -> PatternIdentity {
+    if ((role == .given) || (role == .using)), let u = take(.underscore) {
+      // Implicits always introduce a binding.
+      return .init(file.synthesizeVariableDeclaration(at: u.site))
+    } else {
+      // Identifiers occurring in binding subpatterns denote variable declarations.
+      return try entering(.bindingSubpattern, { (me) in try me.parsePattern(in: &file) })
     }
   }
 
@@ -2796,7 +2805,7 @@ extension Module.SourceContainer {
     let p: PatternIdentity = if let i = identifier {
       .init(insert(VariableDeclaration(identifier: .init(i))))
     } else {
-      .init(insert(WildcardLiteral(site: s)))
+      .init(synthesizeVariableDeclaration(at: s))
     }
 
     let b = insert(
@@ -2813,6 +2822,14 @@ extension Module.SourceContainer {
   ) -> BindingDeclaration.ID {
     synthesizeBindingDeclaration(
       role: .using, identifier: nil, ascription: t, initializer: nil, at: self[t].site)
+  }
+
+  /// Inserts a variable declaration with a unique name.
+  fileprivate mutating func synthesizeVariableDeclaration(
+    at site: SourceSpan
+  ) -> VariableDeclaration.ID {
+    let n = String(syntax.count, radix: 36)
+    return insert(VariableDeclaration(identifier: .init("$\(n)", at: site)))
   }
 
 }
