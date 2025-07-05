@@ -6,20 +6,43 @@ import Utilities
 /// A source file.
 public struct SourceFile: Hashable, Sendable {
 
-  /// The name of the file that the source came from.
-  public let name: FileName
+  /// The internal representation of a source file.
+  private final class Properties: Hashable, Sendable {
 
-  /// The contents of the file.
-  public let text: String
+    /// The name of the file that the source came from.
+    let name: FileName
 
-  /// The start position of each line.
-  private let lineStarts: [Index]
+    /// The contents of the file.
+    let text: String
+
+    /// The start position of each line.
+    let lineStarts: [Index]
+
+    /// Creates an instance with the given properties.
+    init(name: FileName, text: String) {
+      self.name = name
+      self.text = text
+      self.lineStarts = text.lineBoundaries()
+    }
+
+    /// Hashes `name` into `hasher`.
+    func hash(into hasher: inout Hasher) {
+      hasher.combine(name)
+    }
+
+    /// Returns `true` iff `l` and `r` have the same name.
+    static func == (l: SourceFile.Properties, r: SourceFile.Properties) -> Bool {
+      l.name == r.name
+    }
+
+  }
+
+  /// The properties of `self`.
+  private let properties: Properties
 
   /// Creates a source file with the given name and contents.
   private init(name: FileName, contents: String) {
-    self.name = name
-    self.text = contents
-    self.lineStarts = contents.lineBoundaries()
+    self.properties = .init(name: name, text: contents)
   }
 
   /// Creates a source file with the contents of the file at `path`.
@@ -34,6 +57,11 @@ public struct SourceFile: Hashable, Sendable {
     self.init(name: .virtual(hasher.state), contents: contents)
   }
 
+  /// The name of the file that the source came from.
+  public var name: FileName {
+    properties.name
+  }
+
   /// The name of the source file, sans path qualification or extension.
   public var baseName: String {
     switch name {
@@ -42,6 +70,11 @@ public struct SourceFile: Hashable, Sendable {
     case .virtual(let i):
       return String(UInt(bitPattern: i), radix: 36)
     }
+  }
+
+  /// The contents of the file.
+  public var text: String {
+    properties.text
   }
 
   /// Returns a hash of the source file that suitable for determining whether it has changed.
@@ -65,7 +98,7 @@ public struct SourceFile: Hashable, Sendable {
 
   /// The number of lines in `self`.
   public var lineCount: Int {
-    lineStarts.count
+    properties.lineStarts.count
   }
 
   /// A span covering the whole contents of `self`.
@@ -80,8 +113,9 @@ public struct SourceFile: Hashable, Sendable {
 
   /// The bounds of given `line`, including any trailing newline.
   public func bounds(of line: SourceLine) -> SourceSpan {
-    let end = line.number < lineStarts.count ? lineStarts[line.number] : text.endIndex
-    return SourceSpan(lineStarts[line.number - 1] ..< end, in: self)
+    let starts = properties.lineStarts
+    let end = line.number < starts.count ? starts[line.number] : text.endIndex
+    return SourceSpan(starts[line.number - 1] ..< end, in: self)
   }
 
   /// Returns the line containing `i`.
@@ -89,7 +123,7 @@ public struct SourceFile: Hashable, Sendable {
   /// - Requires: `i` is a valid index in `contents`.
   /// - Complexity: O(log N) where N is the number of lines in `self`.
   public func line(containing i: Index) -> SourceLine {
-    SourceLine(lineStarts.partitioningIndex(where: { (l) in l > i }), in: self)
+    SourceLine(properties.lineStarts.partitioningIndex(where: { (l) in l > i }), in: self)
   }
 
   /// Returns the line at 1-based index `lineNumber`.
@@ -105,7 +139,7 @@ public struct SourceFile: Hashable, Sendable {
   ///   column number.
   func lineAndColumn(_ i: Index) -> (line: Int, column: Int) {
     let lineNumber = line(containing: i).number
-    let columnNumber = text.distance(from: lineStarts[lineNumber - 1], to: i) + 1
+    let columnNumber = text.distance(from: properties.lineStarts[lineNumber - 1], to: i) + 1
     return (lineNumber, columnNumber)
   }
 

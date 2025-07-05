@@ -4,11 +4,11 @@ import Utilities
 /// A half-open range of textual positions in a source file.
 public struct SourceSpan: Hashable, Sendable {
 
-  /// The source file containing the region that `self` represents.
-  public let source: SourceFile
-
   /// The bounds of the region that `self` represents.
   public let region: Range<SourceFile.Index>
+
+  /// The source file containing the region that `self` represents.
+  public let source: SourceFile
 
   /// Creates an instance representing `source[region]`.
   public init(_ region: Range<SourceFile.Index>, in source: SourceFile) {
