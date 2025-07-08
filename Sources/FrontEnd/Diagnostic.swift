@@ -188,6 +188,18 @@ extension Program {
     .init(.error, "not enough context to infer a type", at: spanForDiagnostic(about: n))
   }
 
+  /// Returns an error diagnosing a failure of implicit search.
+  internal func noUniqueGivenInstance(
+    of t: AnyTypeIdentity, found: [Typer.SummonResult], at site: SourceSpan
+  ) -> Diagnostic {
+    assert(found.count != 1)
+    if found.isEmpty {
+      return noGivenInstance(of: t, at: site)
+    } else {
+      return multipleGivenInstances(of: t, at: site)
+    }
+  }
+
   /// Returns an error diagnosing an undefined symbol.
   internal func undefinedSymbol(
     _ n: Name, memberOf t: AnyTypeIdentity? = nil, at site: SourceSpan

@@ -223,11 +223,10 @@ internal struct Solver {
             let x = tp.program.types.reify(using, applying: s)
             if x[.hasError] { continue }
 
-            let n = tp.summon(x, in: scopeOfUse).count
-            if n == 0 {
-              notes.append(tp.program.noGivenInstance(of: x, at: k.site).as(.note))
-            } else if n > 1 {
-              notes.append(tp.program.multipleGivenInstances(of: x, at: k.site).as(.note))
+            let ws = tp.summon(x, in: scopeOfUse)
+            if ws.count != 1 {
+              notes.append(
+                tp.program.noUniqueGivenInstance(of: x, found: ws, at: k.site).as(.note))
             }
           }
         }
