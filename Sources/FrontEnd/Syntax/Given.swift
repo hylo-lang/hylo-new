@@ -1,5 +1,5 @@
 /// The declaration of a given.
-public enum Given: Hashable {
+public enum Given: Hashable, Sendable {
 
   /// A user-defined given.
   case user(DeclarationIdentity)

@@ -1,5 +1,5 @@
 /// The identity of a lexical scope.
-public struct ScopeIdentity: Hashable {
+public struct ScopeIdentity: Hashable, Sendable {
 
   /// The internal representation of this identity.
   private var representation: AnySyntaxIdentity

@@ -8,7 +8,7 @@ public struct List<Element> {
   // after an element has been removed.
 
   /// The address of an element in a doubly linked list.
-  public struct Address: Hashable {
+  public struct Address: Hashable, Sendable {
 
     public fileprivate(set) var rawValue: Int
 
@@ -390,6 +390,10 @@ extension List: BidirectionalCollection, MutableCollection {
   }
 
 }
+
+extension List: Sendable where Element: Sendable {}
+
+extension List.Bucket: Sendable where Element: Sendable {}
 
 extension List: Equatable where Element: Equatable {
 
