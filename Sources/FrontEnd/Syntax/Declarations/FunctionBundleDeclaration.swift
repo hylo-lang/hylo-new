@@ -23,7 +23,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
   /// The capture-list of the function.
   public let captures: CaptureList
 
-  /// The run-time parameters of the bundle.
+  /// The explicit parameters of the bundle.
   public let parameters: [ParameterDeclaration.ID]
 
   /// The effect of the bundle's call operator.

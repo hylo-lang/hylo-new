@@ -1,4 +1,4 @@
-/// Information identifying a run-time argument of a function or subscript call.
+/// Information identifying an argument of a function or subscript call.
 internal enum ParameterBinding: Equatable {
 
   /// The argument is the n-th expression in the syntax of the call.

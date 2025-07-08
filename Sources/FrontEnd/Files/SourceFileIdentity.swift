@@ -1,6 +1,6 @@
 extension SourceFile {
 
-  /// The identity of a file added to a module.
+  /// The identity of a source file added to a module.
   public struct ID: Comparable, Hashable, RawRepresentable, Showable, Sendable {
 
     /// The raw value of this identity.

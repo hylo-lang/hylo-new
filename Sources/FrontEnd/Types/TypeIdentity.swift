@@ -1,7 +1,7 @@
 import Archivist
 import Utilities
 
-/// A type denoting the identity of type tree.
+/// A type denoting the identity of a type tree.
 public protocol TypeIdentity: Hashable, Showable, Archivable, Sendable {
 
   /// The type-erased value of this identity.

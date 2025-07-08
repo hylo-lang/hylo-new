@@ -38,7 +38,7 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
   /// The capture-list of the function.
   public let captures: CaptureList
 
-  /// The run-time parameters of the function.
+  /// The explicit parameters of the function.
   public let parameters: [ParameterDeclaration.ID]
 
   /// The effect of the function's call operator.

@@ -7,7 +7,7 @@ public protocol RoutineDeclaration: ModifiableDeclaration {
   /// The capture-list of the entity.
   var captures: CaptureList { get }
 
-  /// The run-time parameters of the entity.
+  /// The explicit parameters of the entity.
   var parameters: [ParameterDeclaration.ID] { get }
 
   /// The effect of the entity's call operator.
