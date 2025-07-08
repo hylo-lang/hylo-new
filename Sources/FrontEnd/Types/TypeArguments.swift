@@ -20,11 +20,6 @@ public struct TypeArguments: Sendable {
     self.contents = contents
   }
 
-  /// Creates an new dictionary from the key-value pairs in `parametersWithValues`.
-  public init<S: Sequence<(GenericParameter.ID, AnyTypeIdentity)>>(parametersWithValues: S) {
-    self.contents = .init(uniqueKeysWithValues: parametersWithValues)
-  }
-
   /// Creates an instance mapping each parameter in `ps` to its corresponding argument in `ts`.
   public init<P: Collection<GenericParameter.ID>, A: Collection<AnyTypeIdentity>>(
     mapping ps: P, to ts: A

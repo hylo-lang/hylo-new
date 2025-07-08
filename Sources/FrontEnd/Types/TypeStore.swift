@@ -192,7 +192,7 @@ public struct TypeStore: Sendable {
 
   /// Returns a table mapping each parameter in `ps` to a fresh unification variable.
   public mutating func open(_ ps: [GenericParameter.ID]) -> TypeArguments {
-    .init(parametersWithValues: ps.map({ (p) in (p, fresh().erased) }))
+    .init(mapping: ps, to: { _ in fresh().erased })
   }
 
   /// Returns `body` as the head of a universal type and/or implication introducing `c`.

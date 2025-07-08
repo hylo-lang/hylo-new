@@ -1218,7 +1218,7 @@ public struct Typer {
     var ps = [typeOfSelf(in: d)]
     ps.append(contentsOf: declaredTypes(of: program[d].parameters))
 
-    let a = TypeArguments(parametersWithValues: ps.map({ (p) in (p, p.erased) }))
+    let a = TypeArguments(mapping: ps, to: \.erased)
     let f = demand(Trait(declaration: d)).erased
     let t = demand(TypeApplication(abstraction: f, arguments: a)).erased
     let u = metatype(of: UniversalType(parameters: ps, body: t)).erased
@@ -4243,7 +4243,7 @@ public struct Typer {
     if ps.isEmpty {
       return metatype(of: t)
     } else {
-      let a = TypeArguments(parametersWithValues: ps.map({ (p) in (p, p.erased) }))
+      let a = TypeArguments(mapping: ps, to: \.erased)
       let u = demand(t).erased
       let v = demand(TypeApplication(abstraction: u, arguments: a)).erased
       return metatype(of: UniversalType(parameters: ps, body: v))
