@@ -2767,7 +2767,7 @@ public struct Typer {
     for p in program[d].parameters {
       let t = declaredType(of: p)
       let u = program.types.select(t, \Metatype.inhabitant, as: GenericParameter.self)!
-      a[u] = t
+      a[u] = u.erased
     }
 
     return demand(TypeApplication(abstraction: f, arguments: a))
