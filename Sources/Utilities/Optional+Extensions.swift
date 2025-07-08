@@ -6,16 +6,6 @@ extension Optional {
     return self!
   }
 
-  /// Returns the value wrapped in `self`, if any, and assigns `self` to `nil`.
-  public mutating func take() -> Wrapped? {
-    if let wrapped = self {
-      self = nil
-      return wrapped
-    } else {
-      return nil
-    }
-  }
-
   /// If `self` is `nil`, wraps and returns `newValue`; otherwise, returns the wrapped value.
   public mutating func wrapIfEmpty(
     _ newValue: @autoclosure () throws -> Wrapped
