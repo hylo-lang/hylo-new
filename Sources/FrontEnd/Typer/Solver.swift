@@ -59,7 +59,7 @@ internal struct Solver {
   }
 
   /// Returns a copy of `base` with its `typer` set to `nil`.
-  private init (forking base: Self) {
+  private init(forking base: Self) {
     self = base
     self.typer = nil
   }
