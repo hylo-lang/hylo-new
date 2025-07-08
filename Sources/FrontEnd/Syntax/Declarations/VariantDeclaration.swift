@@ -2,7 +2,7 @@ import Archivist
 
 /// The declaration of a variant in a function or subscript bundle.
 @Archivable
-public struct VariantDeclaration: Declaration {
+public struct VariantDeclaration: Declaration, Scope {
 
   /// The effect of the variant on its receiver operator.
   public let effect: Parsed<AccessEffect>
