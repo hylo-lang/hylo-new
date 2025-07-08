@@ -703,6 +703,8 @@ public struct TypeStore: Sendable {
       result = false
     case (let t as EqualityWitness, let u as EqualityWitness):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
+    case (let t as FunctionPointer, let u as FunctionPointer):
+      result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (_ as GenericParameter, _ as GenericParameter):
       result = false
     case (let t as Implication, let u as Implication):
@@ -786,6 +788,18 @@ public struct TypeStore: Sendable {
   ) -> Bool {
     unifiable(lhs.lhs, rhs.lhs, extending: &ss, handlingCoercionsWith: areCoercible)
       && unifiable(lhs.rhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
+  }
+
+  /// Returns `true` if `lhs` and `rhs` are unifiable.
+  private func unifiable(
+    _ lhs: FunctionPointer, _ rhs: FunctionPointer, extending ss: inout SubstitutionTable,
+    handlingCoercionsWith areCoercible: CoercionHandler
+  ) -> Bool {
+    unifiable(
+      lhs.inputs, rhs.inputs, extending: &ss,
+      by: { (a, b, s) in unifiable(a, b, extending: &s, handlingCoercionsWith: areCoercible) })
+    && unifiable(
+      lhs.output, rhs.output, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.
