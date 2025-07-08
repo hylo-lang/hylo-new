@@ -960,13 +960,13 @@ public struct Typer {
   private mutating func check(_ s: Assignment.ID) {
     let l = check(program[s].lhs)
     check(program[s].rhs, requiring: l)
-    program[module].setType(.void, for: s)
+    program[s.module].setType(.void, for: s)
   }
 
   /// Type checks `s`.
   private mutating func check(_ s: Discard.ID) {
     check(program[s].value)
-    program[module].setType(.void, for: s)
+    program[s.module].setType(.void, for: s)
   }
 
   /// Type checks `s`.
@@ -975,7 +975,7 @@ public struct Typer {
       check(s, requiring: u)
     } else if let v = program[s].value {
       check(v)
-      program[module].setType(.void, for: s)
+      program[s.module].setType(.void, for: s)
     }
   }
 
@@ -989,7 +989,7 @@ public struct Typer {
       report(.init(.error, m, at: s))
     }
 
-    program[module].setType(.void, for: s)
+    program[s.module].setType(.void, for: s)
   }
 
   /// Returns the declared type of `d` without type checking its contents.
@@ -1037,7 +1037,7 @@ public struct Typer {
     let t = typeOfTraitSelf(in: c).erased
     let w = WitnessExpression(value: .abstract, type: t)
     let u = metatype(of: AssociatedType(declaration: d, qualification: w)).erased
-    program[module].setType(u, for: d)
+    program[d.module].setType(u, for: d)
     return u
   }
 
@@ -1056,7 +1056,7 @@ public struct Typer {
       let u = program.types.reify(p, applying: s.substitutions)
 
       ascribe(.let, u, to: program[d].pattern)
-      program[module].setType(u, for: d)
+      program[d.module].setType(u, for: d)
       return u
     }
 
@@ -1080,7 +1080,7 @@ public struct Typer {
       initializeContext(program[d].contextParameters)
       let t = evaluateTypeAscription(.init(program[d].witness))
       let u = introduce(program[d].contextParameters, into: t)
-      program[module].setType(u, for: d)
+      program[d.module].setType(u, for: d)
       return u
     }
 
@@ -1101,7 +1101,7 @@ public struct Typer {
     let o = typeOfSelf(in: program.parent(containing: d, as: EnumDeclaration.self)!)
     let i = declaredTypes(of: program[d].parameters, defaultConvention: .sink)
     let a = demand(Arrow(effect: .let, environment: .void, inputs: i, output: o)).erased
-    program[module].setType(a, for: d)
+    program[d.module].setType(a, for: d)
     return a
   }
 
@@ -1111,7 +1111,7 @@ public struct Typer {
     assert(d.module == module, "dependency is not typed")
 
     let t = metatype(of: Enum(declaration: d), parameterizedBy: program[d].parameters).erased
-    program[module].setType(t, for: d)
+    program[d.module].setType(t, for: d)
     return t
   }
 
@@ -1129,7 +1129,7 @@ public struct Typer {
     let bundle = demand(Bundle(shape: head, variants: variants)).erased
     let result = program.types.introduce(context, into: bundle)
 
-    program[module].setType(result, for: d)
+    program[d.module].setType(result, for: d)
     return result
   }
 
@@ -1153,7 +1153,7 @@ public struct Typer {
       for b in program.collect(BindingDeclaration.self, in: program[s].members) {
         _ = declaredType(of: b)
         program.forEachVariable(introducedBy: b) { (v, _) in
-          let t = program[module].type(assignedTo: b) ?? .error
+          let t = program[b.module].type(assignedTo: b) ?? .error
           inputs.append(Parameter(label: program[v].identifier.value, access: .sink, type: t))
         }
       }
@@ -1165,7 +1165,7 @@ public struct Typer {
     }
 
     let result = declaredArrowType(of: d, taking: inputs)
-    program[module].setType(result, for: d)
+    program[d.module].setType(result, for: d)
     return result
   }
 
@@ -1176,7 +1176,7 @@ public struct Typer {
 
     let k = declaredKind(of: d)
     let t = metatype(of: GenericParameter.user(d, k)).erased
-    program[module].setType(t, for: d)
+    program[d.module].setType(t, for: d)
     return t
   }
 
@@ -1192,7 +1192,7 @@ public struct Typer {
 
     if let a = program[d].ascription {
       let t = evaluateTypeAscription(.init(a))
-      program[module].setType(t, for: d)
+      program[d.module].setType(t, for: d)
       return t
     } else {
       report(.error, "parameter declaration requires an ascription", about: d)
@@ -1206,7 +1206,7 @@ public struct Typer {
     assert(d.module == module, "dependency is not typed")
 
     let t = metatype(of: Struct(declaration: d), parameterizedBy: program[d].parameters).erased
-    program[module].setType(t, for: d)
+    program[d.module].setType(t, for: d)
     return t
   }
 
@@ -1222,7 +1222,7 @@ public struct Typer {
     let f = demand(Trait(declaration: d)).erased
     let t = demand(TypeApplication(abstraction: f, arguments: a)).erased
     let u = metatype(of: UniversalType(parameters: ps, body: t)).erased
-    program[module].setType(u, for: d)
+    program[d.module].setType(u, for: d)
     return u
   }
 
@@ -1237,14 +1237,14 @@ public struct Typer {
 
       switch evaluateTypeAscription(program[d].aliasee) {
       case .error:
-        program[module].setType(.error, for: d)
+        program[d.module].setType(.error, for: d)
         return .error
 
       case let aliasee:
         let t = metatype(
           of: TypeAlias(declaration: d, aliasee: aliasee),
           parameterizedBy: program[d].parameters)
-        program[module].setType(t.erased, for: d)
+        program[d.module].setType(t.erased, for: d)
         return t.erased
       }
     }
@@ -1266,7 +1266,7 @@ public struct Typer {
     // pattern, which is visited before any reference to the variable can be formed.
     let b = program.bindingDeclaration(containing: d) ?? unreachable("pattern is not typed")
     _ = declaredType(of: b)
-    return program[module].type(assignedTo: d) ?? .error
+    return program[d.module].type(assignedTo: d) ?? .error
   }
 
   /// Returns the declared type of `d` without checking.
@@ -1283,12 +1283,12 @@ public struct Typer {
     case Arrow.self:
       let t = Arrow.ID(uncheckedFrom: shape)
       let u = program.types.variant(program[d].effect.value, of: t).erased
-      program[module].setType(u, for: d)
+      program[d.module].setType(u, for: d)
       return program.types.introduce(context, into: u)
 
     default:
       assert(bundle[.hasError])
-      program[module].setType(.error, for: d)
+      program[d.module].setType(.error, for: d)
       return .error
     }
   }
@@ -1456,7 +1456,7 @@ public struct Typer {
     initializeContext(program[d].contextParameters)
     let t = ignoring(d, { (me) in me.evaluateTypeAscription(me.program[d].extendee) })
     let u = introduce(program[d].contextParameters, into: t)
-    program[module].setType(u, for: d)
+    program[d.module].setType(u, for: d)
     return u
   }
 
@@ -1509,10 +1509,10 @@ public struct Typer {
     if let a = program[program[d].pattern].ascription {
       let t = evaluateTypeAscription(a)
       ascribe(.let, t, to: program[d].pattern)
-      program[module].setType(t, for: d)
+      program[d.module].setType(t, for: d)
     } else {
       report(.error, "binding declaration requires an ascription", about: d)
-      program[module].setType(.error, for: d)
+      program[d.module].setType(.error, for: d)
     }
   }
 
@@ -1554,7 +1554,7 @@ public struct Typer {
   private mutating func ascribe(
     _ k: AccessEffect, _ t: AnyTypeIdentity, to p: BindingPattern.ID
   ) {
-    program[module].setType(t, for: p)
+    program[p.module].setType(t, for: p)
     ascribe(.init(program[p].introducer.value), t, to: program[p].pattern)
   }
 
@@ -1565,7 +1565,7 @@ public struct Typer {
   ) {
     let m = demand(Metatype(inhabitant: t)).erased
     guard let (_, ps) = extractor(referredToBy: p, matching: m) else {
-      program[module].setType(.error, for: p)
+      program[p.module].setType(.error, for: p)
       return
     }
 
@@ -1583,7 +1583,7 @@ public struct Typer {
       ascribe(k, rhs.type, to: lhs.value)
     }
 
-    program[module].setType(t, for: p)
+    program[p.module].setType(t, for: p)
   }
 
   /// Implements `ascribe(_:_:to:)` for tuple patterns.
@@ -1593,7 +1593,7 @@ public struct Typer {
     guard let u = program.types[t] as? Tuple else {
       let m = program.format("tuple pattern cannot match values of type '%T'", [t])
       report(.init(.error, m, at: program[p].site))
-      program[module].setType(.error, for: p)
+      program[p.module].setType(.error, for: p)
       return
     }
 
@@ -1602,11 +1602,11 @@ public struct Typer {
         found: program[p].elements.map(\.label?.value), expected: u.labels,
         at: program[p].site)
       report(d)
-      program[module].setType(.error, for: p)
+      program[p.module].setType(.error, for: p)
       return
     }
 
-    program[module].setType(t, for: p)
+    program[p.module].setType(t, for: p)
     for i in 0 ..< u.elements.count {
       ascribe(k, u.elements[i].type, to: program[p].elements[i].value)
     }
@@ -1617,14 +1617,14 @@ public struct Typer {
     _ k: AccessEffect, _ t: AnyTypeIdentity, to p: VariableDeclaration.ID
   ) {
     let u = demand(RemoteType(projectee: t, access: k)).erased
-    program[module].setType(u, for: p)
+    program[p.module].setType(u, for: p)
   }
 
   /// Implements `ascribe(_:_:to:)` for wildcard literals.
   private mutating func ascribe(
     _ k: AccessEffect, _ t: AnyTypeIdentity, to p: WildcardLiteral.ID
   ) {
-    program[module].setType(t, for: p)
+    program[p.module].setType(t, for: p)
   }
 
   /// Returns `true` iff the argument labels occuring in `p` are compatible with those of `d`.
@@ -1834,10 +1834,10 @@ public struct Typer {
     // Is the callee referring to a sugared constructor?
     if (program[e].style == .parenthesized) && isTypeDeclarationReference(callee) {
       let site = program[callee].site
-      let n = program[module].insert(
+      let n = program[e.module].insert(
         NameExpression(qualification: callee, name: .init("new", at: site), site: site),
         in: program.parent(containing: e))
-      program[module].replace(.init(e), for: program[e].replacing(callee: .init(n)))
+      program[e.module].replace(.init(e), for: program[e].replacing(callee: .init(n)))
       return context.withSubcontext(role: r) { (ctx) in
         inferredType(of: n, in: &ctx)
       }
@@ -2142,10 +2142,10 @@ public struct Typer {
 
     // Is `e` a constructor reference?
     if program.isConstructorReference(e) {
-      let n = program[module].insert(
+      let n = program[e.module].insert(
         NameExpression(qualification: nil, name: .init("init", at: s), site: s),
         in: program.parent(containing: e))
-      let m = program[module].replace(
+      let m = program[e.module].replace(
         .init(e),
         for: New(qualification: program[e].qualification!, target: n, site: program[e].site))
       return inferredType(of: m, in: &context)
@@ -2881,7 +2881,7 @@ public struct Typer {
     switch program[e].value {
     case .proper:
       let k = demand(Metakind(inhabitant: .proper))
-      program[module].setType(k.erased, for: e)
+      program[e.module].setType(k.erased, for: e)
       return k
 
     case .arrow(let a, let b):
@@ -2889,7 +2889,7 @@ public struct Typer {
       let r = evaluateKindAscription(b)
       let k = demand(
         Metakind(inhabitant: .arrow(program.types[l].inhabitant, program.types[r].inhabitant)))
-      program[module].setType(k.erased, for: e)
+      program[e.module].setType(k.erased, for: e)
       return k
     }
   }
