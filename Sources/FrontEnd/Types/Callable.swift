@@ -10,6 +10,17 @@ public struct Callable {
   /// The input labels and types of the abstraction.
   public let inputs: [Parameter]
 
+  /// The type of the abstraction's result.
+  public let output: AnyTypeIdentity
+
+  /// Creates an instance from an arrow type.
+  public init(_ a: Arrow) {
+    self.style = .parenthesized
+    self.environment = a.environment
+    self.inputs = a.inputs
+    self.output = a.output
+  }
+
   /// The labels associated with each input.
   public var labels: some Sequence<String?> {
     inputs.lazy.map(\.label)

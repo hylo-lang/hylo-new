@@ -255,12 +255,10 @@ public struct TypeStore: Sendable {
   }
 
   /// Returns properties of `n` iff it identifies the type of a callable abstraction.
-  public func seenAsCallableAbstraction<T: TypeIdentity>(
-    _ n: T
-  ) -> Callable? {
+  public func seenAsCallableAbstraction<T: TypeIdentity>(_ n: T) -> Callable? {
     switch self[head(n)] {
     case let t as Arrow:
-      return .init(style: .parenthesized, environment: t.environment, inputs: t.inputs)
+      return .init(t)
     case let t as Bundle:
       return seenAsCallableAbstraction(t.shape)
     default:
