@@ -1406,8 +1406,7 @@ public struct Typer {
   ) -> AnyTypeIdentity {
     let substitutions = aliasesInConformance(seenThrough: witness)
     let member = declaredType(of: requirement)
-    let memberSansContext = program.types.head(member)
-    return program.types.substitute(substitutions, in: memberSansContext)
+    return program.types.substitute(substitutions, in: member)
   }
 
   /// Returns a table mapping abstract types to their implementations in the conformance witnessed
