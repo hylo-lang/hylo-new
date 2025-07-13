@@ -803,7 +803,7 @@ public struct Program: Sendable {
     case TuplePattern.self:
       let q = castUnchecked(p, to: TuplePattern.self)
       for (i, e) in self[q].elements.enumerated() {
-        forEachVariable(introducedBy: e.value, at: path + [i], do: action)
+        forEachVariable(introducedBy: e.value, at: path.appending(i), do: action)
       }
 
     case VariableDeclaration.self:
