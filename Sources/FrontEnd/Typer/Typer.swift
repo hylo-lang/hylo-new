@@ -30,7 +30,7 @@ public struct Typer {
   ) {
     self.module = m
     self.program = p
-    self.cache = .init(typing: module, in: program)
+    self.cache = program.typingCache[m].take() ?? .init(typing: m, in: program)
     self.declarationsOnStack = []
     self.isLoggingEnabled = isLoggingEnabled
   }
@@ -45,58 +45,62 @@ public struct Typer {
 
   /// Returns the resources held by this instance.
   public consuming func release() -> Program {
-    self.program
+    program.typingCache[module] = cache
+    return program
   }
 
   // MARK: Caching
 
   /// A memoization cache for the operations of a `Typer`.
-  private struct Memos {
+  internal struct Memos {
 
     /// A table mapping identifiers to declarations.
-    typealias LookupTable = OrderedDictionary<String, [DeclarationIdentity]>
+    fileprivate typealias LookupTable = OrderedDictionary<String, [DeclarationIdentity]>
 
     /// The cache of `Typer.lookup(_:atTopLevelOf:)`.
-    var moduleToIdentifierToDeclaration: [LookupTable?]
+    fileprivate var moduleToIdentifierToDeclaration: [LookupTable?]
 
     /// The cache of `Typer.givens(atTopLevelOf:)`.
-    var moduleToGivens: [[Given]?]
+    fileprivate var moduleToGivens: [[Given]?]
 
     /// The cache of `Typer.imports(of:in:)`.
-    var sourceToImports: [[Module.ID]?]
+    fileprivate var sourceToImports: [[Module.ID]?]
 
     /// The cache of `Typer.extensions(visibleAtTopLevelOf:)`.
-    var sourceToExtensions: [[ExtensionDeclaration.ID]?]
+    fileprivate var sourceToExtensions: [[ExtensionDeclaration.ID]?]
 
     /// The cache of `Typer.extensions(lexicallyIn:)`.
-    var scopeToExtensions: [ScopeIdentity: [ExtensionDeclaration.ID]]
+    fileprivate var scopeToExtensions: [ScopeIdentity: [ExtensionDeclaration.ID]]
 
     /// The cache of `Typer.declarations(lexicallyIn:)`.
-    var scopeToLookupTable: [ScopeIdentity: LookupTable]
+    fileprivate var scopeToLookupTable: [ScopeIdentity: LookupTable]
 
     /// The cache of `Typer.traits(visibleFrom:)`.
-    var scopeToTraits: [ScopeIdentity: [TraitDeclaration.ID]]
+    fileprivate var scopeToTraits: [ScopeIdentity: [TraitDeclaration.ID]]
 
     /// The cache of `Typer.givens(lexicallyIn:)`.
-    var scopeToGivens: [ScopeIdentity: [Given]]
+    fileprivate var scopeToGivens: [ScopeIdentity: [Given]]
 
     /// The cache of `Typer.summon(_:in:)`.
-    var scopeToSummoned: [ScopeIdentity: [AnyTypeIdentity: [SummonResult]]]
+    fileprivate var scopeToSummoned: [ScopeIdentity: [AnyTypeIdentity: [SummonResult]]]
 
     /// The cache of `Typer.typeOfSelf(in:)`.
-    var scopeToTypeOfSelf: [ScopeIdentity: AnyTypeIdentity?]
+    fileprivate var scopeToTypeOfSelf: [ScopeIdentity: AnyTypeIdentity?]
+
+    /// The cache of `Typer.typeOfTraitSelf(in:)`.
+    fileprivate var traitToTypeOfTraitSelf: [TraitDeclaration.ID: AnyTypeIdentity]
 
     /// The cache of `Typer.aliasesInConformance(seenThrough:)`.
-    var witnessToAliases: [WitnessExpression: [AnyTypeIdentity: AnyTypeIdentity]]
+    fileprivate var witnessToAliases: [WitnessExpression: [AnyTypeIdentity: AnyTypeIdentity]]
 
     /// The cache of `Typer.tentativeType(of:)`.
-    var declarationToTentativeType: [DeclarationIdentity: AnyTypeIdentity]
+    fileprivate var declarationToTentativeType: [DeclarationIdentity: AnyTypeIdentity]
 
     /// The cache of `Typer.declaredType(of:)` for predefined givens.
-    var predefinedGivens: [Given: AnyTypeIdentity]
+    fileprivate var predefinedGivens: [Given: AnyTypeIdentity]
 
     /// Creates an instance for typing `m`, which is a module in `p`.
-    init(typing m: Module.ID, in p: Program) {
+    fileprivate init(typing m: Module.ID, in p: Program) {
       self.moduleToIdentifierToDeclaration = .init(repeating: nil, count: p.modules.count)
       self.moduleToGivens = .init(repeating: nil, count: p.modules.count)
       self.sourceToImports = .init(repeating: nil, count: p[m].sources.count)
@@ -107,6 +111,7 @@ public struct Typer {
       self.scopeToGivens = [:]
       self.scopeToSummoned = [:]
       self.scopeToTypeOfSelf = [:]
+      self.traitToTypeOfTraitSelf = [:]
       self.witnessToAliases = [:]
       self.declarationToTentativeType = [:]
       self.predefinedGivens = [:]
@@ -151,7 +156,7 @@ public struct Typer {
   }
 
   /// Returns the types of stored parts of `t`.
-  private mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
+  public mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
     let u = program.types.dealiased(t)
     switch program.types.tag(of: u) {
     case Enum.self:
@@ -187,6 +192,20 @@ public struct Typer {
     } else {
       return nil
     }
+  }
+
+  /// Returns the type of the part at `p` relative to a root of type `t`, or `nil` if `p` is not
+  /// a valid field path in `t`.
+  public mutating func field(of t: AnyTypeIdentity, at p: IndexPath) -> AnyTypeIdentity? {
+    var u = t
+    for i in p {
+      if let s = storage(of: u), UInt(bitPattern: i) < s.count {
+        u = s[i]
+      } else {
+        return nil
+      }
+    }
+    return u
   }
 
   /// The occurrences of a particular capture in a local definition.
@@ -551,12 +570,12 @@ public struct Typer {
   ) {
     if let b = body {
       // Is the function single-expression bodied?
-      if let s = singleReturn(of: b) {
+      if let s = program.singleReturn(of: b) {
         check(s, requiring: r)
       } else {
         for s in b { check(s) }
       }
-    } else if requiresDefinition(d) {
+    } else if program.requiresDefinition(d) {
       // Only requirements, FFIs, and external functions can be without a body.
       let s = program.spanForDiagnostic(about: d)
       report(.init(.error, "declaration requires a body", at: s))
@@ -700,22 +719,6 @@ public struct Typer {
     }
   }
 
-  /// Returns `true` iff `d` needs a user-defined a definition.
-  ///
-  /// A declaration requires a definition unless it is a trait requirement, an FFI, an external
-  /// function, or a memberwise initializer.
-  private func requiresDefinition(_ d: DeclarationIdentity) -> Bool {
-    switch program.tag(of: d) {
-    case FunctionDeclaration.self:
-      let f = program.castUnchecked(d, to: FunctionDeclaration.self)
-      return !program.isRequirement(f)
-        && !program.isForeign(f) && !program.isExtern(f) && !program[f].isMemberwiseInitializer
-
-    default:
-      return !program.isRequirement(d)
-    }
-  }
-
   /// Returns the declaration implementing `requirement` in `d`, if any.
   private mutating func implementation(
     of requirement: AssociatedTypeDeclaration.ID, in d: ConformanceDeclaration.ID
@@ -736,7 +739,7 @@ public struct Typer {
       structurallyConforms(storageOf: conformer, to: concept, in: .init(node: d))
     {
       return .synthetic(requirement)
-    } else if isBuiltin(conformanceOf: conformer, to: concept) {
+    } else if isBuiltin(conformanceTo: concept, for: conformer) {
       return .synthetic(requirement)
     } else {
       return nil
@@ -763,7 +766,7 @@ public struct Typer {
 
   /// Returns `true` iff there exists a buil-in conformance of `conformer` to `concept`.
   private mutating func isBuiltin(
-    conformanceOf conformer: AnyTypeIdentity, to concept: TraitDeclaration.ID
+    conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity
   ) -> Bool {
     guard program.containsStandardLibrary else { return false }
     switch concept {
@@ -783,7 +786,7 @@ public struct Typer {
     in scopeOfUse: ScopeIdentity
   ) -> Bool {
     if let s = storage(of: conformer) {
-      return s.allSatisfy({ (t) in isDerivable(conformanceOf: t, to: concept, in: scopeOfUse) })
+      return s.allSatisfy({ (t) in isDerivable(conformanceTo: concept, for: t, in: scopeOfUse) })
     } else {
       return false
     }
@@ -798,7 +801,7 @@ public struct Typer {
     in scopeOfUse: ScopeIdentity
   ) -> Bool {
     program.types[conformer].elements.allSatisfy { (e) in
-      isDerivable(conformanceOf: e, to: concept, in: scopeOfUse)
+      isDerivable(conformanceTo: concept, for: e, in: scopeOfUse)
     }
   }
 
@@ -811,14 +814,24 @@ public struct Typer {
     in scopeOfUse: ScopeIdentity
   ) -> Bool {
     program.types[conformer].elements.allSatisfy { (e) in
-      isDerivable(conformanceOf: e.type, to: concept, in: scopeOfUse)
+      isDerivable(conformanceTo: concept, for: e.type, in: scopeOfUse)
     }
+  }
+
+  /// Returns `true` iff a conformance of `conformer` to `concept`, which identifies a trait, can
+  /// be resolved or synthesized in `scopeOfUse`.
+  internal mutating func isDerivable(
+    conformanceTo concept: Program.StandardLibraryEntity, for conformer: AnyTypeIdentity,
+    in scopeOfUse: ScopeIdentity
+  ) -> Bool {
+    let p = program.standardLibraryDeclaration(concept, as: TraitDeclaration.self)
+    return isDerivable(conformanceTo: p, for: conformer, in: scopeOfUse)
   }
 
   /// Returns `true` iff a conformance of `conformer` to `concept` can be resolved or synthesized
   /// in `scopeOfUse`.
   private mutating func isDerivable(
-    conformanceOf conformer: AnyTypeIdentity, to concept: TraitDeclaration.ID,
+    conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity,
     in scopeOfUse: ScopeIdentity
   ) -> Bool {
     assert(isStructurallySynthesizable(conformanceTo: concept))
@@ -1034,7 +1047,7 @@ public struct Typer {
     assert(d.module == module, "dependency is not typed")
 
     let c = program.parent(containing: d, as: TraitDeclaration.self)!
-    let t = typeOfTraitSelf(in: c).erased
+    let t = typeOfTraitSelf(in: c)
     let w = WitnessExpression(value: .abstract, type: t)
     let u = metatype(of: AssociatedType(declaration: d, qualification: w)).erased
     program[d.module].setType(u, for: d)
@@ -1460,7 +1473,7 @@ public struct Typer {
   }
 
   /// Returns the type used to represent instances of the given enumeration.
-  internal mutating func underlyingType(of d: EnumDeclaration.ID) -> AnyTypeIdentity {
+  private mutating func underlyingType(of d: EnumDeclaration.ID) -> AnyTypeIdentity {
     if let e = program[d].representation {
       return check(e)
     } else {
@@ -1930,8 +1943,8 @@ public struct Typer {
 
     // Are both branches single-bodied expressions?
     if
-      let e0 = singleExpression(of: program[e].success),
-      let e1 = singleExpression(of: program[e].failure)
+      let e0 = program.singleExpression(of: program[e].success),
+      let e1 = program.singleExpression(of: program[e].failure)
     {
       let t0 = inferredType(of: program[e].success, in: &context)
       let t1 = inferredType(of: program[e].failure, in: &context)
@@ -2226,7 +2239,7 @@ public struct Typer {
     let site = program.spanForDiagnostic(about: e)
 
     // Is the case single-expression bodied?
-    if let b = singleExpression(of: program[e].body) {
+    if let b = program.singleExpression(of: program[e].body) {
       let t = inferredType(of: b, in: &context)
       if let u = r {
         context.obligations.assume(CoercionConstraint(on: b, from: t, to: u, at: program[b].site))
@@ -2457,7 +2470,7 @@ public struct Typer {
   private mutating func inferredType(
     of b: Block.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    if let e = singleExpression(of: b) {
+    if let e = program.singleExpression(of: b) {
       let t = inferredType(of: e, in: &context)
       return context.obligations.assume(b, hasType: t, at: program[b].site)
     } else {
@@ -2758,7 +2771,9 @@ public struct Typer {
   }
 
   /// Returns the type of `P.self` in `d`, which declares a trait `P`.
-  private mutating func typeOfTraitSelf(in d: TraitDeclaration.ID) -> TypeApplication.ID {
+  internal mutating func typeOfTraitSelf(in d: TraitDeclaration.ID) -> AnyTypeIdentity {
+    if let memoized = cache.traitToTypeOfTraitSelf[d] { return memoized }
+
     let f = demand(Trait(declaration: d)).erased
     let s = typeOfSelf(in: d)
 
@@ -2769,7 +2784,9 @@ public struct Typer {
       a[u] = u.erased
     }
 
-    return demand(TypeApplication(abstraction: f, arguments: a))
+    let result = demand(TypeApplication(abstraction: f, arguments: a)).erased
+    cache.traitToTypeOfTraitSelf[d] = result
+    return result
   }
 
   /// Returns the type of a model witnessing the conformance of `conformer` to `concept` with the
@@ -2837,7 +2854,11 @@ public struct Typer {
   /// Returns the context parameters of the type of an instance of `Self` in `s`.
   private mutating func contextOfSelf(in s: TraitDeclaration.ID) -> ContextClause {
     let w = typeOfTraitSelf(in: s)
-    return .init(parameters: .init(program.types[w].arguments.parameters), usings: [w.erased])
+    if let a = program.types.cast(w, to: TypeApplication.self) {
+      return .init(parameters: .init(program.types[a].arguments.parameters), usings: [w])
+    } else {
+      return .init(parameters: [], usings: [w])
+    }
   }
 
   // MARK: Compile-time evaluation
@@ -2967,7 +2988,7 @@ public struct Typer {
   // MARK: Implicit search
 
   /// A witness resolved by implicit resolution.
-  internal struct SummonResult {
+  internal struct SummonResult: Sendable {
 
     /// The expression of the witness.
     internal let witness: WitnessExpression
@@ -3360,7 +3381,7 @@ public struct Typer {
     appendGivens(in: program.declarations(lexicallyIn: s), to: &gs)
 
     if let d = s.node, let c = program.cast(d, to: TraitDeclaration.self) {
-      gs.append(.recursive(typeOfTraitSelf(in: c).erased))
+      gs.append(.recursive(typeOfTraitSelf(in: c)))
     }
 
     cache.scopeToGivens[s] = gs
@@ -3429,9 +3450,8 @@ public struct Typer {
 
   /// Returns the value of a witness expression referring directly to`d`.
   private func expression(referringTo d: DeclarationIdentity) -> WitnessExpression.Value {
-    if let b = program.cast(d, to: BindingDeclaration.self),
-      let v = program.cast(program[program[b].pattern].pattern, to: VariableDeclaration.self)
-    {
+    if let b = program.cast(d, to: BindingDeclaration.self) {
+      let (_, v) = program.implicit(introducedBy: b)
       return .reference(.direct(.init(v)))
     } else {
       return .reference(.direct(d))
@@ -4206,6 +4226,9 @@ public struct Typer {
   ///
   /// Unlike `Program.standardLibraryType(_:)`, this method may be called while `self` is typing
   /// the standard library (i.e., when `self.module` is the standard library).
+  ///
+  /// The module containing the standard library must have been loaded in the `self.progam`, or
+  /// `self.module` is the standard library.
   private mutating func standardLibraryType(
     _ n: Program.StandardLibraryEntity
   ) -> AnyTypeIdentity {
@@ -4296,35 +4319,6 @@ public struct Typer {
       return (a, b)
     } else {
       return nil
-    }
-  }
-
-  /// If `b`, which is the body of a routine, contains exactly one return statement, return that
-  /// statemenr. Otherwise, returns `nil`.
-  private func singleReturn(of b: [StatementIdentity]) -> Return.ID? {
-    b.uniqueElement.flatMap({ (s) in program.cast(s, to: Return.self) })
-  }
-
-  /// If `b` contains exactly one statement that is an expression, returns that expression.
-  /// Otherwise, returns `nil`.
-  private func singleExpression(of b: [StatementIdentity]) -> ExpressionIdentity? {
-    b.uniqueElement.flatMap(program.castToExpression(_:))
-  }
-
-  /// If `b` contains exactly one statement that is an expression, returns that expression.
-  /// Otherwise, returns `nil`.
-  private func singleExpression(of b: Block.ID) -> ExpressionIdentity? {
-    singleExpression(of: program[b].statements)
-  }
-
-  /// Returns `b` if it is an if-expression or `singleExpression(of: b)` if it is a block.
-  private func singleExpression(of b: If.ElseIdentity) -> ExpressionIdentity? {
-    if let e = program.cast(b, to: If.self) {
-      return .init(e)
-    } else if let s = program.cast(b, to: Block.self) {
-      return singleExpression(of: s)
-    } else {
-      program.unexpected(b)
     }
   }
 

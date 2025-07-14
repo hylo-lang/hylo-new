@@ -1,4 +1,5 @@
 import Archivist
+import Utilities
 
 /// A set of access effects.
 @Archivable
@@ -15,6 +16,11 @@ public struct AccessEffectSet: Hashable, Sendable {
   /// Creates an instance from its raw value.
   public init(rawValue: UInt8) {
     self.rawValue = rawValue
+  }
+
+  /// Creates an instance containing `k`.
+  public init(_ k: AccessEffect) {
+    self.rawValue = k.rawValue
   }
 
   /// `true` iff `self` contains no effect.
@@ -95,6 +101,14 @@ extension AccessEffectSet: Collection {
 
   public subscript(position: UInt8) -> AccessEffect {
     AccessEffect(rawValue: position)!
+  }
+
+}
+
+extension AccessEffectSet: CustomStringConvertible {
+
+  public var description: String {
+    "[\(list: self)]"
   }
 
 }

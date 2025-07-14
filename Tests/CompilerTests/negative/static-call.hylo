@@ -4,7 +4,7 @@ fun f0(x: Void) {}
 
 fun f1<T>(x: T) {}
 
-fun f2<T :: * -> *>() -> T { Builtin.halt() }
+fun f2<T :: * -> *>() -> T { Builtin.trap() }
 
 fun main() {
   f0<Void>(x: ())

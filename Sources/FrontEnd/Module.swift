@@ -35,9 +35,6 @@ public struct Module: Sendable {
 
   }
 
-  /// The type of a table mapping file names to source files.
-  internal typealias SourceTable = OrderedDictionary<FileName, SourceContainer>
-
   /// A source file added to a module.
   internal struct SourceContainer: Sendable {
 
@@ -116,6 +113,18 @@ public struct Module: Sendable {
       return .init(uncheckedFrom: n.erased)
     }
 
+    /// Replaces the node identified by `n` by `newTree`.
+    ///
+    /// - Requires: If `n` identifies a scope, then `T` must conform to `Scope`.
+    internal mutating func replace<T: Expression>(
+      _ n: WildcardLiteral.ID, for newTree: T
+    ) -> T.ID {
+      assert(n.file == identity)
+      syntax[n.offset] = .init(newTree)
+      syntaxToTag[n.offset] = .init(T.self)
+      return .init(uncheckedFrom: n.erased)
+    }
+
     /// Inserts a copy of `n` into `self`.
     fileprivate mutating func clone(_ n: ExpressionIdentity) -> ExpressionIdentity {
       assert(n.file == identity)
@@ -149,7 +158,10 @@ public struct Module: Sendable {
   public private(set) var dependencies: [Module.Name] = []
 
   /// The source files in the module.
-  internal private(set) var sources = SourceTable()
+  internal private(set) var sources = OrderedDictionary<FileName, SourceContainer>()
+
+  /// The IR functions in the module.
+  internal private(set) var ir = OrderedDictionary<IRFunction.Name, IRFunction>()
 
   /// Creates an empty module with the given name and identity.
   public init(name: Name, identity: Module.ID) {
@@ -204,6 +216,18 @@ public struct Module: Sendable {
       sources[s.name] = f
       return (inserted: true, identity: f.identity)
     }
+  }
+
+  /// Adds `f` to this module.
+  ///
+  /// - Requires: `self` contains no IR function having the name of `f`.
+  @discardableResult
+  public mutating func addFunction(_ f: IRFunction) -> IRFunction.ID {
+    modify(&ir[f.name]) { (d) in
+      assert(d == nil, "function already declared")
+      d = f
+    }
+    return ir.index(forKey: f.name)!
   }
 
   /// Inserts `child` into `self` in the bucket of `file`.
@@ -277,16 +301,20 @@ public struct Module: Sendable {
 
   /// Projects the node identified by `n`.
   internal subscript<T: SyntaxIdentity>(n: T) -> any Syntax {
-    _read {
-      assert(n.module == identity)
-      yield sources.values[n.file.offset].syntax[n.offset].wrapped
-    }
+    assert(n.module == identity)
+    return sources.values[n.file.offset].syntax[n.offset].wrapped
   }
 
   /// Projects the node identified by `n`.
   internal subscript<T: Syntax>(n: T.ID) -> T {
     assert(n.module == identity)
     return sources.values[n.file.offset].syntax[n.offset].wrapped as! T
+  }
+
+  /// Projects the function identified by `f`.
+  internal subscript(f: IRFunction.ID) -> IRFunction {
+    get { ir.values[f] }
+    _modify { yield &ir.values[f] }
   }
 
   /// Returns the tag of `n`.

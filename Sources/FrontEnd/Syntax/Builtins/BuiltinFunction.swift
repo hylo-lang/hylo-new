@@ -30,8 +30,10 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   // MARK: Functions unique to Hylo
 
-  /// Stops execution.
-  case halt
+  /// Stops the execution of the program.
+  ///
+  /// This function abstracts over the `trap` instruction of the target.
+  case trap
 
   /// `Builtin.address<T>(of v: T) -> Builtin.ptr`
   ///
@@ -381,21 +383,12 @@ public enum BuiltinFunction: Hashable, Sendable {
 
 extension BuiltinFunction {
 
-  //  /// The function's result type.
-  //  public var output: AnyType {
-  //    switch self {
-  //    case .addressOf: .builtin(.ptr)
-  //    case .markUninitialized: .void
-  //    default: type(makingFreshVariableWith: { fatalError("unreachable") }).output
-  //    }
-  //  }
-
   /// Returns the type of the function, calling `freshVariable` to create fresh type variables.
   public func type(uniquingTypesWith s: inout TypeStore) -> Arrow.ID {
     let i1 = s.demand(MachineType.i(1))
 
     switch self {
-    case .halt:
+    case .trap:
       let t0 = s.never().erased
       return s.demand(Arrow(inputs: [], output: t0))
 
@@ -747,8 +740,8 @@ extension BuiltinFunction: Showable {
   /// Returns the part of the name of this function that comes before the parentheses.
   public func show(using printer: inout TreePrinter) -> String {
     switch self {
-    case .halt:
-      return "halt"
+    case .trap:
+      return "trap"
     case .addressOf:
       return "address"
     case .markUninitialized:
@@ -1092,8 +1085,8 @@ extension BuiltinFunction {
     // The first token is the LLVM instruction name.
     guard let head = tokens.popFirst() else { return nil }
     switch head {
-    case "halt":
-      self = .halt
+    case "trap":
+      self = .trap
     case "address":
       if !tokens.isEmpty { return nil }
       self = .addressOf

@@ -43,6 +43,13 @@ public struct TypeStore: Sendable {
     return t
   }
 
+  /// Returns the body of `f` with each parameter substituted for its corresponding argument.
+  public mutating func application(
+    of f: UniversalType.ID, to arguments: [AnyTypeIdentity],
+  ) -> AnyTypeIdentity {
+    substitute(.init(mapping: self[f].parameters, to: arguments), in: self[f].body)
+  }
+
   /// Inserts `t` in `self` it isn't already present and returns the identity of an equal tree.
   public mutating func demand<T: TypeTree>(_ t: T) -> T.ID {
     .init(uncheckedFrom: demand(any: t))
@@ -237,6 +244,19 @@ public struct TypeStore: Sendable {
       k = b
     }
     return p
+  }
+
+  /// Returns the type of a pointer to a free-function implementing `a`'s interface.
+  public mutating func pointer(to a: Callable) -> FunctionPointer.ID {
+    let o = dealiased(a.output)
+    var i: [AnyTypeIdentity]
+    if let t = self[a.environment] as? Tuple, !t.elements.isEmpty {
+      i = t.elements.map({ (e) in dealiased(e.type) })
+    } else {
+      i = []
+    }
+    i.append(contentsOf: a.inputs.map({ (e) in dealiased(e.type) }))
+    return demand(FunctionPointer(inputs: i, output: o))
   }
 
   /// Returns `n` if it identifies a tree of type `U`; otherwise, returns `nil`.
@@ -567,6 +587,11 @@ public struct TypeStore: Sendable {
         return .stepInto(t)
       }
     }
+  }
+
+  /// Returns `a` without any type alias.
+  public mutating func dealiased(_ a: TypeArguments) -> TypeArguments {
+    a.mapValues({ (t) in dealiased(t) })
   }
 
   /// Returns `n` with each open variable substituted by either its corresponding value in

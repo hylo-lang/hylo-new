@@ -3,6 +3,7 @@
 public trait Movable {
 
   /// Gives `self` the value of a consumed `source`.
+  @_symbol("Movable.take_value(from:)")
   fun take_value(from source: sink Self) auto { set inout }
 
 }

@@ -2,7 +2,7 @@
 @_symbol("ExpressibleByIntegerLiteral")
 public trait ExpressibleByIntegerLiteral {
 
-  @_symbol("ExpressibleByIntegerLiteral.init")
+  @_symbol("ExpressibleByIntegerLiteral.init(integer_literal:)")
   init(integer_literal: Builtin.IntegerLiteral)
 
 }

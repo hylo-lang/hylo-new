@@ -92,6 +92,7 @@ import Utilities
     await perform("parsing", { await driver.parse(sources, into: module) })
     await perform("scoping", { await driver.assignScopes(of: module) })
     await perform("typing", { await driver.assignTypes(of: module) })
+    await perform("lowering", { await driver.lower(module) })
 
     let c = treePrinterConfiguration(for: treePrinterFlags)
     for d in driver.program.select(

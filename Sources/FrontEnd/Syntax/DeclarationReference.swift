@@ -12,12 +12,20 @@ public enum DeclarationReference: Hashable, Sendable {
 
   /// A reference to a member declaration that is bound to a receiver.
   ///
-  /// The reference was formed by an expression `receiver.member` where `member` is a non-static
-  /// member of `receiver`'s type. The whole expression is notionally a partial application of some
-  /// function or subscript to the receiver.
+  /// The reference was formed from an expression `x.m` where `m` is a non-static member of `x`'s
+  /// type. The whole expression denotes a function or subscript partially applied to `x`
   case member(DeclarationIdentity)
 
-  /// A reference to a member inherited by conformance or extension.
+  /// A reference to a non-static member inherited by conformance or extension.
+  ///
+  /// The reference was formed from an expression `x.member` where `member` is a declaration
+  /// defined either in an extension of `x`'s type, or as a requirement of a
+  /// trait to which `receiver`'s type conform.
+  ///
+  /// In either case, the first value in the payload is an expression computing a record containing
+  /// the `member`s implementation; the second value is the identity of the `member`'s declaration;
+  /// and the last value is the type of the selection (i.e., the type of `member` seen as a field
+  /// of the aforementioned record.).
   case inherited(WitnessExpression, DeclarationIdentity)
 
   /// A reference to a synthetic implementation of a trait requirement.

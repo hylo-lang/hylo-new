@@ -25,6 +25,16 @@ public struct FunctionPointer: TypeTree {
     inputs.reduce(output.properties, { (a, i) in a.union(i.properties) })
   }
 
+  /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
+  public func modified(
+    in store: inout TypeStore,
+    by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
+  ) -> FunctionPointer {
+    .init(
+      inputs: inputs.map({ (i) in store.map(i, transform) }),
+      output: store.map(output, transform))
+  }
+
 }
 
 extension FunctionPointer: Showable {

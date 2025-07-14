@@ -2,7 +2,8 @@
 @_symbol("Deinitializable")
 public trait Deinitializable {
 
-  /// Deinitializes self.
+  /// Deinitializes `self`.
+  @_symbol("Deinitializable.deinit(:)")
   fun deinit() sink
 
 }

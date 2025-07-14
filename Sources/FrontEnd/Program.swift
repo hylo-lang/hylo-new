@@ -11,11 +11,16 @@ public struct Program: Sendable {
   /// The types in the program.
   public internal(set) var types = TypeStore()
 
+  /// The memoization caches of type inference and name resolution.
+  ///
+  /// This table is used by `Typer` to persist its state throughout the compilation pipeline.
+  internal var typingCache: [Module.ID: Typer.Memos] = [:]
+
   /// The cache of `standardLibraryDeclaration(_:)`.
   ///
   /// This table is initialized either by `Typer.apply` before the standard library is type checked
   /// or by `self.load(module:from:)` after the standard library has been deserialized.
-  internal var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
+  private var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
 
   /// Creates an empty program.
   public init() {}
@@ -77,6 +82,13 @@ public struct Program: Sendable {
     var typer = Typer(typing: m, of: consume self)
     typer.apply()
     self = typer.release()
+  }
+
+  /// Lowers the contents of `m` to IR.
+  public mutating func lower(_ m: Module.ID) {
+    var emitter = IREmitter(insertingIn: m, of: consume self)
+    emitter.incorporateTopLevelDeclarations()
+    self = emitter.release()
   }
 
   /// Projects the module identified by `m`.
@@ -353,31 +365,6 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns the left-most tree in the qualification of `e` iff `e` is a name or new expression.
-  /// Otherwise, returns `nil`.
-  public func rootQualification(of e: ExpressionIdentity) -> ExpressionIdentity? {
-    var root: ExpressionIdentity
-
-    if let n = cast(e, to: NameExpression.self) {
-      guard let q = self[n].qualification else { return nil }
-      root = q
-    } else if let n = cast(e, to: New.self) {
-      root = self[n].qualification
-    } else {
-      return nil
-    }
-
-    while true {
-      if let x = cast(root, to: NameExpression.self) {
-        if let y = self[x].qualification { root = y } else { return root }
-      } else if let x = cast(root, to: Call.self) {
-        root = self[x].callee
-      } else {
-        return root
-      }
-    }
-  }
-
   /// Returns `n` if it identifies a node of type `U`; otherwise, returns `nil`.
   public func cast<T: SyntaxIdentity, U: Syntax>(_ n: T, to: U.Type) -> U.ID? {
     if tag(of: n) == .init(U.self) {
@@ -455,6 +442,32 @@ public struct Program: Sendable {
     } else {
       return nil
     }
+  }
+
+  /// Returns the type assigned to `n`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func type<T: SyntaxIdentity>(assignedTo n: T) -> AnyTypeIdentity {
+    self[n.module].type(assignedTo: n) ?? unreachable("untyped node at \(self[n].site)")
+  }
+
+  /// Returns the type assigned to `n`, assuming it is an instance of `T`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func type<T: SyntaxIdentity, U: TypeTree>(assignedTo n: T, assuming: U.Type) -> U.ID {
+    let t = type(assignedTo: n)
+    if let u = types.cast(t, to: U.self) {
+      return u
+    } else {
+      unreachable("expected node of type '\(U.self)'; found '\(types.tag(of: t))'")
+    }
+  }
+
+  /// Returns the declaration referred to by `n`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func declaration(referredToBy n: NameExpression.ID) -> DeclarationReference {
+    self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
   /// If `n` is a requirement, returns the traits that introduces it. Otherwise, returns `nil`.
@@ -748,6 +761,60 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns the left-most tree in the qualification of `e` iff `e` is a name or new expression.
+  /// Otherwise, returns `nil`.
+  public func rootQualification(of e: ExpressionIdentity) -> ExpressionIdentity? {
+    var root: ExpressionIdentity
+
+    if let n = cast(e, to: NameExpression.self) {
+      guard let q = self[n].qualification else { return nil }
+      root = q
+    } else if let n = cast(e, to: New.self) {
+      root = self[n].qualification
+    } else {
+      return nil
+    }
+
+    while true {
+      if let x = cast(root, to: NameExpression.self) {
+        if let y = self[x].qualification { root = y } else { return root }
+      } else if let x = cast(root, to: Call.self) {
+        root = self[x].callee
+      } else {
+        return root
+      }
+    }
+  }
+
+  /// If `b`, which is the body of a routine, contains exactly one return statement, return that
+  /// statemenr. Otherwise, returns `nil`.
+  public func singleReturn(of b: [StatementIdentity]) -> Return.ID? {
+    b.uniqueElement.flatMap({ (s) in cast(s, to: Return.self) })
+  }
+
+  /// If `b` contains exactly one statement that is an expression, returns that expression.
+  /// Otherwise, returns `nil`.
+  public func singleExpression(of b: [StatementIdentity]) -> ExpressionIdentity? {
+    b.uniqueElement.flatMap(castToExpression(_:))
+  }
+
+  /// If `b` contains exactly one statement that is an expression, returns that expression.
+  /// Otherwise, returns `nil`.
+  public func singleExpression(of b: Block.ID) -> ExpressionIdentity? {
+    singleExpression(of: self[b].statements)
+  }
+
+  /// Returns `b` if it is an if-expression or `singleExpression(of: b)` if it is a block.
+  public func singleExpression(of b: If.ElseIdentity) -> ExpressionIdentity? {
+    if let e = cast(b, to: If.self) {
+      return .init(e)
+    } else if let s = cast(b, to: Block.self) {
+      return singleExpression(of: s)
+    } else {
+      unexpected(b)
+    }
+  }
+
   /// Returns the adjunct conformances of `d`, if any.
   public func adjuncts(of d: DeclarationIdentity) -> [ConformanceDeclaration.ID]? {
     switch tag(of: d) {
@@ -814,6 +881,16 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns the declaration of the implicit symbol introduced by `d`.
+  public func implicit(
+    introducedBy d: BindingDeclaration.ID
+  ) -> (introducer: BindingPattern.Introducer, declaration: VariableDeclaration.ID) {
+    assert(self[d].isImplicit)
+    let p = self[d].pattern
+    let v = castUnchecked(self[p].pattern, to: VariableDeclaration.self)
+    return (self[p].introducer.value, v)
+  }
+
   /// Returns the declaration of the variant with effect `k` in the bundle `d`, or `nil` if `d`
   /// does not declare a bundle or `d` does not contain such a variant.
   public func variant(_ k: AccessEffect, of d: DeclarationIdentity) -> VariantDeclaration.ID? {
@@ -839,6 +916,20 @@ public struct Program: Sendable {
       return m.modifiers
     } else {
       return []
+    }
+  }
+
+  /// Returns `true` iff `d` needs a user-defined a definition.
+  ///
+  /// A declaration requires a definition unless it is a trait requirement, an FFI, an external
+  /// function, or a memberwise initializer.
+  public func requiresDefinition(_ d: DeclarationIdentity) -> Bool {
+    switch tag(of: d) {
+    case FunctionDeclaration.self:
+      let f = castUnchecked(d, to: FunctionDeclaration.self)
+      return !isRequirement(f) && !isForeign(f) && !isExtern(f) && !self[f].isMemberwiseInitializer
+    default:
+      return !isRequirement(d)
     }
   }
 
@@ -996,23 +1087,39 @@ extension Program {
     /// `Hylo.Deinitializable`.
     case deinitializable = "Deinitializable"
 
+    /// `Hyloe.Deinitializable.deinit`.
+    case deinitializableDeinit = "Deinitializable.deinit(:)"
+
     /// `Hylo.Equatable`.
     case equatable = "Equatable"
 
     /// `Hylo.Movable`.
     case movable = "Movable"
 
+    /// `Hylo.Movable.take_value(from:)`
+    case movableTakeValue = "Movable.take_value(from:)"
+
     /// `Hylo.ExpressibleByIntegerLiteral`.
     case expressibleByIntegerLiteral = "ExpressibleByIntegerLiteral"
 
     /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
-    case expressibyByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init"
+    case expressibyByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
 
+  }
+
+  /// Returns the type of a term witnessing that `t` conforms to the core trait `p`.
+  ///
+  /// The module containing the standard library must have been loaded and type checked.
+  public mutating func typeOfWitness(
+    of t: AnyTypeIdentity, is p: StandardLibraryEntity
+  ) -> AnyTypeIdentity {
+    let f = types.cast(standardLibraryType(p), to: UniversalType.self)!
+    return types.application(of: f, to: [t])
   }
 
   /// Returns the type of the given standard library entity.
   ///
-  /// The module containing the standard library must have been loaded.
+  /// The module containing the standard library must have been loaded and type checked.
   public func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
     let d = standardLibraryDeclaration(n)
     let t = type(assignedTo: d, assuming: Metatype.self)
@@ -1021,11 +1128,22 @@ extension Program {
 
   /// Returns the declaration of the given standard library entity.
   ///
-  /// The module containing the standard library must have been loaded.
+  /// The source files of the standard library must have been loaded but the module many not
+  /// necessarily be type checked already.
   public func standardLibraryDeclaration(
     _ n: StandardLibraryEntity
   ) -> DeclarationIdentity {
     standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library")
+  }
+
+  /// Returns the declaration of the given standard library assuming it is represented by `T`.
+  ///
+  /// The source files of the standard library must have been loaded but the module many not
+  /// necessarily be type checked already.
+  public func standardLibraryDeclaration<T: Declaration>(
+    _ n: StandardLibraryEntity, as: T.Type
+  ) -> T.ID {
+    castUnchecked(standardLibraryDeclaration(n), to: T.self)
   }
 
   /// Fills `program.standardLibraryDeclarations`.

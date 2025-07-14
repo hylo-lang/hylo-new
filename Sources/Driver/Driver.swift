@@ -38,7 +38,7 @@ public struct Driver {
     return (elapsed, program[module].containsError)
   }
 
-  /// Assignes the trees in `module` to their scopes, exiting if an error occurred.
+  /// Assigns the trees in `module` to their scopes.
   @discardableResult
   public mutating func assignScopes(
     of module: Module.ID
@@ -50,7 +50,7 @@ public struct Driver {
     return (elapsed, program[module].containsError)
   }
 
-  /// Assigns the trees in `module` to their types, exiting if an error occured.
+  /// Assigns the trees in `module` to their types.
   @discardableResult
   public mutating func assignTypes(
     of module: Module.ID
@@ -58,6 +58,17 @@ public struct Driver {
     let clock = ContinuousClock()
     let elapsed = clock.measure {
       program.assignTypes(module)
+    }
+    return (elapsed, program[module].containsError)
+  }
+
+  /// Lowers the contents of `module` to IR.
+  public mutating func lower(
+    _ module: Module.ID
+  ) async -> (elapsed: Duration, containsError: Bool) {
+    let clock = ContinuousClock()
+    let elapsed = clock.measure {
+      program.lower(module)
     }
     return (elapsed, program[module].containsError)
   }
