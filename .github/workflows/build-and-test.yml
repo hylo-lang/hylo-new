@@ -14,8 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }} (non-Windows)
-        if: ${{ runner.os != 'Windows' }}
+      - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }}
+        # if: ${{ runner.os != 'Windows' }}
         uses: SwiftyLab/setup-swift@latest
         with:
           swift-version: ${{ matrix.swift }}
@@ -25,12 +25,12 @@ jobs:
           winsdk: "10.0.22621.0" # Workaround for this: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
           # TL;DR: The Windows SDK had a change in 10.0.26100.0 that the Swift compiler didn't account for.
           # The Swift compiler team is aware of the issue and they are going to release a fix some time.
-      - name: Set up swift (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        uses: compnerd/gha-setup-swift@v0.2.2
-        with:
-          branch: release/6.2
-          tag: 6.2-DEVELOPMENT-SNAPSHOT-2025-07-09-a
+      # - name: Set up swift (Windows)
+      #   if: ${{ runner.os == 'Windows' }}
+      #   uses: compnerd/gha-setup-swift@v0.2.2
+      #   with:
+      #     branch: release/6.2
+      #     tag: 6.2-DEVELOPMENT-SNAPSHOT-2025-07-09-a
 
       - name: Verify swift version
         run: swift --version && swift --version | grep -q ${{ matrix.swift }}
