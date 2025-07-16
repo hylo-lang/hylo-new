@@ -14,6 +14,9 @@ public struct WitnessExpression: Hashable, Sendable {
     /// An abstract given.
     case abstract
 
+    /// An instance of a structural conformance synthesized by the compiler.
+    case synthetic
+
     /// An assumed given.
     case assumed(Int)
 
@@ -33,7 +36,7 @@ public struct WitnessExpression: Hashable, Sendable {
     /// substituted for `new`.
     public func substituting(assumed i: Int, for new: Value) -> Self {
       switch self {
-      case .identity, .abstract:
+      case .identity, .abstract, .synthetic:
         return self
       case .assumed(let j):
         return i == j ? new : self
@@ -56,7 +59,7 @@ public struct WitnessExpression: Hashable, Sendable {
       switch self {
       case .identity(let x):
         return .identity(x == m ? n : m)
-      case .abstract, .assumed:
+      case .abstract, .assumed, .synthetic:
         return self
       case .reference(let d):
         return .reference(d.substituting(m, for: n))
@@ -94,7 +97,7 @@ public struct WitnessExpression: Hashable, Sendable {
     if type[.hasVariable] { return true }
 
     switch value {
-    case .identity, .abstract, .assumed:
+    case .identity, .abstract, .synthetic, .assumed:
       return false
     case .reference(let r):
       return r.hasVariable
@@ -110,7 +113,7 @@ public struct WitnessExpression: Hashable, Sendable {
   /// A measure of the size of the deduction tree used to produce the witness.
   public var elaborationCost: Int {
     switch value {
-    case .identity, .abstract, .assumed, .reference:
+    case .identity, .abstract, .synthetic, .assumed, .reference:
       return 0
     case .termApplication(let w, let a):
       return 1 + w.elaborationCost + a.elaborationCost
@@ -124,13 +127,11 @@ public struct WitnessExpression: Hashable, Sendable {
   /// The declaration of the witness evaluated by this expression, if any.
   public var declaration: DeclarationIdentity? {
     switch value {
-    case .identity, .abstract, .assumed:
+    case .identity, .abstract, .synthetic, .assumed:
       return nil
     case .reference(let r):
       return r.target
-    case .termApplication(let w, _), .typeApplication(let w, _):
-      return w.declaration
-    case .nested(let w):
+    case .termApplication(let w, _), .typeApplication(let w, _), .nested(let w):
       return w.declaration
     }
   }
@@ -181,6 +182,8 @@ extension WitnessExpression.Value: Showable {
       return printer.show(e)
     case .abstract:
       return "$<abstract given>"
+    case .synthetic:
+      return "$<synthesized given>"
     case .assumed(let i):
       return "$<assumed given \(i)>"
     case .reference(let d):

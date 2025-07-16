@@ -540,6 +540,9 @@ public struct TypeStore: Sendable {
     case .abstract:
       return .init(value: .abstract, type: t)
 
+    case .synthetic:
+      return .init(value: .synthetic, type: t)
+
     case .assumed(let i):
       return .init(value: .assumed(i), type: t)
 
