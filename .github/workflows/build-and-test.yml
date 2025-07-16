@@ -8,7 +8,7 @@ jobs:
       matrix:
         # Note: all combinations of the following will be run independently
         os: [macos-14, ubuntu-24.04, windows-2022]
-        swift: ["6.1"]
+        swift: ["6.2"]
         config: [release, debug]
 
     steps:
