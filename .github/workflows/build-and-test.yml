@@ -40,6 +40,6 @@ jobs:
       # reuse the build cache from here, doubling the CI time.
 
       - name: Build and test for ${{ matrix.swift }} on ${{ matrix.os }} in ${{ matrix.config }} mode
-        run: swift test -c ${{ matrix.config }}
+        run: swift test -c ${{ matrix.config }} --verbose
 
     runs-on: ${{ matrix.os }}
