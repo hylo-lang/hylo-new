@@ -105,6 +105,11 @@ public struct Name: Hashable, Sendable {
     labels.isEmpty && (notation == .none) && (introducer == .none)
   }
 
+  /// Returns `true` iff `self` identifies an operator with the given notation.
+  public func isOperator(_ n: OperatorNotation) -> Bool {
+    notation == n
+  }
+
   /// Returns `true` iff `scrutinee` can be used to refer to a declaration named after `pattern`.
   public static func ~= (pattern: Name, scrutinee: Name) -> Bool {
     pattern.identifier == scrutinee.identifier

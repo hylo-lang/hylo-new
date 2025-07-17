@@ -1,9 +1,9 @@
 //! no-std
 
 struct A {
-  memberwise init
-  let m0 = ()
-  let m1: Void
+  public memberwise init
+  public let m0 = ()
+  public let m1: Void
 }
 
 fun a() -> A { A(m0: (), m1: ()) }

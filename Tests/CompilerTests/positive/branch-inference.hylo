@@ -13,8 +13,8 @@ public fun main() {
   check<A<Bool>>(a1)
 
   let a2 = if true {
-    _ = (a: ())
-    _ = (b: ())
+    _ = ()
+    _ = ()
   }
   check<Void>(a2)
 }

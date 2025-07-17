@@ -1,6 +1,6 @@
 //! no-std
 
-struct A { memberwise init }
+struct A { public memberwise init }
 
 fun one(x: A) {}
 fun one(x: A, y: A) {}

@@ -1,8 +1,6 @@
 //! no-std
 
-struct A<T> {
-  memberwise init
-}
+struct A<T> { public memberwise init }
 
 fun g<T, U>(_ x: T) {}
 

@@ -1,3 +1,3 @@
-negative/incompatible-if-branches.hylo:2.34-41: error: no coercion from '{b: Void}' to '{a: Void}'
-  _ = if true { (a: ()) } else { (b: ()) }
-                                 ~~~~~~~
+negative/incompatible-if-branches.hylo:5.30-33: error: no coercion from 'B' to 'A'
+  _ = if true { A() } else { B() }
+                             ~~~

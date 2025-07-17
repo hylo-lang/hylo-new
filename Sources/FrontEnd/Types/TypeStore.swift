@@ -60,7 +60,7 @@ public struct TypeStore: Sendable {
     switch t {
     case is ErrorType:
       return AnyTypeIdentity.error
-    case let u as Tuple where u.elements.isEmpty:
+    case is VoidType:
       return AnyTypeIdentity.void
     case let u as TypeVariable:
       return AnyTypeIdentity(variable: u.identifier)
@@ -84,16 +84,6 @@ public struct TypeStore: Sendable {
   /// Returns `true` iff `n` identifies the type of an equality witness.
   public func isEquality<T: TypeIdentity>(_ n: T) -> Bool {
     tag(of: n) == EqualityWitness.self
-  }
-
-  /// Returns `true` iff `n` identifies a non-nominal type (e.g., a tuple).
-  public func isStructural<T: TypeIdentity>(_ n: T) -> Bool {
-    switch tag(of: n) {
-    case Sum.self, Tuple.self:
-      return true
-    default:
-      return false
-    }
   }
 
   /// Returns `true` iff `n` identifies a metatype whose inhabitant satifies `predicate`.
@@ -246,12 +236,70 @@ public struct TypeStore: Sendable {
     return p
   }
 
+  /// Returns the canonical representation of a sum containing the given elements.
+  ///
+  /// The result is:
+  /// - an instance of `Sum` iff `elements` contains two elements or more,
+  /// - `t` iff `t` is the unique element in `elements`
+  /// - `.never` iff `elements` is empty.
+  public mutating func sum<S: Sequence<AnyTypeIdentity>>(of elements: S) -> AnyTypeIdentity {
+    var i = elements.makeIterator()
+    guard var l = i.next() else { return .never }
+    while let r = i.next() {
+      l = demand(Sum(l, r)).erased
+    }
+    return l
+  }
+
+  /// Returns the canonical representation of a tuple containing the given elements.
+  ///
+  /// The result is:
+  /// - an instance of `Tuple` iff `elements` contains two elements or more,
+  /// - `t` iff `t` is the unique element in `elements`
+  /// - `.void` iff `elements` is empty.
+  public mutating func tuple<S: Sequence<AnyTypeIdentity>>(of elements: S) -> AnyTypeIdentity {
+    var i = elements.makeIterator()
+    guard var l = i.next() else { return .void }
+    while let r = i.next() {
+      l = demand(Tuple(l, r)).erased
+    }
+    return l
+  }
+
+  /// Returns the components of `t`.
+  public func elements(of t: Sum.ID) -> [AnyTypeIdentity] {
+    var result = [self[t].rhs]
+
+    var lhs = self[t].lhs
+    while let u = self[lhs] as? Sum {
+      result.append(u.rhs)
+      lhs = u.lhs
+    }
+    result.append(lhs)
+
+    return result.reversed()
+  }
+
+  /// Returns the components of `t`.
+  public func elements(of t: Tuple.ID) -> [AnyTypeIdentity] {
+    var result = [self[t].rhs]
+
+    var lhs = self[t].lhs
+    while let u = self[lhs] as? Tuple {
+      result.append(u.rhs)
+      lhs = u.lhs
+    }
+    result.append(lhs)
+
+    return result.reversed()
+  }
+
   /// Returns the type of a pointer to a free-function implementing `a`'s interface.
   public mutating func pointer(to a: Callable) -> FunctionPointer.ID {
     let o = dealiased(a.output)
     var i: [AnyTypeIdentity]
-    if let t = self[a.environment] as? Tuple, !t.elements.isEmpty {
-      i = t.elements.map({ (e) in dealiased(e.type) })
+    if a.environment != .void {
+      i = [dealiased(a.environment)]
     } else {
       i = []
     }
@@ -317,7 +365,7 @@ public struct TypeStore: Sendable {
     return introduce(c, into: t).erased
   }
 
-  /// Returns `[{self: k T}](A...) k -> B` iff `n` has the form `[Void](self: k T, A...) x -> B`.
+  /// Returns `[{k T}](A...) k -> B` iff `n` has the form `[Void](self: k T, A...) x -> B`.
   public mutating func asBoundMemberFunction(_ n: AnyTypeIdentity) -> AnyTypeIdentity? {
     let (c, h) = contextAndHead(n.erased)
 
@@ -346,7 +394,7 @@ public struct TypeStore: Sendable {
     }
   }
 
-  /// Returns `[{self: k T}](A...) k -> B` iff `n` has the form `[Void](self: k T, A...) x -> B`.
+  /// Returns `[{k T}](A...) k -> B` iff `n` has the form `[Void](self: k T, A...) x -> B`.
   private mutating func asBoundMemberFunction(_ n: Arrow.ID) -> Arrow.ID? {
     let f = self[n]
     guard let s = f.inputs.first, (f.environment == .void) && (s.label == "self") else {
@@ -354,10 +402,9 @@ public struct TypeStore: Sendable {
     }
 
     let capture = demand(RemoteType(projectee: s.type, access: s.access)).erased
-    let environment = demand(Tuple(elements: [.init(label: "self", type: capture)])).erased
     let adapted = Arrow(
       effect: f.effect,
-      environment: environment,
+      environment: capture,
       inputs: Array(f.inputs[1...]),
       output: f.output)
 
@@ -402,9 +449,9 @@ public struct TypeStore: Sendable {
   /// for `k` and, iff `k` is non-mutating, the return type is the original return type along with
   /// the types of the values notionally modified by the bundle.
   ///
-  /// For example, given a type `[{x: auto A}](y: auto B) auto -> C`, this method returns
-  /// - `[{x: let A}](y: let B) let -> {A, B, C}` with `k == .let`; and
-  /// - `[{x: set A}](y: set B) set -> C` with `k == .set`.
+  /// For example, given a type `[auto A](y: auto B) auto -> C`, this method returns
+  /// - `[let A](y: let B) let -> A * B * C` with `k == .let`; and
+  /// - `[set A](y: set B) set -> C` with `k == .set`.
   ///
   /// - Requires: `n` is the type of a function bundle.
   public mutating func variant(_ k: AccessEffect, of n: Arrow.ID) -> Arrow.ID {
@@ -416,20 +463,20 @@ public struct TypeStore: Sendable {
     /// The type of the adapted environment.
     var environment: AnyTypeIdentity = .void
     /// The types of the values that appear in the return type of a non-mutating variant.
-    var updates: [Tuple.Element] = []
+    var updates: [AnyTypeIdentity] = []
 
-    if let x = self[self[n].environment] as? Tuple {
-      var es: [Tuple.Element] = []
-      for e in x.elements {
-        if let t = self[e.type] as? RemoteType, t.access == .auto {
+    if let x = cast(self[n].environment, to: Tuple.self) {
+      var es: [AnyTypeIdentity] = []
+      for e in elements(of: x) {
+        if let t = self[e] as? RemoteType, t.access == .auto {
           let u = demand(RemoteType(projectee: t.projectee, access: k)).erased
-          es.append(.init(label: e.label, type: u))
-          if k.isNonMutating { updates.append(.init(label: nil, type: t.projectee)) }
+          es.append(u)
+          if k.isNonMutating { updates.append(t.projectee) }
         } else {
           es.append(e)
         }
       }
-      environment = demand(Tuple(elements: es)).erased
+      environment = tuple(of: es).erased
     } else {
       environment = self[n].environment
     }
@@ -437,7 +484,7 @@ public struct TypeStore: Sendable {
     for p in self[n].inputs {
       if p.access == .auto {
         inputs.append(.init(label: p.label, access: k, type: p.type, defaultValue: p.defaultValue))
-        if k.isNonMutating { updates.append(.init(label: nil, type: p.type)) }
+        if k.isNonMutating { updates.append(p.type) }
       } else {
         inputs.append(p)
       }
@@ -446,7 +493,7 @@ public struct TypeStore: Sendable {
     let output = if k.isMutating {
       self[n].output
     } else {
-      demand(Tuple(elements: updates + [.init(label: nil, type: self[n].output)])).erased
+      tuple(of: updates + [self[n].output]).erased
     }
 
     return demand(Arrow(effect: k, environment: environment, inputs: inputs, output: output))
@@ -491,7 +538,7 @@ public struct TypeStore: Sendable {
       case AnyTypeIdentity.error.offset:
         yield ErrorType()
       case AnyTypeIdentity.void.offset:
-        yield Tuple(elements: [])
+        yield VoidType()
       case let i where n.isVariable:
         yield TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
       case let i:
@@ -863,9 +910,8 @@ public struct TypeStore: Sendable {
     _ lhs: Tuple, _ rhs: Tuple, extending ss: inout SubstitutionTable,
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
-    unifiable(lhs.elements, rhs.elements, extending: &ss) { (a, b, s) in
-      unifiable(a, b, extending: &s, handlingCoercionsWith: areCoercible)
-    }
+    unifiable(lhs.lhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(lhs.rhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.
@@ -883,7 +929,8 @@ public struct TypeStore: Sendable {
     _ lhs: Sum, _ rhs: Sum, extending ss: inout SubstitutionTable,
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
-    unifiable(lhs.elements, rhs.elements, extending: &ss, handlingCoercionsWith: areCoercible)
+    unifiable(lhs.lhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(lhs.rhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.
@@ -905,15 +952,6 @@ public struct TypeStore: Sendable {
   ) -> Bool {
     lhs.parameters.elementsEqual(rhs.parameters)
       && unifiable(lhs.body, rhs.body, extending: &ss, handlingCoercionsWith: areCoercible)
-  }
-
-  /// Returns `true` if `lhs` and `rhs` are unifiable.
-  private func unifiable(
-    _ lhs: Tuple.Element, _ rhs: Tuple.Element, extending ss: inout SubstitutionTable,
-    handlingCoercionsWith areCoercible: CoercionHandler
-  ) -> Bool {
-    (lhs.label == rhs.label)
-      && unifiable(lhs.type, rhs.type, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if the the pairwise elements of `lhs` and `rhs` are unifiable.

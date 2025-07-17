@@ -1,9 +1,9 @@
-negative/invalid-return.hylo:6.3-8: error: no coercion from 'Void[1]' to 'Void'
-  ((),)
-  ~~~~~
-negative/invalid-return.hylo:10.10-15: error: no coercion from 'Void[1]' to 'Void'
-  return ((),)
-         ~~~~~
+negative/invalid-return.hylo:6.3-4: error: type 'A' has no static member 'init'
+  A()
+  ^
+negative/invalid-return.hylo:10.10-11: error: type 'A' has no static member 'init'
+  return A()
+         ^
 negative/invalid-return.hylo:14.3: error: expected value of type 'A'
   return
   ^

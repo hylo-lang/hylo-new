@@ -1,3 +1,6 @@
+struct A { public memberwise init }
+struct B { public memberwise init }
+
 public fun main() {
-  _ = if true { (a: ()) } else { (b: ()) }
+  _ = if true { A() } else { B() }
 }

@@ -50,6 +50,7 @@ public struct TypeTag: Sendable {
     TypeApplication.self,
     TypeVariable.self,
     UniversalType.self,
+    VoidType.self,
   ]
 
   static let indices = Dictionary(

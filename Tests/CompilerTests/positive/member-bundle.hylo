@@ -2,7 +2,7 @@
 
 struct A {
   public memberwise init
-  fun f(x: inout B) auto -> B {
+  public fun f(x: inout B) auto -> B {
     let   { (A(), B()) }
     inout { B() }
   }
@@ -17,5 +17,5 @@ public fun main() {
   var b = B()
 
   check<B>(&a.f(x: &b))
-  check<{A, B}>(a.f(x: &b))
+  check<A * B>(a.f(x: &b))
 }

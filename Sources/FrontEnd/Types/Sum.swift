@@ -4,17 +4,21 @@ import Archivist
 @Archivable
 public struct Sum: TypeTree {
 
-  /// The elements of the union.
-  public let elements: [AnyTypeIdentity]
+  /// The left-hand side of the sum.
+  public let lhs: AnyTypeIdentity
 
-  /// Creates an instance with the given properties.
-  public init(elements: [AnyTypeIdentity]) {
-    self.elements = elements
+  /// The right-hand side of the sum.
+  public let rhs: AnyTypeIdentity
+
+  /// Creates an instance representing the sum of `lhs` and `rhs`.
+  public init(_ lhs: AnyTypeIdentity, _ rhs: AnyTypeIdentity) {
+    self.lhs = lhs
+    self.rhs = rhs
   }
 
   /// Properties about `self`.
   public var properties: TypeProperties {
-    elements.reduce([], { (a, e) in a.union(e.properties) })
+    lhs.properties.union(rhs.properties)
   }
 
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
@@ -22,7 +26,7 @@ public struct Sum: TypeTree {
     in store: inout TypeStore,
     by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
   ) -> Sum {
-    .init(elements: elements.map({ (e) in store.map(e, transform) }))
+    .init(store.map(lhs, transform), store.map(rhs, transform))
   }
 
 }
@@ -31,7 +35,7 @@ extension Sum: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    elements.isEmpty ? "Never" : "(\(printer.show(elements, separatedBy: " (+) ")))"
+    "\(printer.show(lhs)) + \(printer.show(rhs))"
   }
 
 }

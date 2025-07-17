@@ -1,14 +1,13 @@
 //! no-std
 
-fun f() -> {a: {}} {
-  (a: ())
-}
+struct A { public memberwise init }
+struct B { public memberwise init }
 
-fun f() -> {b: {}} {
-  (b: ())
-}
+fun f() -> A { A() }
 
-fun g(_ x: {a: {}}) {}
+fun f() -> B { B() }
+
+fun g(_ x: A) {}
 
 fun main() {
   g(f())

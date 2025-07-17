@@ -114,14 +114,10 @@ extension Program {
       traverse(castUnchecked(n, to: StaticCall.self), calling: &v)
     case StringLiteral.self:
       break
-    case SumTypeExpression.self:
-      traverse(castUnchecked(n, to: SumTypeExpression.self), calling: &v)
     case SynthethicExpression.self:
       break
     case TupleLiteral.self:
       traverse(castUnchecked(n, to: TupleLiteral.self), calling: &v)
-    case TupleTypeExpression.self:
-      traverse(castUnchecked(n, to: TupleTypeExpression.self), calling: &v)
     case WildcardLiteral.self:
       break
 
@@ -344,18 +340,8 @@ extension Program {
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
-  public func traverse<T: SyntaxVisitor>(_ n: SumTypeExpression.ID, calling v: inout T) {
-    visit(self[n].elements, calling: &v)
-  }
-
-  /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: TupleLiteral.ID, calling v: inout T) {
-    for a in self[n].elements { visit(a.value, calling: &v) }
-  }
-
-  /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
-  public func traverse<T: SyntaxVisitor>(_ n: TupleTypeExpression.ID, calling v: inout T) {
-    for a in self[n].elements { visit(a.value, calling: &v) }
+    visit(self[n].elements, calling: &v)
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
@@ -372,7 +358,7 @@ extension Program {
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: TuplePattern.ID, calling v: inout T) {
-    for a in self[n].elements { visit(a.value, calling: &v) }
+    visit(self[n].elements, calling: &v)
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.

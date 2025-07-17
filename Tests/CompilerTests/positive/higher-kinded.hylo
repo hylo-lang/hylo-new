@@ -11,7 +11,7 @@ fun g<T :: * -> *, U>(_ x: T<U>) -> T<A<U>> { Builtin.trap() }
 fun check<T>(_ x: T) {}
 
 public fun main() {
-  let x = f<A, {}>()
+  let x = f<A, Void>()
   check<A<Void>>(x)
   let y = g(A(x: ()))
   check<A<A<Void>>>(y)
