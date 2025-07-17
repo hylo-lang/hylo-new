@@ -1,4 +1,4 @@
-// swift-tools-version:6.0
+// swift-tools-version:6.1
 import PackageDescription
 
 #if os(Windows)
@@ -33,6 +33,9 @@ let package = Package(
     .package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
+    .package(
+      url: "https://github.com/hylo-lang/Swifty-LLVM",
+      branch: "main"),
   ],
   targets: [
     .executableTarget(
@@ -48,7 +51,7 @@ let package = Package(
     .executableTarget(
       name: "hc-tests",
       dependencies: [
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser")
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -74,6 +77,13 @@ let package = Package(
       swiftSettings: commonSwiftSettings),
 
     .target(
+      name: "CodeGen",
+      dependencies: [
+        .target(name: "FrontEnd"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
+      ]
+    ),
+    .target(
       name: "StableCollections"),
 
     .target(
@@ -85,7 +95,7 @@ let package = Package(
     .target(
       name: "Utilities",
       dependencies: [
-        .product(name: "Algorithms", package: "swift-algorithms"),
+        .product(name: "Algorithms", package: "swift-algorithms")
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -103,14 +113,20 @@ let package = Package(
     .testTarget(
       name: "FrontEndTests",
       dependencies: [
-        .target(name: "FrontEnd"),
+        .target(name: "FrontEnd")
       ],
       swiftSettings: commonSwiftSettings),
-
+    .testTarget(
+      name: "CodeGenTests",
+      dependencies: [
+        .target(name: "CodeGen"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
+      ],
+    ),
     .testTarget(
       name: "UtilitiesTests",
       dependencies: [
-        .target(name: "Utilities"),
+        .target(name: "Utilities")
       ],
       swiftSettings: commonSwiftSettings),
 

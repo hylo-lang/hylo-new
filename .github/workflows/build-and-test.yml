@@ -1,5 +1,11 @@
 name: Build and Test
-on: push
+on:
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".editorconfig"
 
 jobs:
   test:
@@ -7,22 +13,141 @@ jobs:
       fail-fast: false
       matrix:
         # Note: all combinations of the following will be run independently
-        os: [macos-14, ubuntu-24.04]
-        swift: ["6.0"]
+        os: [macos-14, ubuntu-24.04, windows-2025]
+        # os: [windows-2025]
+        swift: ["6.2"]
         config: [release, debug]
+
+        include:
+          - HYLO_LLVM_BUILD_RELEASE: 20250617-222524
+          - HYLO_LLVM_DOWNLOAD_URL: https://github.com/hylo-lang/llvm-build/releases/download
+          - HYLO_LLVM_VERSION: '20.1.6'
+          - llvm_package_suffix: .tar.zst
+          - unpackage_command: tar -x --zstd -f
+          - triple_cpu: x86_64
+
+          - os: windows-2025
+            unpackage_command: 7z x -t7z
+            llvm_package_suffix: .7z
+            triple_suffix: unknown-windows-msvc17
+
+          - os: macos-14
+            triple_suffix: apple-darwin24.1.0
+            triple_cpu: arm64
+
+          - os: ubuntu-24.04
+            triple_suffix: unknown-linux-gnu
+            triple_cpu: x86_64
+
+          - config: debug
+            cmake_build_type: Debug
+            HYLO_LLVM_BUILD_TYPE: Debug
+
+          - config: release
+            cmake_build_type: Release
+            HYLO_LLVM_BUILD_TYPE: MinSizeRel
+
+    env:
+      llvm_url_prefix: ${{ matrix.HYLO_LLVM_DOWNLOAD_URL }}/${{ matrix.HYLO_LLVM_BUILD_RELEASE }}
+      llvm_package_basename: llvm-${{ matrix.HYLO_LLVM_VERSION }}-${{ matrix.triple_cpu }}-${{ matrix.triple_suffix }}-${{ matrix.HYLO_LLVM_BUILD_TYPE }}
 
     steps:
       - uses: actions/checkout@v4
+      - name: Install LLVM
+        # 7z doesn't support decompressing from a stream or we'd do this all as one statement. Maybe
+        # we should find a way to use zstd on windows.
+        run: >-
+          curl --no-progress-meter -L -O
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}"
+          ${{ env.llvm_url_prefix }}/${{ env.llvm_package_basename }}${{ matrix.llvm_package_suffix }}
+
+          ${{ matrix.unpackage_command }} ${{ env.llvm_package_basename }}${{ matrix.llvm_package_suffix }}
+
+      - name: List directories in workspace in depth 2
+        run: find . -maxdepth 2 -type d
+        shell: bash
+
+      - name: Install Perl Pod::Usage module
+        run: cpan install Pod::Usage
+
+      - name: Create LLVM pkgconfig file and make it findable
+        run: >-
+          set -ex -o pipefail
+
+          mkdir pkg-config
+
+          PATH="${{ github.workspace }}/${{ env.llvm_package_basename }}/bin:$PATH"
+          ./Tools/make-pkgconfig.sh pkg-config/llvm.pc
+
+          echo 'PKG_CONFIG_PATH=${{ github.workspace }}/pkg-config' >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: List directories in workspace in depth 2 again
+        run: find . -maxdepth 2 -type d
+        shell: bash
+
+      - name: Verify LLVM installation and pkgconfig (non-Windows)
+        if: runner.os != 'Windows'
+        run: |
+          set -ex -o pipefail
+          
+          # Verify LLVM binaries are accessible
+          PATH="${{ github.workspace }}/${{ env.llvm_package_basename }}/bin:$PATH"
+          
+          echo "Verifying LLVM binaries:"
+          llvm-config --version
+          clang --version
+          
+          echo "Verifying pkgconfig file:"
+          pkg-config --exists llvm
+          pkg-config --modversion llvm
+          pkg-config --cflags llvm
+          pkg-config --libs llvm
+          
+          echo "LLVM installation verification completed successfully"
+        shell: bash
+
+      - name: Verify LLVM installation and pkgconfig (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = "Stop"
+          
+          # Verify LLVM binaries are accessible
+          $env:PATH = "${{ github.workspace }}/${{ env.llvm_package_basename }}/bin;" + $env:PATH
+          
+          Write-Host "Verifying LLVM binaries:"
+          llvm-config --version
+          clang --version
+          
+          Write-Host "Verifying pkgconfig file:"
+          pkg-config --exists llvm
+          pkg-config --modversion llvm
+          pkg-config --cflags llvm
+          pkg-config --libs llvm
+          
+          Write-Host "LLVM installation verification completed successfully"
+
 
       - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }}
         uses: SwiftyLab/setup-swift@latest
         with:
           swift-version: ${{ matrix.swift }}
 
+      - uses: compnerd/gha-setup-vsdevenv@main
+        with:
+          winsdk: "10.0.22621.0" # Workaround for this: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
+          # TL;DR: The Windows SDK had a change in 10.0.26100.0 that the Swift compiler didn't account for.
+          # The Swift compiler team is aware of the issue and they are going to release a fix some time.
+
+      - name: Verify swift version
+        run: swift --version && swift --version | grep -q ${{ matrix.swift }}
+        shell: bash
+
+
       # We disabled the separate build step, as it consumes extra CI time - building for testing apparently doesn't
       # reuse the build cache from here, doubling the CI time.
 
       - name: Build and test for ${{ matrix.swift }} on ${{ matrix.os }} in ${{ matrix.config }} mode
-        run: swift test -c ${{ matrix.config }}
+        run: swift test -c ${{ matrix.config }} --verbose
 
     runs-on: ${{ matrix.os }}
