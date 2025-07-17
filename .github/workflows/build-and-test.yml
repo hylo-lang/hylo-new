@@ -1,17 +1,14 @@
 name: Build and Test
-on: 
-  push:
-    paths-ignore:
-      - "**.md"
-      - "LICENSE"
-      - ".gitignore"
-      - ".editorconfig"
+on:
   pull_request:
     paths-ignore:
       - "**.md"
       - "LICENSE"
       - ".gitignore"
       - ".editorconfig"
+env:
+  llvm-build-release: 20251018-115119
+  llvm-version: '20.1.6'
 
 jobs:
   test:
@@ -23,6 +20,13 @@ jobs:
         swift: ["6.2"]
         config: [release, debug]
 
+        include:
+          - config: release
+            llvm-build-type: MinSizeRel
+
+          - config: debug
+            llvm-build-type: Debug
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +34,16 @@ jobs:
         uses: SwiftyLab/setup-swift@latest
         with:
           swift-version: ${{ matrix.swift }}
+
+      - name: Set up LLVM
+        uses: hylo-lang/get-llvm@v0.3.0
+        id: get-llvm
+        with:
+          llvmVersion: ${{ env.llvm-version }}
+          llvmBuildRelease: ${{ env.llvm-build-release }}
+          llvmBuildConfig: ${{ matrix.llvm-build-type }}
+          addToPkgConfigPath: true
+          addToPath: true
 
       - uses: compnerd/gha-setup-vsdevenv@main
         with:

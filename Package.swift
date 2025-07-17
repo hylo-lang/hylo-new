@@ -33,6 +33,9 @@ let package = Package(
     .package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
+    .package(
+      url: "https://github.com/hylo-lang/Swifty-LLVM",
+      branch: "1c515a866b15feeac3ab8bb43a43c0073e9886df"),
   ],
   targets: [
     .executableTarget(
@@ -72,6 +75,14 @@ let package = Package(
         .product(name: "Collections", package: "swift-collections"),
       ],
       swiftSettings: commonSwiftSettings),
+
+    .target(
+      name: "CodeGen",
+      dependencies: [
+        .target(name: "FrontEnd"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
+      ]
+    ),
 
     .target(
       name: "StableCollections",
@@ -118,6 +129,13 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings),
 
+    .testTarget(
+      name: "CodeGenTests",
+      dependencies: [
+        .target(name: "CodeGen"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
+      ],
+    ),
     .testTarget(
       name: "UtilitiesTests",
       dependencies: [
