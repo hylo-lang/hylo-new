@@ -1,5 +1,5 @@
 {
-    "name": "Hylo LLVM",
+    "name": "Swift + Hylo LLVM",
     "build": {
         "dockerfile": "Dockerfile",
         "args": {
