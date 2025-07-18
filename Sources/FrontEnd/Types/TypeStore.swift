@@ -365,7 +365,7 @@ public struct TypeStore: Sendable {
     return introduce(c, into: t).erased
   }
 
-  /// Returns `[{k T}](A...) k -> B` iff `n` has the form `[Void](self: k T, A...) x -> B`.
+  /// Returns `[k1 T](A...) k2 -> B` iff `n` has the form `[Void](self: k1 T, A...) k2 -> B`.
   public mutating func asBoundMemberFunction(_ n: AnyTypeIdentity) -> AnyTypeIdentity? {
     let (c, h) = contextAndHead(n.erased)
 
@@ -394,7 +394,7 @@ public struct TypeStore: Sendable {
     }
   }
 
-  /// Returns `[{k T}](A...) k -> B` iff `n` has the form `[Void](self: k T, A...) x -> B`.
+  /// Returns `[k1 T](A...) k2 -> B` iff `n` has the form `[Void](self: k1 T, A...) k2 -> B`.
   private mutating func asBoundMemberFunction(_ n: Arrow.ID) -> Arrow.ID? {
     let f = self[n]
     guard let s = f.inputs.first, (f.environment == .void) && (s.label == "self") else {
@@ -465,18 +465,9 @@ public struct TypeStore: Sendable {
     /// The types of the values that appear in the return type of a non-mutating variant.
     var updates: [AnyTypeIdentity] = []
 
-    if let x = cast(self[n].environment, to: Tuple.self) {
-      var es: [AnyTypeIdentity] = []
-      for e in elements(of: x) {
-        if let t = self[e] as? RemoteType, t.access == .auto {
-          let u = demand(RemoteType(projectee: t.projectee, access: k)).erased
-          es.append(u)
-          if k.isNonMutating { updates.append(t.projectee) }
-        } else {
-          es.append(e)
-        }
-      }
-      environment = tuple(of: es).erased
+    if let t = self[self[n].environment] as? RemoteType, t.access == .auto {
+      environment = demand(RemoteType(projectee: t.projectee, access: k)).erased
+      if k.isNonMutating { updates.append(t.projectee) }
     } else {
       environment = self[n].environment
     }
