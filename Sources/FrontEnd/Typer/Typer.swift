@@ -813,8 +813,13 @@ public struct Typer {
     _ conformer: Tuple.ID, to concept: TraitDeclaration.ID,
     in scopeOfUse: ScopeIdentity
   ) -> Bool {
-    program.types.elements(of: conformer).allSatisfy { (e) in
-      isDerivable(conformanceTo: concept, for: e, in: scopeOfUse)
+    switch program.types[conformer] {
+    case .cons(let head, let tail):
+      return isDerivable(conformanceTo: concept, for: head, in: scopeOfUse)
+        && isDerivable(conformanceTo: concept, for: tail, in: scopeOfUse)
+
+    case .empty:
+      return true
     }
   }
 
@@ -847,7 +852,7 @@ public struct Typer {
     } else if let s = program.types.cast(conformer, to: Tuple.self) {
       return structurallyConforms(s, to: concept, in: scopeOfUse)
     } else {
-      return program.types.tag(of: conformer) == VoidType.self
+      return false
     }
   }
 
@@ -1598,7 +1603,6 @@ public struct Typer {
   ) {
     assert(program[p].elements.count > 1)
 
-
     guard let u = program.types.cast(t, to: Tuple.self) else {
       let m = program.format("tuple pattern cannot match values of type '%T'", [t])
       report(.init(.error, m, at: program[p].site))
@@ -1606,7 +1610,13 @@ public struct Typer {
       return
     }
 
-    let elements = program.types.elements(of: u)
+    guard let elements = program.types.elements(of: u) else {
+      let m = program.format("tuple pattern cannot match open-ended value of type '%T'", [t])
+      report(.init(.error, m, at: program[p].site))
+      program[p.module].setType(.error, for: p)
+      return
+    }
+
     guard program[p].elements.count == elements.count else {
       report(
         program.incompatibleTupleElementCount(
@@ -1715,6 +1725,8 @@ public struct Typer {
       return inferredType(of: castUnchecked(e, to: StaticCall.self), in: &context)
     case TupleLiteral.self:
       return inferredType(of: castUnchecked(e, to: TupleLiteral.self), in: &context)
+    case TupleTypeExpression.self:
+      return inferredType(of: castUnchecked(e, to: TupleTypeExpression.self), in: &context)
     case WildcardLiteral.self:
       return inferredType(of: castUnchecked(e, to: WildcardLiteral.self), in: &context)
     default:
@@ -2321,8 +2333,8 @@ public struct Typer {
 
     // If the expected type is a tuple compatible with the shape of the expression, propagate that
     // information down the expression tree.
-    else if let h = context.expectedType.flatMap({ (t) in cast(type: t, to: Tuple.self) }) {
-      for (e, t) in zip(es, program.types.elements(of: h)) { ts.append(type(of: e, expecting: t)) }
+    else if let elements = expectedTupleElements() {
+      for (e, t) in zip(es, elements) { ts.append(type(of: e, expecting: t)) }
     }
 
     // Otherwise, infer the type of the expression from the leaves and use type constraints to
@@ -2333,7 +2345,55 @@ public struct Typer {
 
     let r = program.types.tuple(of: ts)
     return context.obligations.assume(e, hasType: r, at: program[e].site)
+
+    /// Returns the elements of `context.expectedType` if it is a fixed-sized tuple.
+    func expectedTupleElements() -> [AnyTypeIdentity]? {
+      if let t = context.expectedType, let u = cast(type: t, to: Tuple.self) {
+        return program.types.elements(of: u)
+      } else {
+        return nil
+      }
+    }
   }
+
+  /// Returns the inferred type of `e`.
+   private mutating func inferredType(
+     of e: TupleTypeExpression.ID, in context: inout InferenceContext
+   ) -> AnyTypeIdentity {
+     let s = program[e].elements.map({ (e) in evaluateTypeAscription(e) })
+
+     // Unit type?
+     if s.isEmpty {
+       assert(program[e].ellipsis == nil)
+       let t = metatype(of: Tuple.empty).erased
+       return context.obligations.assume(e, hasType: t, at: program[e].site)
+     }
+
+     // Variable-length tuple (i.e., `{T, ...U}`)?
+     else if program[e].ellipsis != nil {
+       // Ill-formed tuple type expressions should be caught during parsing.
+       assert(s.count >= 2)
+
+       let t = s.dropLast().reversed().reduce(s.last!) { (t, h) in
+         demand(Tuple.cons(head: h, tail: t)).erased
+       }
+
+       if program.types.tag(of: s.last!) != GenericParameter.self {
+         let m = program.format("open-ended tuple '%T' is uninhabited", [t])
+         report(.warning, m, about: e)
+       }
+
+       let u = demand(Metatype(inhabitant: t)).erased
+       return context.obligations.assume(e, hasType: u, at: program[e].site)
+     }
+
+     // Regular tuple type.
+     else {
+       let t = program.types.tuple(of: s)
+       let u = demand(Metatype(inhabitant: t)).erased
+       return context.obligations.assume(e, hasType: u, at: program[e].site)
+     }
+   }
 
   /// Returns the inferred type of `e`.
   private mutating func inferredType(
@@ -3526,13 +3586,8 @@ public struct Typer {
     if let m = program[e].qualification {
       let q = inferredType(of: m, in: &context)
 
-      // Is the name applying a type operator?
-      if let t = program.types.cast(q, to: Metatype.self), name.isOperator(.infix) {
-        candidates = resolve(infixTypeOperator: e, partiallyAppliedTo: t)
-      }
-
       // Is the qualification a unification variable?
-      else if q.isVariable || program.types.isMetatype(q, of: \.isVariable) {
+      if q.isVariable || program.types.isMetatype(q, of: \.isVariable) {
         let t = fresh().erased
         let k = MemberConstraint(
           member: e, role: context.role, qualification: q, type: t, site: site)
@@ -3582,36 +3637,6 @@ public struct Typer {
     case .right(let d):
       report(d)
       return .error
-    }
-  }
-
-  /// Resolves and returns the declaration of the built-in type operator to which `e` refers.
-  private mutating func resolve(
-    infixTypeOperator e: NameExpression.ID, partiallyAppliedTo l: Metatype.ID
-  ) -> [NameResolutionCandidate] {
-    assert(program[e].name.value.notation == .infix)
-
-    switch program[e].name.value.identifier {
-    case "*":
-      return candidate(.product, returning: Tuple.init(_:_:))
-    case "+":
-      return candidate(.product, returning: Sum.init(_:_:))
-    default:
-      return []
-    }
-
-    func candidate<T: TypeTree>(
-      _ entity: BuiltinEntity, returning makeReturnType: (AnyTypeIdentity, AnyTypeIdentity) -> T
-    ) -> [NameResolutionCandidate] {
-      let p = demand(GenericParameter.nth(0, .proper))
-      let r = demand(Metatype(inhabitant: p.erased))
-      let o = metatype(of: makeReturnType(program.types[l].inhabitant, p.erased))
-      let a = demand(
-        Arrow(
-          inputs: [.init(access: .let, type: r.erased)],
-          output: o.erased))
-      let u = demand(UniversalType(parameters: [p], body: a.erased))
-      return [NameResolutionCandidate(reference: .builtin(entity), type: u.erased)]
     }
   }
 

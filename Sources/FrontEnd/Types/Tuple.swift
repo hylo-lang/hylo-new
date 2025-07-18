@@ -3,23 +3,22 @@ import Utilities
 
 /// The type of a tuple.
 @Archivable
-public struct Tuple: TypeTree {
+public enum Tuple: TypeTree {
 
-  /// The left-hand side of the product.
-  public let lhs: AnyTypeIdentity
+  /// The first element of the tuple followed by the rest.
+  case cons(head: AnyTypeIdentity, tail: AnyTypeIdentity)
 
-  /// The right-hand side of the product.
-  public let rhs: AnyTypeIdentity
-
-  /// Creates an instance representing the product of `lhs` and `rhs`.
-  public init(_ lhs: AnyTypeIdentity, _ rhs: AnyTypeIdentity) {
-    self.lhs = lhs
-    self.rhs = rhs
-  }
+  /// An empty tuple.
+  case empty
 
   /// Properties about `self`.
   public var properties: TypeProperties {
-    lhs.properties.union(rhs.properties)
+    switch self {
+    case .cons(let head, let tail):
+      return head.properties.union(tail.properties)
+    case .empty:
+      return .init()
+    }
   }
 
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
@@ -27,7 +26,13 @@ public struct Tuple: TypeTree {
     in store: inout TypeStore,
     by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
   ) -> Tuple {
-    .init(store.map(lhs, transform), store.map(rhs, transform))
+    switch self {
+    case .cons(let head, let tail):
+      return .cons(head: store.map(head, transform), tail: store.map(tail, transform))
+    case .empty:
+      return .empty
+    }
+
   }
 
 }
@@ -36,7 +41,21 @@ extension Tuple: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "\(printer.show(lhs)) * \(printer.show(rhs))"
+    guard case .cons(let head, let tail) = self else { return "Void" }
+
+    var elements = [head]
+    var rest = tail
+    while let t = printer.program.types.cast(rest, to: Tuple.self) {
+      switch printer.program.types[t] {
+      case .cons(let a, let b):
+        elements.append(a)
+        rest = b
+      case .empty:
+        return "{\(printer.show(elements))}"
+      }
+    }
+
+    return "{\(printer.show(elements)), ...\(printer.show(rest))}"
   }
 
 }

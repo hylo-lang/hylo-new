@@ -4,7 +4,7 @@ struct S<T> { public memberwise init }
 
 type X<T> = T
 type Y<T> = S<T>
-type Z<T> = T * T
+type Z<T> = {T, T}
 
 let a: X<_> = ()
 let b: Y<_> = S<Void>()

@@ -1,0 +1,11 @@
+//! no-std
+
+struct A {}
+
+trait P {
+  fun f() -> {Void, ...A}
+}
+
+public fun test<T is P>(_ x: T) {
+  let (a, b) = x.f()
+}

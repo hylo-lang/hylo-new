@@ -1,0 +1,6 @@
+negative/invalid-deconstruction.hylo:6.14-26: warning: open-ended tuple '{Void, ...A}' is uninhabited
+  fun f() -> {Void, ...A}
+             ~~~~~~~~~~~~
+negative/invalid-deconstruction.hylo:10.7-13: error: tuple pattern cannot match open-ended value of type '{Void, ...A}'
+  let (a, b) = x.f()
+      ~~~~~~

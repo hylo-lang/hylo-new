@@ -1,5 +1,5 @@
 //! no-std
 
 fun main() {
-  _ = () as Void * Void
+  _ = () as {Void, Void}
 }

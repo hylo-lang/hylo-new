@@ -17,5 +17,5 @@ public fun main() {
   var b = B()
 
   check<B>(&a.f(x: &b))
-  check<A * B>(a.f(x: &b))
+  check<{A, B}>(a.f(x: &b))
 }

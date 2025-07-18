@@ -14,7 +14,7 @@ final class TypeStoreTests: XCTestCase {
 
   func testDemandVoid() {
     var store = TypeStore()
-    let t = VoidType()
+    let t = Tuple.empty
     let i = store.demand(t)
     XCTAssertEqual(i.erased, AnyTypeIdentity.void)
     XCTAssertEqual(store[i], t)
@@ -37,7 +37,7 @@ final class TypeStoreTests: XCTestCase {
 
   func testDemand() {
     var store = TypeStore()
-    let t = Tuple(.void, .void)
+    let t = Tuple.cons(head: .void, tail: .void)
     let i = store.demand(t)
     XCTAssertEqual(store[i], t)
     let j = store.demand(t)

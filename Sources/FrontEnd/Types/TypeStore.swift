@@ -60,7 +60,7 @@ public struct TypeStore: Sendable {
     switch t {
     case is ErrorType:
       return AnyTypeIdentity.error
-    case is VoidType:
+    case let u as Tuple where u == .empty:
       return AnyTypeIdentity.void
     case let u as TypeVariable:
       return AnyTypeIdentity(variable: u.identifier)
@@ -253,17 +253,19 @@ public struct TypeStore: Sendable {
 
   /// Returns the canonical representation of a tuple containing the given elements.
   ///
-  /// The result is:
-  /// - an instance of `Tuple` iff `elements` contains two elements or more,
-  /// - `t` iff `t` is the unique element in `elements`
-  /// - `.void` iff `elements` is empty.
+  /// The result is `.void` if `elements` is empty. Otherwise, it is an instance of `Tuple`.
   public mutating func tuple<S: Sequence<AnyTypeIdentity>>(of elements: S) -> AnyTypeIdentity {
-    var i = elements.makeIterator()
-    guard var l = i.next() else { return .void }
-    while let r = i.next() {
-      l = demand(Tuple(l, r)).erased
+    let xs = elements.reversed()
+
+    if xs.count == 0 {
+      return .void
+    } else {
+      var result = demand(Tuple.empty)
+      for e in elements.reversed() {
+        result = demand(Tuple.cons(head: e, tail: result.erased))
+      }
+      return result.erased
     }
-    return l
   }
 
   /// Returns the components of `t`.
@@ -280,18 +282,25 @@ public struct TypeStore: Sendable {
     return result.reversed()
   }
 
-  /// Returns the components of `t`.
-  public func elements(of t: Tuple.ID) -> [AnyTypeIdentity] {
-    var result = [self[t].rhs]
+  /// Returns the elements of `t` iff `t` is not open-ended.
+  ///
+  /// A tuple is open-ended if it is of the form `.cons(A, B)` where `B` is not a tuple or `B` is
+  /// an open-ended tuple.
+  public func elements(of t: Tuple.ID) -> [AnyTypeIdentity]? {
+    var result: [AnyTypeIdentity] = []
 
-    var lhs = self[t].lhs
-    while let u = self[lhs] as? Tuple {
-      result.append(u.rhs)
-      lhs = u.lhs
+    var s = t
+    while case .cons(let a, let b) = self[s] {
+      result.append(a)
+      if let u = cast(b, to: Tuple.self) {
+        s = u
+      } else {
+        return nil
+      }
     }
-    result.append(lhs)
 
-    return result.reversed()
+    assert(self[s] == .empty)
+    return result
   }
 
   /// Returns the type of a pointer to a free-function implementing `a`'s interface.
@@ -529,7 +538,7 @@ public struct TypeStore: Sendable {
       case AnyTypeIdentity.error.offset:
         yield ErrorType()
       case AnyTypeIdentity.void.offset:
-        yield VoidType()
+        yield Tuple.empty
       case let i where n.isVariable:
         yield TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
       case let i:
@@ -901,8 +910,13 @@ public struct TypeStore: Sendable {
     _ lhs: Tuple, _ rhs: Tuple, extending ss: inout SubstitutionTable,
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
-    unifiable(lhs.lhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
-      && unifiable(lhs.rhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
+    switch (lhs, rhs) {
+    case (.cons(let la, let lb), .cons(let ra, let rb)):
+      return unifiable(la, ra, extending: &ss, handlingCoercionsWith: areCoercible)
+        && unifiable(lb, rb, extending: &ss, handlingCoercionsWith: areCoercible)
+    default:
+      return false
+    }
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.

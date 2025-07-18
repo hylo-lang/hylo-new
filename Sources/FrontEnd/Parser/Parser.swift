@@ -1382,6 +1382,8 @@ public struct Parser {
       return try .init(parseUnqualifiedNameExpression(in: &file))
     case .auto, .inout, .let, .set, .sink:
       return try .init(parseRemoteTypeExpression(in: &file))
+    case .leftBrace:
+        return try .init(parseTupleTypeExpression(in: &file))
     case .leftBracket:
       return try .init(parseArrowExpression(in: &file))
     case .leftParenthesis:
@@ -1696,12 +1698,51 @@ public struct Parser {
       at: span(from: head.site.start))
   }
 
+  /// Parses a tuple type expression.
+  ///
+  ///     tuple-type-expression ::=
+  ///       '{' tuple-type-body? '}'
+  ///     tuple-type-body ::=
+  ///       expression (',' expression)* tuple-type-tail?
+  ///     tuple-type-tail ::=
+  ///       ',' ('...' expression)?
+  ///
+  private mutating func parseTupleTypeExpression(
+    in file: inout Module.SourceContainer
+  ) throws -> TupleTypeExpression.ID {
+    let start = nextTokenStart()
+    let (elements, ellipsis) = try inBraces { (me) -> ([ExpressionIdentity], Token?) in
+      try me.parseTupleTypeExpressionBody(in: &file)
+    }
+    return file.insert(
+      TupleTypeExpression(elements: elements, ellipsis: ellipsis, site: span(from: start)))
+  }
+
+  /// Parses the body of a tuple type expression.
+  private mutating func parseTupleTypeExpressionBody(
+    in file: inout Module.SourceContainer
+  ) throws -> ([ExpressionIdentity], Token?) {
+    // Parse the front elements.
+    let (xs, lc) = try commaSeparated(until: Token.oneOf([.rightBrace, .ellipsis])) { (me) in
+      try me.parseExpression(in: &file)
+    }
+
+    // Check for spread operators.
+    if lc != nil, let ellipsis = take(.ellipsis) {
+      let last = try parseExpression(in: &file)
+      return (xs + [last], ellipsis)
+    } else {
+      return (xs, nil)
+    }
+  }
+
   /// Parses a tuple literal or a parenthesized expression.
   ///
   ///     tuple-literal ::=
   ///       '(' tuple-literal-body? ')'
   ///     tuple-literal-body ::=
-  ///       expression ',' expression (',' expression)* ','?
+  ///       expression ','
+  ///       expression (',' expression)* ','?
   ///
   private mutating func parseTupleOrParenthesizedExpression(
     in file: inout Module.SourceContainer
@@ -1711,10 +1752,7 @@ public struct Parser {
       try me.parseExpressionList(until: .rightParenthesis, in: &file)
     }
 
-    if let e = elements.uniqueElement {
-      if let c = lastComma {
-        report(.init("expected expression after ','", at: c.site))
-      }
+    if let e = elements.uniqueElement, lastComma == nil {
       return e
     } else {
       return .init(file.insert(TupleLiteral(elements: elements, site: span(from: start))))
@@ -1963,7 +2001,8 @@ public struct Parser {
   ///     tuple-pattern ::=
   ///       '(' tuple-pattern-body? ')'
   ///     tuple-pattern-body ::=
-  ///       labeled-pattern ',' labeled-pattern (',' labeled-pattern)* ','?
+  ///       pattern ','
+  ///       pattern (',' labeled-pattern)* ','?
   ///
   private mutating func parseTupleOrParenthesizedPattern(
     in file: inout Module.SourceContainer
@@ -1973,10 +2012,7 @@ public struct Parser {
       try me.parsePatternList(until: .rightParenthesis, in: &file)
     }
 
-    if let e = elements.uniqueElement {
-      if let c = lastComma {
-        report(.init("expected expression after ','", at: c.site))
-      }
+    if let e = elements.uniqueElement, lastComma == nil {
       return e
     } else {
       return .init(file.insert(TuplePattern(elements: elements, site: span(from: start))))

@@ -2,11 +2,11 @@
 
 trait P { fun f() }
 
-extension <T> (Void * T) {
+extension <T> {Void, T} {
   fun f() {}
 }
 
-given (Void * Void) is P {
+given {Void, Void} is P {
   // Requirement satisfied by the extension.
 }
 

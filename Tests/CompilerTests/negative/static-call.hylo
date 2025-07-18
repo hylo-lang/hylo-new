@@ -10,6 +10,6 @@ fun main() {
   f0<Void>(x: ())
 
   f1<Void>(x: ())
-  f1<Void>(x: ((),()))
+  f1<Void>(x: ((), ()))
   f1<Void, Void>(x: ())
 }

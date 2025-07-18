@@ -13,5 +13,5 @@ fun check<T>(_ x: T) {}
 public fun main() {
   var a = A()
   check<B>(f(x: &a))
-  check<A * B>(f(x: a))
+  check<{A, B}>(f(x: a))
 }
