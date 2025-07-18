@@ -776,7 +776,7 @@ internal struct IREmitter {
   /// An error is reported at the current anchor if no such conformance can be resolved in the
   /// scope of that anchor and a call to `Builtin.trap` is generated.
   private mutating func _emitMove(
-    _ k: AccessEffect, _ source: IRValue, of typeOfSource: AnyTypeIdentity, to target: IRValue,
+    _ k: AccessEffect, _ source: IRValue, of typeOfSource: AnyTypeIdentity, to target: IRValue
   ) {
     assert((k == .set) || (k == .inout))
     assert(currentFunction.isAddress(source))

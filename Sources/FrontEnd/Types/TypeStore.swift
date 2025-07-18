@@ -45,7 +45,7 @@ public struct TypeStore: Sendable {
 
   /// Returns the body of `f` with each parameter substituted for its corresponding argument.
   public mutating func application(
-    of f: UniversalType.ID, to arguments: [AnyTypeIdentity],
+    of f: UniversalType.ID, to arguments: [AnyTypeIdentity]
   ) -> AnyTypeIdentity {
     substitute(.init(mapping: self[f].parameters, to: arguments), in: self[f].body)
   }
