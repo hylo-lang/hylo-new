@@ -3,61 +3,22 @@ import Utilities
 
 /// The type of a tuple.
 @Archivable
-public struct Tuple: TypeTree {
+public enum Tuple: TypeTree {
 
-  /// An element in a tuple type.
-  @Archivable
-  public struct Element: Hashable, Sendable {
+  /// The first element of the tuple followed by the rest.
+  case cons(head: AnyTypeIdentity, tail: AnyTypeIdentity)
 
-    /// The label of the element.
-    public let label: String?
-
-    /// The type of the element.
-    public let type: AnyTypeIdentity
-
-    /// Creates an instance with the given properties.
-    public init(label: String?, type: AnyTypeIdentity) {
-      self.label = label
-      self.type = type
-    }
-
-    /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
-    public func modified(
-      in store: inout TypeStore,
-      by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
-    ) -> Element {
-      .init(label: label, type: store.map(type, transform))
-    }
-
-  }
-
-  /// The elements of the tuple.
-  public let elements: [Element]
-
-  /// Creates an instance with the given properties.
-  public init<S: Sequence<Element>>(elements: S) {
-    self.elements = Array(elements)
-  }
-
-  /// Creates an instance with the given types, without any labels.
-  public init<T: Sequence<AnyTypeIdentity>>(types: T) {
-    self.init(elements: types.map({ (t) in .init(label: nil, type: t) }))
-  }
+  /// An empty tuple.
+  case empty
 
   /// Properties about `self`.
   public var properties: TypeProperties {
-    elements.reduce([], { (a, e) in a.union(e.type.properties) })
-  }
-
-  /// The labels associated with each element.
-  public var labels: some Sequence<String?> {
-    elements.lazy.map(\.label)
-  }
-
-  /// Returns `true` iff the labels of the elements in `self` are equal to the labels of the
-  /// elements in `other`, which are at `path`.
-  public func labelsEqual<T: Sequence>(_ other: T, _ path: KeyPath<T.Element, String?>) -> Bool {
-    elements.elementsEqual(other, by: { (a, b) in a.label == b[keyPath: path] })
+    switch self {
+    case .cons(let head, let tail):
+      return head.properties.union(tail.properties)
+    case .empty:
+      return .init()
+    }
   }
 
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
@@ -65,7 +26,13 @@ public struct Tuple: TypeTree {
     in store: inout TypeStore,
     by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
   ) -> Tuple {
-    .init(elements: elements.map({ (e) in e.modified(in: &store, by: transform) }))
+    switch self {
+    case .cons(let head, let tail):
+      return .cons(head: store.map(head, transform), tail: store.map(tail, transform))
+    case .empty:
+      return .empty
+    }
+
   }
 
 }
@@ -74,25 +41,21 @@ extension Tuple: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    if let (h, t) = elements.headAndTail {
-      if (h.label == nil) && t.allSatisfy({ (e) in (e.type == h.type) && (e.label == nil) }) {
-        return "\(printer.show(h.type))[\(elements.count)]"
-      } else {
+    guard case .cons(let head, let tail) = self else { return "Void" }
+
+    var elements = [head]
+    var rest = tail
+    while let t = printer.program.types.cast(rest, to: Tuple.self) {
+      switch printer.program.types[t] {
+      case .cons(let a, let b):
+        elements.append(a)
+        rest = b
+      case .empty:
         return "{\(printer.show(elements))}"
       }
-    } else {
-      return "Void"
     }
-  }
 
-}
-
-extension Tuple.Element: Showable {
-
-  /// Returns a textual representation of `self` using `printer`.
-  public func show(using printer: inout TreePrinter) -> String {
-    let t = printer.show(type)
-    return if let l = label { "\(l): \(t)" } else { t }
+    return "{\(printer.show(elements)), ...\(printer.show(rest))}"
   }
 
 }

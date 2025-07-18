@@ -1,7 +1,7 @@
 //! no-std
 
 struct S {
-  var x: {}
+  var x: Void
   public memberwise init
   public fun m() {}
 }

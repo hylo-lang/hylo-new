@@ -205,8 +205,8 @@ internal struct IREmitter {
 
     // Otherwise, store each element in place.
     for (i, x) in program[e].elements.enumerated() {
-      let s = lowering(x.value, { $0._subfield(target, at: [i]) })
-      lower(store: x.value, to: s)
+      let s = lowering(x, { $0._subfield(target, at: [i]) })
+      lower(store: x, to: s)
     }
   }
 

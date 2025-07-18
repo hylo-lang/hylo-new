@@ -9,8 +9,8 @@ struct A is Deinitializable {}
 
 // Conformance is structurally synthesizable.
 struct B is Deinitializable {
-  var x: {x: Void}  // structural conformance
-  var y: A          // user-defined conformance
+  var x: {Void, Void} // structural conformance
+  var y: A            // user-defined conformance
 }
 
 // Conformance is synthesizable using the where clause.

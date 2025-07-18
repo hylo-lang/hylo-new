@@ -5,13 +5,13 @@ import Archivist
 public struct TuplePattern: Pattern {
 
   /// The elements of the pattern.
-  public let elements: [LabeledPattern]
+  public let elements: [PatternIdentity]
 
   /// The site from which `self` was parsed.
   public let site: SourceSpan
 
   /// Creates an instance with the given properties.
-  public init(elements: [LabeledPattern], site: SourceSpan) {
+  public init(elements: [PatternIdentity], site: SourceSpan) {
     self.elements = elements
     self.site = site
   }

@@ -41,6 +41,16 @@ public enum DeclarationReference: Hashable, Sendable {
     }
   }
 
+  /// Returns `true` iff `self` refers to a built-in type operator.
+  public var targetIsTypeOperator: Bool {
+    switch self {
+    case .builtin(.product), .builtin(.sum):
+      return true
+    default:
+      return false
+    }
+  }
+
   /// The referred declaration, unless it is built-in.
   public var target: DeclarationIdentity? {
     switch self {

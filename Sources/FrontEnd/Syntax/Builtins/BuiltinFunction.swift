@@ -429,22 +429,22 @@ extension BuiltinFunction {
     case .xor(let t):
       return s.demand(Arrow(t, t, to: t))
     case .signedAdditionWithOverflow(let t):
-      let u = s.demand(Tuple(types: [t.erased, i1.erased]))
+      let u = s.tuple(of: [t.erased, i1.erased])
       return s.demand(Arrow(t, t, to: u))
     case .unsignedAdditionWithOverflow(let t):
-      let u = s.demand(Tuple(types: [t.erased, i1.erased]))
+      let u = s.tuple(of: [t.erased, i1.erased])
       return s.demand(Arrow(t, t, to: u))
     case .signedSubtractionWithOverflow(let t):
-      let u = s.demand(Tuple(types: [t.erased, i1.erased]))
+      let u = s.tuple(of: [t.erased, i1.erased])
       return s.demand(Arrow(t, t, to: u))
     case .unsignedSubtractionWithOverflow(let t):
-      let u = s.demand(Tuple(types: [t.erased, i1.erased]))
+      let u = s.tuple(of: [t.erased, i1.erased])
       return s.demand(Arrow(t, t, to: u))
     case .signedMultiplicationWithOverflow(let t):
-      let u = s.demand(Tuple(types: [t.erased, i1.erased]))
+      let u = s.tuple(of: [t.erased, i1.erased])
       return s.demand(Arrow(t, t, to: u))
     case .unsignedMultiplicationWithOverflow(let t):
-      let u = s.demand(Tuple(types: [t.erased, i1.erased]))
+      let u = s.tuple(of: [t.erased, i1.erased])
       return s.demand(Arrow(t, t, to: u))
     case .icmp(_, let t):
       return s.demand(Arrow(t, t, to: i1))

@@ -1,6 +1,6 @@
-negative/missing-context.hylo:10.7-10: error: not enough context to infer a type
+negative/missing-context.hylo:8.7-10: error: not enough context to infer a type
   _ = A()
       ~~~
-negative/missing-context.hylo:11.3-4: error: not enough context to infer a type
+negative/missing-context.hylo:9.3-4: error: not enough context to infer a type
   g(())
   ^

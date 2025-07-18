@@ -1,0 +1,11 @@
+//! no-std
+
+struct A { public memberwise init }
+struct B { public memberwise init }
+
+fun check<T, U>(whole: {T, ...U}, tail: U) {}
+
+public fun main() {
+  check(whole: (B(),), tail: ())
+  check(whole: (B(), A()), tail: (A(),))
+}

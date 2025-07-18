@@ -241,12 +241,13 @@ internal struct Solver {
     let k = goals[g] as! WideningConstraint
 
     // Check that the left-hand side can be widened to the right-hand side.
-    switch program.types[k.rhs] {
-    case is TypeVariable:
+    switch program.types.tag(of: k.rhs) {
+    case TypeVariable.self:
       return postpone(g)
 
-    case let u as Sum:
-      if k.lhs.isVariable || u.elements.contains(where: \.isVariable) {
+    case Sum.self:
+      let u = program.types.castUnchecked(k.rhs, to: Sum.self)
+      if k.lhs.isVariable || program.types.elements(of: u).contains(where: \.isVariable) {
         return postpone(g)
       } else {
         fatalError("TODO")

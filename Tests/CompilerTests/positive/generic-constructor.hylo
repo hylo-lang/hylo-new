@@ -1,14 +1,14 @@
 //! no-std
 
 struct A<T> {
-  memberwise init
-  fun f(x: sink T) -> T { x }
+  public memberwise init
+  public fun f(x: sink T) -> T { x }
 }
 
 struct B<T, U> {
-  memberwise init
-  let x: T
-  let y: U
+  public memberwise init
+  public let x: T
+  public let y: U
 }
 
 fun check<T>(_ x: T) {}
@@ -20,6 +20,6 @@ fun main() {
   let a1 = A().f(x: ())
   check<Void>(a1)
 
-  let b0 = B(x: (x: ()), y: (y: ()))
-  check<B<{x: Void}, {y: Void}>>(b0)
+  let b0 = B(x: (), y: ((), ()))
+  check<B<Void, {Void, Void}>>(b0)
 }

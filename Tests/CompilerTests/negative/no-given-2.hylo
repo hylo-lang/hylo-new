@@ -2,8 +2,8 @@
 
 trait P {}
 
-struct A { memberwise init }
-struct B { memberwise init }
+struct A { public memberwise init }
+struct B { public memberwise init }
 
 given A is P {}
 

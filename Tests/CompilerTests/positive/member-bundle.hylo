@@ -2,7 +2,7 @@
 
 struct A {
   public memberwise init
-  fun f(x: inout B) auto -> B {
+  public fun f(x: inout B) auto -> B {
     let   { (A(), B()) }
     inout { B() }
   }

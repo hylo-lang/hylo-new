@@ -1,18 +1,22 @@
 //! no-std
 
+struct A { public memberwise init }
+struct B { public memberwise init }
+struct C { public memberwise init }
+
 trait P {
   type X ; given X is P
   fun x() -> X
 }
 
-given {a: Void} is P {
-  type X = {a: Void}
-  public fun x() -> X { (a: ()) }
+given A is P {
+  type X = A
+  public fun x() -> X { A() }
 }
 
-given {b: Void} is P {
-  type X = {c: Void}
-  public fun x() -> X { (c: ()) }
+given B is P {
+  type X = C
+  public fun x() -> X { C() }
 }
 
 fun f<T where T is P>(_ t: T) {

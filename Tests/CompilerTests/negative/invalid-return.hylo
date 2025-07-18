@@ -3,11 +3,11 @@
 struct A {}
 
 fun f0() {
-  ((),)
+  A()
 }
 
 fun f1() {
-  return ((),)
+  return A()
 }
 
 fun f2() -> A {

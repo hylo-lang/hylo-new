@@ -132,6 +132,16 @@ extension Program {
     return .init(level, m, at: site)
   }
 
+  /// Returns an error diagnosing incompatible numbers of elements in the matching of a tuple.
+  internal func incompatibleTupleElementCount(
+    found: Int, expected: Int, at site: SourceSpan
+  ) -> Diagnostic {
+    let m = """
+      incompatible number of elements: found '(\(found))', expected '(\(expected))'
+      """
+    return .init(.error, m, at: site)
+  }
+
   /// Returns an error diagnosing an invalid number of type arguments.
   internal func invalidTypeArguments(
     toApply entity: String, found: Int, expected: Int, at site: SourceSpan

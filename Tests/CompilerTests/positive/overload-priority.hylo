@@ -1,29 +1,31 @@
 //! no-std
 
+struct A<T> { public memberwise init }
+
 trait P {
   type X
   fun f() -> X
 }
 
-extension <T> {a: T} {
+extension <T> A<T> {
   fun f() { () }
 }
 
-given {a: Void} is P {
-  type X = {a: Void}
-  fun f() -> X { (a: ()) }
+given A<Void> is P {
+  type X = A<Void>
+  fun f() -> X { A() }
 }
 
 fun use(_ x: Void) {}
 
 fun main() {
-  let a = (a: ())
+  let a = A<Void>()
 
   // `x: Void` because members inherited by extension have priority.
   let x = a.f()
   use(x)
 
   // Members inherited by conformance can be selected with an expected type.
-  let y: {a: {}} = a.f()
-  let z = a.f() as {a: {}}
+  let y: A<Void> = a.f()
+  let z = a.f() as A<Void>
 }

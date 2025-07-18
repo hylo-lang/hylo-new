@@ -5,13 +5,13 @@ import Archivist
 public struct TupleLiteral: Expression {
 
   /// The elements of the tuple.
-  public let elements: [LabeledExpression]
+  public let elements: [ExpressionIdentity]
 
   /// The site from which `self` was parsed.
   public let site: SourceSpan
 
   /// Creates an instance with the given properties.
-  public init(elements: [LabeledExpression], site: SourceSpan) {
+  public init(elements: [ExpressionIdentity], site: SourceSpan) {
     self.elements = elements
     self.site = site
   }

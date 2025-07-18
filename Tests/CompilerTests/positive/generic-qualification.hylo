@@ -1,8 +1,8 @@
 //! no-std
 
 struct A<T> {
-  memberwise init
-  fun f(x: T) {}
+  public memberwise init
+  public fun f(x: T) {}
 }
 
 fun main() {
