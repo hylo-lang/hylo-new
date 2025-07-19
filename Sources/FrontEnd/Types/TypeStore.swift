@@ -236,21 +236,6 @@ public struct TypeStore: Sendable {
     return p
   }
 
-  /// Returns the canonical representation of a sum containing the given elements.
-  ///
-  /// The result is:
-  /// - an instance of `Sum` iff `elements` contains two elements or more,
-  /// - `t` iff `t` is the unique element in `elements`
-  /// - `.never` iff `elements` is empty.
-  public mutating func sum<S: Sequence<AnyTypeIdentity>>(of elements: S) -> AnyTypeIdentity {
-    var i = elements.makeIterator()
-    guard var l = i.next() else { return .never }
-    while let r = i.next() {
-      l = demand(Sum(l, r)).erased
-    }
-    return l
-  }
-
   /// Returns the canonical representation of a tuple containing the given elements.
   ///
   /// The result is `.void` if `elements` is empty. Otherwise, it is an instance of `Tuple`.
@@ -266,20 +251,6 @@ public struct TypeStore: Sendable {
       }
       return result.erased
     }
-  }
-
-  /// Returns the components of `t`.
-  public func elements(of t: Sum.ID) -> [AnyTypeIdentity] {
-    var result = [self[t].rhs]
-
-    var lhs = self[t].lhs
-    while let u = self[lhs] as? Sum {
-      result.append(u.rhs)
-      lhs = u.lhs
-    }
-    result.append(lhs)
-
-    return result.reversed()
   }
 
   /// Returns the elements of `t` iff `t` is not open-ended.
@@ -800,8 +771,6 @@ public struct TypeStore: Sendable {
       result = false
     case (_ as Trait, _ as Trait):
       result = false
-    case (let t as Sum, let u as Sum):
-      result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as Tuple, let u as Tuple):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as TypeApplication, let u as TypeApplication):
@@ -927,15 +896,6 @@ public struct TypeStore: Sendable {
     (lhs.label == rhs.label)
       && (lhs.access == rhs.access)
       && unifiable(lhs.type, rhs.type, extending: &ss, handlingCoercionsWith: areCoercible)
-  }
-
-  /// Returns `true` if `lhs` and `rhs` are unifiable.
-  private func unifiable(
-    _ lhs: Sum, _ rhs: Sum, extending ss: inout SubstitutionTable,
-    handlingCoercionsWith areCoercible: CoercionHandler
-  ) -> Bool {
-    unifiable(lhs.lhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
-      && unifiable(lhs.rhs, rhs.rhs, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.

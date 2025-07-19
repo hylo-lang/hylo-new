@@ -156,6 +156,9 @@ public struct Typer {
   }
 
   /// Returns the types of stored parts of `t`.
+  ///
+  /// The result lists the types of the fields in `t`, which correspond to the stored properties
+  /// declared in a struct, the cases declared in an enum, or the members of a tuple.
   public mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
     let u = program.types.dealiased(t)
     switch program.types.tag(of: u) {
@@ -174,7 +177,17 @@ public struct Typer {
 
   /// Returns the types of stored parts of `t`.
   private mutating func storage(of t: Enum.ID) -> [AnyTypeIdentity] {
-    [underlyingType(of: program.types[t].declaration)]
+    let d = program.types[t].declaration
+    if let e = program[d].representation {
+      return [check(e)]
+    } else {
+      var elements: [AnyTypeIdentity] = []
+      for m in program[d].members {
+        guard let c = program.cast(m, to: EnumCaseDeclaration.self) else { continue }
+        elements.append(underlyingType(of: c))
+      }
+      return elements
+    }
   }
 
   /// Returns the types of stored parts of `t`.
@@ -797,19 +810,6 @@ public struct Typer {
   ///
   /// - Requires: conformances to `concept` may be synthesized.
   private mutating func structurallyConforms(
-    _ conformer: Sum.ID, to concept: TraitDeclaration.ID,
-    in scopeOfUse: ScopeIdentity
-  ) -> Bool {
-    program.types.elements(of: conformer).allSatisfy { (e) in
-      isDerivable(conformanceTo: concept, for: e, in: scopeOfUse)
-    }
-  }
-
-  /// Returns `true` iff conformances of each stored part of `conformer` to `concept` can be
-  /// derived (i.e., resolved or synthesized) in `scopeOfUse`.
-  ///
-  /// - Requires: conformances to `concept` may be synthesized.
-  private mutating func structurallyConforms(
     _ conformer: Tuple.ID, to concept: TraitDeclaration.ID,
     in scopeOfUse: ScopeIdentity
   ) -> Bool {
@@ -847,8 +847,6 @@ public struct Typer {
     let a = typeOfModel(of: conformer, conformingTo: concept, with: []).erased
     if summon(a, in: scopeOfUse).count == 1 {
       return true
-    } else if let s = program.types.cast(conformer, to: Sum.self) {
-      return structurallyConforms(s, to: concept, in: scopeOfUse)
     } else if let s = program.types.cast(conformer, to: Tuple.self) {
       return structurallyConforms(s, to: concept, in: scopeOfUse)
     } else {
@@ -1470,20 +1468,6 @@ public struct Typer {
     let u = introduce(program[d].contextParameters, into: t)
     program[d.module].setType(u, for: d)
     return u
-  }
-
-  /// Returns the type used to represent instances of the given enumeration.
-  private mutating func underlyingType(of d: EnumDeclaration.ID) -> AnyTypeIdentity {
-    if let e = program[d].representation {
-      return check(e)
-    } else {
-      var elements: [AnyTypeIdentity] = []
-      for m in program[d].members {
-        guard let c = program.cast(m, to: EnumCaseDeclaration.self) else { continue }
-        elements.append(underlyingType(of: c))
-      }
-      return program.types.sum(of: elements)
-    }
   }
 
   /// Returns the type used to represent an instance of the given case.
