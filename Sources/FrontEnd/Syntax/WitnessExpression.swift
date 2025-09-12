@@ -114,11 +114,11 @@ public struct WitnessExpression: Hashable, Sendable {
   public var elaborationCost: Int {
     switch value {
     case .identity, .abstract, .synthetic, .assumed, .reference:
-      return 0
+      return 1
     case .termApplication(let w, let a):
       return 1 + w.elaborationCost + a.elaborationCost
     case .typeApplication(let w, _):
-      return w.elaborationCost
+      return 1 + w.elaborationCost
     case .nested(let w):
       return 1 + w.elaborationCost
     }

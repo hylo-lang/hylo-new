@@ -3209,26 +3209,24 @@ public struct Typer {
     return result
   }
 
-  /// Returns the result of `continuation` applied to witnesses of values of type `t` derivable
-  /// from the implicit store in `scopeOfUse`.
+  /// Returns the the resolution threads for entailing a value of type `t` in `scopeOfUse`.
   ///
   /// - Parameters:
   ///   - t: The type whose instance is summoned.
-  ///   - scopeOfUse: The scope in which the witnesses are resolve.
+  ///   - scopeOfUse: The scope in which the witnesses are resolved.
   ///   - environment: An assignment of unification variables in `t` and a set of assumed givens.
   ///   - continuation: The work to be done with the summoned results.
+  ///   - penalties: Extra weight added to the results of each thread.
   private mutating func summon(
     _ t: AnyTypeIdentity, in scopeOfUse: ScopeIdentity,
     where environment: ResolutionThread.Environment,
-    then continuation: [ResolutionThread.ContinuationItem]
+    then continuation: [ResolutionThread.ContinuationItem],
+    penalties: Int
   ) -> [ResolutionThread] {
-    // Assumed givens.
     var gs: [[Given]] = []
 
     // Assumed givens.
-    if !environment.givens.isEmpty {
-      gs.append(environment.givens)
-    }
+    gs.append(contentsOf: environment.givens.reversed().map({ (g) in [g] }))
 
     // Givens visible from `scopeOfUse`.
     gs.append(contentsOf: givens(visibleFrom: scopeOfUse))
@@ -3245,7 +3243,8 @@ public struct Typer {
       for g in grouping.element {
         let w = expression(referringTo: g)
         let r = formThread(
-          matching: w, to: u, in: environment, then: continuation, delayedBy: grouping.offset)
+          matching: w, to: u, in: environment, then: continuation,
+          penalties: penalties + grouping.offset)
         result.append(r)
       }
     }
@@ -3256,12 +3255,12 @@ public struct Typer {
   /// - Parameters:
   ///   - environment: Assignments of open variables and assumed givens.
   ///   - tail: The operations to perform after matching succeeds.
-  ///   - delay: Extra weight added to the result of this thread.
+  ///   - penalties: Extra weight added to the result of this thread.
   private mutating func formThread(
     matching witness: WitnessExpression, to queried: AnyTypeIdentity,
     in environment: ResolutionThread.Environment,
     then tail: [ResolutionThread.ContinuationItem] = [],
-    delayedBy delay: Int
+    penalties: Int = 0
   ) -> ResolutionThread {
     var witness = witness
     var queried = queried
@@ -3296,7 +3295,9 @@ public struct Typer {
       }
 
       // The witness already has a simple type.
-      return .init(matching: witness, to: queried, in: environment, then: tail, delayedBy: delay)
+      return .init(
+        matching: witness, to: queried, in: environment, then: tail,
+        initialDelay: 0, penalties: penalties)
     }
   }
 
@@ -3309,8 +3310,8 @@ public struct Typer {
   private mutating func match(
     _ thread: ResolutionThread, in scopeOfUse: ScopeIdentity
   ) -> ResolutionThread.Advanced {
-    if thread.delay > 0 {
-      return .next([thread.removingPenalty()])
+    if thread.initialDelay > 0 {
+      return .next([thread.removingDelay()])
     }
 
     assert(!program.types.hasContext(thread.witness.type))
