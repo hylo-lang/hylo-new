@@ -30,7 +30,7 @@ extension TupleTypeExpression: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     if ellipsis != nil {
-      return "{\(printer.show(elements.dropLast())), ...\(elements.last!)}"
+      return "{\(printer.show(elements.dropLast())), ...\(printer.show(elements.last!))}"
     } else {
       return "{\(printer.show(elements))}"
     }

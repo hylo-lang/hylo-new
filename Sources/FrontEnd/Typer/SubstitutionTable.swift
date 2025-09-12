@@ -1,7 +1,7 @@
 import Utilities
 
 /// A substitution table mapping type and term variables to their values.
-public struct SubstitutionTable: Sendable {
+public struct SubstitutionTable: Hashable, Sendable {
 
   /// A map from type variable to its assignment.
   internal private(set) var types: [TypeVariable.ID: AnyTypeIdentity]

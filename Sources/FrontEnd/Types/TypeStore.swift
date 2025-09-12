@@ -253,11 +253,12 @@ public struct TypeStore: Sendable {
     }
   }
 
-  /// Returns the elements of `t` iff `t` is not open-ended.
+  /// Returns `(types, isOpenEnded)` where `types` contains the members of `t` and `isOpenEnded` is
+  /// `true` iff `t` is open-ended.
   ///
   /// A tuple is open-ended if it is of the form `.cons(A, B)` where `B` is not a tuple or `B` is
   /// an open-ended tuple.
-  public func elements(of t: Tuple.ID) -> [AnyTypeIdentity]? {
+  public func members(of t: Tuple.ID) -> (types: [AnyTypeIdentity], isOpenEnded: Bool) {
     var result: [AnyTypeIdentity] = []
 
     var s = t
@@ -266,12 +267,12 @@ public struct TypeStore: Sendable {
       if let u = cast(b, to: Tuple.self) {
         s = u
       } else {
-        return nil
+        return (result + [b], isOpenEnded: true)
       }
     }
 
     assert(self[s] == .empty)
-    return result
+    return (result, isOpenEnded: false)
   }
 
   /// Returns the type of a pointer to a free-function implementing `a`'s interface.

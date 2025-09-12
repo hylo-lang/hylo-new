@@ -14,13 +14,13 @@ import Foundation
     transform: URL.init(fileURLWithPath:))
   private var output: URL?
 
-  /// Whether the command should just list test cases.
+  /// Whether the command should only list test cases.
   @Flag(
     name: [.customShort("l"), .customLong("list")],
     help: ArgumentHelp("Only list test cases without generating them."))
   private var shouldOnlyList: Bool = false
 
-  /// Whether the command should just list test cases.
+  /// Whether the command should remove observed files.
   @Flag(
     name: [.customShort("c"), .customLong("clean")],
     help: ArgumentHelp("Remove '*.observed' files."))

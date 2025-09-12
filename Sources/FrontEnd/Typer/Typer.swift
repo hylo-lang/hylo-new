@@ -169,7 +169,7 @@ public struct Typer {
     case TypeApplication.self:
       return storage(of: program.types.castUnchecked(t, to: TypeApplication.self))
     case Tuple.self:
-      return program.types.elements(of: program.types.castUnchecked(t, to: Tuple.self))
+      return program.types.members(of: program.types.castUnchecked(t, to: Tuple.self)).types
     default:
       return nil
     }
@@ -845,13 +845,7 @@ public struct Typer {
     }
 
     let a = typeOfModel(of: conformer, conformingTo: concept, with: []).erased
-    if summon(a, in: scopeOfUse).count == 1 {
-      return true
-    } else if let s = program.types.cast(conformer, to: Tuple.self) {
-      return structurallyConforms(s, to: concept, in: scopeOfUse)
-    } else {
-      return false
-    }
+    return summon(a, in: scopeOfUse).count == 1
   }
 
   /// Reports that `requirement` has no implementation.
@@ -1594,7 +1588,8 @@ public struct Typer {
       return
     }
 
-    guard let elements = program.types.elements(of: u) else {
+    let (elements, isOpenEnded) = program.types.members(of: u)
+    guard !isOpenEnded else {
       let m = program.format("tuple pattern cannot match open-ended value of type '%T'", [t])
       report(.init(.error, m, at: program[p].site))
       program[p.module].setType(.error, for: p)
@@ -2333,7 +2328,8 @@ public struct Typer {
     /// Returns the elements of `context.expectedType` if it is a fixed-sized tuple.
     func expectedTupleElements() -> [AnyTypeIdentity]? {
       if let t = context.expectedType, let u = cast(type: t, to: Tuple.self) {
-        return program.types.elements(of: u)
+        let (elements, isOpenEnded) = program.types.members(of: u)
+        return isOpenEnded ? nil : elements
       } else {
         return nil
       }
@@ -3043,13 +3039,16 @@ public struct Typer {
   // MARK: Implicit search
 
   /// A witness resolved by implicit resolution.
-  internal struct SummonResult: Sendable {
+  internal struct SummonResult: Hashable, Sendable {
 
     /// The expression of the witness.
     internal let witness: WitnessExpression
 
     /// A table assigning the open variables of the witness's type.
     internal let substitutions: SubstitutionTable
+
+    /// Extra cost considered for comparing this result to another.
+    internal let penalties: Int
 
   }
 
@@ -3142,24 +3141,24 @@ public struct Typer {
     /// in a tack-based DSL.
     let tail: [ContinuationItem]
 
-    /// Extra weight added to the resolution of the witness.
+    /// Extra cost considered for comparing the results of this thread.
     ///
-    /// - Invariant: This property is greater than or equal to 0.
-    let delay: Int
+    /// Penalties are used to favor lexically closer givens.
+    let penalties: Int
 
     /// Creates an instance with the given properties.
     init(
       matching witness: WitnessExpression, to queried: AnyTypeIdentity,
       in environment: Environment,
       then tail: [ContinuationItem] = [],
-      delayedBy delay: Int
+      penalties: Int
     ) {
-      assert(delay >= 0)
+      // assert(delay >= 0)
       self.witness = witness
       self.queried = queried
       self.environment = environment
       self.tail = tail
-      self.delay = delay
+      self.penalties = penalties
     }
 
     /// Returns a copy of `self` with the given properties reassigned.
@@ -3167,12 +3166,7 @@ public struct Typer {
       matching witness: WitnessExpression, to queried: AnyTypeIdentity,
       in environment: Environment
     ) -> Self {
-      .init(matching: witness, to: queried, in: environment, then: tail, delayedBy: delay)
-    }
-
-    /// Returns a copy of `self` with one less penalty.
-    consuming func removingPenalty() -> Self {
-      .init(matching: witness, to: queried, in: environment, then: tail, delayedBy: delay - 1)
+      .init(matching: witness, to: queried, in: environment, then: tail, penalties: penalties)
     }
 
   }
@@ -3197,7 +3191,7 @@ public struct Typer {
     // introduction of a new given may change the result of implicit resolution. Instead, we must
     // consider all visible givens at once.
     else {
-      let threads = summon(t, in: scopeOfUse, where: .empty, then: [])
+      let threads = summon(t, in: scopeOfUse, where: .empty, then: [], penalties: 0)
       result = takeSummonResults(from: threads, in: scopeOfUse)
     }
 
@@ -3296,8 +3290,7 @@ public struct Typer {
 
       // The witness already has a simple type.
       return .init(
-        matching: witness, to: queried, in: environment, then: tail,
-        initialDelay: 0, penalties: penalties)
+        matching: witness, to: queried, in: environment, then: tail, penalties: penalties)
     }
   }
 
@@ -3310,10 +3303,6 @@ public struct Typer {
   private mutating func match(
     _ thread: ResolutionThread, in scopeOfUse: ScopeIdentity
   ) -> ResolutionThread.Advanced {
-    if thread.initialDelay > 0 {
-      return .next([thread.removingDelay()])
-    }
-
     assert(!program.types.hasContext(thread.witness.type))
     let (a, b) = (thread.witness.type, thread.queried)
 
@@ -3331,13 +3320,8 @@ public struct Typer {
       let w = program.types.reify(thread.witness, applying: s, withVariables: .kept)
       if w.type[.hasError] { return .next([]) }
 
-      let r = SummonResult(witness: w, substitutions: s)
+      let r = SummonResult(witness: w, substitutions: s, penalties: thread.penalties)
       return threadContinuation(appending: r, to: thread, in: scopeOfUse)
-    }
-
-    // Can coercions be derived in the current context?
-    else if !canDeriveCoercions(in: scopeOfUse, where: thread.environment) {
-      return .next([])
     }
 
     // Resolution failed if nothing matches structurally.
@@ -3345,9 +3329,18 @@ public struct Typer {
       return .next([])
     }
 
-    // Otherwise, assume non-syntactic equalities between pairwise parts.
-    let e = thread.environment.assuming(
-      givens: coercions.map({ (c) in demand(EqualityWitness(lhs: c.0, rhs: c.1)).erased }))
+    // Can coercions of pairwise nested parts be derived in the current context?
+    var gs: [AnyTypeIdentity] = .init(minimumCapacity: coercions.count)
+    for c in coercions {
+      if canDeriveCoercions(c.0, c.1, in: scopeOfUse, where: thread.environment) {
+        gs.append(demand(EqualityWitness(lhs: c.0, rhs: c.1)).erased)
+      } else {
+        return .next([])
+      }
+    }
+
+    // If yes, assume non-syntactic equalities between pairwise nested parts.
+    let e = thread.environment.assuming(givens: gs)
     let t = demand(EqualityWitness(lhs: a, rhs: b)).erased
     let w = WitnessExpression(
       value: .termApplication(.init(builtin: .coercion, type: t), thread.witness),
@@ -3366,7 +3359,8 @@ public struct Typer {
         nextGivenIdentifier: thread.environment.nextGivenIdentifier)
       var t = thread.tail
       t.append(.init(i, in: operand))
-      return .next(summon(assumed, in: scopeOfUse, where: e, then: t))
+      return .next(
+        summon(assumed, in: scopeOfUse, where: e, then: t, penalties: operand.penalties))
     }
 
     // We're done; apply the continuation.
@@ -3385,11 +3379,13 @@ public struct Typer {
       let x = r.witness.substituting(assumed: last.assumed, for: operand.witness.value)
       let e = operand.substitutions.union(r.substitutions)
       return .init(
-        witness: program.types.reify(x, applying: e, withVariables: .kept), substitutions: e)
+        witness: program.types.reify(x, applying: e, withVariables: .kept),
+        substitutions: e,
+        penalties: operand.penalties)
     } else {
       let w = program.types.reify(
         operand.witness, applying: operand.substitutions, withVariables: .kept)
-      return .init(witness: w, substitutions: operand.substitutions)
+      return .init(witness: w, substitutions: operand.substitutions, penalties: operand.penalties)
     }
   }
 
@@ -3415,7 +3411,7 @@ public struct Typer {
       swap(&next, &work)
     }
 
-    return done
+    return done.minimalElements(by: { (a, b) in a.penalties < b.penalties })
   }
 
   /// Returns the givens whose definitions are at the top-level of `m`.
@@ -3451,15 +3447,25 @@ public struct Typer {
   private mutating func givens(visibleFrom scopeOfUse: ScopeIdentity) -> [[Given]] {
     var gs: [[Given]] = []
 
+    // Gather the givens in the current file.
     for s in program.scopes(from: scopeOfUse) {
-      gs.append(givens(lexicallyIn: s).filter(notOnStack(_:)))
+      let ls = givens(lexicallyIn: s).filter(notOnStack(_:))
+      if !ls.isEmpty { gs.append(ls) }
     }
+
+    // Gather the givens in other files of the module.
+    var fs: [Given] = []
     for f in program[scopeOfUse.module].sourceFileIdentities where f != scopeOfUse.file {
-      gs.append(givens(lexicallyIn: .init(file: f)).filter(notOnStack(_:)))
+      fs.append(contentsOf: givens(lexicallyIn: .init(file: f)).filter(notOnStack(_:)))
     }
+    if !fs.isEmpty { gs.append(fs) }
+
+    // Gather the givens imported from other modules.
+    var ms: [Given] = []
     for i in imports(of: scopeOfUse.file) {
-      gs.append(givens(atTopLevelOf: i).filter(notOnStack(_:)))
+      ms.append(contentsOf: givens(atTopLevelOf: i).filter(notOnStack(_:)))
     }
+    if !ms.isEmpty { gs.append(ms) }
 
     return gs
   }
@@ -3523,37 +3529,68 @@ public struct Typer {
 
     // Fast path: types are unifiable without any coercion.
     if let subs = program.types.unifiable(head, goal) {
-      // FIXME: Should the witness have the typeof the goal?
-      return [SummonResult(witness: .init(value: .identity(e), type: head), substitutions: subs)]
+      // FIXME: Should the witness have the type of the goal?
+      let w = WitnessExpression(value: .identity(e), type: head)
+      return [SummonResult(witness: w, substitutions: subs, penalties: 0)]
     }
 
     // Slow path: compute an elaboration.
     let scopeOfUse = program.parent(containing: e)
     let root = WitnessExpression(value: .identity(e), type: head)
-    var threads = [formThread(matching: root, to: goal, in: .empty, delayedBy: 0)]
+    var threads = [formThread(matching: root, to: goal, in: .empty)]
 
-    if canDeriveCoercions(in: scopeOfUse, where: .empty) {
+    if canDeriveCoercions(root.type, goal, in: scopeOfUse, where: .empty) {
+    // if canDeriveCoercions(in: scopeOfUse, where: .empty) {
       // Either the type of the elaborated witness is unifiable with the queried type or we need to
       // assume a coercion. Implicit resolution will figure out the "cheapest" alternative.
       let (environment, coercion) = ResolutionThread.Environment.empty.assuming(
         given: demand(EqualityWitness(lhs: root.type, rhs: goal)).erased)
       let w = WitnessExpression(value: .termApplication(coercion, root), type: goal)
-      threads.append(formThread(matching: w, to: goal, in: environment, delayedBy: 0))
+      threads.append(formThread(matching: w, to: goal, in: environment))
     }
 
     return takeSummonResults(from: threads, in: scopeOfUse)
   }
 
-  /// Returns `true` iff a coercion may be derived using the givens visible from `scopeOfUse` and
-  /// those assumed in `environment`.
+  /// Returns `true` iff a coercion (i.e., a witness of a type equality) from `a` to `b` can be
+  /// derived using the givens visible from `scopeOfUse` and those assumed in `environment`.
+  ///
+  /// This method enumerates givens having heads of the form `T ~ U`, excluding the built-in ones,
+  /// and checks whether `T` and `U` are unifiable with the given arguments. If either `a` or `b`
+  /// can't be unified in any of these givens, then we can conclude that implicit resolution will
+  /// necessarily fail to prove a coercion from `a` to `b`.
   private mutating func canDeriveCoercions(
-    in scopeOfUse: ScopeIdentity, where environment: ResolutionThread.Environment
+    _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, in scopeOfUse: ScopeIdentity,
+    where environment: ResolutionThread.Environment
   ) -> Bool {
-    chain(environment.givens, givens(visibleFrom: scopeOfUse).joined()).contains { (g) in
+    var lhs = false
+    var rhs = false
+
+    for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined()) {
       let t = declaredType(of: g)
-      let (c, u) = program.types.contextAndHead(t)
-      return program.types.isEquality(u) || c.parameters.contains(where: { (p) in p == u })
+      let u = program.types.contextAndHead(t)
+
+      // Can the given can match any type (e.g., `<T> T`)?
+      if u.context.parameters.contains(where: { (p) in p == u.body }) {
+        return true
+      }
+
+      // Is the given of the form `T ~ U`?
+      if let e = program.types.cast(u.body, to: EqualityWitness.self) {
+        let l = program.types.open(u.context.parameters, in: program.types[e].lhs)
+        let r = program.types.open(u.context.parameters, in: program.types[e].rhs)
+
+        lhs = lhs || unifiable(a, l) || unifiable(a, r)
+        rhs = rhs || unifiable(b, l) || unifiable(b, r)
+
+        if lhs && rhs {
+          return true
+        }
+      }
     }
+
+    assert(!lhs || !rhs)
+    return false
   }
 
   // MARK: Name resolution
@@ -4142,13 +4179,13 @@ public struct Typer {
     let w = WitnessExpression(value: .reference(.direct(.init(d))), type: u)
 
     // Fast path: types are trivially equal.
-    if t == u { return .init(witness: w, substitutions: .init()) }
+    if t == u { return .init(witness: w, substitutions: .init(), penalties: 0) }
 
     // Slow path: use the match judgement of implicit resolution to create a witness describing
     // "how" the type matches the extension.
     let (context, head) = program.types.contextAndHead(t)
     assert(context.usings.isEmpty)
-    let thread = formThread(matching: w, to: head, in: .empty, delayedBy: 0)
+    let thread = formThread(matching: w, to: head, in: .empty)
     return takeSummonResults(from: [thread], in: s).uniqueElement
   }
 
