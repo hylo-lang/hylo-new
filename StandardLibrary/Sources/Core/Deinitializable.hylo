@@ -7,3 +7,9 @@ public trait Deinitializable {
   fun deinit() sink
 
 }
+
+/// A witness that `Void` is `Deinitializable`.
+public given Void is Deinitializable {}
+
+/// A witness that a tuple is `Deinitializable` when its elements are too.
+public given <T is Deinitializable, U is Deinitializable> {T, ...U} is Deinitializable {}

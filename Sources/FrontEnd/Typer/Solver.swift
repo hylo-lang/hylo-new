@@ -245,14 +245,6 @@ internal struct Solver {
     case TypeVariable.self:
       return postpone(g)
 
-    case Sum.self:
-      let u = program.types.castUnchecked(k.rhs, to: Sum.self)
-      if k.lhs.isVariable || program.types.elements(of: u).contains(where: \.isVariable) {
-        return postpone(g)
-      } else {
-        fatalError("TODO")
-      }
-
     default:
       return simplify(k)
     }

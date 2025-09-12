@@ -5,9 +5,9 @@ extension Sequence {
     self.sorted(by: { (a, b) in a[keyPath: p] < b[keyPath: p] })
   }
 
-  /// Returns the least element in `self` according to `areInIncreasingOrder`, or `nil` if `self`
-  /// contains no such element.
-  public func least(by areInIncreasingOrder: (Element, Element) -> Bool) -> Element? {
+  /// Returns the set of elements in `self` that are not greater than any other element in `self`
+  /// according to `areInIncreasingOrder`.
+  public func minimalElements(by areInIncreasingOrder: (Element, Element) -> Bool) -> [Element] {
     var it = makeIterator()
     var leaves: [Element] = []
     var hasLeast = false
@@ -29,7 +29,13 @@ extension Sequence {
       }
     }
 
-    return hasLeast ? leaves[0] : nil
+    return leaves
+  }
+
+  /// Returns the least element in `self` according to `areInIncreasingOrder`, or `nil` if `self`
+  /// contains no such element.
+  public func least(by areInIncreasingOrder: (Element, Element) -> Bool) -> Element? {
+    minimalElements(by: areInIncreasingOrder).uniqueElement
   }
 
   /// Returns the descriptions of all elements, joined by the given `separator`.

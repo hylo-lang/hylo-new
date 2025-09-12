@@ -65,7 +65,7 @@ public enum DeclarationReference: Hashable, Sendable {
   public var elaborationCost: Int {
     switch self {
     case .builtin, .direct, .member, .synthetic:
-      return 0
+      return 1
     case .inherited(let w, _):
       return 1 + w.elaborationCost
     }

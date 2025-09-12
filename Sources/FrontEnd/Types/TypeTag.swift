@@ -43,7 +43,6 @@ public struct TypeTag: Sendable {
     OpaqueType.self,
     RemoteType.self,
     Struct.self,
-    Sum.self,
     Trait.self,
     Tuple.self,
     TypeAlias.self,

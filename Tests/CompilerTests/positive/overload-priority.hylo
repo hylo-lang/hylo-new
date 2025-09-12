@@ -7,7 +7,7 @@ trait P {
   fun f() -> X
 }
 
-extension <T> A<T> {
+extension A<Void> {
   fun f() { () }
 }
 
@@ -21,7 +21,8 @@ fun use(_ x: Void) {}
 fun main() {
   let a = A<Void>()
 
-  // `x: Void` because members inherited by extension have priority.
+  // `x: Void` because members inherited by extension have priority for
+  // witnesses of equal size.
   let x = a.f()
   use(x)
 
