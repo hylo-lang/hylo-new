@@ -442,7 +442,7 @@ public struct Parser {
     var p: [ParameterDeclaration.ID] = []
     if (context == .typeBody) && !prologue.contains(.static) {
       isMember = true
-      p = [file.synthesizeSelfParameter(effect: effect)] + parameters
+      p = Array(file.synthesizeSelfParameter(effect: effect), prependedTo: parameters)
     } else {
       isMember = false
       p = parameters
@@ -516,7 +516,7 @@ public struct Parser {
           identifier: .init(.simple("init"), at: introducer.site),
           contextParameters: contextParameters,
           captures: .empty(at: introducer.site.end),
-          parameters: [receiver] + parameters,
+          parameters: .init(receiver, prependedTo: parameters),
           effect: .init(.let, at: introducer.site),
           output: nil,
           body: b,
@@ -2771,7 +2771,8 @@ extension Module.SourceContainer {
   ) -> StaticCall.ID {
     if let rhs = self[concept] as? StaticCall {
       let desugared = StaticCall(
-        callee: rhs.callee, arguments: [conformer] + rhs.arguments, site: self[concept].site)
+        callee: rhs.callee, arguments: Array(conformer, prependedTo: rhs.arguments),
+        site: self[concept].site)
       return replace(concept, for: desugared)
     } else {
       return insert(StaticCall(callee: concept, arguments: [conformer], site: self[concept].site))

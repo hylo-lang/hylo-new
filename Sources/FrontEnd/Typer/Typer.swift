@@ -2175,7 +2175,7 @@ public struct Typer {
     // of the underlying initializer.
     let role: SyntaxRole
     if case .function(let ls) = context.role {
-      role = .function(labels: ["self" as Optional] + ls)
+      role = .function(labels: Array("self" as Optional, prependedTo: ls))
     } else {
       role = .unspecified
     }

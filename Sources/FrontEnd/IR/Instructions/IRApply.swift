@@ -17,7 +17,7 @@ public struct IRApply: Instruction {
     termArguments: [IRValue],
     anchor: Anchor
   ) {
-    self.operands = [callee] + termArguments
+    self.operands = Array(callee, prependedTo: termArguments)
     self.anchor = anchor
     self.typeArguments = typeArguments
   }
