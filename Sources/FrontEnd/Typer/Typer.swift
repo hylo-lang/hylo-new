@@ -1776,7 +1776,7 @@ public struct Typer {
       i.append(.init(label: a.label?.value, type: t))
     }
 
-    // We cannot use the expected type to constrain the result of the callee. It would make the
+    // We cannot use the expected type to constrain the result of the callee. It would cause the
     // solver to commit prematurely in the presence of overloads.
     let o = fresh().erased
     let k = CallConstraint(callee: f, arguments: i, output: o, origin: e, site: program[e].site)
