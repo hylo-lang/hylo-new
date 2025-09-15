@@ -438,13 +438,10 @@ public struct Parser {
     let effect = parseOptionalAccessEffect() ?? .init(.let, at: .empty(at: position))
 
     // Insert the self-parameter of non-static member declarations.
-    let isMember: Bool
     var p: [ParameterDeclaration.ID] = []
     if (context == .typeBody) && !prologue.contains(.static) {
-      isMember = true
       p = Array(file.synthesizeSelfParameter(effect: effect), prependedTo: parameters)
     } else {
-      isMember = false
       p = parameters
     }
 
@@ -483,7 +480,7 @@ public struct Parser {
           contextParameters: contextParameters,
           captures: captures,
           parameters: p,
-          effect: isMember ? .init(.let, at: effect.site) : effect,
+          effect: effect,
           output: output,
           body: b,
           site: introducer.site.extended(upTo: position.index)))
