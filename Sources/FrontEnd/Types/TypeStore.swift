@@ -540,8 +540,8 @@ public struct TypeStore: Sendable {
     switch r {
     case .builtin, .direct, .member, .synthetic:
       return r
-    case .inherited(let w, let d):
-      return .inherited(self.map(w, transform), d)
+    case .inherited(let w, let d, let s):
+      return .inherited(self.map(w, transform), d, statically: s)
     }
   }
 
