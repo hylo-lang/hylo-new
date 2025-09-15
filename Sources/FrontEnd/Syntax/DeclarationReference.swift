@@ -18,15 +18,15 @@ public enum DeclarationReference: Hashable, Sendable {
 
   /// A reference to a non-static member inherited by conformance or extension.
   ///
-  /// The reference was formed from an expression `x.member` where `member` is a declaration
-  /// defined either in an extension of `x`'s type, or as a requirement of a
-  /// trait to which `receiver`'s type conform.
+  /// The reference was formed from an expression `x.member` where `member` refers to a symbol
+  /// declared in an extension of `x`'s type, or defined as a requirement of a trait to which the
+  /// type of `x` conforms.
   ///
   /// In either case, the first value in the payload is an expression computing a record containing
-  /// the `member`s implementation; the second value is the identity of the `member`'s declaration;
-  /// and the last value is the type of the selection (i.e., the type of `member` seen as a field
-  /// of the aforementioned record.).
-  case inherited(WitnessExpression, DeclarationIdentity)
+  /// the `member`s implementation (e.g., a conformance witness), the second value is the identity
+  /// of the `member`'s declaration, and the last value is a flag indicating whether `member` is
+  /// used statically.
+  case inherited(WitnessExpression, DeclarationIdentity, statically: Bool)
 
   /// A reference to a synthetic implementation of a trait requirement.
   case synthetic(DeclarationIdentity)
@@ -36,7 +36,7 @@ public enum DeclarationReference: Hashable, Sendable {
     switch self {
     case .builtin, .direct, .member, .synthetic:
       return false
-    case .inherited(let w, _):
+    case .inherited(let w, _, _):
       return w.hasVariable
     }
   }
@@ -54,7 +54,7 @@ public enum DeclarationReference: Hashable, Sendable {
   /// The referred declaration, unless it is built-in.
   public var target: DeclarationIdentity? {
     switch self {
-    case .direct(let d), .member(let d), .inherited(_, let d):
+    case .direct(let d), .member(let d), .inherited(_, let d, _):
       return d
     case .builtin, .synthetic:
       return nil
@@ -66,15 +66,15 @@ public enum DeclarationReference: Hashable, Sendable {
     switch self {
     case .builtin, .direct, .member, .synthetic:
       return 1
-    case .inherited(let w, _):
+    case .inherited(let w, _, _):
       return 1 + w.elaborationCost
     }
   }
 
   /// Returns a copy of `self` in which occurrences of `m` have been substituted for `n`.
   internal func substituting(_ m: ExpressionIdentity, for n: ExpressionIdentity) -> Self {
-    if case .inherited(let w, let d) = self {
-      return .inherited(w.substituting(m, for: n), d)
+    if case .inherited(let w, let d, let s) = self {
+      return .inherited(w.substituting(m, for: n), d, statically: s)
     } else {
       return self
     }
@@ -91,7 +91,7 @@ extension DeclarationReference: Showable {
       return "$<builtin \(e)>"
     case .synthetic(let d):
       return "$<synthetic implementation of \(printer.program.nameOrTag(of: d))>"
-    case .direct(let d), .member(let d), .inherited(_, let d):
+    case .direct(let d), .member(let d), .inherited(_, let d, _):
       return printer.program.nameOrTag(of: d)
     }
   }

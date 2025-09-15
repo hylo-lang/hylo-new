@@ -460,7 +460,7 @@ public struct Typer {
 
           // If we resolved the requirement, make sure it has a default implementation.
           switch c.reference {
-          case .inherited(_, requirement) where !hasDefinition(requirement):
+          case .inherited(_, requirement, _) where !hasDefinition(requirement):
             continue
           default:
             viable.append(c.reference)
@@ -3057,7 +3057,7 @@ public struct Typer {
     if let n = program.cast(program[c].callee, to: New.self) {
       let r = program[e.module].declaration(referredToBy: program[n].target)
       let d = program.standardLibraryDeclaration(.expressibyByIntegerLiteralInit)
-      if case .inherited(_, d) = r {
+      if case .inherited(_, d, _) = r {
         let i = program.castUnchecked(program[c].arguments[0].value, to: IntegerLiteral.self)
         return Int(program[i].value)
       }
@@ -3988,7 +3988,8 @@ public struct Typer {
           if let arguments = w.typeArguments(appliedTo: e) {
             member = program.types.substitute(arguments, in: member)
           }
-          candidates.append(.init(reference: .inherited(w, m), type: member))
+          candidates.append(
+            .init(reference: .inherited(w, m, statically: selectionIsStatic), type: member))
         }
       }
     }
@@ -4017,7 +4018,8 @@ public struct Typer {
           if !selectionIsStatic {
             member = typeOfBoundMember(referringTo: m, withUnboundType: member)
           }
-          candidates.append(.init(reference: .inherited(w, m), type: member))
+          candidates.append(
+            .init(reference: .inherited(w, m, statically: selectionIsStatic), type: member))
         }
       }
     }
