@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         # Note: all combinations of the following will be run independently
-        os: [macos-14, ubuntu-24.04, windows-2025]
+        os: [macos-15, ubuntu-24.04, windows-2025]
         swift: ["6.2"]
         config: [release, debug]
 
