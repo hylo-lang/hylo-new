@@ -18,7 +18,9 @@ let package = Package(
     .macOS(.v15)
   ],
   products: [
-    .executable(name: "hc", targets: ["hc"])
+    .executable(name: "hc", targets: ["hc"]),
+    .library(name: "HyloStandardLibrary", targets: ["StandardLibrary"]),
+    .library(name: "HyloFrontEnd", targets: ["FrontEnd"]),
   ],
   dependencies: [
     .package(
