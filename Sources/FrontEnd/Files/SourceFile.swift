@@ -50,6 +50,11 @@ public struct SourceFile: Hashable, Sendable {
     try self.init(name: .local(path), contents: .init(contentsOf: path, encoding: .utf8))
   }
 
+  /// Creates an in-memory source file that represents a possibly non-existent file at `path`.
+  public init(representing path: URL, inMemoryContents: String) {
+    self.init(name: .local(path), contents: inMemoryContents)
+  }
+
   /// Creates a virtual source file with the given contents.
   public init(contents: String) {
     var hasher = FNV()
