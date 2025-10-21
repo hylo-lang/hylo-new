@@ -57,6 +57,11 @@ public struct SourceFile: Hashable, Sendable {
     self.init(name: .virtual(hasher.state), contents: contents)
   }
 
+  /// Creates an in-memory source file that represents a possibly non-existent file at `path`.
+  public init(representing path: URL, inMemoryContents: String) {
+    self.init(name: .localInMemory(path), contents: inMemoryContents)
+  }
+
   /// The name of the file that the source came from.
   public var name: FileName {
     properties.name
@@ -66,6 +71,8 @@ public struct SourceFile: Hashable, Sendable {
   public var baseName: String {
     switch name {
     case .local(let u):
+      return u.deletingPathExtension().lastPathComponent
+    case .localInMemory(let u):
       return u.deletingPathExtension().lastPathComponent
     case .virtual(let i):
       return String(UInt(bitPattern: i), radix: 36)
