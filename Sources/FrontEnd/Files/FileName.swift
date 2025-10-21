@@ -10,23 +10,50 @@ public enum FileName: Hashable, Sendable {
   /// A unique identifier for a file that only exists in memory.
   case virtual(Int)
 
+  /// A path to a file whose supplied contents may be different than what is on disk.
+  ///
+  /// This is needed for LSP support to represent un-saved files.
+  case localInMemory(URL)
+
   /// Returns `true` iff `self` is ordered before `other` in a dictionary.
   public func lexicographicallyPrecedes(_ other: Self) -> Bool {
+    // local < localInMemory < virtual
+
     switch (self, other) {
+    //comparison with same types
     case (.local(let a), .local(let b)):
       return a.standardizedFileURL.path().lexicographicallyPrecedes(b.standardizedFileURL.path())
     case (.virtual(let a), .virtual(let b)):
       return a < b
-    case (.virtual, _):
-      return false
+    case (.localInMemory(let a), .localInMemory(let b)):
+      return a.standardizedFileURL.path().lexicographicallyPrecedes(b.standardizedFileURL.path())
+
+    // local precedes everything else
     case (.local, _):
       return true
+    // localInMemory doesn't precede local but precedes virtual
+    case (.localInMemory, .local(_)):
+      return false
+    case (.localInMemory, .virtual):
+      return true
+    // virtual is last, doesn't precede anything
+    default:
+      return false
     }
   }
 
   /// Returns a textual description of `self`'s path relative to `base`.
   public func gnuPath(relativeTo base: URL) -> String? {
-    guard base.isFileURL, case .local(let path) = self else { return nil }
+    guard base.isFileURL else { return nil }
+    
+    let path: URL
+    switch self {
+    case .local(let p), .localInMemory(let p):
+      path = p
+    case .virtual:
+      return nil
+    }
+    
     let source = path.standardized.pathComponents
     let prefix = base.standardized.pathComponents
 
@@ -64,6 +91,8 @@ extension FileName: CustomStringConvertible {
     switch self {
     case .local(let p):
       return p.relativePath
+    case .localInMemory(let p):
+      return p.relativePath + "#inmemory"
     case .virtual(let i):
       return "virtual://\(String(UInt(bitPattern: i), radix: 36))"
     }
@@ -79,6 +108,8 @@ extension FileName: Archivable {
       self = try .local(.init(string: archive.read(String.self))!)
     case 1:
       self = try .virtual(archive.read(Int.self))
+    case 2:
+      self = try .localInMemory(.init(string: archive.read(String.self))!)
     default:
       throw ArchiveError.invalidInput
     }
@@ -92,6 +123,9 @@ extension FileName: Archivable {
     case .virtual(let i):
       archive.write(byte: 1)
       try archive.write(i)
+    case .localInMemory(let p):
+      archive.write(byte: 2)
+      try archive.write(p.absoluteString)
     }
   }
 
