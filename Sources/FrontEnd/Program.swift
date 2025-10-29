@@ -639,7 +639,13 @@ public struct Program: Sendable {
   /// Returns the name of the unique entity declared by `d` or a description of `d`'s tag if it
   /// declares zero or more than one named entity.
   public func nameOrTag(of d: DeclarationIdentity) -> String {
-    name(of: d)?.description ?? "$<\(tag(of: d))(\(d.erased.bits))>"
+    if let n = name(of: d) {
+      return n.description
+    } else {
+      let s = self[d].site
+      let (l, c) = s.start.lineAndColumn
+      return "$<\(tag(of: d)) at \(s.source.baseName):\(l).\(c)>"
+    }
   }
 
   /// Returns the name of the unique entity declared by `d`, or `nil` if `d` declares zero or more

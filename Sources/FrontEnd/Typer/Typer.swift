@@ -823,16 +823,6 @@ public struct Typer {
     }
   }
 
-  /// Returns `true` iff a conformance of `conformer` to `concept`, which identifies a trait, can
-  /// be resolved or synthesized in `scopeOfUse`.
-  internal mutating func isDerivable(
-    conformanceTo concept: Program.StandardLibraryEntity, for conformer: AnyTypeIdentity,
-    in scopeOfUse: ScopeIdentity
-  ) -> Bool {
-    let p = program.standardLibraryDeclaration(concept, as: TraitDeclaration.self)
-    return isDerivable(conformanceTo: p, for: conformer, in: scopeOfUse)
-  }
-
   /// Returns `true` iff a conformance of `conformer` to `concept` can be resolved or synthesized
   /// in `scopeOfUse`.
   private mutating func isDerivable(

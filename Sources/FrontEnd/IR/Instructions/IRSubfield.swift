@@ -31,9 +31,9 @@ public struct IRSubfield: Instruction {
     operands[0]
   }
 
-  /// The type of the value loaded by this instruction.
+  /// The type of the instruction's result.
   public var type: IRType {
-    .hylo(typeOfSubfield, isAddress: true)
+    .lowered(typeOfSubfield, isAddress: true)
   }
 
 }

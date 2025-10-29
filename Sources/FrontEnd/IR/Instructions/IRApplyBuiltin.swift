@@ -1,4 +1,6 @@
 /// Invokes a function of the `Builtin` module.
+///
+/// Unlike `apply`, this instruction does produce a result.
 public struct IRApplyBuiltin: Instruction {
 
   /// The operands of the instruction.
@@ -7,11 +9,11 @@ public struct IRApplyBuiltin: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The function being called.
+  /// The function being applied.
   public let callee: BuiltinFunction
 
   /// The type of the value returned by `callee`.
-  public let returnTypeOfCallee: AnyTypeIdentity
+  public let type: IRType
 
   /// Creates an instance with the given properties.
   public init(
@@ -23,17 +25,12 @@ public struct IRApplyBuiltin: Instruction {
     self.operands = arguments
     self.anchor = anchor
     self.callee = callee
-    self.returnTypeOfCallee = returnTypeOfCallee
+    self.type = .lowered(returnTypeOfCallee, isAddress: false)
   }
 
   /// The arguments of the call.
   public var arguments: [IRValue] {
     operands
-  }
-
-  /// The type of the value returned by `callee`.
-  public var type: IRType {
-    .addressOf(returnTypeOfCallee)
   }
 
 }

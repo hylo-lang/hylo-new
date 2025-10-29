@@ -161,7 +161,7 @@ public struct Module: Sendable {
   internal private(set) var sources = OrderedDictionary<FileName, SourceContainer>()
 
   /// The IR functions in the module.
-  internal private(set) var ir = OrderedDictionary<IRFunction.Name, IRFunction>()
+  public private(set) var ir = OrderedDictionary<IRFunction.Name, IRFunction>()
 
   /// Creates an empty module with the given name and identity.
   public init(name: Name, identity: Module.ID) {

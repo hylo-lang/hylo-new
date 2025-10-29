@@ -1,4 +1,9 @@
+import Utilities
+
 /// Invokes an IR function.
+///
+/// This instruction does not define any register. The return value of the function being applied
+/// is stored in the first argument of the function, which is always a `set` access.
 public struct IRApply: Instruction {
 
   /// The operands of the instruction.
@@ -7,29 +12,35 @@ public struct IRApply: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The type arguments of passed to the function.
-  public let typeArguments: TypeArguments
-
   /// Creates an instance with the given properties.
   public init(
     callee: IRValue,
-    typeArguments: TypeArguments,
-    termArguments: [IRValue],
+    arguments: [IRValue],
+    result: IRValue,
     anchor: Anchor
   ) {
-    self.operands = Array(callee, prependedTo: termArguments)
+    var operands = Array<IRValue>(minimumCapacity: arguments.count + 2)
+    operands.append(callee)
+    operands.append(result)
+    operands.append(contentsOf: arguments)
+
+    self.operands = operands
     self.anchor = anchor
-    self.typeArguments = typeArguments
   }
 
-  /// The function being called.
+  /// The function being applied.
   public var callee: IRValue {
     operands[0]
   }
 
-  /// The arguments of the call.
-  public var termArguments: ArraySlice<IRValue> {
-    operands[1...]
+  /// The register in which the result of the function is stored.
+  public var result: IRValue {
+    operands[1]
+  }
+
+  /// The arguments of the call (excluding the return register).
+  public var arguments: ArraySlice<IRValue> {
+    operands[2...]
   }
 
 }
@@ -38,12 +49,7 @@ extension IRApply: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    var result = "apply \(printer.show(callee))"
-    if !typeArguments.isEmpty {
-      result.append("<\(printer.show(typeArguments.values))>")
-    }
-    result.append("(\(printer.show(termArguments)))")
-    return result
+    "apply \(printer.show(callee))(\(printer.show(arguments))) => \(printer.show(self.result))"
   }
 
 }
