@@ -2,7 +2,7 @@ import Archivist
 
 /// A pointer to a monomorphic free function.
 ///
-/// Function pointers denote addresses of a non-generic functions having empty environments, e.g.,
+/// Function pointers denote addresses of non-generic functions having empty environments, e.g.,
 /// instances of `[]() let -> Int`. They can be used to implement low-level dynamic dispatch
 /// mechanisms, e.g., to pass a callback across a language boundary.
 @Archivable

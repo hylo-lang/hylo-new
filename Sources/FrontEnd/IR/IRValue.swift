@@ -10,8 +10,8 @@ public enum IRValue: Hashable, Sendable {
   /// A constant integer.
   case word(Int, MachineType.ID)
 
-  /// A pointer to a function.
-  case function(IRFunction.Name, FunctionPointer.ID)
+  /// A reference to a lowered function.
+  case function(IRFunction.Name, AnyTypeIdentity)
 
   /// The payload of `self` iff it denotes a register.
   public var register: AnyInstructionIdentity? {

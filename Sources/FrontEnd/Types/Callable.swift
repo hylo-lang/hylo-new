@@ -1,4 +1,4 @@
-/// A witness that some type denotes a callable abstraction.
+/// A witness that some simple (i.e., without context) type denotes an abstraction.
 public struct Callable {
 
   /// The way in which the abstraction must be applied.
@@ -47,6 +47,23 @@ public struct Callable {
     }
 
     return i == labels.endIndex
+  }
+
+}
+
+extension Callable: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  public func show(using printer: inout TreePrinter) -> String {
+    let e = printer.show(environment)
+    let i = printer.show(inputs)
+    let o = printer.show(output)
+    switch style {
+    case .parenthesized:
+      return "[\(e)](\(i)) -> \(o)"
+    case .bracketed:
+      return "[\(e)](\(i)) [-]> \(o)"
+    }
   }
 
 }

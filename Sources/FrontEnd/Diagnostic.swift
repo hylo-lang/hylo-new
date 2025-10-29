@@ -235,4 +235,9 @@ extension Program {
     undefinedSymbol(n.value, memberOf: t, at: n.site)
   }
 
+  /// Returns a warning diagnosing an unused value.
+  internal func unusedValue(of t: AnyTypeIdentity, at site: SourceSpan) -> Diagnostic {
+    .init(.warning, format("unused value of type '%T'", [t]), at: site)
+  }
+
 }

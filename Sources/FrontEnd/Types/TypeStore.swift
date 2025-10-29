@@ -275,6 +275,61 @@ public struct TypeStore: Sendable {
     return (result, isOpenEnded: false)
   }
 
+  /// Assuming `a` identifies the (possibly polymorphic) type of a callable abstraction with an
+  /// environement `e`, returns a copy of `a` where `e` is taken as first parameter if `e` is
+  /// non-empty or `a` unchanged otherwise.
+  ///
+  /// For example, if `a` is of the form `[let T]() let -> U`, the result is `[](let T) let -> U`.
+  public mutating func lifted<T: TypeIdentity>(_ a: T) -> AnyTypeIdentity {
+    switch tag(of: a) {
+    case Arrow.self:
+      return lifted(castUnchecked(a, to: Arrow.self)).erased
+    case Bundle.self:
+      return lifted(castUnchecked(a, to: Bundle.self)).erased
+    case Implication.self:
+      return lifted(castUnchecked(a, to: Implication.self)).erased
+    case UniversalType.self:
+      return lifted(castUnchecked(a, to: UniversalType.self)).erased
+    default:
+      preconditionFailure("not a callable abstraction")
+    }
+  }
+
+  /// Implements `lifted(_:)` for arrows.
+  public mutating func lifted(_ a: Arrow.ID) -> Arrow.ID {
+    let e = dealiased(self[a].environment)
+    let p: Parameter
+
+    if let r = self[e] as? RemoteType {
+      p = Parameter(access: r.access, type: r.projectee)
+    } else if e != .void {
+      p = Parameter(access: self[a].effect, type: e)
+    } else {
+      return a
+    }
+
+    let i = Array(p, prependedTo: self[a].inputs)
+    return demand(Arrow(effect: self[a].effect, inputs: i, output: self[a].output))
+  }
+
+  /// Implements `lifted(_:)` for bundles.
+  public mutating func lifted(_ a: Bundle.ID) -> Bundle.ID {
+    let s = lifted(self[a].shape)
+    return demand(Bundle(shape: s, variants: self[a].variants))
+  }
+
+  /// Implements `lifted(_:)` for implications.
+  public mutating func lifted(_ a: Implication.ID) -> Implication.ID {
+    let h = lifted(self[a].body)
+    return demand(Implication(context: self[a].usings, head: h))
+  }
+
+  /// Implements `lifted(_:)` for universal types.
+  public mutating func lifted(_ a: UniversalType.ID) -> UniversalType.ID {
+    let b = lifted(self[a].body)
+    return demand(UniversalType(parameters: self[a].parameters, body: b))
+  }
+
   /// Returns the type of a pointer to a free-function implementing `a`'s interface.
   public mutating func pointer(to a: Callable) -> FunctionPointer.ID {
     let o = dealiased(a.output)
@@ -303,7 +358,7 @@ public struct TypeStore: Sendable {
     return .init(uncheckedFrom: n.erased)
   }
 
-  /// Returns properties of `n` iff it identifies the type of a callable abstraction.
+  /// Returns properties of `n` iff it identifies the type of a simple callable abstraction.
   public func seenAsCallableAbstraction<T: TypeIdentity>(_ n: T) -> Callable? {
     switch self[head(n)] {
     case let t as Arrow:

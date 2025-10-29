@@ -1,9 +1,12 @@
 import Archivist
 import Utilities
 
-/// The type of term abstraction returning independent values.
+/// The type of term abstraction.
 @Archivable
 public struct Arrow: TypeTree {
+
+  /// The way in which the abstraction must be applied.
+  public let style: Call.Style
 
   /// The effect of the abstraction's call operator.
   public let effect: AccessEffect
@@ -19,11 +22,13 @@ public struct Arrow: TypeTree {
 
   /// Creates an instance with the given properties.
   public init(
+    style: Call.Style = .parenthesized,
     effect: AccessEffect = .let,
     environment: AnyTypeIdentity = .void,
     inputs: [Parameter],
     output: AnyTypeIdentity
   ) {
+    self.style = style
     self.effect = effect
     self.environment = environment
     self.inputs = inputs

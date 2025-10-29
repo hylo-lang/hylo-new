@@ -10,6 +10,9 @@ public protocol Instruction: Hashable, Showable, Sendable {
   /// The region of the code corresponding to this instruction.
   var anchor: Anchor { get }
 
+  /// Asserts that the well-formedness conditions of the instruction hold.
+  func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool
+
 }
 
 extension Instruction {
@@ -25,6 +28,10 @@ extension Instruction {
 
   public var type: IRType {
     .nothing
+  }
+
+  public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
+    true
   }
 
 }

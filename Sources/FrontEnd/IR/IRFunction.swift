@@ -115,7 +115,7 @@ public struct IRFunction: Sendable {
     case .word(_, let t):
       return (t.erased, false)
     case .function(_, let t):
-      return (t.erased, false)
+      return (t.erased, true)
     }
   }
 
@@ -124,7 +124,7 @@ public struct IRFunction: Sendable {
   /// - Requires: `v` is either a constant or an isntruction in this function.
   private func resolved(_ t: IRType) -> (type: AnyTypeIdentity, isAddress: Bool)? {
     switch t {
-    case .hylo(let u, let isAddress):
+    case .lowered(let u, let isAddress):
       return (u, isAddress)
 
     case .same(let i):
@@ -134,7 +134,7 @@ public struct IRFunction: Sendable {
       if let (u, isAddress) = type(of: i), isAddress {
         return (u, false)
       } else {
-        unreachable("ill-formed IR type")
+        fatalError("ill-formed IR type")
       }
 
     case .nothing:

@@ -26,10 +26,10 @@ public struct InstructionTag: Sendable {
 
   static let allValues: [any Instruction.Type] = [
     // Instructions.
-    IRAccess.self,
     IRAccess.End.self,
     IRLoad.self,
     IRStore.self,
+    IRProperty.self,
 
     // Terminators.
     IRReturn.self,
