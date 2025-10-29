@@ -25,7 +25,6 @@ public struct InstructionTag: Sendable {
   }
 
   static let allValues: [any Instruction.Type] = [
-    // Instructions.
     IRAccess.self,
     IRAccess.End.self,
     IRAlloca.self,
