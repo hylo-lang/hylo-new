@@ -99,8 +99,8 @@ public struct TypeStore: Sendable {
 
   /// Returns `true` iff `n` is the type of an entity callable with the given style.
   public func isCallable<T: TypeIdentity>(_ n: T, _ style: Call.Style) -> Bool {
-    if let w = seenAsCallableAbstraction(n) {
-      return w.style == style
+    if let w = seenAsTermAbstraction(n) {
+      return self[w].style == style
     } else {
       return false
     }
@@ -110,8 +110,8 @@ public struct TypeStore: Sendable {
   public func isCallable<T: TypeIdentity, S: Collection<String?>>(
     _ n: T, _ style: Call.Style, withLabels labels: S
   ) -> Bool {
-    if let w = seenAsCallableAbstraction(n) {
-      return (w.style == style) && w.labelsCompatible(with: labels)
+    if let w = seenAsTermAbstraction(n) {
+      return (self[w].style == style) && self[w].labelsCompatible(with: labels)
     } else {
       return false
     }
@@ -331,15 +331,11 @@ public struct TypeStore: Sendable {
   }
 
   /// Returns the type of a pointer to a free-function implementing `a`'s interface.
-  public mutating func pointer(to a: Callable) -> FunctionPointer.ID {
-    let o = dealiased(a.output)
-    var i: [AnyTypeIdentity]
-    if a.environment != .void {
-      i = [dealiased(a.environment)]
-    } else {
-      i = []
-    }
-    i.append(contentsOf: a.inputs.map({ (e) in dealiased(e.type) }))
+  public mutating func pointer(to a: Arrow.ID) -> FunctionPointer.ID {
+    let e = dealiased(self[a].environment)
+    let o = dealiased(self[a].output)
+    var i: [AnyTypeIdentity] = (e == .void) ? [] : [e]
+    i.append(contentsOf: self[a].inputs.map({ (e) in dealiased(e.type) }))
     return demand(FunctionPointer(inputs: i, output: o))
   }
 
@@ -358,13 +354,19 @@ public struct TypeStore: Sendable {
     return .init(uncheckedFrom: n.erased)
   }
 
-  /// Returns properties of `n` iff it identifies the type of a simple callable abstraction.
-  public func seenAsCallableAbstraction<T: TypeIdentity>(_ n: T) -> Callable? {
-    switch self[head(n)] {
-    case let t as Arrow:
-      return .init(t)
-    case let t as Bundle:
-      return seenAsCallableAbstraction(t.shape)
+  /// Returns the shape of the term abstraction that `n` identifies, if any.
+  ///
+  /// The result is non-`nil` iff `n` sans context identifies either an arrow or a bundle. For
+  /// example, if `n` has the form `<T, E> [E]() auto -> T { let, inout }` (i.e., a polymorphic
+  /// bundle), the result is `[E]() auto -> T`.
+  public func seenAsTermAbstraction<T: TypeIdentity>(_ n: T) -> Arrow.ID? {
+    let h = head(n)
+
+    switch tag(of: h) {
+    case Arrow.self:
+      return .init(uncheckedFrom: h)
+    case Bundle.self:
+      return seenAsTermAbstraction(self[Bundle.ID(uncheckedFrom: h)].shape)
     default:
       return nil
     }
@@ -417,7 +419,7 @@ public struct TypeStore: Sendable {
     // `n` identifies a function bundle?
     else if let b = cast(h, to: Bundle.self) {
       if let a = cast(self[b].shape, to: Arrow.self), let shape = asBoundMemberFunction(a) {
-        let adapted = demand(Bundle(shape: shape.erased, variants: self[b].variants))
+        let adapted = demand(Bundle(shape: shape, variants: self[b].variants))
         return introduce(c, into: adapted.erased)
       } else {
         return nil
@@ -469,7 +471,7 @@ public struct TypeStore: Sendable {
 
       // Otherwise, the result is the same as that of the underlying shape.
       else if !t.variants.intersection(.inplace).isEmpty {
-        return resultOfApplying(t.shape, mutably: isAppliedMutably)
+        return resultOfApplying(t.shape.erased, mutably: isAppliedMutably)
       } else {
         return nil
       }
@@ -878,7 +880,8 @@ public struct TypeStore: Sendable {
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
     (lhs.variants == rhs.variants)
-      && unifiable(lhs.shape, rhs.shape, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(
+        lhs.shape.erased, rhs.shape.erased, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.

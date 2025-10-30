@@ -1123,10 +1123,11 @@ public struct Typer {
     initializeContext(program[d].contextParameters)
     let variants = AccessEffectSet(program[d].variants.map(program.read(\.effect.value)))
     let inputs = declaredTypes(of: program[d].parameters)
-    let shape = declaredArrowType(of: d, taking: inputs)
+    let arrow = declaredArrowType(of: d, taking: inputs)
 
-    let (context, head) = program.types.contextAndHead(shape)
-    let bundle = demand(Bundle(shape: head, variants: variants)).erased
+    let (context, head) = program.types.contextAndHead(arrow)
+    let shape = program.types.cast(head, to: Arrow.self)!
+    let bundle = demand(Bundle(shape: shape, variants: variants)).erased
     let result = program.types.introduce(context, into: bundle)
 
     program[d.module].setType(result, for: d)
@@ -1278,15 +1279,11 @@ public struct Typer {
     let bundle = declaredType(of: parent)
     let (context, head) = program.types.contextAndHead(bundle)
 
-    let shape = program.types.select(head, \Bundle.shape) ?? .error
-    switch program.types.tag(of: shape) {
-    case Arrow.self:
-      let t = Arrow.ID(uncheckedFrom: shape)
+    if let t = program.types.select(head, \Bundle.shape) {
       let u = program.types.variant(program[d].effect.value, of: t).erased
       program[d.module].setType(u, for: d)
       return program.types.introduce(context, into: u)
-
-    default:
+    } else {
       assert(bundle[.hasError])
       program[d.module].setType(.error, for: d)
       return .error
@@ -2640,8 +2637,9 @@ public struct Typer {
       let s = program.spanForDiagnostic(about: d)
       let h = program.types.head(c.type)
 
-      if let w = program.types.seenAsCallableAbstraction(h), w.style == style {
-        return program.incompatibleLabels(found: w.labels, expected: labels, at: s, as: .note)
+      if let w = program.types.seenAsTermAbstraction(h), program.types[w].style == style {
+        let found = program.types[w].labels
+        return program.incompatibleLabels(found: found, expected: labels, at: s, as: .note)
       } else {
         return .init(.note, "candidate not viable", at: s)
       }
