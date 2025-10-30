@@ -210,14 +210,16 @@ internal struct IREmitter {
       operands.append(lowered(lvalue: a.value))
     }
 
-    // At this point the callee must monomorphic.
-    let shape = program.types.seenAsCallableAbstraction(callee.type)!
-    assert(operands.count == shape.inputs.count)
+    // At this point the callee must be a monomorphic term abstraction.
+    let shape = program.types.seenAsTermAbstraction(callee.type)!
+    let inputs = program.types[shape].inputs
+    assert(!program.types.hasContext(callee.type))
+    assert(operands.count == inputs.count)
 
     lowering(e) { (me) in
       // Form accesses on the parameters.
       for i in 0 ..< operands.count {
-        operands[i] = me._access(.init(shape.inputs[i].access), from: operands[i])
+        operands[i] = me._access(.init(inputs[i].access), from: operands[i])
       }
       let r = me._access([.set], from: result)
 
@@ -398,14 +400,14 @@ internal struct IREmitter {
   /// IR functions can be generic. Type parameters are only lowered to term parameters in
   /// existentialized functions.
   private mutating func termParameters<T: Declaration>(of d: T.ID) -> [IRParameter] {
-    let abstraction = program.types.seenAsCallableAbstraction(program.type(assignedTo: d))!
+    let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
     let parameters = program.parametersAndCaptures(of: d)
 
     var result: [IRParameter] = []
 
     // Return register comes first.
-    if abstraction.style == .parenthesized {
-      let o = loweredType(addressOf: abstraction.output)
+    if program.types[abstraction].style == .parenthesized {
+      let o = loweredType(addressOf: program.types[abstraction].output)
       result.append(IRParameter(type: o, access: .set, declaration: nil))
     }
 

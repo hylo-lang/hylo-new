@@ -53,6 +53,29 @@ public struct Arrow: TypeTree {
     inputs.lazy.map(\.label)
   }
 
+  /// Returns `true` iff instances of `self` can be applied with `labels`.
+  public func labelsCompatible<T: Collection<String?>>(with labels: T) -> Bool {
+    var i = labels.startIndex
+    for p in inputs {
+      // Is there's an explicit argument with the right label?
+      if (labels.endIndex > i) && (labels[i] == p.label) {
+        labels.formIndex(after: &i)
+      }
+
+      // The parameter has a default value?
+      else if p.defaultValue != nil {
+        continue
+      }
+
+      // Arguments do not match.
+      else {
+        return false
+      }
+    }
+
+    return i == labels.endIndex
+  }
+
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
   public func modified(
     in store: inout TypeStore,
