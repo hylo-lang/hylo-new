@@ -39,10 +39,10 @@ public struct Module: Sendable {
   public struct SourceContainer: Sendable {
 
     /// The position of `self` in the containing module.
-    internal let identity: SourceFile.ID
+    public let identity: SourceFile.ID
 
     /// The source file contained in `self`.
-    internal let source: SourceFile
+    public let source: SourceFile
 
     /// The abstract syntax of `source`'s contents.
     internal var syntax: [AnySyntax] = []
