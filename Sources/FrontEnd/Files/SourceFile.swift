@@ -150,6 +150,13 @@ public struct SourceFile: Hashable, Sendable {
     return (lineNumber, columnNumber)
   }
 
+  /// Returns the index in `text` corresponding to the 1-based `line` and `column`.
+  ///
+  /// - Requires: `line` and `column` describe a valid position in `self`.
+  public func index(line: Int, column: Int) -> Index {
+    text.index(properties.lineStarts[line - 1], offsetBy: column - 1)
+  }
+
   /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`.
   public static func forEachURL(
     in directory: URL, withPathExtension pathExtension: String = "hylo",
