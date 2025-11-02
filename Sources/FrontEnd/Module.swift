@@ -36,7 +36,7 @@ public struct Module: Sendable {
   }
 
   /// A source file added to a module.
-  internal struct SourceContainer: Sendable {
+  public struct SourceContainer: Sendable {
 
     /// The position of `self` in the containing module.
     internal let identity: SourceFile.ID
@@ -54,7 +54,7 @@ public struct Module: Sendable {
     internal var roots: [DeclarationIdentity] = []
 
     /// The top-level declarations in `self`.
-    internal var topLevelDeclarations: [DeclarationIdentity] = []
+    public internal(set) var topLevelDeclarations: [DeclarationIdentity] = []
 
     /// A table from syntax tree to the scope that contains it.
     ///
@@ -79,7 +79,7 @@ public struct Module: Sendable {
     internal var witnessTables: [Int: WitnessTable] = [:]
 
     /// The diagnostics accumulated during compilation.
-    internal var diagnostics = DiagnosticSet()
+    public internal(set) var diagnostics = DiagnosticSet()
 
     /// Projects the node identified by `n`.
     internal subscript<T: SyntaxIdentity>(n: T) -> any Syntax {
@@ -161,7 +161,7 @@ public struct Module: Sendable {
   public private(set) var dependencies: [Module.Name] = []
 
   /// The source files in the module.
-  internal private(set) var sources: OrderedDictionary<FileName, SourceContainer> = [:]
+  public private(set) var sources: OrderedDictionary<FileName, SourceContainer> = [:]
 
   /// The IR functions in the module.
   internal private(set) var ir: OrderedDictionary<IRFunction.Name, IRFunction?> = [:]
