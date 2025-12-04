@@ -397,10 +397,11 @@ public struct Typer {
     let qualification = demand(Metatype(inhabitant: conformer)).erased
 
     // The expected types of implementations satisfying the concept's requirements are computed by
-    // substituting the abstract types of the concept by their corresponding assignment.
+    // substituting the abstract types of the concept by their corresponding assignments.
     var substitutions = Dictionary(
       uniqueKeysWithValues: witness.arguments.elements.map({ (k, v) in (k.erased, v) }))
 
+    var implementations = WitnessTable()
     let (requirements, associatedTypes) = program[concept].members.partitioned { (r) in
       program.tag(of: r) == AssociatedTypeDeclaration.self
     }
@@ -414,30 +415,41 @@ public struct Typer {
         let k0 = declaredType(of: a)
         let k1 = program.types[k0] as! Metatype
         substitutions[k1.inhabitant] = m.inhabitant
+        implementations.assign(m.inhabitant, to: a)
       } else {
         return reportMissingImplementation(of: a, in: d)
       }
     }
 
-    // Check that other requirements may be satisfied. We do not need to store the implementations
-    // since witness tables are built on demand.
+    // Check that other requirements may be satisfied.
     for r in requirements {
       switch program.tag(of: r) {
       case ConformanceDeclaration.self:
-        _ = anonymousImplementation(of: r)
+        if let i = anonymousImplementation(of: r) {
+          implementations.assign(
+            i.witness,
+            to: program.castUnchecked(r, to: ConformanceDeclaration.self))
+        }
 
       case FunctionDeclaration.self:
-        _ = namedImplementation(of: r)
+        if let i = namedImplementation(of: r) {
+          implementations.assign(i, to: r)
+        }
 
       case FunctionBundleDeclaration.self:
         let b = program.castUnchecked(r, to: FunctionBundleDeclaration.self)
         for v in program[b].variants {
-          _ = namedImplementation(of: .init(v))
+          if let i = namedImplementation(of: .init(v)) {
+            implementations.assign(i, to: r )
+          }
         }
 
       default:
         program.unexpected(r)
       }
+
+      // Save the witness table.
+      program[module].setImplementations(implementations, for: d)
     }
 
     /// Returns the declarations implementing `requirement`.

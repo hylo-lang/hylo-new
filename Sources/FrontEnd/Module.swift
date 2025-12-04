@@ -75,6 +75,9 @@ public struct Module: Sendable {
     /// A table from name to its declaration.
     internal var nameToDeclaration: [Int: DeclarationReference] = [:]
 
+    /// A table from conformance declaration to the implementations of its requirements.
+    internal var witnessTables: [Int: WitnessTable] = [:]
+
     /// The diagnostics accumulated during compilation.
     internal var diagnostics = DiagnosticSet()
 
@@ -346,6 +349,12 @@ public struct Module: Sendable {
     assert(r == s, "inconsistent property assignment")
   }
 
+  /// Assigns to `n` the witness table `i` that it defines.
+  internal mutating func setImplementations(_ i: WitnessTable, for n: ConformanceDeclaration.ID) {
+    assert(n.module == identity)
+    sources.values[n.file.offset].witnessTables[n.offset] = i
+  }
+
   /// Returns the type assigned to `n`, if any.
   internal func type<T: SyntaxIdentity>(assignedTo n: T) -> AnyTypeIdentity? {
     assert(n.module == identity)
@@ -481,6 +490,7 @@ extension Module: Archivable {
         s.variableToBinding = try archive.read([Int: BindingDeclaration.ID].self, in: &context)
         s.syntaxToType = try archive.read([Int: AnyTypeIdentity].self, in: &context)
         s.nameToDeclaration = try archive.read([Int: DeclarationReference].self, in: &context)
+        s.witnessTables = try archive.read([Int: WitnessTable].self, in: &context)
       }
     }
 
@@ -536,6 +546,7 @@ extension Module: Archivable {
         try archive.write(s.variableToBinding, in: &ctx, sortedBy: \.key)
         try archive.write(s.syntaxToType, in: &ctx, sortedBy: \.key)
         try archive.write(s.nameToDeclaration, in: &ctx, sortedBy: \.key)
+        try archive.write(s.witnessTables, in: &ctx)
       }
     }
   }
