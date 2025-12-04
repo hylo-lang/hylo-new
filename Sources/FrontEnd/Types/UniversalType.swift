@@ -9,17 +9,17 @@ public struct UniversalType: TypeTree {
   public let parameters: [GenericParameter.ID]
 
   /// The type under the quantifier.
-  public let body: AnyTypeIdentity
+  public let head: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
-  public init(parameters: [GenericParameter.ID], body: AnyTypeIdentity) {
+  public init(parameters: [GenericParameter.ID], head: AnyTypeIdentity) {
     self.parameters = parameters
-    self.body = body
+    self.head = head
   }
 
   /// Properties about `self`.
   public var properties: TypeProperties {
-    parameters.reduce(body.properties, { (a, i) in a.union(i.properties) })
+    parameters.reduce(head.properties, { (a, i) in a.union(i.properties) })
   }
 
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
@@ -27,7 +27,7 @@ public struct UniversalType: TypeTree {
     in store: inout TypeStore,
     by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
   ) -> UniversalType {
-    .init(parameters: parameters, body: store.map(body, transform))
+    .init(parameters: parameters, head: store.map(head, transform))
   }
 
 }
@@ -44,7 +44,7 @@ extension UniversalType: Showable {
         return "\(printer.show(p)) :: \(k)"
       }
     }
-    return "<\(list: ps)> \(printer.show(body))"
+    return "<\(list: ps)> \(printer.show(head))"
   }
 
 }

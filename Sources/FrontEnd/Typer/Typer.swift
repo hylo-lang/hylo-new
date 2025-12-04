@@ -150,8 +150,8 @@ public struct Typer {
       a[p] = .init(q)
     }
 
-    let x = program.types.introduce(usings: lhs.context.usings, into: lhs.body)
-    let y = program.types.introduce(usings: rhs.context.usings, into: rhs.body)
+    let x = program.types.introduce(usings: lhs.context.usings, into: lhs.head)
+    let y = program.types.introduce(usings: rhs.context.usings, into: rhs.head)
     return x == program.types.substitute(a, in: y)
   }
 
@@ -386,7 +386,7 @@ public struct Typer {
     // The type of the declaration has the form `<T...> A... ==> P<B...>` where `P<B...>` is the
     // type of the declared witness and the rest forms a context. Requirements are resolved as
     // members of the type `B` where type parameters occur as skolems.
-    let witnessSansContext = program.types.contextAndHead(t).body
+    let witnessSansContext = program.types.contextAndHead(t).head
     guard let witness = program.types.seenAsTraitApplication(witnessSansContext) else {
       assert(t[.hasError])
       return
@@ -1222,7 +1222,7 @@ public struct Typer {
     let a = TypeArguments(mapping: ps, to: \.erased)
     let f = demand(Trait(declaration: d)).erased
     let t = demand(TypeApplication(abstraction: f, arguments: a)).erased
-    let u = metatype(of: UniversalType(parameters: ps, body: t)).erased
+    let u = metatype(of: UniversalType(parameters: ps, head: t)).erased
     program[d.module].setType(u, for: d)
     return u
   }
@@ -1365,7 +1365,7 @@ public struct Typer {
       // <T> T ~ T
       let t0 = demand(GenericParameter.nth(0, .proper))
       let x0 = demand(EqualityWitness(lhs: t0.erased, rhs: t0.erased)).erased
-      result = demand(UniversalType(parameters: [t0], body: x0)).erased
+      result = demand(UniversalType(parameters: [t0], head: x0)).erased
 
     case .coercion(.symmetry):
       // <T0, T1> T0 ~ T1 ==> T1 ~ T0
@@ -1374,7 +1374,7 @@ public struct Typer {
       let x0 = demand(EqualityWitness(lhs: t0.erased, rhs: t1.erased)).erased
       let x1 = demand(EqualityWitness(lhs: t1.erased, rhs: t0.erased)).erased
       let x2 = demand(Implication(context: [x0], head: x1)).erased
-      result = demand(UniversalType(parameters: [t0, t1], body: x2)).erased
+      result = demand(UniversalType(parameters: [t0, t1], head: x2)).erased
 
     case .coercion(.transitivity):
       // <T0, T1, T2> T0 ~ T1, T1 ~ T2 ==> T0 ~ T2
@@ -1385,7 +1385,7 @@ public struct Typer {
       let x1 = demand(EqualityWitness(lhs: t1.erased, rhs: t2.erased)).erased
       let x2 = demand(EqualityWitness(lhs: t0.erased, rhs: t2.erased)).erased
       let x3 = demand(Implication(context: [x0, x1], head: x2)).erased
-      result = demand(UniversalType(parameters: [t0, t1, t2], body: x3)).erased
+      result = demand(UniversalType(parameters: [t0, t1, t2], head: x3)).erased
     }
 
     cache.predefinedGivens[g] = result
@@ -1790,7 +1790,7 @@ public struct Typer {
 
     // The callee must be a polymorphic function taking two metatypes and returning one.
     let u = program.types.castUnchecked(callee, to: UniversalType.self)
-    let f = program.types.castUnchecked(program.types[u].body, to: Arrow.self)
+    let f = program.types.castUnchecked(program.types[u].head, to: Arrow.self)
     let t = program.types.substitute(
       TypeArguments.init(mapping: program.types[u].parameters, to: [rhs]),
       in: program.types[f].output)
@@ -3290,7 +3290,7 @@ public struct Typer {
         let a = TypeArguments(mapping: u.parameters, to: { _ in fresh().erased })
         witness = WitnessExpression(
           value: .typeApplication(witness, a),
-          type: program.types.substitute(a, in: u.body))
+          type: program.types.substitute(a, in: u.head))
         continue
       }
 
@@ -3589,12 +3589,12 @@ public struct Typer {
       let u = program.types.contextAndHead(t)
 
       // Can the given can match any type (e.g., `<T> T`)?
-      if u.context.parameters.contains(where: { (p) in p == u.body }) {
+      if u.context.parameters.contains(where: { (p) in p == u.head }) {
         return true
       }
 
       // Is the given of the form `T ~ U`?
-      if let e = program.types.cast(u.body, to: EqualityWitness.self) {
+      if let e = program.types.cast(u.head, to: EqualityWitness.self) {
         let l = program.types.open(u.context.parameters, in: program.types[e].lhs)
         let r = program.types.open(u.context.parameters, in: program.types[e].rhs)
 
@@ -4381,7 +4381,7 @@ public struct Typer {
       let a = TypeArguments(mapping: ps, to: \.erased)
       let u = demand(t).erased
       let v = demand(TypeApplication(abstraction: u, arguments: a)).erased
-      return metatype(of: UniversalType(parameters: ps, body: v))
+      return metatype(of: UniversalType(parameters: ps, head: v))
     }
   }
 
