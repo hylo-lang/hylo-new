@@ -16,13 +16,22 @@ public struct IRFunction: Sendable {
   }
 
   /// The way in which an IR function returns its result.
-  public enum ReturnStyle: Hashable, Sendable {
+  public enum Result: Hashable, Sendable {
 
     /// The result is returned in register.
     case register
 
     /// The result is projected.
-    case projection
+    case projection(AnyTypeIdentity)
+
+    /// The payload of `self` iff it denotes a projection.
+    public var projection: AnyTypeIdentity? {
+      if case .projection(let t) = self {
+        return t
+      } else {
+        return nil
+      }
+    }
 
   }
 
@@ -36,7 +45,7 @@ public struct IRFunction: Sendable {
   public let termParameters: [IRParameter]
 
   /// The way in which the function returns its result.
-  public let returnStyle: ReturnStyle
+  public let result: Result
 
   /// The basic blocks in the function, the first of which being the function's entry.
   public private(set) var blocks: List<IRBlock>
@@ -50,12 +59,12 @@ public struct IRFunction: Sendable {
   /// Creates an instance with the given properties.
   public init(
     name: Name, typeParameters: [GenericParameter.ID], termParameters: [IRParameter],
-    returnStyle: ReturnStyle
+    result: Result
   ) {
     self.name = name
     self.typeParameters = typeParameters
     self.termParameters = termParameters
-    self.returnStyle = returnStyle
+    self.result = result
     self.blocks = []
     self.instructions = []
   }
@@ -206,6 +215,10 @@ extension IRFunction: Showable {
     }
     result.append(")")
 
+    if case .projection(let t) = self.result {
+      result.append(" -> \(printer.show(t))")
+    }
+
     if !instructions.isEmpty {
       result.append(" {\n")
       for b in blocks.addresses {
@@ -229,7 +242,7 @@ extension IRFunction.Name: Showable {
   public func show(using printer: inout TreePrinter) -> String {
     switch self {
     case .lowered(let d):
-      printer.program.nameOrTag(of: d)
+      printer.program.debugName(of: d)
     }
   }
 

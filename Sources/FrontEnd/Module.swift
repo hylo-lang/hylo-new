@@ -367,6 +367,12 @@ public struct Module: Sendable {
     return sources.values[n.file.offset].nameToDeclaration[n.offset]
   }
 
+  /// Returns the witness table defined by `d`, if any.
+  internal func implementations(definedBy d: ConformanceDeclaration.ID) -> WitnessTable? {
+    assert(d.module == identity)
+    return sources.values[d.file.offset].witnessTables[d.offset]
+  }
+
 }
 
 extension Module: Archivable {

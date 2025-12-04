@@ -401,7 +401,7 @@ public struct Typer {
     var substitutions = Dictionary(
       uniqueKeysWithValues: witness.arguments.elements.map({ (k, v) in (k.erased, v) }))
 
-    var implementations = WitnessTable()
+    var implementations = WitnessTable(concept: concept)
     let (requirements, associatedTypes) = program[concept].members.partitioned { (r) in
       program.tag(of: r) == AssociatedTypeDeclaration.self
     }

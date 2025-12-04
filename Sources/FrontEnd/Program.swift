@@ -470,6 +470,13 @@ public struct Program: Sendable {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
+  /// Returns the witness table defined by `d`.
+  ///
+  /// - Requires: The module containing `d` is typed.
+  public func implementations(definedBy d: ConformanceDeclaration.ID) -> WitnessTable {
+    self[d.module].implementations(definedBy: d) ?? unreachable("untyped node at \(self[d].site)")
+  }
+
   /// If `n` is a requirement, returns the traits that introduces it. Otherwise, returns `nil`.
   ///
   /// - Requires: The module containing `n` is scoped.
@@ -634,6 +641,16 @@ public struct Program: Sendable {
       result.append(.init(identifier: self[v].identifier.value))
     }
     return result
+  }
+
+  public func debugName(of d: DeclarationIdentity) -> String {
+    var result = [nameOrTag(of: d)]
+    for s in scopes(from: self.parent(containing: d)) {
+      if let n = s.node {
+        result.append(castToDeclaration(n).flatMap(name(of:))?.description ?? "\(tag(of: n))")
+      }
+    }
+    return result.reversed().joined(separator: ".")
   }
 
   /// Returns the name of the unique entity declared by `d` or a description of `d`'s tag if it
