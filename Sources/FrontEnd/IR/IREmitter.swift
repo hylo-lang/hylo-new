@@ -38,8 +38,12 @@ internal struct IREmitter {
   /// Generates the IR of `d`.
   private mutating func lower(_ d: DeclarationIdentity) {
     switch program.tag(of: d) {
+    case ConformanceDeclaration.self:
+      lower(program.castUnchecked(d, to: ConformanceDeclaration.self))
     case FunctionDeclaration.self:
       lower(program.castUnchecked(d, to: FunctionDeclaration.self))
+    case StructDeclaration.self:
+      lower(program.castUnchecked(d, to: StructDeclaration.self))
     case TraitDeclaration.self:
       lower(program.castUnchecked(d, to: TraitDeclaration.self))
     default:
@@ -48,13 +52,52 @@ internal struct IREmitter {
   }
 
   /// Generates the IR of `d`.
+  private mutating func lower(_ d: ConformanceDeclaration.ID) {
+    // Lower explicit requirement implementations first.
+    if let ms = program[d].members {
+      for m in ms { lower(m) }
+    }
+
+    // TODO: Construct the function that projects the witness.
+    withClearContext({ (me) in me.lowerDefinitionInClearContext(d) })
+  }
+
+  /// Generates the IR of the subscript that projects the witness declared by `d`.
+  private mutating func lowerDefinitionInClearContext(_ d: ConformanceDeclaration.ID) {
+    let f = demandLoweredDeclaration(of: d)
+    assert(!program[module][f].isDefined, "conformance already lowered")
+
+    insertionContext.function = program[module][f]
+    insertionContext.point = .end(of: insertionContext.function!.addBlock())
+
+    let w = insertionContext.function!.result.projection!
+
+    // TODO: Construct a witness table
+    // The idea is to iterate over the implementation to figure out the shape of the concrete
+    // witness object that implements the "interface" defined by the trait.
+    let i = program.implementations(definedBy: d)
+    _ = program[i.concept].members
+
+    lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
+      let x0 = me._witnesstable(type: w)
+      let x1 = me._access([.let], from: x0)
+      me._yield(x1)
+      me._end(IRAccess.self, openedBy: x1)
+      me._return()
+    }
+
+    program[module][f] = insertionContext.function.sink()
+  }
+
+  /// Generates the IR of `d`.
   private mutating func lower(_ d: FunctionDeclaration.ID) {
-    withClearContext({ $0.lowerAssumingClearContext(d) })
+    withClearContext({ (me) in me.lowerInClearContext(d) })
   }
 
   /// Generates the IR of `d` assuming the insertion context is clear.
-  private mutating func lowerAssumingClearContext(_ d: FunctionDeclaration.ID) {
+  private mutating func lowerInClearContext(_ d: FunctionDeclaration.ID) {
     let f = demandLoweredDeclaration(of: d)
+    assert(!program[module][f].isDefined, "function already lowered")
 
     // Is there a body to lower?
     guard let body = program[d].body else {
@@ -63,10 +106,8 @@ internal struct IREmitter {
       return
     }
 
-    // Did we already lower the function?
+    // Lower the function's definition.
     insertionContext.function = program[module][f]
-    assert(!insertionContext.function!.isDefined, "function already lowered")
-
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
     var frame = Frame()
     for (i, p) in program[module][f].termParameters.enumerated() {
@@ -85,9 +126,23 @@ internal struct IREmitter {
     program[module][f] = insertionContext.function.sink()
   }
 
-  /// Generates the IR of the members in `d` having a default implementation.
+  /// Generates the IR of the members in `d`.
+  private mutating func lower(_ d: StructDeclaration.ID) {
+    for c in program[d].conformances {
+      lower(c)
+    }
+    for m in program[d].members {
+      lower(m)
+    }
+  }
+
+  /// Generates the IR of the members in `d`.
+  ///
+  /// Requirements with no default implementation have no IR.
   private mutating func lower(_ d: TraitDeclaration.ID) {
-    for m in program[d].members { lower(m) }
+    for m in program[d].members {
+      lower(m)
+    }
   }
 
   /// Generates the IR of `body`, which is the definition of an abstraction.
@@ -292,7 +347,12 @@ internal struct IREmitter {
     switch program.declaration(referredToBy: e) {
     case .direct(let d):
       // The callee is referring to a function directly.
-      return loweredCallee(e, referringTo: d)
+      return loweredCallee(e, referringTo: d, boundTo: nil)
+
+    case .member(let d):
+      // The callee is referring to a bound member.
+      let q = lowered(lvalue: program[e].qualification!)
+      return loweredCallee(e, referringTo: d, boundTo: q)
 
     case .inherited(let w, let m, let statically):
       // The callee referring to a member declared in extension.
@@ -313,13 +373,13 @@ internal struct IREmitter {
 
   /// Implements `loweredCallee(_:)` for direct declaration references.
   private mutating func loweredCallee(
-    _ e: NameExpression.ID, referringTo d: DeclarationIdentity
+    _ e: NameExpression.ID, referringTo d: DeclarationIdentity, boundTo r: IRValue?
   ) -> LoweredCallee {
     switch program.tag(of: d) {
     case FunctionDeclaration.self:
       let n = IRFunction.Name.lowered(d)
-      let t = program.type(assignedTo: e)
-      return LoweredCallee(value: .function(n, t), receiver: nil, type: t)
+      let t = loweredCalleeType(of: .init(e), denotingReceiver: r != nil)
+      return LoweredCallee(value: .function(n, t), receiver: r, type: t)
 
     default:
       program.unexpected(d)
@@ -353,6 +413,21 @@ internal struct IREmitter {
     program.unexpected(e)
   }
 
+  /// Returns the type of `e` used as a callee, assuming it is the receiver of a member method if
+  /// `isBoundMember` is `true`.
+  private mutating func loweredCalleeType(
+    of e: ExpressionIdentity, denotingReceiver isBoundMember: Bool
+  ) -> AnyTypeIdentity {
+    let t = program.type(assignedTo: e)
+    if isBoundMember {
+      // If there's a receiver, then then `e` should be a bound member function.
+      assert(program.types.isLikeBoundMember(t))
+      return program.types.lifted(t)
+    } else {
+      return t
+    }
+  }
+
   /// Generates the IR for computing the address of the value denoted by `e`.
   ///
   /// The return value is the (possibly raw) address of some storage holding the value of `e`. If
@@ -379,7 +454,7 @@ internal struct IREmitter {
 
   /// Returns the identity of the function lowering `d`, declaring it if needed.
   ///
-  /// `d` identifies the declaration of a callable abstraction (e.g., a function declaration).
+  /// `d` identifies the declaration of a function, subscript, bundle, or conformance.
   private mutating func demandLoweredDeclaration<T: Declaration & Scope>(
     of d: T.ID
   ) -> IRFunction.ID {
@@ -388,10 +463,24 @@ internal struct IREmitter {
       return i
     }
 
-    let ps = termParameters(of: d)
     let ts = program.accumulatedGenericParameters(visibleFrom: .init(node: d))
-    return program[module].addFunction(
-      IRFunction(name: name, typeParameters: ts, termParameters: ps, returnStyle: .register))
+
+    // Are we declaring a conformance?
+    if program.tag(of: d) == ConformanceDeclaration.self {
+      let signature = program.type(assignedTo: d)
+      let (context, head) = program.types.contextAndHead(signature)
+      precondition(context.isEmpty, "not implemented")
+
+      return program[module].addFunction(
+        IRFunction(name: name, typeParameters: ts, termParameters: [], result: .projection(head)))
+    }
+
+    // Otherwise, assume `d` identifies the declaration of a function, subscript, or bundle.
+    else {
+      let ps = termParameters(of: d)
+      return program[module].addFunction(
+        IRFunction(name: name, typeParameters: ts, termParameters: ps, result: .register))
+    }
   }
 
   /// Returns the term parameters of `d`'s lowered representation, which includes `d`' explicit
@@ -536,9 +625,9 @@ internal struct IREmitter {
     insertionContext.anchor!
   }
 
-  /// The return register of `self.currentFunction`, assuming its return style is `.register`.
+  /// The return register of `self.currentFunction`, assuming there is one.
   private var currentReturnRegister: IRValue {
-    assert(currentFunction.returnStyle == .register)
+    assert(currentFunction.result == .register)
     return .parameter(0)
   }
 
@@ -762,6 +851,18 @@ internal struct IREmitter {
       callee: callee, arguments: arguments, typeOfApplication: u,
       anchor: currentAnchor)
     return insert(s)!
+  }
+
+  /// Inserts a `witnesstable` instruction.
+  private mutating func _witnesstable(
+    type: AnyTypeIdentity
+  ) -> IRValue {
+    insert(IRWitnessTable(witnessType: type, anchor: currentAnchor))!
+  }
+
+  /// Inserts a `return` instruction.
+  private mutating func _yield(_ projectee: IRValue) {
+    insert(IRYield(projectee: projectee, anchor: currentAnchor))
   }
 
   /// Generates the IR of `r`, which computes a lvalue.

@@ -3,6 +3,9 @@ import Archivist
 /// A table from trait requirement to its implementation.
 public struct WitnessTable: Hashable, Sendable {
 
+  /// The trait declaring the requirements occurring as keys in this table.
+  public let concept: TraitDeclaration.ID
+
   /// A table from base requirement to its implementation.
   private var bases: [Int: WitnessExpression]
 
@@ -14,18 +17,20 @@ public struct WitnessTable: Hashable, Sendable {
 
   /// Creates an instance with the given properties.
   private init(
+    concept: TraitDeclaration.ID,
     bases: [Int: WitnessExpression],
     associatedTypes: [Int: AnyTypeIdentity],
     members: [Int: DeclarationReference]
   ) {
+    self.concept = concept
     self.bases = bases
     self.associatedTypes = associatedTypes
     self.members = members
   }
 
   /// Creates an empty instance.
-  public init() {
-    self.init(bases: [:], associatedTypes: [:], members:  [:])
+  public init(concept: TraitDeclaration.ID) {
+    self.init(concept: concept, bases: [:], associatedTypes: [:], members:  [:])
   }
 
   /// Assigns `i` to `r`, which is a base trait requirement.
@@ -48,13 +53,15 @@ public struct WitnessTable: Hashable, Sendable {
 extension WitnessTable: Archivable {
 
   public init<A>(from archive: inout ReadableArchive<A>, in context: inout Any) throws {
+    let c = try archive.read(TraitDeclaration.ID.self, in: &context)
     let b = try archive.read([Int: WitnessExpression].self, in: &context)
     let a = try archive.read([Int: AnyTypeIdentity].self, in: &context)
     let m = try archive.read([Int: DeclarationReference].self, in: &context)
-    self.init(bases: b, associatedTypes: a, members: m)
+    self.init(concept: c, bases: b, associatedTypes: a, members: m)
   }
 
   public func write<A>(to archive: inout WriteableArchive<A>, in context: inout Any) throws {
+    try archive.write(concept, in: &context)
     try archive.write(bases, in: &context, sortedBy: \.key)
     try archive.write(associatedTypes, in: &context, sortedBy: \.key)
     try archive.write(members, in: &context, sortedBy: \.key)

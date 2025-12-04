@@ -117,6 +117,15 @@ public struct TypeStore: Sendable {
     }
   }
 
+  /// Returns `true` iff `n` is possibly the type of a bound member function.
+  public func isLikeBoundMember<T: TypeIdentity>(_ n: T) -> Bool {
+    if let f = seenAsTermAbstraction(n) {
+      return tag(of: self[f].environment) == RemoteType.self
+    } else {
+      return false
+    }
+  }
+
   /// Returns `true` iff `n` is a universal type or an implication.
   public func hasContext<T: TypeIdentity>(_ n: T) -> Bool {
     (tag(of: n) == UniversalType.self) || (tag(of: n) == Implication.self)

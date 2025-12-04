@@ -22,7 +22,6 @@ public enum IRValue: Hashable, Sendable {
     }
   }
 
-
 }
 
 extension IRValue: Showable {
