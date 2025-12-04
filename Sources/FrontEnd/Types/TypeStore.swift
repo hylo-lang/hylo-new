@@ -39,7 +39,7 @@ public struct TypeStore: Sendable {
   /// Returns the identity of `Hylo.Never`, which is equivalent to `<T> T`.
   public mutating func never() -> UniversalType.ID {
     let p = demand(GenericParameter.nth(0, .proper))
-    let t = demand(UniversalType(parameters: [p], body: p.erased))
+    let t = demand(UniversalType(parameters: [p], head: p.erased))
     return t
   }
 
@@ -47,7 +47,7 @@ public struct TypeStore: Sendable {
   public mutating func application(
     of f: UniversalType.ID, to arguments: [AnyTypeIdentity]
   ) -> AnyTypeIdentity {
-    substitute(.init(mapping: self[f].parameters, to: arguments), in: self[f].body)
+    substitute(.init(mapping: self[f].parameters, to: arguments), in: self[f].head)
   }
 
   /// Inserts `t` in `self` it isn't already present and returns the identity of an equal tree.
@@ -128,9 +128,9 @@ public struct TypeStore: Sendable {
     while true {
       switch self[h] {
       case let t as UniversalType:
-        h = t.body
+        h = t.head
       case let t as Implication:
-        h = t.body
+        h = t.head
       default:
         return h
       }
@@ -140,7 +140,7 @@ public struct TypeStore: Sendable {
   /// Returns the head and context clause of `n`.
   public func contextAndHead(
     _ n: AnyTypeIdentity
-  ) -> (context: ContextClause, body: AnyTypeIdentity) {
+  ) -> (context: ContextClause, head: AnyTypeIdentity) {
     var p: [GenericParameter.ID] = []
     var u: [AnyTypeIdentity] = []
     var h = n
@@ -149,10 +149,10 @@ public struct TypeStore: Sendable {
       switch self[h] {
       case let t as UniversalType:
         p.append(contentsOf: t.parameters)
-        h = t.body
+        h = t.head
       case let t as Implication:
         u.append(contentsOf: t.usings)
-        h = t.body
+        h = t.head
       default:
         return (.init(parameters: p, usings: u), h)
       }
@@ -169,10 +169,10 @@ public struct TypeStore: Sendable {
     while true {
       switch self[h] {
       case let t as UniversalType:
-        h = open(t.parameters, in: t.body)
+        h = open(t.parameters, in: t.head)
       case let t as Implication:
         u.append(contentsOf: t.usings)
-        h = t.body
+        h = t.head
       default:
         return (u, h)
       }
@@ -192,36 +192,36 @@ public struct TypeStore: Sendable {
     .init(mapping: ps, to: { _ in fresh().erased })
   }
 
-  /// Returns `body` as the head of a universal type and/or implication introducing `c`.
+  /// Returns `n` as the head of a universal type and/or implication introducing `c`.
   public mutating func introduce(
-    _ c: ContextClause, into body: AnyTypeIdentity
+    _ c: ContextClause, into n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    let t = introduce(usings: c.usings, into: body)
+    let t = introduce(usings: c.usings, into: n)
     let u = introduce(parameters: c.parameters, into: t)
     return u
   }
 
-  /// Returns `body` as the head of an implication having `lhs` on the left-hand side.
+  /// Returns `n` as the head of an implication having `lhs` on the left-hand side.
   public mutating func introduce(
-    usings lhs: [AnyTypeIdentity], into body: AnyTypeIdentity
+    usings lhs: [AnyTypeIdentity], into n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    lhs.isEmpty ? body : demand(Implication(context: lhs, head: body)).erased
+    lhs.isEmpty ? n : demand(Implication(context: lhs, head: n)).erased
   }
 
-  /// Returns `body` as the head of a universal type introducing `ps`.
+  /// Returns `n` as the head of a universal type introducing `ps`.
   public mutating func introduce(
-    parameters ps: [GenericParameter.ID], into body: AnyTypeIdentity
+    parameters ps: [GenericParameter.ID], into n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    ps.isEmpty ? body : demand(UniversalType(parameters: ps, body: body)).erased
+    ps.isEmpty ? n : demand(UniversalType(parameters: ps, head: n)).erased
   }
 
   /// Returns `n` without its first requirement.
   public mutating func dropFirstRequirement(_ n: Implication.ID) -> AnyTypeIdentity {
     let i = self[n]
     if i.usings.count == 1 {
-      return i.body
+      return i.head
     } else {
-      return demand(Implication(context: .init(i.usings.dropFirst()), head: i.body)).erased
+      return demand(Implication(context: .init(i.usings.dropFirst()), head: i.head)).erased
     }
   }
 
@@ -320,14 +320,14 @@ public struct TypeStore: Sendable {
 
   /// Implements `lifted(_:)` for implications.
   public mutating func lifted(_ a: Implication.ID) -> Implication.ID {
-    let h = lifted(self[a].body)
+    let h = lifted(self[a].head)
     return demand(Implication(context: self[a].usings, head: h))
   }
 
   /// Implements `lifted(_:)` for universal types.
   public mutating func lifted(_ a: UniversalType.ID) -> UniversalType.ID {
-    let b = lifted(self[a].body)
-    return demand(UniversalType(parameters: self[a].parameters, body: b))
+    let b = lifted(self[a].head)
+    return demand(UniversalType(parameters: self[a].parameters, head: b))
   }
 
   /// Returns the type of a pointer to a free-function implementing `a`'s interface.
@@ -686,7 +686,7 @@ public struct TypeStore: Sendable {
     // Reduce type applications if the abstaction is a universal type.
     var t = substitutions[n]
     while let a = self[t] as? TypeApplication, let f = self[a.abstraction] as? UniversalType {
-      t = substitute(.init(mapping: f.parameters, to: a.arguments.values), in: f.body)
+      t = substitute(.init(mapping: f.parameters, to: a.arguments.values), in: f.head)
     }
 
     // Recurse if necessary.
@@ -911,7 +911,7 @@ public struct TypeStore: Sendable {
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
     unifiable(lhs.usings, rhs.usings, extending: &ss, handlingCoercionsWith: areCoercible)
-      && unifiable(lhs.body, rhs.body, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(lhs.head, rhs.head, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.
@@ -975,7 +975,7 @@ public struct TypeStore: Sendable {
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
     lhs.parameters.elementsEqual(rhs.parameters)
-      && unifiable(lhs.body, rhs.body, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(lhs.head, rhs.head, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if the the pairwise elements of `lhs` and `rhs` are unifiable.

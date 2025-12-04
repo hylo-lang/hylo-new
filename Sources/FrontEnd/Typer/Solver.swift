@@ -428,7 +428,7 @@ internal struct Solver {
       }
 
       let ss = TypeArguments(mapping: u.parameters, to: k.arguments)
-      let t = program.types.substitute(ss, in: u.body)
+      let t = program.types.substitute(ss, in: u.head)
       let subgoal = schedule(EqualityConstraint(lhs: k.output, rhs: t, site: k.site))
       return delegate([subgoal])
     }
