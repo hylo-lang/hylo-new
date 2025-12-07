@@ -24,8 +24,8 @@ let package = Package(
   ],
   dependencies: [
     .package(
-      url: "https://github.com/kyouko-taiga/archivist.git",
-      branch: "main"),
+      url: "https://github.com/kyouko-taiga/Archivist.git",
+      branch: "086c16e150ae2ea11bbdbe4546c3a6de6bd22a31"),
     .package(
       url: "https://github.com/apple/swift-algorithms.git",
       from: "1.2.0"),
@@ -36,7 +36,7 @@ let package = Package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
     .package(
-      url: "https://github.com/hylo-lang/Swifty-LLVM",
+      url: "https://github.com/hylo-lang/Swifty-LLVM.git",
       branch: "1c515a866b15feeac3ab8bb43a43c0073e9886df"),
   ],
   targets: [
