@@ -2718,7 +2718,7 @@ public struct Typer {
       w = w.substituting(n, for: m)
 
       program[n.module].replace(
-        n, for: SynthethicExpression(value: .witness(w), site: program[n].site))
+        n, for: SyntheticExpression(value: .witness(w), site: program[n].site))
       let u = program.types.substituteVariableForError(in: w.type)
       program[n.module].updateType(u, for: n)
     }
@@ -2740,7 +2740,7 @@ public struct Typer {
     case .defaulted(let e):
       let t = program[n.module].type(assignedTo: e) ?? .error
       let n = program[n.module].insert(
-        SynthethicExpression(value: .defaultArgument(e), site: program[n].site),
+        SyntheticExpression(value: .defaultArgument(e), site: program[n].site),
         in: program.parent(containing: n))
       program[n.module].setType(t, for: n)
       return .init(label: nil, value: e)
