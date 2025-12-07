@@ -3056,7 +3056,7 @@ public struct Typer {
     // Are we looking at `.new(integer_literal: i)`?
     if let n = program.cast(program[c].callee, to: New.self) {
       let r = program[e.module].declaration(referredToBy: program[n].target)
-      let d = program.standardLibraryDeclaration(.expressibyByIntegerLiteralInit)
+      let d = program.standardLibraryDeclaration(.expressibleByIntegerLiteralInit)
       if case .inherited(_, d, _) = r {
         let i = program.castUnchecked(program[c].arguments[0].value, to: IntegerLiteral.self)
         return Int(program[i].value)
