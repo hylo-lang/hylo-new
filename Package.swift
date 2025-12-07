@@ -15,7 +15,7 @@ let commonSwiftSettings: [SwiftSetting] = [
 let package = Package(
   name: "Hylo",
   platforms: [
-    .macOS(.v13)
+    .macOS(.v15)
   ],
   products: [
     .executable(name: "hc", targets: ["hc"]),
@@ -24,8 +24,8 @@ let package = Package(
   ],
   dependencies: [
     .package(
-      url: "https://github.com/kyouko-taiga/archivist.git",
-      branch: "main"),
+      url: "https://github.com/kyouko-taiga/Archivist.git",
+      branch: "086c16e150ae2ea11bbdbe4546c3a6de6bd22a31"),
     .package(
       url: "https://github.com/apple/swift-algorithms.git",
       from: "1.2.0"),
