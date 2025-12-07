@@ -8,7 +8,7 @@ on:
       - ".editorconfig"
 
 env:
-  llvm-build-release: 20251018-135440
+  llvm-build-release: 20251207-115516
   llvm-version: '20.1.6'
 
 jobs:
