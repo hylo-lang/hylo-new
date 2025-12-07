@@ -75,7 +75,7 @@ jobs:
           # The Swift compiler team is aware of the issue and they are going to release a fix some time.
 
       - name: Build in release mode
-        run: swift build -c release --verbose
+        run: swift build -c release --verbose --target hc --static-swift-stdlib
 
       - name: Prepare distributable
         id: prepare-distributable
