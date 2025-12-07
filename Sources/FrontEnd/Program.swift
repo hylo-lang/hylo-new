@@ -1126,7 +1126,7 @@ extension Program {
     case expressibleByIntegerLiteral = "ExpressibleByIntegerLiteral"
 
     /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
-    case expressibyByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
+    case expressibleByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
 
   }
 
