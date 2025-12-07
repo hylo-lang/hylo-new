@@ -23,6 +23,17 @@ final class SourceFileTests: XCTestCase {
     }
   }
 
+  func testLocalInMemoryText() {
+    let f = SourceFile(representing: URL(string: "file:///C:/hylo-test/file.hylo")!, inMemoryContents: "Hola.")
+    XCTAssertEqual(f.text, "Hola.")
+  }
+
+  func testLocalInMemoryName() {
+    let f = SourceFile(representing: URL(string: "file:///C:/hylo-test/file.hylo")!, inMemoryContents: "Hola.")
+    XCTAssertEqual(f.name, .localInMemory(URL(string: "file:///C:/hylo-test/file.hylo")!))
+    XCTAssertEqual(f.span.source.name, .localInMemory(URL(string: "file:///C:/hylo-test/file.hylo")!))
+  }
+
   func testSpan() {
     let f: SourceFile = "Hello."
     XCTAssertEqual(f.span.region, f.text.startIndex ..< f.text.endIndex)
