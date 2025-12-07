@@ -335,8 +335,8 @@ internal struct IREmitter {
       return loweredCallee(program.castUnchecked(e, to: NameExpression.self))
     case New.self:
       unreachable("new expression should be handled in the lowering of the call")
-    case SynthethicExpression.self:
-      return loweredCallee(program.castUnchecked(e, to: SynthethicExpression.self))
+    case SyntheticExpression.self:
+      return loweredCallee(program.castUnchecked(e, to: SyntheticExpression.self))
     default:
       program.unexpected(e)
     }
@@ -392,7 +392,7 @@ internal struct IREmitter {
   }
 
   /// Implements `loweredCallee(_:)` for synthetic expressions.
-  private mutating func loweredCallee(_ e: SynthethicExpression.ID) -> LoweredCallee {
+  private mutating func loweredCallee(_ e: SyntheticExpression.ID) -> LoweredCallee {
     guard case .witness(let w) = program[e].value else { program.unexpected(e) }
     switch w.value {
     case .typeApplication(let f, let a):
