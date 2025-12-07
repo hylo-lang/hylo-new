@@ -1,5 +1,5 @@
 name: Build and Test
-on: 
+on:
   push:
     paths-ignore:
       - "**.md"
@@ -32,6 +32,7 @@ jobs:
           swift-version: ${{ matrix.swift }}
 
       - uses: compnerd/gha-setup-vsdevenv@main
+        if: ${{ matrix.os == 'windows-2025' }}
         with:
           winsdk: "10.0.22621.0" # Workaround for this: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
           # TL;DR: The Windows SDK had a change in 10.0.26100.0 that the Swift compiler didn't account for.
@@ -48,3 +49,44 @@ jobs:
         run: swift test -c ${{ matrix.config }} --verbose
 
     runs-on: ${{ matrix.os }}
+
+  build-distributable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025, windows-11-arm]
+        swift: ["6.2"]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }}
+        uses: SwiftyLab/setup-swift@latest
+        with:
+          swift-version: ${{ matrix.swift }}
+
+      - uses: compnerd/gha-setup-vsdevenv@main
+        if: ${{ runner.os == 'Windows' }}
+        with:
+          winsdk: "10.0.22621.0" # Workaround for this: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
+          # TL;DR: The Windows SDK had a change in 10.0.26100.0 that the Swift compiler didn't account for.
+          # The Swift compiler team is aware of the issue and they are going to release a fix some time.
+
+      - name: Build in release mode
+        run: swift build -c release --verbose
+
+      - name: Prepare distributable
+        id: prepare-distributable
+        run: |
+          BIN_PATH=$(swift build -c release --show-bin-path)
+          ${BIN_PATH}/hc --help
+          echo "path=${BIN_PATH}" >> $GITHUB_OUTPUT
+
+        shell: bash
+      - name: Upload the distributable
+        uses: actions/upload-artifact@v4
+        with:
+          name: hylo-distributable-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ steps.prepare-distributable.outputs.path }}
