@@ -1,0 +1,1 @@
+Responsible for lowering [Hylo IR](https://hylo-lang.org/docs/reference/ir/) to [LLVM IR](https://llvm.org/docs/LangRef.html).
