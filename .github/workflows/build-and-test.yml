@@ -6,10 +6,12 @@ on:
       - "LICENSE"
       - ".gitignore"
       - ".editorconfig"
-
-env:
-  llvm-build-release: 20251018-115119
-  llvm-version: '20.1.6'
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".editorconfig"
 
 jobs:
   test:
@@ -21,13 +23,6 @@ jobs:
         swift: ["6.2"]
         config: [release, debug]
 
-        include:
-          - config: release
-            llvm-build-type: MinSizeRel
-
-          - config: debug
-            llvm-build-type: Debug
-
     steps:
       - uses: actions/checkout@v4
 
@@ -37,21 +32,14 @@ jobs:
           swift-version: ${{ matrix.swift }}
 
       - uses: compnerd/gha-setup-vsdevenv@main
-        if: ${{ matrix.os == 'windows-2025' }}
         with:
           winsdk: "10.0.22621.0" # Workaround for this: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
           # TL;DR: The Windows SDK had a change in 10.0.26100.0 that the Swift compiler didn't account for.
           # The Swift compiler team is aware of the issue and they are going to release a fix some time.
 
-      - name: Set up LLVM
-        uses: hylo-lang/get-llvm@v0.3.0
-        id: get-llvm
-        with:
-          llvmVersion: ${{ env.llvm-version }}
-          llvmBuildRelease: ${{ env.llvm-build-release }}
-          llvmBuildConfig: ${{ matrix.llvm-build-type }}
-          addToPkgConfigPath: true
-          addToPath: true
+      - name: Verify swift version
+        run: swift --version && swift --version | grep -q ${{ matrix.swift }}
+        shell: bash
 
       # We disabled the separate build step, as it consumes extra CI time - building for testing apparently doesn't
       # reuse the build cache from here, doubling the CI time.

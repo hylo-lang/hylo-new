@@ -15,7 +15,7 @@ let commonSwiftSettings: [SwiftSetting] = [
 let package = Package(
   name: "Hylo",
   platforms: [
-    .macOS(.v15)
+    .macOS(.v13)
   ],
   products: [
     .executable(name: "hc", targets: ["hc"])
@@ -36,9 +36,6 @@ let package = Package(
     .package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
-    .package(
-      url: "https://github.com/hylo-lang/Swifty-LLVM",
-      branch: "1c515a866b15feeac3ab8bb43a43c0073e9886df"),
   ],
   targets: [
     .executableTarget(
@@ -88,14 +85,6 @@ let package = Package(
       swiftSettings: commonSwiftSettings),
 
     .target(
-      name: "CodeGen",
-      dependencies: [
-        .target(name: "FrontEnd"),
-        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
-      ]
-    ),
-
-    .target(
       name: "StandardLibrary",
       path: "StandardLibrary",
       resources: [.copy("Sources")],
@@ -126,14 +115,6 @@ let package = Package(
         .target(name: "FrontEnd")
       ],
       swiftSettings: commonSwiftSettings),
-
-    .testTarget(
-      name: "CodeGenTests",
-      dependencies: [
-        .target(name: "CodeGen"),
-        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
-      ],
-    ),
 
     .testTarget(
       name: "StableCollectionsTests",
