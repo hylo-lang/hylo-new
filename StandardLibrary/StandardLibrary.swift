@@ -4,3 +4,5 @@ import Foundation
 public let standardLibrarySources = URL(fileURLWithPath: #filePath)
   .deletingLastPathComponent()
   .appendingPathComponent("Sources")
+
+public let bundledStandardLibrarySources = Bundle.module.url(forResource: "Sources", withExtension: nil)!
