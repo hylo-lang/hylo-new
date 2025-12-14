@@ -155,7 +155,7 @@ public struct Driver {
 
   /// Loads the standard library with `load(_:withSourcesAt:)`.
   public mutating func loadStandardLibrary() async throws {
-    try await load(Module.standardLibraryName, withSourcesAt: standardLibrarySources)
+    try await load(Module.standardLibraryName, withSourcesAt: bundledStandardLibrarySources)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
