@@ -76,6 +76,11 @@ public struct TypeStore: Sendable {
     .init(type(of: self[n]))
   }
 
+  /// Returns `true` iff `n` identifies a machine type.
+  public func isBuiltin<T: TypeIdentity>(_ n: T) -> Bool {
+    tag(of: n).value is MachineType.Type
+  }
+
   /// Returns `true` iff `n` identifies a generic type parameter.
   public func isParameter<T: TypeIdentity>(_ n: T) -> Bool {
     tag(of: n) == GenericParameter.self

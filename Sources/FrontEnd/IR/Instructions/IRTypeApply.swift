@@ -44,7 +44,7 @@ public struct IRTypeApply: Instruction {
   public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
     // The callee must be instance of a universal type.
     guard
-      let t = parent.type(of: callee),
+      let t = parent.result(of: callee),
       let u = program.types.cast(t.type, to: UniversalType.self)
     else { preconditionFailure("monomorphic callee") }
 

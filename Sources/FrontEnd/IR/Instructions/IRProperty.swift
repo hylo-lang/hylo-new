@@ -34,6 +34,11 @@ public struct IRProperty: Instruction {
     .lowered(propertyType, isAddress: true)
   }
 
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
+  }
+
 }
 
 extension IRProperty: Showable {

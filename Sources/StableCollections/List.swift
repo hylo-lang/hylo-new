@@ -8,10 +8,18 @@ public struct List<Element> {
   // after an element has been removed.
 
   /// The address of an element in a doubly linked list.
-  public struct Address: Hashable, Sendable {
+  ///
+  /// Note that the relative order between two addresses does not relate to the order between the
+  /// elements stored at these addresses.
+  public struct Address: Hashable, Comparable, Sendable {
 
+    /// The raw representation of an address.
+    public typealias RawValue = Int
+
+    /// The raw representation of this address.
     public fileprivate(set) var rawValue: Int
 
+    /// Creates an address with the given raw value.
     fileprivate init(_ rawValue: Int) {
       self.rawValue = rawValue
     }
@@ -26,6 +34,11 @@ public struct List<Element> {
         current = next
       }
       return false
+    }
+
+    /// Returns `true` iff the raw value of `l` is less than the raw value of `r`.
+    public static func < (l: Self, r: Self) -> Bool {
+      l.rawValue < r.rawValue
     }
 
   }
@@ -138,6 +151,15 @@ public struct List<Element> {
     precondition(isInBounds(address), "address out of bounds")
     if address == firstAddress { return nil }
     return Address(storage[address.rawValue].previousOffset)
+  }
+
+  /// Returns the address having the given value iff it is valid in `self`.
+  public func address(rawValue: Int) -> Address? {
+    if (UInt(bitPattern: rawValue) < storage.count) && (storage[rawValue].element != nil) {
+      return Address(rawValue)
+    } else {
+      return nil
+    }
   }
 
   /// The addresses in the list.
@@ -326,7 +348,7 @@ public struct List<Element> {
 
   /// Returns whether `address` is in bounds.
   private func isInBounds(_ address: Address) -> Bool {
-    !storage.isEmpty && (address.rawValue >= 0) && (address.rawValue < storage.count)
+    UInt(bitPattern: address.rawValue) < storage.count
   }
 
 }

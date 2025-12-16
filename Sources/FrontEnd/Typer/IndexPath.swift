@@ -105,6 +105,9 @@ public struct IndexPath: Hashable, Sendable {
     return clone
   }
 
+  /// Returns a path identifying the root of an object.
+  public static var root: IndexPath { .init() }
+
 }
 
 extension IndexPath: ExpressibleByArrayLiteral {

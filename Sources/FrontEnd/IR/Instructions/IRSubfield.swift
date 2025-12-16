@@ -36,13 +36,18 @@ public struct IRSubfield: Instruction {
     .lowered(typeOfSubfield, isAddress: true)
   }
 
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
+  }
+
 }
 
 extension IRSubfield: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "subfield \(printer.show(base)) at \(list: path)"
+    "subfield \(printer.show(base)) at \(path)"
   }
 
 }

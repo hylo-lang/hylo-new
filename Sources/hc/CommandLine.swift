@@ -94,11 +94,17 @@ import Utilities
     await perform("typing", { await driver.assignTypes(of: module) })
     await perform("lowering", { await driver.lower(module) })
 
-    let c = treePrinterConfiguration(for: treePrinterFlags)
-    for d in driver.program.select(
-      from: module, .satisfies({ driver.program.parent(containing: $0).isFile }))
-    {
-      print(driver.program.show(d, configuration: c))
+//    let c = treePrinterConfiguration(for: treePrinterFlags)
+//    for d in driver.program.select(
+//      from: module, .satisfies({ driver.program.parent(containing: $0).isFile }))
+//    {
+//      print(driver.program.show(d, configuration: c))
+//    }
+
+    var first = true
+    for f in driver.program[module].functions {
+      if first { first = false } else { print() }
+      print(driver.program.show(f))
     }
 
     let a = try driver.program.archive(module: module)

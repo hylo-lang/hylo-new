@@ -1,3 +1,5 @@
+import BigInt
+
 /// A value in Hylo IR.
 public enum IRValue: Hashable, Sendable {
 
@@ -8,10 +10,20 @@ public enum IRValue: Hashable, Sendable {
   case register(AnyInstructionIdentity)
 
   /// A constant integer.
-  case word(Int, MachineType.ID)
+  indirect case integer(BigInt, MachineType.ID)
 
   /// A reference to a lowered function.
-  case function(IRFunction.Name, AnyTypeIdentity)
+  indirect case function(IRFunction.Name, AnyTypeIdentity)
+
+  /// `true` iff `self` is a constant.
+  public var isConstant: Bool {
+    switch self {
+    case .integer, .function:
+      return true
+    default:
+      return false
+    }
+  }
 
   /// The payload of `self` iff it denotes a register.
   public var register: AnyInstructionIdentity? {
@@ -32,8 +44,8 @@ extension IRValue: Showable {
     case .parameter(let i):
       return "%p\(i)"
     case .register(let i):
-      return "%r\(i.rawValue)"
-    case .word(let n, let t):
+      return "%r\(i.address.rawValue)"
+    case .integer(let n, let t):
       return "\(printer.show(t)) \(n)"
     case .function(let n, _):
       return printer.show(n)
