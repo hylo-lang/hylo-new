@@ -12,10 +12,6 @@ public struct IRReturn: Terminator {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  public mutating func replaceSuccessor(_ old: Block.ID, with new: Block.ID) -> Bool {
-    false
-  }
-
 }
 
 extension IRReturn: Showable {

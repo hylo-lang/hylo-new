@@ -86,9 +86,62 @@ public struct Program: Sendable {
 
   /// Lowers the contents of `m` to IR.
   public mutating func lower(_ m: Module.ID) {
+    // Generate raw IR from the syntax tree.
     var emitter = IREmitter(insertingIn: m, of: consume self)
     emitter.incorporateTopLevelDeclarations()
     self = emitter.release()
+
+    // Apply transformation passes.
+    withTyper(typing: m) { (typer) in
+      // Temporarily move all functions to a local work list.
+      var work: [IRFunction] = []
+      modify(&typer.program[typer.module]) { (module) in
+        work = module.ir.values.indices.map({ (f) in module.takeFunction(f) })
+      }
+
+      let never = typer.program.types.never()
+
+      // Mandatory intra-procedural passes.
+      for i in work.indices {
+        work[i].foldRedundantInstructions()
+        work[i].removeCodeAfterCallsReturning(never: never.erased)
+        work[i].removeUnreachableBlocks()
+        work[i].removedUnusedDefinitions()
+        // reifyBundles
+        // reifyAccesses
+        work[i].closeOpenEndedRegions()
+        work[i].normalizeLifetimes(emittingInto: m, using: &typer)
+      }
+
+      // Move all functions back.
+      modify(&typer.program[typer.module]) { (module) in
+        for f in module.ir.values.indices.reversed() {
+          module.reassignFunction(work.removeLast(), to: f)
+        }
+      }
+    }
+  }
+
+  /// Returns the result of calling `action` on a typer configured with `module`.
+  public mutating func withTyper<T>(
+    typing m: Module.ID, _ action: (inout Typer) -> T
+  ) -> T {
+    var typer = Typer(typing: m, of: consume self)
+    defer { self = typer.release() }
+    return action(&typer)
+//    withUnsafeMutablePointer(to: &self) { (p) in
+//      var typer = Typer(typing: m, of: p.move())
+//      defer { p.initialize(to: typer.release()) }
+//      return action(&typer)
+//    }
+  }
+
+  internal mutating func withEmitter<T>(
+    insertingIn m: Module.ID, _ action: (inout IREmitter) -> T
+  ) -> T {
+    var emitter = IREmitter(insertingIn: m, of: consume self)
+    defer { self = emitter.release() }
+    return action(&emitter)
   }
 
   /// Projects the module identified by `m`.
@@ -410,6 +463,31 @@ public struct Program: Sendable {
   /// Returns `w` if it is the desugared form of a conformance type. Otherwise, returns `nil`.
   public func seenAsConformanceTypeExpression(_ w: StaticCall.ID) -> ConformanceTypeSugar? {
     Utilities.read(self[w], { (tree) in tree.arguments.isEmpty ? nil : .init(tree) })
+  }
+
+  /// Returns the built-in entity referred to by `n` iff it denotes the a built-in constructor for
+  /// converting scalar literals.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func asBuiltinScalarLiteralConversion(_ n: ExpressionIdentity) -> StandardLibraryEntity? {
+    guard
+      containsStandardLibrary,
+      let f = cast(n, to: New.self),
+      case .inherited(let w, let m, true) = declaration(referredToBy: self[f].target),
+      case .reference(.direct(let d)) = w.value
+    else { return nil }
+
+    // Is the witness defined in the standard library?
+    if parent(containing: d).module != identity(module: .standardLibrary) {
+      return nil
+    }
+
+    switch m {
+    case standardLibraryDeclaration(.expressibleByIntegerLiteralInit):
+      return .expressibleByIntegerLiteralInit
+    default:
+      return nil
+    }
   }
 
   /// Returns the innermost scope that strictly contains `n`.
@@ -1218,7 +1296,7 @@ extension Program {
     module moduleName: Module.Name, from archive: inout ReadableArchive<A>
   ) throws -> (loaded: Bool, identity: Module.ID) {
     // Nothing to do if the module is already loaded.
-    if let m = modules.index(forKey: moduleName) { return (false, m) }
+    if let m = identity(module: moduleName) { return (false, m) }
 
     // Reserve an identity for the new module.
     let m = modules.count

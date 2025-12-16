@@ -36,6 +36,11 @@ public struct IRSubfield: Instruction {
     .lowered(typeOfSubfield, isAddress: true)
   }
 
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
+  }
+
 }
 
 extension IRSubfield: Showable {

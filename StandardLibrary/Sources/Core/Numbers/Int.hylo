@@ -22,6 +22,8 @@ public struct Int {
 
 public given Int is ExpressibleByIntegerLiteral { /* built-in */ }
 
+public given Int is Deinitializable {}
+
 public given Int is Equatable {
 
   public fun infix== (other: Self) -> Bool {
