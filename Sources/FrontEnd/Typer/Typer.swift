@@ -1457,11 +1457,24 @@ public struct Typer {
     if let memoized = program[d.module].type(assignedTo: d) { return memoized }
     assert(d.module == module, "dependency is not typed")
 
-    initializeContext(program[d].contextParameters)
-    let t = ignoring(d, { (me) in me.evaluateTypeAscription(me.program[d].extendee) })
-    let u = introduce(program[d].contextParameters, into: t)
-    program[d.module].setType(u, for: d)
-    return u
+    // Is it the first time we enter this method for `d`?
+    if declarationsOnStack.insert(.init(d)).inserted {
+      defer { declarationsOnStack.remove(.init(d)) }
+
+      initializeContext(program[d].contextParameters)
+      let t = ignoring(d, { (me) in me.evaluateTypeAscription(me.program[d].extendee) })
+      let u = introduce(program[d].contextParameters, into: t)
+
+      program[d.module].setType(u, for: d)
+      return u
+    }
+
+    // Cyclic reference detected.
+    else {
+      let s = program.spanForDiagnostic(about: d)
+      report(.init(.error, "declaration refers to itself", at: s))
+      return .error
+    }
   }
 
   /// Returns the type used to represent an instance of the given case.
@@ -1472,9 +1485,9 @@ public struct Typer {
 
   /// Computes the types of the given context parameters, introducing them in order.
   private mutating func initializeContext(_ parameters: ContextParameters) {
-    // Parameters are pushed onto the stack and removed after they have been processed so that,
-    // given two parameters `p` and `q` such that `q` occurs after `p`, resolution can't "see" `q`
-    // while we're computing the type of `p`.
+    // Parameters are pushed onto the stack and removed after they have been visted so that, given
+    // two parameters `p` and `q` such that `q` occurs after `p`, resolution can't "see" `q` while
+    // it is computing the type of `p`.
     declarationsOnStack.formUnion(parameters.usings)
 
     for p in parameters.usings {
@@ -2806,8 +2819,19 @@ public struct Typer {
 
   /// Returns the type of an instance of `Self` in `s`.
   private mutating func typeOfSelf(in d: ExtensionDeclaration.ID) -> AnyTypeIdentity {
-    let t = extendeeType(d)
-    return program.types.head(t)
+    // `d` may be on stack if `Self` appears in its generic clause. In this situation, calling
+    // `extendeeType(_:)` will trigger cyclic detection. Instead, we can try to resolve the
+    // extendee's expression directly, expecting its parameters to have been resolved already.
+    if declarationsOnStack.contains(.init(d)) {
+      let t = ignoring(d, { (me) in me.evaluateTypeAscription(me.program[d].extendee) })
+      return t
+    }
+
+    // Normal path.
+    else {
+      let t = extendeeType(d)
+      return program.types.head(t)
+    }
   }
 
   /// Returns the type of an instance of `Self` in `s`.
