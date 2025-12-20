@@ -1,0 +1,13 @@
+//! no-std
+
+trait P {}
+trait Q<U> {}
+
+struct S<T, U> {}
+
+// These ones type check because `Self` occurs after `T` and `U`.
+extension <T, U where Self is P> S<T, U> {}
+extension <T, U is Q<Self>> S<T, U> {}
+
+// This one type checks because `Self` occurs after `T` and `U` in the desugared where-clause.
+extension <T is Q<Self>, U> S<T, U> {}
