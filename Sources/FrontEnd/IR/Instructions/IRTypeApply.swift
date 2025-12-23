@@ -40,6 +40,11 @@ public struct IRTypeApply: Instruction {
     .lowered(typeOfApplication, isAddress: true)
   }
 
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
+  }
+
   /// Asserts that the well-formedness conditions of the instruction hold.
   public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
     // The callee must be instance of a universal type.

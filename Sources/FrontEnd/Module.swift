@@ -143,7 +143,7 @@ public struct Module: Sendable {
 
     /// Adds a diagnostic to this file.
     ///
-    /// - requires: The diagnostic is anchored at a position in `self`.
+    /// - requires: The diagnostic is anchored to a position in `self`.
     internal mutating func addDiagnostic(_ d: Diagnostic) {
       assert(d.site.source.name == source.name)
       diagnostics.insert(d)

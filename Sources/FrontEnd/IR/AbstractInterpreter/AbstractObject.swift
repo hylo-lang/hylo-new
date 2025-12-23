@@ -56,7 +56,7 @@ internal struct AbstractObject<Domain: AbstractDomain>: Hashable, Sendable {
   }
 
   /// Returns `l` merged with `r`.
-  internal static func && (l: AbstractObject, r: AbstractObject) -> AbstractObject {
+  internal static func && (l: Self, r: Self) -> Self {
     precondition(l.type == r.type)
     return AbstractObject(type: l.type, value: l.value && r.value)
   }
@@ -97,7 +97,7 @@ extension AbstractObject {
     }
 
     /// Returns `lhs` merged with `rhs`.
-    internal static func && (lhs: Value, rhs: Value) -> Value {
+    internal static func && (lhs: Self, rhs: Self) -> Self {
       switch (lhs.canonical, rhs.canonical) {
       case (.uniform(let lhs), .uniform(let rhs)):
         return .uniform(lhs && rhs)
@@ -117,8 +117,8 @@ extension AbstractObject {
 extension AbstractObject: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
-  public func show(using printer: inout TreePrinter) -> String {
-    "\(type)(\(printer.show(value)))"
+  internal func show(using printer: inout TreePrinter) -> String {
+    "\(printer.show(value)) as \(printer.show(type))"
   }
 
 }
@@ -126,10 +126,10 @@ extension AbstractObject: Showable {
 extension AbstractObject.Value: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
-  public func show(using printer: inout TreePrinter) -> String {
+  internal func show(using printer: inout TreePrinter) -> String {
     switch self {
     case .uniform(let s):
-      return String(describing: s)
+      return printer.show(s)
     case .mixed(let s):
       return "{\(printer.show(s))}"
     }

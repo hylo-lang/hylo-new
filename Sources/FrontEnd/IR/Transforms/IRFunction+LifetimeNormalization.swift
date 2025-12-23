@@ -51,6 +51,12 @@ private struct Transfer: AbstractTransferFunction {
     self.module = m
   }
 
+  /// The program containing the module being typed.
+  internal var program: Program {
+    get { typer.program }
+    _modify { yield &typer.program }
+  }
+
   mutating func apply(
     _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
     using typer: inout Typer
@@ -74,16 +80,28 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRAlloca.self), from: &f)
       case IRApply.self:
         pc = interpret(f.castUnchecked(i, to: IRApply.self), from: &f)
+      case IRAssumeState.self:
+        pc = interpret(f.castUnchecked(i, to: IRAssumeState.self), from: &f)
       case IRProject.self:
         pc = interpret(f.castUnchecked(i, to: IRProject.self), from: &f)
       case IRProject.End.self:
         pc = interpret(f.castUnchecked(i, to: IRProject.End.self), from: &f)
+      case IRProperty.self:
+        pc = interpret(f.castUnchecked(i, to: IRProperty.self), from: &f)
+      case IRReturn.self:
+        pc = interpret(f.castUnchecked(i, to: IRReturn.self), from: &f)
       case IRStore.self:
         pc = interpret(f.castUnchecked(i, to: IRStore.self), from: &f)
       case IRSubfield.self:
         pc = interpret(f.castUnchecked(i, to: IRSubfield.self), from: &f)
-      default:
-        fatalError("invalid IR")
+      case IRTypeApply.self:
+        pc = interpret(f.castUnchecked(i, to: IRTypeApply.self), from: &f)
+      case IRWitnessTable.self:
+        pc = interpret(f.castUnchecked(i, to: IRWitnessTable.self), from: &f)
+      case IRYield.self:
+        pc = interpret(f.castUnchecked(i, to: IRYield.self), from: &f)
+      case let t:
+        fatalError("unexpected instruction \(t)")
       }
     }
   }
@@ -92,30 +110,30 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRAccess.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let s = f.at(i)
+    let access = f.at(i)
 
     // Access is expected to be reified at this stage.
-    switch s.capabilities.uniqueElement! {
+    let k = access.capabilities.uniqueElement!
+    switch k {
     case .let, .inout, .sink:
-      // Operand must be a place.
-      let a = context.locals[s.source]!.place!
-      var o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
+      let a = context.locals[access.source]!.place!
+      let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
+      checkInitialized(object: o, at: f.at(i).anchor.site)
+      declare(i, from: f, initially: .initialized)
 
-      // All three effects require that the object be fully initialized.
-      if !checkInitialized(o.value, at: s.anchor.site) {
-        o.value = .uniform(.initialized)
-        context.withObject(at: a, computingLayoutWith: &typer, { (x, _) in x = o })
+      // A `sink` access consumes its source.
+      if k == .sink {
+        context.setValue(.uniform(.consumed(by: [i.erased])), at: a, computingLayoutWith: &typer)
       }
 
     case .set:
-      // A set access requires that the object be fully uninitialized.
-      ensureDeinitialized(at: s.source, insertingDeinitializationBefore: i.erased, in: &f)
+      ensureDeinitialized(place: access.source, before: i.erased, in: &f)
+      declare(i, from: f, initially: .uninitialized)
 
     case .auto:
       fatalError("invalid IR")
     }
 
-    context.locals[.register(i.erased)] = context.locals[s.source]
     return f.instruction(after: i.erased)
   }
 
@@ -123,9 +141,29 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRAccess.End.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let s = f.start(of: i)
-    let k = f.at(s).capabilities.uniqueElement!
-    closeProjection(k, openedBy: s.erased, endedBy: i.erased, in: &f)
+    let start = f.start(of: i)
+    let access = f.at(start)
+
+    // Access is expected to be reified at this stage.
+    let k = access.capabilities.uniqueElement!
+    switch k {
+    case .let, .set, .inout:
+      checkInitialized(place: .register(start.erased), at: f.at(i).anchor.site)
+
+      // Assume the postcondition moving forward.
+      let a = context.locals[access.source]!.place!
+      context.setValue(.uniform(.initialized), at: a, computingLayoutWith: &typer)
+
+    case .sink:
+      ensureDeinitialized(place: .register(start.erased), before: i.erased, in: &f)
+
+    case .auto:
+      fatalError("invalid IR")
+    }
+
+    let s = f.at(i).start
+    context.memory[context.locals[s]!.place!] = nil
+    context.locals[s] = nil
     return f.instruction(after: i.erased)
   }
 
@@ -133,7 +171,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRAlloca.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declareStorage(assignedTo: i.erased, from: f, initially: .uninitialized)
+    declare(i.erased, from: f, initially: .uninitialized)
     return f.instruction(after: i.erased)
   }
 
@@ -142,18 +180,42 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRApply.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
-    let t = typer.program.types.cast(f.result(of: s.callee)!.type, to: Arrow.self)
+    let t = f.result(of: s.callee)!.type
+    let u = program.types.seenAsTermAbstraction(t)!
 
-    print(t as Any)
-    fatalError("invalid IR")
+    passArgument(.set, s.result, insertingDeinitializationBefore: i.erased, in: &f)
+    for (p, v) in zip(program.types[u].inputs, s.arguments) {
+      passArgument(p.access, v, insertingDeinitializationBefore: i.erased, in: &f)
+    }
+
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRAssumeState.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+    let a = context.locals[s.storage]!.place!
+    let v: Domain = s.initialized ? .initialized : .uninitialized
+    context.setValue(.uniform(v), at: a, computingLayoutWith: &typer)
+    return f.instruction(after: i.erased)
   }
 
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
     _ i: IRProject.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+    let t = f.result(of: s.callee)!.type
+    let u = program.types.seenAsTermAbstraction(t)!
+
+    for (p, v) in zip(program.types[u].inputs, s.arguments) {
+      applyParameterPrecondition(p.access, v, insertingDeinitializationBefore: i.erased, in: &f)
+    }
+
     let v: Domain = (f.at(i).access == .set) ? .uninitialized : .initialized
-    context.declareStorage(assignedTo: i.erased, from: f, initially: v)
+    declare(i, from: f, initially: v)
     return f.instruction(after: i.erased)
   }
 
@@ -161,10 +223,61 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRProject.End.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let s = f.start(of: i)
-    let k = f.at(s).access
-    closeProjection(k, openedBy: s.erased, endedBy: i.erased, in: &f)
+    let start = f.start(of: i)
+    let project = f.at(start)
+    let k = project.access
+
+    switch k {
+    case .let, .set, .inout:
+      checkInitialized(place: .register(start.erased), at: f.at(i).anchor.site)
+    case .sink:
+      ensureDeinitialized(place: .register(start.erased), before: i.erased, in: &f)
+    case .auto:
+      fatalError("invalid IR")
+    }
+
+    let t = f.result(of: project.callee)!.type
+    let u = program.types.seenAsTermAbstraction(t)!
+    for (p, v) in zip(program.types[u].inputs, project.arguments) {
+      applyParameterPostcondition(p.access, v)
+    }
+
+    let s = f.at(i).start
+    context.memory[context.locals[s]!.place!] = nil
+    context.locals[s] = nil
     return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRProperty.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    declare(i.erased, from: f, initially: .initialized)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRReturn.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    for (v, o) in context.locals {
+      // Deinitialize outstanding owned values.
+      if f.owns(v) {
+        let parts = initializedParts(context.memory[o.place!]!.value)
+        if !parts.isEmpty && !deinitialize(parts, of: v, before: i.erased, in: &f) {
+          // Bail out if something isn't deinitializable.
+          break
+        }
+      }
+
+      // Ensure `set` parameters have been initialized.
+      else if f.isParameter(v, .set) {
+        checkInitialized(place: v, at: f.at(i).anchor.site)
+      }
+    }
+
+    // No instruction after terminators
+    return nil
   }
 
   /// Interprets `i`, which is in `f`.
@@ -172,8 +285,8 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRStore.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
-    consume(s.value, with: i.erased, in: f)
-    initialize(at: s.target, in: f)
+    consume(object: s.value, with: i.erased, in: f)
+    initialize(place: s.target, in: f)
     return f.instruction(after: i.erased)
   }
 
@@ -215,6 +328,33 @@ private struct Transfer: AbstractTransferFunction {
     return paths
   }
 
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRTypeApply.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    declare(i.erased, from: f, initially: .initialized)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRWitnessTable.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    declare(i.erased, from: f, initially: .initialized)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRYield.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let o = f.output.projection!
+    passArgument(
+      program.types[o].access, f.at(i).projectee,
+      insertingDeinitializationBefore: i.erased, in: &f)
+    return f.instruction(after: i.erased)
+  }
+
   /// Return the initialized parts of `v`.
   private func initializedParts(_ v: AbstractObject<Domain>.Value) -> [IndexPath] {
     switch v {
@@ -239,14 +379,11 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Returns `true` iff `v` is fully initialized. Otherwise, reports a diagnostic at `site`
-  /// and returns false.
-  private mutating func checkInitialized(
-    _ v: AbstractObject<Domain>.Value, at site: SourceSpan
-  ) -> Bool {
-    switch v {
+  /// Reports a diagnostic at `site` iff `object` is not fully initialized.
+  private mutating func checkInitialized(object: AbstractObject<Domain>, at site: SourceSpan) {
+    switch object.value {
     case .uniform(.initialized):
-      return true
+      break
     case .uniform(.uninitialized):
       log.insert(.useOfUninitializedObject(at: site))
     case .uniform(.consumed):
@@ -254,11 +391,32 @@ private struct Transfer: AbstractTransferFunction {
     case .mixed:
       log.insert(.useOfPartialObject(at: site))
     }
-    return false
+  }
+
+  /// Reports a diagnostic at `site` iff the object at `place` is not fully initialized.
+  private mutating func checkInitialized(place: IRValue, at site: SourceSpan) {
+    let a = context.locals[place]!.place!
+    let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
+    checkInitialized(object: o, at: site)
+  }
+
+  /// Adds a new place in `self` holding an object `v` and assigns that place to assigned to `i`,
+  /// which is in `f`.
+  ///
+  /// - Requires: `i` is not defined in `self` and its result is different from `.nothing`.
+  private mutating func declare<T: InstructionIdentity>(
+    _ i: T, from f: IRFunction, initially v: Domain
+  ) {
+    let a = AbstractPlace.root(.register(i.erased))
+    let t = f.resolved(f.at(i.erased).type)!.type
+    assert(context.memory[a] == nil, "storage already exists")
+
+    context.memory[a] = .init(type: t, value: .uniform(v))
+    context.locals[.register(i.erased)] = .place(a)
   }
 
   /// Updates the object at `place`, which is a `set` access, to mark it initialized.
-  private mutating func initialize(at place: IRValue, in f: IRFunction) {
+  private mutating func initialize(place: IRValue, in f: IRFunction) {
     assert(f.isAccess(place, .set), "invalid IR")
     let a = context.locals[place]!.place!
     context.withObject(at: a, computingLayoutWith: &typer) { (o, _) in
@@ -268,13 +426,13 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Updates the object at `place`, which is a `sink` access, to mark it consumed by `consumer`.
   private mutating func consume(
-    at place: IRValue, with consumer: AnyInstructionIdentity, in f: IRFunction
+    place: IRValue, with consumer: AnyInstructionIdentity, in f: IRFunction
   ) {
     assert(f.isAccess(place, .set), "invalid IR")
 
     // Built-in values are implictly copied.
     let t = f.result(of: place)
-    if (t?.type).satisfies(typer.program.types.isBuiltin(_:)) {
+    if (t?.type).satisfies(program.types.isBuiltin(_:)) {
       return
     }
 
@@ -287,13 +445,13 @@ private struct Transfer: AbstractTransferFunction {
   /// Updates `object` to mark it consumed by `consumer`, reporting a diagnostic if `object` cannot
   /// be consumed.
   private mutating func consume(
-    _ object: IRValue, with consumer: AnyInstructionIdentity, in f: IRFunction
+    object: IRValue, with consumer: AnyInstructionIdentity, in f: IRFunction
   ) {
     let t = f.result(of: object)
     assert(!(t.map(\.isAddress) ?? true))
 
     // Constant values are synthesized on demand and built-in values are implicitly copied.
-    if object.isConstant || (t?.type).satisfies(typer.program.types.isBuiltin(_:)) {
+    if object.isConstant || (t?.type).satisfies(program.types.isBuiltin(_:)) {
       return
     }
 
@@ -312,22 +470,31 @@ private struct Transfer: AbstractTransferFunction {
   /// Each part is deinitialized using the conformance of its type to `Hylo.Deinitializable`, which
   /// is looked up in the scope to which `i` is anchored. A diagnostic is reported at the location
   /// to which `i` is anchored for each conformance that can't be resolved.
+  ///
+  /// The return value is `true` iff all parts could be deinitialized. Otherwise, a diagnostic is
+  /// reported and a call to `Builtin.trap` is inserted before `i`.
+  @discardableResult
   private mutating func deinitialize(
     _ parts: [IndexPath], of object: IRValue,
     before i: AnyInstructionIdentity, in f: inout IRFunction
-  ) {
-    typer.program.withEmitter(insertingIn: module) { (emitter) in
+  ) -> Bool {
+    program.withEmitter(insertingIn: module) { (emitter) in
       for p in parts {
-        emitter.lowering(before: i, in: &f) { (e) in
+        // Attempt to resolve and apply a witness of `Deinitializable`.
+        let success = emitter.lowering(before: i, in: &f) { (e) in
           let x = e._subfield(object, at: p)
-          e._emitDeinitialize(x)
+          return e._emitDeinitialize(x)
         }
+
+        // Bail out of one element wasn't deinitializable.
+        if !success { return false }
       }
+      return true
     }
   }
 
   private mutating func ensureDeinitialized(
-    at place: IRValue, insertingDeinitializationBefore i: AnyInstructionIdentity,
+    place: IRValue, before i: AnyInstructionIdentity,
     in f: inout IRFunction
   ) {
     let a = context.locals[place]!.place!
@@ -340,38 +507,45 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  private mutating func closeProjection(
-    _ access: AccessEffect,
-    openedBy start: AnyInstructionIdentity, endedBy end: AnyInstructionIdentity,
-    in f: inout IRFunction,
+  private mutating func applyParameterPrecondition(
+    _ k: AccessEffect, _ v: IRValue,
+    insertingDeinitializationBefore i: AnyInstructionIdentity, in f: inout IRFunction
   ) {
-    switch access {
-    case .let, .set, .inout:
-      // The projection must have defined a place.
-      let a = context.locals[.register(start)]!.place!
-      var o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
+    switch k {
+    case .let, .inout, .sink:
+      // All three effects require that the object be fully initialized.
+      let a = context.locals[v]!.place!
+      let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
+      checkInitialized(object: o, at: f.at(i).anchor.site)
 
-      // The source is expected to be initialized when the access ends.
-      if o.value != .uniform(.initialized) {
-        let cs = consumers(o.value)
-        if cs.isEmpty {
-          log.insert(.uninitializedObject(at: f.at(end).anchor.site))
-        } else {
-          for c in cs { log.insert(.illegalConsumption(access, at: f.at(c).anchor.site)) }
-        }
-
-        // Repair the postcondition.
-        o.value = .uniform(.initialized)
-        context.withObject(at: a, computingLayoutWith: &typer, { (x, _) in x = o })
+      // A `sink` access consumes its source.
+      if k == .sink {
+        context.setValue(.uniform(.consumed(by: [i.erased])), at: a, computingLayoutWith: &typer)
       }
 
-    case .sink:
-      // The source must be deinitialized when the access ends.
-      ensureDeinitialized(at: .register(start), insertingDeinitializationBefore: end, in: &f)
+    case .set:
+      // A set parameter requires that the argument be uninitialized.
+      ensureDeinitialized(place: v, before: i.erased, in: &f)
 
     case .auto:
       fatalError("invalid IR")
     }
+  }
+
+  private mutating func applyParameterPostcondition(_ k: AccessEffect, _ v: IRValue) {
+    if k == .set {
+      // A set parameter initializes memory.
+      let a = context.locals[v]!.place!
+      context.setValue(.uniform(.initialized), at: a, computingLayoutWith: &typer)
+    }
+  }
+
+  private mutating func passArgument(
+    _ k: AccessEffect, _ v: IRValue,
+    insertingDeinitializationBefore i: AnyInstructionIdentity, in f: inout IRFunction
+  ) {
+    applyParameterPrecondition(k, v, insertingDeinitializationBefore: i, in: &f)
+    applyParameterPostcondition(k, v)
   }
 
   /// The initialization state of an object or sub-object.
@@ -430,6 +604,22 @@ private struct Transfer: AbstractTransferFunction {
     /// The paths to the consumed parts, along with the users that consumed them.
     var consumed: [(subfield: IndexPath, consumers: Domain.Consumers)] = []
 
+  }
+
+}
+
+extension Transfer.Domain: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  internal func show(using printer: inout TreePrinter) -> String {
+    switch self {
+    case .initialized:
+      return "◼"
+    case .uninitialized:
+      return "◻"
+    case .consumed(let cs):
+      return "◻{\(printer.show(cs.map(IRValue.register)))}"
+    }
   }
 
 }

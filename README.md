@@ -16,8 +16,9 @@ If `m` denotes a trait requirement, then name resolution should bind it to the e
 
 ## Ideas for optimizations
 
-- Store the contents of "small" type trees in the inline storage of their identities.
-- Use a separate array to store the tag of each syntax tree rather than calling `tag(of:)`.
+[ ] Store the contents of "small" type trees in the inline storage of their identities.
+[x] Use a separate array to store the tag of each syntax tree rather than calling `tag(of:)`.
+[ ] Use out-of-line storage for data structures that have to be "moved" often (e.g., `Program` and `IRFunction`).
 
 ## Questions
 

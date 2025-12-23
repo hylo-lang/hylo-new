@@ -26,9 +26,11 @@ extension IRType: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     switch self {
-    case .lowered(let t, let isAddress):
+    case .lowered(let t, isAddress: true):
       let s = printer.show(t)
-      return isAddress ? "(\(s))&" : s
+      return (s.contains(where: \.isWhitespace) && !s.isParenthesized) ? "(\(s))&" : "\(s)&"
+    case .lowered(let t, isAddress: false):
+      return printer.show(t)
     case .same(let i):
       return "$same(as: \(printer.show(i)))"
     case .dereferenced(let i):

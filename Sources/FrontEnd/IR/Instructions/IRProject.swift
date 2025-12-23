@@ -79,8 +79,8 @@ public struct IRProject: IRRegionEntry {
 
     // Each argument supports the effect of its corresponding parameter.
     precondition(program.types[f].inputs.count == arguments.count)
-    for (p, a) in zip(program.types[f].inputs, arguments) {
-      precondition(parent.isAccess(a, p.access))
+    for (p, v) in zip(program.types[f].inputs, arguments) {
+      precondition(parent.isAccess(v, p.access))
     }
 
     return true

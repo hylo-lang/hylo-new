@@ -168,7 +168,7 @@ extension IRFunction {
     if a.user == b.user {
       return a.index < b.index ? rhs : lhs
     } else {
-      return contents(of: block(defining: a.user)).contains(b.user) ? lhs : rhs
+      return instructions(after: a.user).contains(b.user) ? rhs : lhs
     }
   }
 

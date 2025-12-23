@@ -26,7 +26,7 @@ internal enum AbstractValue<Domain: AbstractDomain>: Hashable, Sendable {
   }
 
   /// Returns `l` merged with `r`.
-  internal static func && (l: AbstractValue, r: AbstractValue) -> AbstractValue {
+  internal static func && (l: Self, r: Self) -> Self {
     switch (l, r) {
     case (.place(let a), .place(let b)):
       return .place(a && b)
@@ -34,6 +34,20 @@ internal enum AbstractValue<Domain: AbstractDomain>: Hashable, Sendable {
       return .object(a && b)
     default:
       fatalError("invalid merge")
+    }
+  }
+
+}
+
+extension AbstractValue: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  internal func show(using printer: inout TreePrinter) -> String {
+    switch self {
+    case .place(let p):
+      return printer.show(p)
+    case .object(let o):
+      return printer.show(o)
     }
   }
 

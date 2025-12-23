@@ -392,7 +392,6 @@ public struct Typer {
       return
     }
 
-    let concept = program.types[witness.concept].declaration
     let conformer = witness.arguments.values[0]
     let qualification = demand(Metatype(inhabitant: conformer)).erased
 
@@ -401,23 +400,20 @@ public struct Typer {
     var substitutions = Dictionary(
       uniqueKeysWithValues: witness.arguments.elements.map({ (k, v) in (k.erased, v) }))
 
-    var implementations = WitnessTable(concept: concept)
-    let (requirements, associatedTypes) = program[concept].members.partitioned { (r) in
-      program.tag(of: r) == AssociatedTypeDeclaration.self
-    }
+    var implementations = WitnessTable(concept: witness.concept, arguments: witness.arguments)
+    let (associatedTypes, requirements) = program.requirements(of: witness.concept)
 
     // Find the implementations of associated types in the conformance declaration itself.
     for r in associatedTypes {
-      let a = program.castUnchecked(r, to: AssociatedTypeDeclaration.self)
-      let i = self.implementation(of: a, in: d).map({ (i) in declaredType(of: i) }) ?? .error
+      let i = self.implementation(of: r, in: d).map({ (i) in declaredType(of: i) }) ?? .error
 
       if let m = program.types[i] as? Metatype {
-        let k0 = declaredType(of: a)
+        let k0 = declaredType(of: r)
         let k1 = program.types[k0] as! Metatype
         substitutions[k1.inhabitant] = m.inhabitant
-        implementations.assign(m.inhabitant, to: a)
+        implementations.assign(m.inhabitant, to: r)
       } else {
-        return reportMissingImplementation(of: a, in: d)
+        return reportMissingImplementation(of: r, in: d)
       }
     }
 
@@ -447,10 +443,10 @@ public struct Typer {
       default:
         program.unexpected(r)
       }
-
-      // Save the witness table.
-      program[module].setImplementations(implementations, for: d)
     }
+
+    // Save the witness table.
+    program[module].setImplementations(implementations, for: d)
 
     /// Returns the declarations implementing `requirement`.
     func namedImplementation(of requirement: DeclarationIdentity) -> DeclarationReference? {
@@ -759,14 +755,24 @@ public struct Typer {
     for conformer: AnyTypeIdentity
   ) -> DeclarationReference? {
     let concept = program.traitRequiring(requirement)!
-    if
-      isStructurallySynthesizable(conformanceTo: concept),
-      structurallyConforms(storageOf: conformer, to: concept, in: .init(node: d))
-    {
-      return .synthetic(requirement)
-    } else if isBuiltin(conformanceTo: concept, for: conformer) {
-      return .synthetic(requirement)
-    } else {
+
+    // Are we looking are a built-in conformance?
+    if isBuiltin(conformanceTo: concept, for: conformer) {
+      return .synthetic(requirement, transitively: true)
+    }
+
+    // Are conformances to `concept` synthesizable?
+    else if isStructurallySynthesizable(conformanceTo: concept) {
+      switch structurallyConforms(storageOf: conformer, to: concept, in: .init(node: d)) {
+      case .failure:
+        return nil
+      case .success(let isTransitivelySynthetic):
+        return .synthetic(requirement, transitively: isTransitivelySynthetic)
+      }
+    }
+
+    // No synthesizable conformance to `concept`.
+    else {
       return nil
     }
   }
@@ -793,7 +799,10 @@ public struct Typer {
   private mutating func isBuiltin(
     conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity
   ) -> Bool {
-    guard program.containsStandardLibrary else { return false }
+    // Nothing to do if the standard library is not loaded.
+    if !program.containsStandardLibrary { return false }
+
+    // Look for built-in conformances.
     switch concept {
     case program.standardLibraryDeclaration(.expressibleByIntegerLiteral):
       return isStandardLibraryIntegerType(conformer)
@@ -802,52 +811,87 @@ public struct Typer {
     }
   }
 
-  /// Returns `true` iff conformances of each stored part of `conformer` to `concept` can be
-  /// derived (i.e., resolved or synthesized) in `scopeOfUse`.
+  /// The result of a structural conformance lookup.
+  private enum StructualConformanceLookupResult {
+
+    /// No structural conformance.
+    case failure
+
+    /// Structural conformance is synthesizable.
+    ///
+    /// The payload is `true` iff the resolved conformance does not involve any user code.
+    case success(Bool)
+
+    /// Returns the logical AND of `l` and `r`.
+    static func && (l: Self, r: @autoclosure () -> Self) -> Self {
+      if case .success(let a) = l, case .success(let b) = r() {
+        return .success(a && b)
+      } else {
+        return .failure
+      }
+    }
+
+  }
+
+  /// Returns whether a conformance of each stored part of `conformer` to `concept` can be derived
+  /// (i.e., resolved or synthesized) in `scopeOfUse`.
   ///
-  /// - Requires: conformances to `concept` may be synthesized.
+  /// - Requires: conformances to `concept` may be synthesized by the compiler.
   private mutating func structurallyConforms(
     storageOf conformer: AnyTypeIdentity, to concept: TraitDeclaration.ID,
     in scopeOfUse: ScopeIdentity
-  ) -> Bool {
-    if let s = storage(of: conformer) {
-      return s.allSatisfy({ (t) in isDerivable(conformanceTo: concept, for: t, in: scopeOfUse) })
-    } else {
-      return false
+  ) -> StructualConformanceLookupResult {
+    guard let parts = storage(of: conformer) else { return .failure }
+
+    var isTriviallySynthetic = true
+    for p in parts {
+      switch isDerivable(conformanceTo: concept, for: p, in: scopeOfUse) {
+      case .failure:
+        return .failure
+      case .success(let s):
+        isTriviallySynthetic = isTriviallySynthetic && s
+      }
     }
+
+    return .success(isTriviallySynthetic)
   }
 
-  /// Returns `true` iff conformances of each stored part of `conformer` to `concept` can be
-  /// derived (i.e., resolved or synthesized) in `scopeOfUse`.
+  /// Returns whether a conformance of each stored part of `conformer` to `concept` can be derived
+  /// (i.e., resolved or synthesized) in `scopeOfUse`.
   ///
-  /// - Requires: conformances to `concept` may be synthesized.
+  /// - Requires: conformances to `concept` may be synthesized by the compiler.
   private mutating func structurallyConforms(
     _ conformer: Tuple.ID, to concept: TraitDeclaration.ID,
     in scopeOfUse: ScopeIdentity
-  ) -> Bool {
+  ) -> StructualConformanceLookupResult {
     switch program.types[conformer] {
     case .cons(let head, let tail):
-      return isDerivable(conformanceTo: concept, for: head, in: scopeOfUse)
+      return
+        isDerivable(conformanceTo: concept, for: head, in: scopeOfUse)
         && isDerivable(conformanceTo: concept, for: tail, in: scopeOfUse)
 
     case .empty:
-      return true
+      return .success(true)
     }
   }
 
-  /// Returns `true` iff a conformance of `conformer` to `concept` can be resolved or synthesized
-  /// in `scopeOfUse`.
+  /// Returns whether a conformance of each stored part of `conformer` to `concept` can be derived
+  /// (i.e., resolved or synthesized) in `scopeOfUse`.
   private mutating func isDerivable(
     conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity,
     in scopeOfUse: ScopeIdentity
-  ) -> Bool {
+  ) -> StructualConformanceLookupResult {
     assert(isStructurallySynthesizable(conformanceTo: concept))
     if program.types[conformer] is MachineType {
-      return true
+      return .success(true)
     }
 
     let a = typeOfModel(of: conformer, conformingTo: concept, with: []).erased
-    return summon(a, in: scopeOfUse).count == 1
+    if let pick = summon(a, in: scopeOfUse).uniqueElement {
+      return .success(program.isTransitivelySyntheticConformance(pick.witness))
+    } else {
+      return .failure
+    }
   }
 
   /// Reports that `requirement` has no implementation.

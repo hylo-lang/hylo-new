@@ -45,9 +45,18 @@ public struct TypeStore: Sendable {
 
   /// Returns the body of `f` with each parameter substituted for its corresponding argument.
   public mutating func application(
+    of f: UniversalType.ID, to arguments: TypeArguments
+  ) -> AnyTypeIdentity {
+    let t = substitute(arguments, in: self[f].head)
+    let p = self[f].parameters.filter({ (p) in !arguments.parameters.contains(p) })
+    return introduce(parameters: p, into: t)
+  }
+
+  /// Returns the body of `f` with each parameter substituted for its corresponding argument.
+  public mutating func application(
     of f: UniversalType.ID, to arguments: [AnyTypeIdentity]
   ) -> AnyTypeIdentity {
-    substitute(.init(mapping: self[f].parameters, to: arguments), in: self[f].head)
+    application(of: f, to: .init(mapping: self[f].parameters, to: arguments))
   }
 
   /// Inserts `t` in `self` it isn't already present and returns the identity of an equal tree.

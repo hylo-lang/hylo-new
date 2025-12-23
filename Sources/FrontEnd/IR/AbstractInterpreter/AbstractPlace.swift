@@ -28,21 +28,55 @@ internal enum AbstractPlace: Hashable, Sendable {
   }
 
   /// Returns `l` merged with `r`.
-  internal static func && (l: AbstractPlace, r: AbstractPlace) -> AbstractPlace {
+  internal static func && (l: Self, r: Self) -> Self {
     precondition(l == r, "invalid merge")
     return l
   }
 
 }
 
-extension AbstractPlace: CustomStringConvertible {
+extension AbstractPlace: Comparable {
 
-  internal var description: String {
+  /// Returns `true` iff `self` precedes `other` in a lexicographical order.
+  internal static func < (l: Self, r: Self) -> Bool {
+    switch (l, r) {
+    case (.root(let a), .root(let b)):
+      return areInIncreasingOrder(a, b)
+    case (.root(let a), .subplace(let b, _)):
+      return (a == b) || areInIncreasingOrder(a, b)
+    case (.subplace(let a, _), .root(let b)):
+      return areInIncreasingOrder(a, b)
+    case (.subplace(let a, let p), .subplace(let b, let q)):
+      return (a == b) ? p.lexicographicallyPrecedes(q) : areInIncreasingOrder(a, b)
+    }
+  }
+
+  /// Returns `true` iff `l` precedes `r` when computing whether two abstract places are in order.
+  private static func areInIncreasingOrder(_ l: IRValue, _ r: IRValue) -> Bool {
+    switch (l, r) {
+    case (.parameter(let a), .parameter(let b)):
+      return a < b
+    case (.parameter, _):
+      return true
+    case (.register, .parameter):
+      return false
+    case (.register(let a), .register(let b)):
+      return a < b
+    default:
+      fatalError()
+    }
+  }
+}
+
+extension AbstractPlace: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  internal func show(using printer: inout TreePrinter) -> String {
     switch self {
     case .root(let r):
-      return String(describing: r)
+      return "[\(printer.show(r))]"
     case .subplace(let root, let path):
-      return "\(root).\(list: path, joinedBy: ".")"
+      return "\(printer.show(root)).\(list: path, joinedBy: ".")"
     }
   }
 

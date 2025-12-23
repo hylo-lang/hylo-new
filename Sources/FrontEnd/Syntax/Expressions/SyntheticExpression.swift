@@ -19,7 +19,7 @@ public struct SyntheticExpression: Expression {
   /// The synthesized expression.
   public let value: Value
 
-  /// The site at which the synthesized expression is anchored.
+  /// The site to which the synthesized expression is anchored.
   public let site: SourceSpan
 
   /// Creates an instance with the given properties.
