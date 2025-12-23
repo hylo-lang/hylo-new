@@ -29,7 +29,10 @@ public enum DeclarationReference: Hashable, Sendable {
   case inherited(WitnessExpression, DeclarationIdentity, statically: Bool)
 
   /// A reference to a synthetic implementation of a trait requirement.
-  case synthetic(DeclarationIdentity)
+  ///
+  /// The payload is `true` iff the implementation is transitively synthetic, meaning that it does
+  /// not involve any user code. This property is set during typing.
+  case synthetic(DeclarationIdentity, transitively: Bool)
 
   /// `true` iff this referennce mentions open variable.
   public var hasVariable: Bool {
@@ -38,6 +41,16 @@ public enum DeclarationReference: Hashable, Sendable {
       return false
     case .inherited(let w, _, _):
       return w.hasVariable
+    }
+  }
+
+  /// `true` iff `self` is a transitively synthetic implementation of some trait requirement.
+  public var isTransitivelySynthethic: Bool {
+    switch self {
+    case .synthetic(_, let t):
+      return t
+    default:
+      return false
     }
   }
 
@@ -89,7 +102,7 @@ extension DeclarationReference: Showable {
     switch self {
     case .builtin(let e):
       return "$<builtin \(e)>"
-    case .synthetic(let d):
+    case .synthetic(let d, _):
       return "$<synthetic implementation of \(printer.program.nameOrTag(of: d))>"
     case .direct(let d), .member(let d), .inherited(_, let d, _):
       return printer.program.nameOrTag(of: d)

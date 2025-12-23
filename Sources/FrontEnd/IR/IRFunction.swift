@@ -13,19 +13,22 @@ public struct IRFunction: Sendable {
     /// The identity of a function lowered from sources.
     case lowered(DeclarationIdentity)
 
+    /// The identity of a synthesized function.
+    case synthesized(DeclarationIdentity, TypeArguments)
+
   }
 
   /// The way in which an IR function returns its result.
-  public enum Result: Hashable, Sendable {
+  public enum Output: Hashable, Sendable {
 
     /// The result is returned in register.
     case register
 
     /// The result is projected.
-    case projection(AnyTypeIdentity)
+    case projection(RemoteType.ID)
 
     /// The payload of `self` iff it denotes a projection.
-    public var projection: AnyTypeIdentity? {
+    public var projection: RemoteType.ID? {
       if case .projection(let t) = self {
         return t
       } else {
@@ -66,7 +69,7 @@ public struct IRFunction: Sendable {
   public let name: Name
 
   /// The way in which the function returns its result.
-  public let result: Result
+  public let output: Output
 
   /// The generic type parameters of the function.
   public let typeParameters: [GenericParameter.ID]
@@ -85,11 +88,11 @@ public struct IRFunction: Sendable {
 
   /// Creates an instance with the given properties.
   public init(
-    name: Name, result: Result,
+    name: Name, output: Output,
     typeParameters: [GenericParameter.ID], termParameters: [IRParameter],
   ) {
     self.name = name
-    self.result = result
+    self.output = output
     self.typeParameters = typeParameters
     self.termParameters = termParameters
     self.slots = []
@@ -99,6 +102,16 @@ public struct IRFunction: Sendable {
   /// `true` iff the function has an entry.
   public var isDefined: Bool {
     !blocks.isEmpty
+  }
+
+   /// `true` iff the function returns a unit value (i.e., an isntance of `Hylo.Void`).
+  public var isProcedure: Bool {
+    returnRegister.flatMap(result(of:))?.type == .void
+  }
+
+  /// The register in which the function writes its result, if any.
+  public var returnRegister: IRValue? {
+    (output == .register) ? .parameter(termParameters.count - 1) : nil
   }
 
   /// The entry block of `self`.
@@ -115,28 +128,32 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns the instructions of `b`.
-  public func contents(of b: IRBlock.ID) -> some Sequence<AnyInstructionIdentity> {
-    var next = blocks[b].first?.address
-    let last = blocks[b].last?.address
-    return AnyIterator {
-      if let n = next {
-        next = (n != last) ? slots.address(after: n) : nil
-        return AnyInstructionIdentity(address: n)
-      } else {
-        return nil
-      }
-    }
-  }
-
   /// Returns the last use of `v` in `b`, if any.
   public func lastUse(of v: IRValue, in b: IRBlock.ID) -> Use? {
-    for i in contents(of: b).reversed() {
+    for i in instructions(in: b).reversed() {
       if let n = at(i).operands.lastIndex(of: v) {
         return Use(user: i, index: n)
       }
     }
     return nil
+  }
+
+  /// Returns the type of `self`, computing it using `p`.
+  public func type(uniquedIn p: inout Program) -> AnyTypeIdentity {
+    let ps = termParameters.map { (p) in
+      Parameter(access: p.access, type: resolved(p.type)!.type)
+    }
+
+    var a: Arrow
+    switch output {
+    case .register:
+      a = Arrow(style: .parenthesized, inputs: Array(ps.dropLast()), output: ps.last!.type)
+    case .projection(let o):
+      a = Arrow(style: .bracketed, inputs: ps, output: o.erased)
+    }
+
+    let t = p.types.demand(a).erased
+    return p.types.introduce(parameters: typeParameters, into: t)
   }
 
   /// Returns the tag of `i`.
@@ -231,6 +248,28 @@ public struct IRFunction: Sendable {
     result(of: v).map(\.isAddress) ?? false
   }
 
+  /// Returns `true` iff `v` is a parameter with access `k`.
+  public func isParameter(_ v: IRValue, _ k: AccessEffect) -> Bool {
+    switch v {
+    case .parameter(let i):
+      return termParameters[i].access == k
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff `v` is an alloca or a `sink` parameter.
+  public func owns(_ v: IRValue) -> Bool {
+    switch v {
+    case .register(let i):
+      return tag(of: i) == IRAlloca.self
+    case .parameter(let i):
+      return termParameters[i].access == .sink
+    default:
+      return false
+    }
+  }
+
   /// Returns the type of the value computed by `v` or `nil` if `v` doesn't compute any.
   ///
   /// - Requires: `v` is either a constant or an instruction in this function.
@@ -300,7 +339,16 @@ public struct IRFunction: Sendable {
 
   /// Returns the instructions in `b`.
   public func instructions(in b: IRBlock.ID) -> IRBlock.Iterator {
-    .init(slots: slots, current: blocks[b].first, last: blocks[b].last)
+    .init(slots: slots, last: blocks[b].last, current: blocks[b].first)
+  }
+
+  /// Returns the instructions that follows `i` in the block containing `i`.
+  public func instructions(after i: AnyInstructionIdentity) -> IRBlock.Iterator {
+    let b = block(defining: i)
+    return .init(
+      slots: slots,
+      last: blocks[b].last,
+      current: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
   }
 
   /// Returns the successors of `b`.
@@ -504,11 +552,11 @@ extension IRFunction: Showable {
     result.append("(")
     for (i, p) in termParameters.enumerated() {
       if (i != 0) { result.append(", ") }
-      result.append("\(printer.show(IRValue.parameter(i))): \(printer.show(p.type))")
+      result.append("\(p.access) \(printer.show(IRValue.parameter(i))): \(printer.show(p.type))")
     }
     result.append(")")
 
-    if case .projection(let t) = self.result {
+    if case .projection(let t) = self.output {
       result.append(" -> \(printer.show(t))")
     }
 
@@ -516,7 +564,7 @@ extension IRFunction: Showable {
       result.append(" {\n")
       for b in blocks.addresses {
         result.append("%b\(b.rawValue):\n")
-        for i in contents(of: b) {
+        for i in instructions(in: b) {
           let r = IRValue.register(i)
           result.append("  \(printer.show(r)) = \(at(i).show(using: &printer))\n")
         }
@@ -535,7 +583,10 @@ extension IRFunction.Name: Showable {
   public func show(using printer: inout TreePrinter) -> String {
     switch self {
     case .lowered(let d):
-      printer.program.debugName(of: d)
+      return printer.program.debugName(of: d)
+    case .synthesized(let d, let a):
+      let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
+      return "\(printer.program.debugName(of: d))<\(list: xs)>"
     }
   }
 
@@ -551,16 +602,16 @@ extension IRBlock {
     /// The instructions containing the subsequence that `self` represents.
     private let slots: List<IRFunction.Slot>
 
-    /// The identity of the next element in `self`, if any.
-    private var current: List<IRFunction.Slot>.Address?
-
     /// The identity of the last element in `self`.
     private let last: List<IRFunction.Slot>.Address?
+
+    /// The identity of the next element in `self`, if any.
+    private var current: List<IRFunction.Slot>.Address?
 
     /// Creates an instance enumerating the identities of the instructions in `slots` between
     /// `current` and `last`, included.
     fileprivate init(
-      slots: List<IRFunction.Slot>, current: AnyInstructionIdentity?, last: AnyInstructionIdentity?
+      slots: List<IRFunction.Slot>, last: AnyInstructionIdentity?, current: AnyInstructionIdentity?
     ) {
       assert((current != nil) || (last == nil))
       self.slots = slots

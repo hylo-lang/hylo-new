@@ -13,8 +13,8 @@ public struct IRWitnessTable: Instruction {
   public let witnessType: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
-  public init(witnessType: AnyTypeIdentity, anchor: Anchor) {
-    self.operands = []
+  public init(witnessType: AnyTypeIdentity, members: [IRValue], anchor: Anchor) {
+    self.operands = members
     self.anchor = anchor
     self.witnessType = witnessType
   }
@@ -30,7 +30,7 @@ extension IRWitnessTable: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "witnesstable \(printer.show(witnessType))"
+    "witnesstable \(printer.show(witnessType)) {\(printer.show(operands))}"
   }
 
 }

@@ -13,4 +13,13 @@ extension Array {
     self.append(contentsOf: tail)
   }
 
+  /// Creates an array with the contents of `e`, if any.
+  public init(contentsOf e: Element?) {
+    if let x = e {
+      self = [x]
+    } else {
+      self = []
+    }
+  }
+
 }

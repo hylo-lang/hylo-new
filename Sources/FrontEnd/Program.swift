@@ -102,7 +102,7 @@ public struct Program: Sendable {
       let never = typer.program.types.never()
 
       // Mandatory intra-procedural passes.
-      for i in work.indices {
+      for i in work.indices where work[i].isDefined {
         work[i].foldRedundantInstructions()
         work[i].removeCodeAfterCallsReturning(never: never.erased)
         work[i].removeUnreachableBlocks()
@@ -129,11 +129,6 @@ public struct Program: Sendable {
     var typer = Typer(typing: m, of: consume self)
     defer { self = typer.release() }
     return action(&typer)
-//    withUnsafeMutablePointer(to: &self) { (p) in
-//      var typer = Typer(typing: m, of: p.move())
-//      defer { p.initialize(to: typer.release()) }
-//      return action(&typer)
-//    }
   }
 
   internal mutating func withEmitter<T>(
@@ -325,6 +320,15 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `true` iff `n` declares a memberwise initializer.
+  public func isMemberwiseInitializer<T: SyntaxIdentity>(_ n: T) -> Bool {
+    if let d = cast(n, to: FunctionDeclaration.self) {
+      return self[d].isMemberwiseInitializer
+    } else {
+      return false
+    }
+  }
+
   /// Returns `true` iff `n` declares a static member entity.
   public func isStatic<T: SyntaxIdentity>(_ n: T) -> Bool {
     // Note: the following relies on the fact that non-member declarations can't be `static`, which
@@ -416,6 +420,35 @@ public struct Program: Sendable {
     } else {
       return false
     }
+  }
+
+  /// Returns `true` iff `w` denotes a synthetic conformance that does not involve any user code.
+  public func isTransitivelySyntheticConformance(_ w: WitnessExpression) -> Bool {
+    switch w.value {
+    case .reference(let r):
+      return isTransitivelySyntheticConformance(r)
+    case .termApplication(let a, _), .typeApplication(let a, _):
+      return isTransitivelySyntheticConformance(a)
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff `r` denotes a synthetic conformance that does not involve any user code.
+  private func isTransitivelySyntheticConformance(_ r: DeclarationReference) -> Bool {
+    guard
+      let x0 = r.target,
+      let x1 = cast(x0, to: ConformanceDeclaration.self),
+      let x2 = self[x1.module].implementations(definedBy: x1)
+    else {
+      // If the typer calls this method while the declaration referred to by `r` in on stack, we
+      // can assume that it is checking a conformance defined for a self-referential type. Since
+      // such types require some form of indirection, we can also assume that the conformance is
+      // not transitively synthetic.
+      return false
+    }
+
+    return x2.isTransitivelySynthetic
   }
 
   /// Returns `n` if it identifies a node of type `U`; otherwise, returns `nil`.
@@ -546,6 +579,23 @@ public struct Program: Sendable {
   /// - Requires: The module containing `n` is typed.
   public func declaration(referredToBy n: NameExpression.ID) -> DeclarationReference {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
+  }
+
+  /// Returns the associated type and member requirements of `t`.
+  public func requirements(
+    of t: Trait.ID
+  ) -> (associatedTypes: [AssociatedTypeDeclaration.ID], members: [DeclarationIdentity]) {
+    let concept = types[t].declaration
+    var ts: [AssociatedTypeDeclaration.ID] = []
+    var ms: [DeclarationIdentity] = .init(minimumCapacity: self[concept].members.count)
+    for m in self[concept].members {
+      if let a = cast(m, to: AssociatedTypeDeclaration.self) {
+        ts.append(a)
+      } else {
+        ms.append(m)
+      }
+    }
+    return (ts, ms)
   }
 
   /// Returns the witness table defined by `d`.

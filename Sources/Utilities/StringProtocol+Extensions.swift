@@ -1,10 +1,15 @@
 extension StringProtocol {
 
-  /// Returns `self` indented by two spaces.
+  /// `self` with each line prefixed by two spaces.
   public var indented: String {
     (self.split(whereSeparator: \.isNewline) as [SubSequence])
       .map({ (line) in "  " + line })
       .joined(separator: "\n")
+  }
+
+  /// `true` iff the first (resp. last) character of `self` is "(" (resp. ")").
+  public var isParenthesized: Bool {
+    (self.first == "(") && (self.last == ")")
   }
 
   /// Returns the indices of the start of each line, in order.

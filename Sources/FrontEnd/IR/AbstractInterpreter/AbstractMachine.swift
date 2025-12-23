@@ -5,7 +5,7 @@ import DequeModule
 ///
 /// The values of an abstract domain must form a meet-semilattice whose meet operation represents
 /// the conservative superposition of two abstract values.
-internal protocol AbstractDomain: Hashable, Sendable {
+internal protocol AbstractDomain: Hashable, Showable, Sendable {
 
   /// Returns `lhs` merged with `rhs`.
   static func && (l: Self, r: Self) -> Self
@@ -20,8 +20,7 @@ internal protocol AbstractTransferFunction {
 
   /// Applies this function on each instruction in `b` of `f` to update the context `c`.
   mutating func apply(
-    _ b: IRBlock.ID, from f: inout IRFunction, in c: inout AbstractContext<Domain>,
-    using typer: inout Typer
+    _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context, using typer: inout Typer
   ) -> Void
 
 }
@@ -34,17 +33,17 @@ extension AbstractTransferFunction {
 }
 
 /// A machine controlling the abstraction interpretation of an IR function.
-internal struct AbstractMachine<Interpret: AbstractTransferFunction> {
+internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
 
   /// The knowledge of the abstract interpreter about a single block.
   private typealias BlockState = (
-    sources: [IRBlock.ID], pre: Interpret.Context, post: Interpret.Context)
+    sources: [IRBlock.ID], pre: Transfer.Context, post: Transfer.Context)
 
   /// A map from basic block to the machine's state before and after the block's execution.
   private typealias State = [IRBlock.ID: BlockState]
 
   /// The transfer function that is used to interpret the function.
-  private var interpret: Interpret
+  private var interpret: Transfer
 
   /// The control flow graph of the function.
   private var cfg: ControlFlowGraph
@@ -63,7 +62,7 @@ internal struct AbstractMachine<Interpret: AbstractTransferFunction> {
 
   /// Creates an instance for interpreting `f` with transfer function `interpret`.
   internal init(
-    interpreting f: IRFunction, with interpret: Interpret
+    interpreting f: IRFunction, with interpret: Transfer
   ) {
     self.interpret = interpret
     self.cfg = f.controlFlow()
@@ -73,7 +72,7 @@ internal struct AbstractMachine<Interpret: AbstractTransferFunction> {
   /// Computes a fixed point on the state reached by this machine for each basic block in `f`,
   /// starting from `initialContext` and using `typer` to compute type-related information.
   mutating func fixedPoint(
-    of f: inout IRFunction, startingFrom initialContext: Interpret.Context,
+    of f: inout IRFunction, startingFrom initialContext: Transfer.Context,
     using typer: inout Typer
   ) {
     // Process the entry.
@@ -94,7 +93,7 @@ internal struct AbstractMachine<Interpret: AbstractTransferFunction> {
       }
 
       let (sources, before) = preContext(of: blockToProcess)
-      let after: Interpret.Context
+      let after: Transfer.Context
       let changed: Bool
 
       // Interpret the block's IR unless we already reached a fixed point.
@@ -139,7 +138,7 @@ internal struct AbstractMachine<Interpret: AbstractTransferFunction> {
   /// Returns the pre-context of `b` and the predecessors from which it's been computed.
   ///
   /// - Requires: `isVisitable(b)` is `true`
-  private func preContext(of b: IRBlock.ID) -> (sources: [IRBlock.ID], pre: Interpret.Context) {
+  private func preContext(of b: IRBlock.ID) -> (sources: [IRBlock.ID], pre: Transfer.Context) {
     if b == dominance.root {
       return ([], state[b]!.pre)
     }
@@ -150,9 +149,9 @@ internal struct AbstractMachine<Interpret: AbstractTransferFunction> {
 
   /// Returns the post-context of `b` by processing it with `interpret` in `initialContext`.
   private mutating func postContext(
-    of b: IRBlock.ID, in f: inout IRFunction, startingFrom initialContext: Interpret.Context,
+    of b: IRBlock.ID, in f: inout IRFunction, startingFrom initialContext: Transfer.Context,
     using typer: inout Typer
-  ) -> Interpret.Context {
+  ) -> Transfer.Context {
     var next = initialContext
     interpret.apply(b, from: &f, in: &next, using: &typer)
     return next
