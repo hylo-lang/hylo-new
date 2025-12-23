@@ -1,5 +1,5 @@
-/// Returns the getter of a property in an opaque record.
-public struct IRGetter: Instruction {
+/// Returns the address of a property stored in an opaque record.
+public struct IRProperty: Instruction {
 
   /// The operands of the instruction.
   public let operands: [IRValue]
@@ -7,22 +7,21 @@ public struct IRGetter: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The property whose getter is returned.
+  /// The property being accessed.
   public let property: DeclarationIdentity
 
-  /// The type of the getter returned by this instruction.
-  public let typeOfGetter: FunctionPointer.ID
+  /// The type of the property being accessed.
+  public let propertyType: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
   public init(
-    property: DeclarationIdentity, receiver: IRValue,
-    typeOfGetter: FunctionPointer.ID,
+    receiver: IRValue, property: DeclarationIdentity, propertyType: AnyTypeIdentity,
     anchor: Anchor
   ) {
     self.operands = [receiver]
     self.anchor = anchor
     self.property = property
-    self.typeOfGetter = typeOfGetter
+    self.propertyType = propertyType
   }
 
   /// The address of the record containing the property whose getter is returned.
@@ -32,17 +31,21 @@ public struct IRGetter: Instruction {
 
   /// The type of the value loaded by this instruction.
   public var type: IRType {
-    .hylo(typeOfGetter.erased, isAddress: false)
+    .lowered(propertyType, isAddress: true)
+  }
+
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
   }
 
 }
 
-extension IRGetter: Showable {
+extension IRProperty: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "getter \(printer.program.nameOrTag(of: property)) of \(printer.show(receiver))"
+    "property \"\(printer.program.nameOrTag(of: property))\" of \(printer.show(receiver))"
   }
 
 }
-

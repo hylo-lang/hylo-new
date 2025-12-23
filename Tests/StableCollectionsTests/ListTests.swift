@@ -1,7 +1,7 @@
 import StableCollections
 import XCTest
 
-class ListTests: XCTestCase {
+final class ListTests: XCTestCase {
 
   func testInitWithMinimumCapacity() {
     let s = List<String>(minimumCapacity: 100)
@@ -37,6 +37,17 @@ class ListTests: XCTestCase {
     XCTAssertEqual(s.count, 1)
     s.remove(at: b)
     XCTAssertEqual(s.count, 0)
+  }
+
+  func testAddressFromRawValue() throws {
+    var s: List = ["a", "b", "c"]
+
+    let a = s.firstAddress!
+    let b = try XCTUnwrap(s.address(rawValue: a.rawValue))
+    XCTAssertEqual(a, b)
+
+    s.remove(at: a)
+    XCTAssertNil(s.address(rawValue: a.rawValue))
   }
 
   func testAppend() {

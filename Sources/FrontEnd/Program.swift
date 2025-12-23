@@ -86,9 +86,57 @@ public struct Program: Sendable {
 
   /// Lowers the contents of `m` to IR.
   public mutating func lower(_ m: Module.ID) {
+    // Generate raw IR from the syntax tree.
     var emitter = IREmitter(insertingIn: m, of: consume self)
     emitter.incorporateTopLevelDeclarations()
     self = emitter.release()
+
+    // Apply transformation passes.
+    withTyper(typing: m) { (typer) in
+      // Temporarily move all functions to a local work list.
+      var work: [IRFunction] = []
+      modify(&typer.program[typer.module]) { (module) in
+        work = module.ir.values.indices.map({ (f) in module.takeFunction(f) })
+      }
+
+      let never = typer.program.types.never()
+
+      // Mandatory intra-procedural passes.
+      for i in work.indices where work[i].isDefined {
+        work[i].foldRedundantInstructions()
+        work[i].removeCodeAfterCallsReturning(never: never.erased)
+        work[i].removeUnreachableBlocks()
+        work[i].removedUnusedDefinitions()
+        // reifyBundles
+        // reifyAccesses
+        work[i].closeOpenEndedRegions()
+        work[i].normalizeLifetimes(emittingInto: m, using: &typer)
+      }
+
+      // Move all functions back.
+      modify(&typer.program[typer.module]) { (module) in
+        for f in module.ir.values.indices.reversed() {
+          module.reassignFunction(work.removeLast(), to: f)
+        }
+      }
+    }
+  }
+
+  /// Returns the result of calling `action` on a typer configured with `module`.
+  public mutating func withTyper<T>(
+    typing m: Module.ID, _ action: (inout Typer) -> T
+  ) -> T {
+    var typer = Typer(typing: m, of: consume self)
+    defer { self = typer.release() }
+    return action(&typer)
+  }
+
+  internal mutating func withEmitter<T>(
+    insertingIn m: Module.ID, _ action: (inout IREmitter) -> T
+  ) -> T {
+    var emitter = IREmitter(insertingIn: m, of: consume self)
+    defer { self = emitter.release() }
+    return action(&emitter)
   }
 
   /// Projects the module identified by `m`.
@@ -272,6 +320,15 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `true` iff `n` declares a memberwise initializer.
+  public func isMemberwiseInitializer<T: SyntaxIdentity>(_ n: T) -> Bool {
+    if let d = cast(n, to: FunctionDeclaration.self) {
+      return self[d].isMemberwiseInitializer
+    } else {
+      return false
+    }
+  }
+
   /// Returns `true` iff `n` declares a static member entity.
   public func isStatic<T: SyntaxIdentity>(_ n: T) -> Bool {
     // Note: the following relies on the fact that non-member declarations can't be `static`, which
@@ -365,6 +422,35 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `true` iff `w` denotes a synthetic conformance that does not involve any user code.
+  public func isTransitivelySyntheticConformance(_ w: WitnessExpression) -> Bool {
+    switch w.value {
+    case .reference(let r):
+      return isTransitivelySyntheticConformance(r)
+    case .termApplication(let a, _), .typeApplication(let a, _):
+      return isTransitivelySyntheticConformance(a)
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff `r` denotes a synthetic conformance that does not involve any user code.
+  private func isTransitivelySyntheticConformance(_ r: DeclarationReference) -> Bool {
+    guard
+      let x0 = r.target,
+      let x1 = cast(x0, to: ConformanceDeclaration.self),
+      let x2 = self[x1.module].implementations(definedBy: x1)
+    else {
+      // If the typer calls this method while the declaration referred to by `r` in on stack, we
+      // can assume that it is checking a conformance defined for a self-referential type. Since
+      // such types require some form of indirection, we can also assume that the conformance is
+      // not transitively synthetic.
+      return false
+    }
+
+    return x2.isTransitivelySynthetic
+  }
+
   /// Returns `n` if it identifies a node of type `U`; otherwise, returns `nil`.
   public func cast<T: SyntaxIdentity, U: Syntax>(_ n: T, to: U.Type) -> U.ID? {
     if tag(of: n) == .init(U.self) {
@@ -410,6 +496,31 @@ public struct Program: Sendable {
   /// Returns `w` if it is the desugared form of a conformance type. Otherwise, returns `nil`.
   public func seenAsConformanceTypeExpression(_ w: StaticCall.ID) -> ConformanceTypeSugar? {
     Utilities.read(self[w], { (tree) in tree.arguments.isEmpty ? nil : .init(tree) })
+  }
+
+  /// Returns the built-in entity referred to by `n` iff it denotes the a built-in constructor for
+  /// converting scalar literals.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func asBuiltinScalarLiteralConversion(_ n: ExpressionIdentity) -> StandardLibraryEntity? {
+    guard
+      containsStandardLibrary,
+      let f = cast(n, to: New.self),
+      case .inherited(let w, let m, true) = declaration(referredToBy: self[f].target),
+      case .reference(.direct(let d)) = w.value
+    else { return nil }
+
+    // Is the witness defined in the standard library?
+    if parent(containing: d).module != identity(module: .standardLibrary) {
+      return nil
+    }
+
+    switch m {
+    case standardLibraryDeclaration(.expressibleByIntegerLiteralInit):
+      return .expressibleByIntegerLiteralInit
+    default:
+      return nil
+    }
   }
 
   /// Returns the innermost scope that strictly contains `n`.
@@ -468,6 +579,30 @@ public struct Program: Sendable {
   /// - Requires: The module containing `n` is typed.
   public func declaration(referredToBy n: NameExpression.ID) -> DeclarationReference {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
+  }
+
+  /// Returns the associated type and member requirements of `t`.
+  public func requirements(
+    of t: Trait.ID
+  ) -> (associatedTypes: [AssociatedTypeDeclaration.ID], members: [DeclarationIdentity]) {
+    let concept = types[t].declaration
+    var ts: [AssociatedTypeDeclaration.ID] = []
+    var ms: [DeclarationIdentity] = .init(minimumCapacity: self[concept].members.count)
+    for m in self[concept].members {
+      if let a = cast(m, to: AssociatedTypeDeclaration.self) {
+        ts.append(a)
+      } else {
+        ms.append(m)
+      }
+    }
+    return (ts, ms)
+  }
+
+  /// Returns the witness table defined by `d`.
+  ///
+  /// - Requires: The module containing `d` is typed.
+  public func implementations(definedBy d: ConformanceDeclaration.ID) -> WitnessTable {
+    self[d.module].implementations(definedBy: d) ?? unreachable("untyped node at \(self[d].site)")
   }
 
   /// If `n` is a requirement, returns the traits that introduces it. Otherwise, returns `nil`.
@@ -636,10 +771,26 @@ public struct Program: Sendable {
     return result
   }
 
+  public func debugName(of d: DeclarationIdentity) -> String {
+    var result = [nameOrTag(of: d)]
+    for s in scopes(from: self.parent(containing: d)) {
+      if let n = s.node {
+        result.append(castToDeclaration(n).flatMap(name(of:))?.description ?? "\(tag(of: n))")
+      }
+    }
+    return result.reversed().joined(separator: ".")
+  }
+
   /// Returns the name of the unique entity declared by `d` or a description of `d`'s tag if it
   /// declares zero or more than one named entity.
   public func nameOrTag(of d: DeclarationIdentity) -> String {
-    name(of: d)?.description ?? "$<\(tag(of: d))(\(d.erased.bits))>"
+    if let n = name(of: d) {
+      return n.description
+    } else {
+      let s = self[d].site
+      let (l, c) = s.start.lineAndColumn
+      return "$<\(tag(of: d)) at \(s.source.baseName):\(l).\(c)>"
+    }
   }
 
   /// Returns the name of the unique entity declared by `d`, or `nil` if `d` declares zero or more
@@ -1103,7 +1254,7 @@ extension Program {
     case expressibleByIntegerLiteral = "ExpressibleByIntegerLiteral"
 
     /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
-    case expressibyByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
+    case expressibleByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
 
   }
 
@@ -1195,7 +1346,7 @@ extension Program {
     module moduleName: Module.Name, from archive: inout ReadableArchive<A>
   ) throws -> (loaded: Bool, identity: Module.ID) {
     // Nothing to do if the module is already loaded.
-    if let m = modules.index(forKey: moduleName) { return (false, m) }
+    if let m = identity(module: moduleName) { return (false, m) }
 
     // Reserve an identity for the new module.
     let m = modules.count

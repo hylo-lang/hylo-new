@@ -22,6 +22,9 @@ let package = Package(
   ],
   dependencies: [
     .package(
+      url: "https://github.com/attaswift/BigInt.git",
+      from: "5.7.0"),
+    .package(
       url: "https://github.com/kyouko-taiga/archivist.git",
       branch: "main"),
     .package(
@@ -70,6 +73,7 @@ let package = Package(
         .product(name: "Archivist", package: "archivist"),
         .product(name: "Algorithms", package: "swift-algorithms"),
         .product(name: "Collections", package: "swift-collections"),
+        .product(name: "BigInt", package: "BigInt"),
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -89,7 +93,8 @@ let package = Package(
     .target(
       name: "Utilities",
       dependencies: [
-        .product(name: "Algorithms", package: "swift-algorithms")
+        .product(name: "Algorithms", package: "swift-algorithms"),
+        .product(name: "Collections", package: "swift-collections"),
       ],
       swiftSettings: commonSwiftSettings),
 

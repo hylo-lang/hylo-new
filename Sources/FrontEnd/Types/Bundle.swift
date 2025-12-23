@@ -6,13 +6,13 @@ import Utilities
 public struct Bundle: TypeTree {
 
   /// The common shape of the types of the variants in the bundle.
-  public let shape: AnyTypeIdentity
+  public let shape: Arrow.ID
 
   /// The effects of the variants in the bundle.
   public let variants: AccessEffectSet
 
   /// Creates an instance with the given properties.
-  public init(shape: AnyTypeIdentity, variants: AccessEffectSet) {
+  public init(shape: Arrow.ID, variants: AccessEffectSet) {
     self.shape = shape
     self.variants = variants
   }
@@ -27,7 +27,9 @@ public struct Bundle: TypeTree {
     in store: inout TypeStore,
     by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
   ) -> Bundle {
-    .init(shape: store.map(shape, transform), variants: variants)
+    let s = store[shape].modified(in: &store, by: transform)
+    let t = store.demand(s)
+    return .init(shape: t, variants: variants)
   }
 
 }

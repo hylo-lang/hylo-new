@@ -235,4 +235,37 @@ extension Program {
     undefinedSymbol(n.value, memberOf: t, at: n.site)
   }
 
+  /// Returns a warning diagnosing an unused value.
+  internal func unusedValue(of t: AnyTypeIdentity, at site: SourceSpan) -> Diagnostic {
+    .init(.warning, format("unused value of type '%T'", [t]), at: site)
+  }
+
+}
+
+extension Diagnostic {
+
+  internal static func illegalConsumption(_ k: AccessEffect, at site: SourceSpan) -> Diagnostic {
+    .init(.error, "cannot consume '\(k)' projection", at: site)
+  }
+
+  internal static func illegalMove(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "illegal move", at: site)
+  }
+
+  internal static func uninitializedObject(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "uninitialized object", at: site)
+  }
+
+  internal static func useOfConsumedObject(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "use of consumed object", at: site)
+  }
+
+  internal static func useOfPartialObject(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "use of partially initialized object", at: site)
+  }
+
+  internal static func useOfUninitializedObject(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "use of uninitialized object", at: site)
+  }
+
 }

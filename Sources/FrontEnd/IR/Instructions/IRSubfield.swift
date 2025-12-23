@@ -31,9 +31,14 @@ public struct IRSubfield: Instruction {
     operands[0]
   }
 
-  /// The type of the value loaded by this instruction.
+  /// The type of the instruction's result.
   public var type: IRType {
-    .hylo(typeOfSubfield, isAddress: true)
+    .lowered(typeOfSubfield, isAddress: true)
+  }
+
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
   }
 
 }
@@ -42,7 +47,7 @@ extension IRSubfield: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "subfield \(printer.show(base)) at \(list: path)"
+    "subfield \(printer.show(base)) at \(path)"
   }
 
 }

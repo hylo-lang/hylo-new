@@ -2,7 +2,7 @@ import Archivist
 
 /// The expression of a value synthesized during elaboration.
 @Archivable
-public struct SynthethicExpression: Expression {
+public struct SyntheticExpression: Expression {
 
   /// The value of a synthetic expression.
   @Archivable
@@ -19,7 +19,7 @@ public struct SynthethicExpression: Expression {
   /// The synthesized expression.
   public let value: Value
 
-  /// The site at which the synthesized expression is anchored.
+  /// The site to which the synthesized expression is anchored.
   public let site: SourceSpan
 
   /// Creates an instance with the given properties.
@@ -30,7 +30,7 @@ public struct SynthethicExpression: Expression {
 
 }
 
-extension SynthethicExpression: Showable {
+extension SyntheticExpression: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
