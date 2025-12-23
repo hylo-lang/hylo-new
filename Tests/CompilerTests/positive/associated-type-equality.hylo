@@ -4,7 +4,7 @@ trait P { type X }
 
 given Void is P { type X = Void }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 fun f0<T where T == Void>(x: T.X) {
   check<Void>(x)

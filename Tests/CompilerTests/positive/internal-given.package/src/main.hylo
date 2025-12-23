@@ -3,5 +3,5 @@ trait P {}
 fun f<T where T is P>(x: T) {}
 
 fun main() {
-  f(x: ())
+  f(())
 }

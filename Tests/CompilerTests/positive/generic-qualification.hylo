@@ -2,7 +2,7 @@
 
 struct A<T> {
   public memberwise init
-  public fun f(x: T) {}
+  public fun f(_ x: T) {}
 }
 
 fun main() {

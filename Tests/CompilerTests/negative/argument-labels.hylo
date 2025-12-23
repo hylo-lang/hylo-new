@@ -2,8 +2,8 @@
 
 struct A { public memberwise init }
 
-fun one(x: A) {}
-fun one(x: A, y: A) {}
+fun one(_ x: A) {}
+fun one(_ x: A, _ y: A) {}
 
 fun main() {
   one(y: A())

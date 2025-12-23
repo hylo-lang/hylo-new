@@ -4,12 +4,12 @@ public trait Numeric refines AdditiveArithmetic {
   /// Returns the product of `self` and `other`.
   ///
   /// - Requires: The result is representable in `Self`.
-  fun infix* (_ other: Self) -> Self
+  fun infix* (other: Self) -> Self
 
   /// Writes the result of `self * other` to `self`.
   ///
   /// - Requires: `self * other` is representable in `Self`.
-  fun infix*= (_ other: Self) inout {
+  fun infix*= (other: Self) inout {
     &self = self * other
   }
 

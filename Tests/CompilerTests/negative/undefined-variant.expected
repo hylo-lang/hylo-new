@@ -1,3 +1,3 @@
 negative/undefined-variant.hylo:9.11-17: error: undefined symbol 'f@sink'
-  let b = f@sink(x: ())
+  let b = f@sink(())
           ~~~~~~

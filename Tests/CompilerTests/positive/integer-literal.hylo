@@ -1,4 +1,4 @@
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 public fun main() {
   let x0 = 10

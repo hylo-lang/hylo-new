@@ -4,24 +4,24 @@ public trait AdditiveArithmetic refines Equatable {
   /// Returns the sum of `self` and `other`.
   ///
   /// - Requires: The result is representable in `Self`.
-  fun infix+ (_ other: Self) -> Self
+  fun infix+ (other: Self) -> Self
 
   /// Writes the result of `self + other` to `self`.
   ///
   /// - Requires: `self + other` is representable in `Self`.
-  fun infix+= (_ other: Self) inout {
+  fun infix+= (other: Self) inout {
     &self = self + other
   }
 
   /// Returns `self` subtracted by `other`.
   ///
   /// - Requires: The result is representable in `Self`.
-  fun infix- (_ other: Self) -> Self
+  fun infix- (other: Self) -> Self
 
   /// Writes the result of `self - other` to `self`.
   ///
   /// - Requires: `self - other` is representable in `Self`.
-  fun infix-= (_ other: Self) inout {
+  fun infix-= (other: Self) inout {
     &self = self - other
   }
 

@@ -8,10 +8,10 @@ fun f<T>(x: auto T) auto -> B {
   inout { B() }
 }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 public fun main() {
   var a = A()
-  check<B>(f(x: &a))
-  check<{A, B}>(f(x: a))
+  check<B>(f(&a))
+  check<{A, B}>(f(a))
 }

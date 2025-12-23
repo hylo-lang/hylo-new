@@ -19,7 +19,7 @@ given B is P {
   public fun x() -> X { C() }
 }
 
-fun f<T where T is P>(_ t: T) {
+fun f<T where T is P>(t: T) {
   let x: T.X = t.x()
   f(x)
 }

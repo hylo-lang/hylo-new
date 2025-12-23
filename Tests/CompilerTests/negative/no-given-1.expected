@@ -10,9 +10,9 @@ negative/no-given-1.hylo:19.3-4: error: no coercion from 'Q<A> ==> [Void]() let 
 negative/no-given-1.hylo:19.3-4: note: no given instance of 'Q<A>' in this scope
   f()
   ^
-negative/no-given-1.hylo:23.3-4: error: no coercion from '<T> P<T> ==> [Void](x: let T) let -> Void' to '[Void](x: let Void) let -> Void'
-  i(x: ())
+negative/no-given-1.hylo:23.3-4: error: no coercion from '<T> P<T> ==> [Void](let T) let -> Void' to '[Void](let Void) let -> Void'
+  i(())
   ^
 negative/no-given-1.hylo:23.3-4: note: no given instance of 'P<Void>' in this scope
-  i(x: ())
+  i(())
   ^

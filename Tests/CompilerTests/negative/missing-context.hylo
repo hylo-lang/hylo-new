@@ -2,7 +2,7 @@
 
 struct A<T> { public memberwise init }
 
-fun g<T, U>(_ x: T) {}
+fun g<T, U>(x: T) {}
 
 fun main() {
   _ = A()

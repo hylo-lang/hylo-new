@@ -2,11 +2,11 @@ negative/static-call.hylo:7.26-27: error: T expects 1 type argument(s)
 fun f2<T :: * -> *>() -> T { Builtin.trap() }
                          ^
 negative/static-call.hylo:10.3-5: error: 'f0' takes no compile-time arguments
-  f0<Void>(x: ())
+  f0<Void>(())
   ~~
-negative/static-call.hylo:13.15-23: error: cannot pass value of type '{Void, Void}' to parameter 'Void'
-  f1<Void>(x: ((), ()))
-              ~~~~~~~~
+negative/static-call.hylo:13.12-20: error: cannot pass value of type '{Void, Void}' to parameter 'Void'
+  f1<Void>(((), ()))
+           ~~~~~~~~
 negative/static-call.hylo:14.3-5: error: 'f1' takes 1 compile-time argument(s); found 2
-  f1<Void, Void>(x: ())
+  f1<Void, Void>(())
   ~~

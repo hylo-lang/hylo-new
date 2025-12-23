@@ -5,7 +5,7 @@ enum A<T> {
   case two(x: sink T)
 }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 public fun main() {
   let a0 = A<Void>.one()
@@ -14,9 +14,9 @@ public fun main() {
   let a1: A<Void> = .one()
   check<A<Void>>(a1)
 
-  let a2 = A<_>.two(x: ())
+  let a2 = A<_>.two(())
   check<A<Void>>(a2)
 
-  let a3: A<_> = .two(x: ())
+  let a3: A<_> = .two(())
   check<A<Void>>(a3)
 }

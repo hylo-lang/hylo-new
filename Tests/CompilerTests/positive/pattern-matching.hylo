@@ -3,6 +3,7 @@
 enum A<T> {
   case one()
   case two(x: sink T)
+  case thr(_ y: sink T)
 }
 
 struct B<U> {
@@ -10,13 +11,14 @@ struct B<U> {
   public memberwise init
 }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 public fun main() {
   let x = A<Void>.one()
   let y = match x {
     case .one() { B(u: ()) }
-    case .two(x: sink let a) { B(u: a) }
+    case .two(sink let a) { B(u: a) }
+    case .thr(y: sink let a) { B(u: a) }
   }
   check<B<Void>>(y)
 }

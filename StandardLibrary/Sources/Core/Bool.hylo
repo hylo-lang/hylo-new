@@ -16,14 +16,14 @@ public struct Bool is Deinitializable {
   /// Returns the logical conjunction of `self` and `other`.
   ///
   /// This operation has short-circuit behavior: `other` is evaluated iff `self` is `true`.
-  public fun infix&& (_ other: lazy Bool) -> Bool {
+  public fun infix&& (other: lazy Bool) -> Bool {
     if self { Bool(value: other.value) } else { Bool() }
   }
 
   /// Returns the logical disjunction of `self` and `other`.
   ///
   /// This operation has short-circuit behavior: `other` is evaluated iff `self` is `false`.
-  public fun infix|| (_ other: lazy Bool) -> Bool {
+  public fun infix|| (other: lazy Bool) -> Bool {
     if self { Bool(value: self.value) } else { Bool(value: other.value) }
   }
 
@@ -37,11 +37,11 @@ public struct Bool is Deinitializable {
 
 public given Bool is Equatable {
 
-  public fun infix== (_ other: Self) -> Bool {
+  public fun infix== (other: Self) -> Bool {
     Bool(value: Builtin.icmp_eq_i1(self.value, other.value))
   }
 
-  public fun infix!= (_ other: Self) -> Bool {
+  public fun infix!= (other: Self) -> Bool {
     Bool(value: Builtin.icmp_ne_i1(self.value, other.value))
   }
 

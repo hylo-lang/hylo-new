@@ -1,6 +1,6 @@
-negative/missing-variant.hylo:15.3-11: error: cannot call bundle of type '[Void](x: auto A) auto -> B { let }' mutably
-  f(x: &a)
-  ~~~~~~~~
-negative/missing-variant.hylo:16.3-10: error: cannot call bundle of type '[Void](x: auto A) auto -> B { inout }' immutably
-  g(x: a)
-  ~~~~~~~
+negative/missing-variant.hylo:15.3-8: error: cannot call bundle of type '[Void](auto A) auto -> B { let }' mutably
+  f(&a)
+  ~~~~~
+negative/missing-variant.hylo:16.3-7: error: cannot call bundle of type '[Void](auto A) auto -> B { inout }' immutably
+  g(a)
+  ~~~~
