@@ -16,7 +16,7 @@ given A<Void> is P {
   fun f() -> X { A() }
 }
 
-fun use(_ x: Void) {}
+fun use(x: Void) {}
 
 fun main() {
   let a = A<Void>()

@@ -1,3 +1,3 @@
-negative/generic-requirement.hylo:13.1-6: error: no implementation of 'f(_:)'
+negative/generic-requirement.hylo:13.1-6: error: no implementation of 'f(x:)'
 given<T> S<T> is P {
 ~~~~~

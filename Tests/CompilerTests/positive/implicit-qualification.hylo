@@ -3,7 +3,7 @@
 struct A<T> {
   public var x: T
   public memberwise init
-  public static fun make(_ x: sink T) -> A<T> { .new(x: x) }
+  public static fun make(x: sink T) -> A<T> { .new(x: x) }
   public fun id() sink -> Self { self }
 }
 

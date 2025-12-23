@@ -3,13 +3,13 @@ struct A<T> {
   public init() {}
 }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 public fun main() {
-  let a0 = if true { A() } else { A(x: ()) }
+  let a0 = if true { A() } else { A(()) }
   check<A<Void>>(a0)
 
-  let a1 = if true { A() } else if true { A() } else { A(x: true) }
+  let a1 = if true { A() } else if true { A() } else { A(true) }
   check<A<Bool>>(a1)
 
   let a2 = if true {

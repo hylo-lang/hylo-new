@@ -8,9 +8,9 @@ struct A {
   public memberwise init
 }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
-fun g<X, Y where X is P<Y>>(_ x: X) {
+fun g<X, Y where X is P<Y>>(x: X) {
   check<Y>(x.f())
 }
 

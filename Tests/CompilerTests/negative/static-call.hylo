@@ -7,9 +7,9 @@ fun f1<T>(x: T) {}
 fun f2<T :: * -> *>() -> T { Builtin.trap() }
 
 fun main() {
-  f0<Void>(x: ())
+  f0<Void>(())
 
-  f1<Void>(x: ())
-  f1<Void>(x: ((), ()))
-  f1<Void, Void>(x: ())
+  f1<Void>(())
+  f1<Void>(((), ()))
+  f1<Void, Void>(())
 }

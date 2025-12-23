@@ -5,6 +5,6 @@ fun f(x: auto Void) auto {
 }
 
 public fun main() {
-  let a = f@let(x: ())
-  let b = f@sink(x: ())
+  let a = f@let(())
+  let b = f@sink(())
 }

@@ -7,7 +7,7 @@ fun f() -> A { A() }
 
 fun f() -> B { B() }
 
-fun g(_ x: A) {}
+fun g(x: A) {}
 
 fun main() {
   g(f())

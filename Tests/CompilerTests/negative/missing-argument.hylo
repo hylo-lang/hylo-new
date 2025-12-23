@@ -1,9 +1,9 @@
 //! no-std
 
-fun f(x: Void = (), y: Void) {}
+fun f(first x: Void = (), second y: Void) {}
 
 fun main() {
-  f(x: (), y: ())
-  f(y: ())
+  f(first: (), second: ())
+  f(second: ())
   f()
 }

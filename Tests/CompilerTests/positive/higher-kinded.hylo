@@ -6,9 +6,9 @@ struct A<T> {
 }
 
 fun f<T :: * -> *, U>() -> T<U> { Builtin.trap() }
-fun g<T :: * -> *, U>(_ x: T<U>) -> T<A<U>> { Builtin.trap() }
+fun g<T :: * -> *, U>(x: T<U>) -> T<A<U>> { Builtin.trap() }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 public fun main() {
   let x = f<A, Void>()

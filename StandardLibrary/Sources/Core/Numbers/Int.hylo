@@ -24,11 +24,11 @@ public given Int is ExpressibleByIntegerLiteral { /* built-in */ }
 
 public given Int is Equatable {
 
-  public fun infix== (_ other: Self) -> Bool {
+  public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_word(self.value, other.value))
   }
 
-  public fun infix!= (_ other: Self) -> Bool {
+  public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_word(self.value, other.value))
   }
 
@@ -36,7 +36,7 @@ public given Int is Equatable {
 
 public given Int is AdditiveArithmetic {
 
-  fun infix+ (_ other: Self) -> Self {
+  fun infix+ (other: Self) -> Self {
     let (result, overflow) = Builtin.sadd_with_overflow_word(self.value, other.value)
     if Bool(value: overflow) {
       fatal_error()
@@ -45,7 +45,7 @@ public given Int is AdditiveArithmetic {
     }
   }
 
-  fun infix- (_ other: Self) -> Self {
+  fun infix- (other: Self) -> Self {
     let (result, overflow) = Builtin.ssub_with_overflow_word(self.value, other.value)
     if Bool(value: overflow) {
       fatal_error()
@@ -62,7 +62,7 @@ public given Int is AdditiveArithmetic {
 
 public given Int is Numeric {
 
-  fun infix* (_ other: Self) -> Self {
+  fun infix* (other: Self) -> Self {
     .new(value: Builtin.mul_word(self.value, other.value))
   }
 

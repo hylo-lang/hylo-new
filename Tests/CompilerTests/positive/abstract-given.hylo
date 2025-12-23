@@ -1,6 +1,6 @@
 //! no-std
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 trait P {
   type X

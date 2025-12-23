@@ -848,14 +848,14 @@ public struct Parser {
     let identifier: Parsed<String>
 
     switch (take(if: \.isArgumentLabel), take(.name)) {
-    case (let n, .some(let m)):
-      identifier = Parsed(m)
-      label = n.map({ (t) in t.tag == .underscore ? nil : Parsed(t) }) ?? identifier
+    case (let x, .some(let y)):
+      identifier = Parsed(y)
+      label = x.map({ (t) in (t.tag == .underscore) ? identifier : Parsed(t) })
 
     case (.some(let n), nil):
       if n.isKeyword { report(.init("'\(n.text)' is not a valid identifier", at: n.site)) }
       identifier = Parsed(n)
-      label = identifier
+      label = nil
 
     case (nil, nil):
       throw expected("parameter declaration")

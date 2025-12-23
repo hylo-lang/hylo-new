@@ -11,7 +11,7 @@ public trait Movable {
 extension T : Movable {
 
   /// Exchanges the value of `self` with that of `other`.
-  public fun swap(_ other: inout Self) inout {
+  public fun swap(other: inout Self) inout {
     var x: Self
     &x.take_value@set(from: self)
     &self.take_value@set(from: other)

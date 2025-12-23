@@ -20,5 +20,5 @@ fun h() {
 }
 
 fun i<T where T is P>(x: T) {
-  i(x: ())
+  i(())
 }

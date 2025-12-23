@@ -4,8 +4,8 @@ struct A {}
 
 fun f<T, U>(x: sink U) -> U { x }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 fun main() {
-  check<Void>(f<A, _>(x: ()))
+  check<Void>(f<A, _>(()))
 }

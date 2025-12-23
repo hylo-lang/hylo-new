@@ -13,10 +13,10 @@ public trait Equatable {
   /// - Reflexivity: `a == a` is `true`.
   /// - Symmetry: if `a == b` is `true` then so is `b == a`.
   /// - Transitivity: if `a == b` and `b == c` are `true` then so is `a == c`.
-  fun infix== (_ other: Self) -> Bool
+  fun infix== (other: Self) -> Bool
 
   /// Returns `true` iff `self` is not equal to `other`.
-  fun infix!= (_ other: Self) -> Bool {
+  fun infix!= (other: Self) -> Bool {
     !(self == other)
   }
 

@@ -2,7 +2,7 @@
 
 trait P { type X }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 fun f0<T, U where T == U, T is P, U is P>(x: U.X) {
   // We cannot conclude that `T.X` is equal to `U.X` here because the function takes different

@@ -12,6 +12,6 @@ fun g(x: auto A) auto -> B {
 
 public fun main() {
   var a = A()
-  f(x: &a)
-  g(x: a)
+  f(&a)
+  g(a)
 }

@@ -1,6 +1,6 @@
-negative/no-given-2.hylo:13.3-4: error: no coercion from '<T> (P<T>, P<A>) ==> [Void](x: let T) let -> Void' to '[Void](x: let B) let -> Void'
-  f(x: B())
+negative/no-given-2.hylo:13.3-4: error: no coercion from '<T> (P<T>, P<A>) ==> [Void](let T) let -> Void' to '[Void](let B) let -> Void'
+  f(B())
   ^
 negative/no-given-2.hylo:13.3-4: note: no given instance of 'P<B>' in this scope
-  f(x: B())
+  f(B())
   ^

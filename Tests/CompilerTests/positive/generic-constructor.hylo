@@ -11,13 +11,13 @@ struct B<T, U> {
   public let y: U
 }
 
-fun check<T>(_ x: T) {}
+fun check<T>(x: T) {}
 
 fun main() {
   let a0 = A<Void>()
   check<A<Void>>(a0)
 
-  let a1 = A().f(x: ())
+  let a1 = A().f(())
   check<Void>(a1)
 
   let b0 = B(x: (), y: ((), ()))

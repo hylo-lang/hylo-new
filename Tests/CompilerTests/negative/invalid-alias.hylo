@@ -11,8 +11,8 @@ let b: Y<_> = S<Void>()
 let c: Z<_> = (S<Void>(), S())
 
 fun f(x: X<Void>) {}
-fun g() { f(x: ()) }
+fun g() { f(()) }
 
 fun h(x: Z<Void>) {
-  f(x: x)
+  f(x)
 }

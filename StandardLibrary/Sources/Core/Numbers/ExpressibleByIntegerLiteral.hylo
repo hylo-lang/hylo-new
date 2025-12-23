@@ -3,6 +3,6 @@
 public trait ExpressibleByIntegerLiteral {
 
   @_symbol("ExpressibleByIntegerLiteral.init(integer_literal:)")
-  init(integer_literal: Builtin.IntegerLiteral)
+  init(integer_literal literal: Builtin.IntegerLiteral)
 
 }
