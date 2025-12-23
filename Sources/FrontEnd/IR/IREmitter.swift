@@ -427,15 +427,9 @@ internal struct IREmitter {
 
   /// Implements `lower(store:to:)` for synthethic expressions.
   private mutating func lower(store e: SyntheticExpression.ID, to target: IRValue) {
-    switch program[e].value {
-    case .defaultArgument(let a):
-      lower(store: a, to: target)
-
-    case .witness(let w):
-      lowering(e) { (me) in
-        let v = me._emit(witness: w)
-        me._emitMove([.inout, .set], v, to: target)
-      }
+    lowering(e) { (me) in
+      let v = me._emit(witness: me.program[e].value)
+      me._emitMove([.inout, .set], v, to: target)
     }
   }
 
@@ -548,10 +542,7 @@ internal struct IREmitter {
 
   /// Implements `loweredCallee(_:)` for synthetic expressions.
   private mutating func loweredCallee(_ e: SyntheticExpression.ID) -> LoweredCallee {
-    // TODO: remove default arguments from synthetic expressions.
-    guard case .witness(let w) = program[e].value else { program.unexpected(e) }
-
-    return loweredCallee(w, at: program[e].site, in: program.parent(containing: e))
+    loweredCallee(program[e].value, at: program[e].site, in: program.parent(containing: e))
   }
 
   private mutating func loweredCallee(
