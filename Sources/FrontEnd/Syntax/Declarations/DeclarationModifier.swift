@@ -1,31 +1,37 @@
 import Archivist
 
 /// A modifier on a declaration.
+@Archivable
 public enum DeclarationModifier: UInt8, Sendable {
 
-  /// The modifier for introducing members stored out-of-line.
+  /// Introduces a member stored out-of-line.
   case indirect
 
-  /// The modifier for introducing a static member.
+  /// Introduces a static member.
   case `static`
 
-  /// The modifier for introducing a private entity.
+  /// Introduces an entity only within its enclosing scope.
   case `private`
 
-  /// The modifier for introducing an entity public up to the module boundary.
+  /// Introduces an entity visible up to the module boundary.
   case `internal`
 
-  /// The modifier for introducing a public entity.
+  /// Introduces an entity visible beyond the module boundary.
   case `public`
+
+  /// Introduces an entity whose contents is visible across resilience boundaries.
+  case inlineable
 
   /// Returns `true` iff `self` can appear after `other` in sources.
   public func canOccurAfter(_ other: DeclarationModifier) -> Bool {
     switch self {
     case .indirect, .static:
       return true
+    case .inlineable:
+      return false
     default:
       assert(isAccessModifier)
-      return false
+      return other == .inlineable
     }
   }
 
@@ -36,6 +42,8 @@ public enum DeclarationModifier: UInt8, Sendable {
       return (other != self) && (other != .static)
     case .static:
       return (other != self) && (other != .indirect)
+    case .inlineable:
+      return true
     default:
       assert(isAccessModifier)
       return !other.isAccessModifier
@@ -59,25 +67,12 @@ public enum DeclarationModifier: UInt8, Sendable {
 
   /// Returns `true` iff `self` can be applied on an initializer declaration.
   public var isApplicableToInitializer: Bool {
-    isAccessModifier
+    isAccessModifier || self == .inlineable
   }
 
   /// Returns `true` iff `self` can be applied on a type declaration.
   public var isApplicableToTypeDeclaration: Bool {
-    isAccessModifier
-  }
-
-}
-
-extension DeclarationModifier: Archivable {
-
-  public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
-    self = try archive.read(rawValueOf: Self.self, in: &context)
-      .unwrapOrThrow(ArchiveError.invalidInput)
-  }
-
-  public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
-    try archive.write(rawValueOf: self)
+    isAccessModifier || self == .inlineable
   }
 
 }

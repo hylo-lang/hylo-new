@@ -9,11 +9,19 @@ public struct Parser {
     /// The default context.
     case `default`
 
+    /// The parsing of statements in the scope of a function or subscript.
+    case functionBody
+
     /// The parsing of member declarations.
     case typeBody
 
     /// The parsing of the subpattern of a binding pattern.
     case bindingSubpattern
+
+    /// `true` iff `self` denotes a local scope.
+    var isLocal: Bool {
+      (self == .functionBody) || (self == .bindingSubpattern)
+    }
 
   }
 
@@ -201,14 +209,32 @@ public struct Parser {
   /// Parses a declaration modifier if the next token denotes one.
   ///
   ///     declaration-modifier ::= (one of)
-  ///       static private internal private
+  ///       static private internal public indirect inlineable
   ///
   private mutating func parseOptionalDeclarationModifier() -> Parsed<DeclarationModifier>? {
+    // Hard keywords.
     if let m = parseExpressibleByTokenTag(DeclarationModifier.self) {
       return m
-    } else if context == .typeBody, let t = take(contextual: "indirect") {
-      return .init(.indirect, at: t.site)
-    } else {
+    }
+
+    // Contextual keywords.
+    else if let t = peek(), t.tag == .name {
+      switch t.text {
+      case "indirect" where context == .typeBody:
+        _ = take()
+        return .init(.indirect, at: t.site)
+
+      case "inlineable" where !context.isLocal:
+        _ = take()
+        return .init(.inlineable, at: t.site)
+
+      default:
+        return nil
+      }
+    }
+
+    // Nothing to parse.
+    else {
       return nil
     }
   }
@@ -894,7 +920,7 @@ public struct Parser {
   private mutating func parseCallableBody(
     in file: inout Module.SourceContainer
   ) throws -> [StatementIdentity] {
-    var ss = try entering(.default, { (me) in try me.parseBracedStatementList(in: &file) })
+    var ss = try entering(.functionBody, { (me) in try me.parseBracedStatementList(in: &file) })
 
     if ss.isEmpty {
       let r = file.insert(Return(introducer: nil, value: nil, site: .empty(at: position)))
@@ -1104,7 +1130,7 @@ public struct Parser {
     in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity? {
     if take(.assign) != nil {
-      return try parseExpression(in: &file)
+      return try entering(.functionBody, { (me) in try me.parseExpression(in: &file) })
     } else {
       return nil
     }
