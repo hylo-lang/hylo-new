@@ -2243,11 +2243,17 @@ public struct Typer {
     of e: PatternMatchCase.ID, requiring r: AnyTypeIdentity?,
     in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    assert(program[e.module].type(assignedTo: program[e].pattern) != nil, "pattern is not typed")
     let site = program.spanForDiagnostic(about: e)
 
+    // Can't do anything unless the pattern is typed.
+    if program[e.module].type(assignedTo: program[e].pattern) == nil {
+      assert(!program[e.module].diagnostics.isEmpty)
+      program[e.module].setType(.error, for: e)
+      return .error
+    }
+
     // Is the case single-expression bodied?
-    if let b = program.singleExpression(of: program[e].body) {
+    else if let b = program.singleExpression(of: program[e].body) {
       let t = inferredType(of: b, in: &context)
       if let u = r {
         context.obligations.assume(CoercionConstraint(on: b, from: t, to: u, at: program[b].site))
