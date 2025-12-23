@@ -425,8 +425,8 @@ public struct Program: Sendable {
   /// Returns `true` iff `w` denotes a synthetic conformance that does not involve any user code.
   public func isTransitivelySyntheticConformance(_ w: WitnessExpression) -> Bool {
     switch w.value {
-    case .reference(let r):
-      return isTransitivelySyntheticConformance(r)
+    case .reference(let d):
+      return isTransitivelySyntheticConformance(d)
     case .termApplication(let a, _), .typeApplication(let a, _):
       return isTransitivelySyntheticConformance(a)
     default:
@@ -435,11 +435,10 @@ public struct Program: Sendable {
   }
 
   /// Returns `true` iff `r` denotes a synthetic conformance that does not involve any user code.
-  private func isTransitivelySyntheticConformance(_ r: DeclarationReference) -> Bool {
+  private func isTransitivelySyntheticConformance(_ d: DeclarationIdentity) -> Bool {
     guard
-      let x0 = r.target,
-      let x1 = cast(x0, to: ConformanceDeclaration.self),
-      let x2 = self[x1.module].implementations(definedBy: x1)
+      let x0 = cast(d, to: ConformanceDeclaration.self),
+      let x1 = self[x0.module].implementations(definedBy: x0)
     else {
       // If the typer calls this method while the declaration referred to by `r` in on stack, we
       // can assume that it is checking a conformance defined for a self-referential type. Since
@@ -448,7 +447,7 @@ public struct Program: Sendable {
       return false
     }
 
-    return x2.isTransitivelySynthetic
+    return x1.isTransitivelySynthetic
   }
 
   /// Returns `n` if it identifies a node of type `U`; otherwise, returns `nil`.
@@ -507,7 +506,7 @@ public struct Program: Sendable {
       containsStandardLibrary,
       let f = cast(n, to: New.self),
       case .inherited(let w, let m, true) = declaration(referredToBy: self[f].target),
-      case .reference(.direct(let d)) = w.value
+      case .reference(let d) = w.value
     else { return nil }
 
     // Is the witness defined in the standard library?

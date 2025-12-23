@@ -3567,7 +3567,7 @@ public struct Typer {
     let t = declaredType(of: g)
     switch g {
     case .coercion:
-      return .init(value: .reference(.builtin(.coercion)), type: t)
+      return .init(value: .builtin(.coercion), type: t)
     case .recursive:
       return .init(value: .abstract, type: t)
     case .assumed(let i, _):
@@ -3583,9 +3583,9 @@ public struct Typer {
   private func expression(referringTo d: DeclarationIdentity) -> WitnessExpression.Value {
     if let b = program.cast(d, to: BindingDeclaration.self) {
       let (_, v) = program.implicit(introducedBy: b)
-      return .reference(.direct(.init(v)))
+      return .reference(.init(v))
     } else {
-      return .reference(.direct(d))
+      return .reference(d)
     }
   }
 
@@ -4247,7 +4247,7 @@ public struct Typer {
     _ d: ExtensionDeclaration.ID, to t: AnyTypeIdentity, in s: ScopeIdentity
   ) -> SummonResult? {
     let u = extendeeType(d)
-    let w = WitnessExpression(value: .reference(.direct(.init(d))), type: u)
+    let w = WitnessExpression(value: .reference(.init(d)), type: u)
 
     // Fast path: types are trivially equal.
     if t == u { return .init(witness: w, substitutions: .init(), penalties: 0) }

@@ -20,8 +20,11 @@ public struct WitnessExpression: Hashable, Sendable {
     /// An assumed given.
     case assumed(Int)
 
+    /// A reference to a built-in entity.
+    case builtin(BuiltinEntity)
+
     /// A reference to a term declaration.
-    case reference(DeclarationReference)
+    case reference(DeclarationIdentity)
 
     /// A context function applied to a term.
     case termApplication(WitnessExpression, WitnessExpression)
@@ -36,12 +39,10 @@ public struct WitnessExpression: Hashable, Sendable {
     /// substituted for `new`.
     public func substituting(assumed i: Int, for new: Value) -> Self {
       switch self {
-      case .identity, .abstract, .synthetic:
+      case .identity, .abstract, .synthetic, .builtin, .reference:
         return self
       case .assumed(let j):
         return i == j ? new : self
-      case .reference:
-        return self
       case .termApplication(let w, let a):
         return .termApplication(
           w.substituting(assumed: i, for: new), a.substituting(assumed: i, for: new))
@@ -59,10 +60,8 @@ public struct WitnessExpression: Hashable, Sendable {
       switch self {
       case .identity(let x):
         return .identity(x == m ? n : m)
-      case .abstract, .assumed, .synthetic:
+      case .abstract, .assumed, .synthetic, .builtin, .reference:
         return self
-      case .reference(let d):
-        return .reference(d.substituting(m, for: n))
       case .termApplication(let w, let a):
         return .termApplication(w.substituting(m, for: n), a.substituting(m, for: n))
       case .typeApplication(let w, let a):
@@ -88,7 +87,7 @@ public struct WitnessExpression: Hashable, Sendable {
 
   /// Creates a reference to a built-in entity.
   public init(builtin entity: BuiltinEntity, type: AnyTypeIdentity) {
-    self.value = .reference(.builtin(entity))
+    self.value = .builtin(entity)
     self.type = type
   }
 
@@ -97,10 +96,8 @@ public struct WitnessExpression: Hashable, Sendable {
     if type[.hasVariable] { return true }
 
     switch value {
-    case .identity, .abstract, .synthetic, .assumed:
+    case .identity, .abstract, .synthetic, .assumed, .builtin, .reference:
       return false
-    case .reference(let r):
-      return r.hasVariable
     case .termApplication(let w, let a):
       return w.hasVariable || a.hasVariable
     case .typeApplication(let w, let a):
@@ -113,7 +110,7 @@ public struct WitnessExpression: Hashable, Sendable {
   /// A measure of the size of the deduction tree used to produce the witness.
   public var elaborationCost: Int {
     switch value {
-    case .identity, .abstract, .synthetic, .assumed, .reference:
+    case .identity, .abstract, .synthetic, .assumed, .builtin, .reference:
       return 1
     case .termApplication(let w, let a):
       return 1 + w.elaborationCost + a.elaborationCost
@@ -127,10 +124,10 @@ public struct WitnessExpression: Hashable, Sendable {
   /// The declaration of the witness evaluated by this expression, if any.
   public var declaration: DeclarationIdentity? {
     switch value {
-    case .identity, .abstract, .synthetic, .assumed:
+    case .identity, .abstract, .synthetic, .assumed, .builtin:
       return nil
-    case .reference(let r):
-      return r.target
+    case .reference(let d):
+      return d
     case .termApplication(let w, _), .typeApplication(let w, _), .nested(let w):
       return w.declaration
     }
@@ -186,8 +183,10 @@ extension WitnessExpression.Value: Showable {
       return "$<synthesized given>"
     case .assumed(let i):
       return "$<assumed given \(i)>"
+    case .builtin(let e):
+      return "$<builtin \(e)>"
     case .reference(let d):
-      return printer.show(d)
+      return printer.program.nameOrTag(of: d)
     case .termApplication(let w, let a):
       return "\(printer.show(w))(\(printer.show(a)))"
     case .typeApplication(let w, let ts):

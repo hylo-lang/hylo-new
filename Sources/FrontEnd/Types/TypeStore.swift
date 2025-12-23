@@ -645,9 +645,11 @@ public struct TypeStore: Sendable {
     case .assumed(let i):
       return .init(value: .assumed(i), type: t)
 
-    case .reference(let r):
-      let u = self.map(r, transform)
-      return .init(value: .reference(u), type: t)
+    case .builtin(let e):
+      return .init(value: .builtin(e), type: t)
+
+    case .reference(let d):
+      return .init(value: .reference(d), type: t)
 
     case .termApplication(let a, let b):
       let u = self.map(a, transform)

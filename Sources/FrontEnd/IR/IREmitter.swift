@@ -1217,8 +1217,8 @@ internal struct IREmitter {
     case .identity(let e):
       return lowered(lvalue: e)
 
-    case .reference(let r):
-      return _emit(reference: r)
+    case .reference(let d):
+      return _emit(referenceTo: d)
 
     case .typeApplication(let f, let a):
       let x = _emit(witness: f)
