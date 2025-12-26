@@ -1,0 +1,6 @@
+negative/illegal-conditional-expression.hylo:4.11-13: error: branches of if-expression cannot contain statements
+  let x = if true {
+          ~~
+negative/illegal-conditional-expression.hylo:8.11-13: error: branches of if-expression cannot contain statements
+  let y = if true { () } else { let x = 0 }
+          ~~

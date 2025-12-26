@@ -12,9 +12,8 @@ public fun main() {
   let a1 = if true { A() } else if true { A() } else { A(true) }
   check<A<Bool>>(a1)
 
-  let a2 = if true {
+  if true {
     _ = ()
     _ = ()
   }
-  check<Void>(a2)
 }

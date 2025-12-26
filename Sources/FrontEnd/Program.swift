@@ -965,6 +965,17 @@ public struct Program: Sendable {
     }
   }
 
+  // Returns the branches of `e` if both are single-expression bodied.
+  public func branches(
+    of e: If.ID
+  ) -> (onSuccess: ExpressionIdentity, onFailure: ExpressionIdentity)? {
+    guard
+      let a = singleExpression(of: self[e].success),
+      let b = singleExpression(of: self[e].failure)
+    else { return nil }
+    return (a, b)
+  }
+
   /// Returns the adjunct conformances of `d`, if any.
   public func adjuncts(of d: DeclarationIdentity) -> [ConformanceDeclaration.ID]? {
     switch tag(of: d) {
@@ -1110,6 +1121,8 @@ public struct Program: Sendable {
       return self[castUnchecked(n, to: ExtensionDeclaration.self)].introducer.site
     case FunctionDeclaration.self:
       return self[castUnchecked(n, to: FunctionDeclaration.self)].identifier.site
+    case If.self:
+      return self[castUnchecked(n, to: If.self)].introducer.site
     case ImportDeclaration.self:
       return self[castUnchecked(n, to: ImportDeclaration.self)].identifier.site
     case ParameterDeclaration.self:

@@ -994,6 +994,16 @@ public struct Typer {
     }
   }
 
+  /// Type checks `e`, which occurs as a statement.
+  private mutating func checkAsStatement(_ e: If.ID) {
+    if program[e.module].type(assignedTo: e) != nil { return }
+
+    var c = InferenceContext(expectedType: .void)
+    let t = inferredType(of: e, occurringAsStatement: true, in: &c)
+    discharge(c.obligations, relatedTo: e)
+    assert(t == .void)
+  }
+
   /// Type checks `s`.
   private mutating func check(_ s: StatementIdentity) {
     switch program.tag(of: s) {
@@ -1001,6 +1011,8 @@ public struct Typer {
       check(program.castUnchecked(s, to: Assignment.self))
     case Discard.self:
       check(program.castUnchecked(s, to: Discard.self))
+    case If.self:
+      checkAsStatement(program.castUnchecked(s, to: If.self))
     case Return.self:
       check(program.castUnchecked(s, to: Return.self))
     case _ where program.isExpression(s):
@@ -1988,42 +2000,49 @@ public struct Typer {
 
   /// Returns the inferred type of `e`.
   private mutating func inferredType(
-    of e: If.ID, in context: inout InferenceContext
+    of e: If.ID, occurringAsStatement isStatement: Bool = false,
+    in context: inout InferenceContext
   ) -> AnyTypeIdentity {
+    let site = program.spanForDiagnostic(about: e)
     for n in program[e].conditions { check(n) }
 
-    // Are both branches single-bodied expressions?
-    if
-      let e0 = program.singleExpression(of: program[e].success),
-      let e1 = program.singleExpression(of: program[e].failure)
-    {
+    // Is the expression occurring as a statement?
+    if isStatement {
+      context.withSubcontext { (ctx) in
+        _ = inferredType(of: program[e].success, in: &ctx)
+        _ = inferredType(of: program[e].failure, occurringAsStatement: true, in: &ctx)
+      }
+      return context.obligations.assume(e, hasType: .void, at: program[e].site)
+    }
+
+    // Are both branches single-bodied?
+    else if let (e0, e1) = program.branches(of: e) {
       let t0 = inferredType(of: program[e].success, in: &context)
-      let t1 = inferredType(of: program[e].failure, in: &context)
+      context.obligations.assume(program[e].success, hasType: t0, at: program[e0].site)
+      let t1 = inferredType(of: program[e].failure, occurringAsStatement: false, in: &context)
+      context.obligations.assume(program[e].failure, hasType: t1, at: program[e1].site)
 
       // Did we inferred the same type for both branches?
       if t0 == t1 {
-        return context.obligations.assume(e, hasType: t0, at: program[e].site)
+        return context.obligations.assume(e, hasType: t0, at: site)
       }
 
       // Is the expected type `Void`?
       else if context.expectedType == .void {
-        return context.obligations.assume(e, hasType: .void, at: program[e].site)
+        return context.obligations.assume(e, hasType: .void, at: site)
       }
 
       // Slow path: we may need coercions.
       let t = fresh().erased
       context.obligations.assume(CoercionConstraint(on: e0, from: t0, to: t, at: program[e0].site))
       context.obligations.assume(CoercionConstraint(on: e1, from: t1, to: t, at: program[e1].site))
-      return context.obligations.assume(e, hasType: t, at: program[e].site)
+      return context.obligations.assume(e, hasType: t, at: site)
     }
 
-    // The branches are not single-bodied expressions; assume `e` produces `Void`.
+    // Branches of nested conditional expressions must be single-bodied.
     else {
-      context.withSubcontext { (ctx) in
-        _ = inferredType(of: program[e].success, in: &ctx)
-        _ = inferredType(of: program[e].failure, in: &ctx)
-      }
-      return context.obligations.assume(e, hasType: .void, at: program[e].site)
+      report(.error, "branches of if-expression cannot contain statements", about: e)
+      return context.obligations.assume(e, hasType: .error, at: site)
     }
   }
 
@@ -2259,7 +2278,7 @@ public struct Typer {
 
     if program[e].branches.isEmpty {
       report(.init(.error, "pattern matching expression must have at least one case", at: site))
-      return context.obligations.assume(e, hasType: .error, at: program.spanForDiagnostic(about: e))
+      return context.obligations.assume(e, hasType: .error, at: site)
     }
 
     // The type of the expression is `Void` if any of the cases isn't single-expression bodied.
@@ -2278,7 +2297,7 @@ public struct Typer {
     }
 
     let all = first ?? .void
-    return context.obligations.assume(e, hasType: all, at: program.spanForDiagnostic(about: e))
+    return context.obligations.assume(e, hasType: all, at: site)
   }
 
   /// Returns the inferred type of `e`.
@@ -2565,10 +2584,11 @@ public struct Typer {
 
   /// Returns the inferred type of `b`, which occurs in `context`.
   private mutating func inferredType(
-    of b: If.ElseIdentity, in context: inout InferenceContext
+    of b: If.ElseIdentity, occurringAsStatement isStatement: Bool,
+    in context: inout InferenceContext
   ) -> AnyTypeIdentity {
     if let e = program.cast(b, to: If.self) {
-      return inferredType(of: e, in: &context)
+      return inferredType(of: e, occurringAsStatement: isStatement, in: &context)
     } else if let s = program.cast(b, to: Block.self) {
       return inferredType(of: s, in: &context)
     } else {

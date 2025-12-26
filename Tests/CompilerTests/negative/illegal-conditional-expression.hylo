@@ -1,0 +1,9 @@
+public fun f() {}
+
+public fun main() {
+  let x = if true {
+    f()
+    f()
+  }
+  let y = if true { () } else { let x = 0 }
+}
