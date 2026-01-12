@@ -14,16 +14,15 @@ Readers with a solid grasp on the topic may skip these details or come back to t
 It's worth mentioning that all of the concepts introduced below have been discovered and extensively studied elsewhere.
 Important references include:
 
-- Wadler, P., & Blott, S. (1989, January). How to make ad-hoc polymorphism less ad hoc. (https://doi.org/10.1145/75277.7528)
+- Wadler, P., & Blott, S. (1989). How to make ad-hoc polymorphism less ad hoc. (https://doi.org/10.1145/75277.7528)
 - Siek, J. G., & Lumsdaine, A. (2005). Essential language support for generic programming. (https://doi.org/10.1145/1065010.1065021)
 - Odersky, M. et al. (2017). Simplicitly: Foundations and applications of implicit function types. (https://doi.org/10.1145/31581)
 
 ### Implicit programming
 
 In statically typed programming languages, an expression has meaning in a context which defines symbols, their types, and their associated operations.
-This context is traditionally defined lexically.
-Implicit programming is a technique that allows abstracting over this context.
-Consider the following program to illustrate:
+While this context is traditionally defined lexically, implicit programming is a technique that allows abstracting over it.
+The following program to illustrates:
 
 ```hylo
 struct Logger is Regular {
@@ -62,9 +61,9 @@ The main function calls both `f1` and `f2`, causing the program to print `Hello,
 In the first call, `global_logger` is passed implicitly to `f1` whereas no implict parameter has to be provided to `f2`.
 
 This somewhat contrived setup shows that contextual parameters can be used to modify the context in which expressions will be evaluated across function boundaries.
-In particular, by introducing a logger in the implicit context, `f2` can influence the behavior of the `log`.
+In particular, by introducing a logger in the implicit context, `f2` can influence the behavior of `log`.
 This influence is transitive.
-For example, `main` could introduce another logger implicitly to influencethe behavior of the function `log` through its call by `f1`.
+For example, `main` could introduce another logger implicitly to influence the behavior of `log` through its call in `f1`.
 
 Finally, note that there's nothing special about `Logger` and its instances.
 The former is just a good old type and the latter are just good old values.
@@ -94,24 +93,23 @@ In order to do so, however, we must also abstract over the way in which we're ab
 ```hylo
 fun contains<T, U is Regular>(
   x: Int, in xs: T, from s: U, to e: U,
-  reading_elements_with read: [](T, U) -> Int,
-  advancing_positions_with advance: [](T, U) -> U
+  reading_with read: [](T, U) -> Int, advancing_with advance: [](T, U) -> U
 ) -> Bool {
   (s != e) && ((read(xs, s) == x) || contains(
     x, in: xs, from: advance(xs, s), to: e,
-    reading_elements_with: read,
-    advancing_positions_with: advance))
+    reading_with: read, advancing_with: advance))
 }
 
 public fun main() {
   assert(contains(
     1, in: [0, 1, 2], from: 0, to: 3,
-    reading_elements_with: fun(xs, p) { xs[p].copy() },
-    advancing_positions_with: fun(xs, p) { p + 1 }))
+    reading_with: fun(xs, p) { xs[p].copy() },
+    advancing_with: fun(xs, p) { p + 1 }))
 }
 ```
 
 This more generic definition is certainly cumbersome to use but it shows that support for standard parametric polymoprhism is enough to get quite far.
+The next section will discuss how to go even farther.
 
 ### Type classes
 
@@ -145,7 +143,7 @@ public fun main() {
 The two generic operations we've been using to interact with the abstract collection are now bundled into a single entity that we can name and document.
 As a result, the signature of `contains` gets quite simpler to read.
 
-To go further, we'd probably like to eliminate some of the boilerplate involved in passing down argumuments to the parameter `w` of `contains`.
+To go further, we'd probably like to eliminate some of the boilerplate involved in passing down arguments to the parameter `w` of `contains`.
 If you've been following from the beginning, it should be quite obvious that it's time for contextual parameters to make an entrance.
 
 ```hylo
@@ -156,20 +154,20 @@ fun contains<T, U is Regular where let w: IntegerCollection<T, U>>(
 }
 ```
 
-For all intents and purposes, `IntegerCollection` is in fact a type class, which [I like to describe as](https://arxiv.org/pdf/2502.20546v1) "a set of requirements representing a concept in the form of operations that a type must support" and `w` is an instance of this type class.
-This instance notionally acting as a witness of `Int[]`'s conformance the concept described by the type class.
-Again, it is interesting to note that `IntegerCollection` is just an ordinary type.
+For all intents and purposes, `IntegerCollection` is in fact a type class, which [I like to describe](https://arxiv.org/pdf/2502.20546v1) as "a set of requirements representing a concept in the form of operations that a type must support", and `w` is an instance of this type class.
+This instance acting as a witness of `Int[]`'s conformance to the concept described by the type class.
+Again, it is interesting to note that `IntegerCollection` is just a good old type.
 The only thing out of the ordinary in our running example is the use of a contextual parameter to pass instances of the type class implicitly, which helps reducing boilerplate.
 
 Programming languages like Haskell, Swift, Scala, or Rust have special syntax to introduce type classes and contextual parameters but the core principles are the same.
-Swift and Rust users can substitute `T` for `Self` in the definitions to make the connection more obvious.
+Swift and Rust users can substitute `Self` for `T` in the definitions to make the connection more obvious.
 More generally, type classes in Haskell, protocols in Swift, and traits in Rust are mostly sugar for what we've discussed so far.
 Of course the devil hides in the details and there are important additional considerations to make if we want to study these systems in more details.
 
 #### Type members
 
 While abstracting over arrays in our running example, we also abstracted over the type representing their positions by introducing  `U`.
-Because there exist a relationship between `U` and the concept described by `IntegerCollection`, we often say that the former is an *associated type* of the latter.
+Because there exists a relationship between `U` and the concept described by `IntegerCollection`, we often say that the former is an *associated type* of the latter.
 
 So far we've been using generic type parameters to represent associated types.
 That is a simple approach but it has an important cost in terms of boilerplate because type parameters typically need to appear in all generic signatures.
@@ -190,7 +188,7 @@ def contains[T](using w: IntegerCollection[T])(
   (s != e) && ((w.read(xs, s) == x) || contains(x, xs, w.advance(xs, s), e))
 ```
 
-As `Position` is defined as a member of `IntegerCollection`, the signature of `contains` no longer needs to explicitly abstract over the type representing positions into instances of `T`.
+Since `Position` is defined as a member of `IntegerCollection`, the signature of `contains` no longer needs to explicitly abstract over the type representing positions into instances of `T`.
 That's a very convenient trick but it comes with some language complexity costs.
 In particular, it requires some support for dependent typing.
 We can study the signature of `contains` to understand why.
@@ -202,8 +200,8 @@ Specifically, we're referring to a type that is a member of `w`, which is a valu
 
 #### Instance uniqueness
 
-Swift, Rust and Haskell's type systems are not expressive enough to manipulate type class instances explicitly but their underlying model is similar to that of Hylo or Scala nonetheless.
-One subtelty, however, is all of these languages adopt a discpline often referred to as "global uniqueness of type class instances", which prescribes that there can be at most one instance of any type class application (i.e., a type class together with arguments for each of its generic parameters), and that such an instance should be defined globally.
+Swift, Rust and Haskell's type systems are not expressive enough to manipulate type class instances explicitly but their underlying model is similar to that of Hylo or Scala.
+One subtelty, however, is that all three former languages adopt a discpline often referred to as "global uniqueness of type class instances", which prescribes that there can be at most one instance of any type class application (i.e., a type class together with arguments for each of its generic parameters), and that such an instance be defined globally.
 The most important benefit of this restriction is that the mere knowledge that a constraint requiring some type `T` to be conform to a concept `P` has been satisfied is enough to assume that any witness of such a conformance will have the same value.
 Further, since instances are defined globally, the value of any witness does not need to be passed down as a parameter or stored anywhere; it can simply be obtained on demand.
 
@@ -223,10 +221,11 @@ Further, the type expression `T.Position` can be assumed to represent the same d
 
 In contrast, it is not enough in a language like Hylo to know that there exists some witness of `T`'s conformance to `IntegerCollection` to tell anything about the value of that witness in an arbitrary context.
 For this reason, one cannot declare a type like `Negated` in the same way as Swift allows.
+We'll revisit this issue in the section dicussing known limitations.
 
 ## Type classes in Hylo (aka traits, aka concepts)
 
-Hylo's approach to generic programming relies heavily on type classes, which can be understood as a special case of the language's support for implicit programming.
+Hylo's approach to generic programming relies heavily on type classes, whose support can be understood as a special case of implicit programming.
 A type class in Hylo is declared as a trait, which defines a set of requirements.
 These requirements can represent functions, subscripts, types, or type class instances (i.e., conformance witnesses).
 For example:
@@ -253,7 +252,7 @@ struct Equatable<T> {
 ```
 
 Using traits mostly helps the compiler (and the user) understand the intent to declare a concept rather than an ordinary generic type, which enables all sorts of sugars.
-One sugar in particular relates to the way we can think of the requirements of a trait just like ordinary members.
+One in particular relates to the way we can think of the trait requirements just like ordinary members.
 For example, the member requirement `equal(_:)` in `Equatable` is declared like a method of `Self` when it is in fact a method of `Equatable`, just like the one declared in the generic struct.
 Of course these shenanigans are mostly transparent to the user, as we'll see throughout this document.
 
@@ -272,7 +271,7 @@ given A is Equatable {
 ```
 
 Note that Hylo places no restriction on conformance declarations.
-It is possible to define another instance of `A`'s conformance to `Equatable` for any type argument we want, in any scope we want.
+It is possible to define another instance of `A`'s conformance to `Equatable` in any scope we want.
 Conflicts will be detected at the point of use.
 It is also possible to name a conformance declaration, which may come handy to resolve these conflicts explicitly.
 
@@ -554,7 +553,7 @@ Unfortunately, neither can be used to call `equal`, as we're looking for an insn
 Fortunately, we can teach the compiler to find such an instance by adding the following definition:
 
 ```hylo
-given <P :: * -> *, A, B, where A is P, A == B> => P<B>
+given <P :: * -> *, A, B where A is P, A == B> => P<B>
 ```
 
 In plain English, this conformance definition reads as "given a trait `P` and two types `A` and `B`, if `A` conforms to `P` and `A` is equal to `B` then `B` conforms to `P`".
@@ -614,7 +613,7 @@ That is, it must satisfy the following formal statement:
 a : P<Bool>, b : P<Bool> => P<Int>, c : ∀T . P<T> => P<S<T>> ⊩ e : P<S<Int>>
 ```
 
-Spoiler: the statement does hold if `e` is substituted for `(c Int) (b a)`.
+Spoiler: the statement does hold if `(c Int) (b a)` is substituted for `e`.
 
 A complete explanation of Hylo's resolution algorithm is beyond the scope of this introductory document but we can nonetheless look at a handful of examples to get some intuition.
 
