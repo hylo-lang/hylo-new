@@ -5,6 +5,14 @@ extension Sequence {
     self.sorted(by: { (a, b) in a[keyPath: p] < b[keyPath: p] })
   }
 
+  /// Returns the elements in `self` sorted according to `areInIncreasingOrder` applied to the
+  /// values of the elements at `path`.
+  public func sorted<T>(
+    by path: KeyPath<Element, T>, using areInIncreasingOrder: (T, T) -> Bool
+  ) -> [Element] {
+    self.sorted(by: { (a, b) in areInIncreasingOrder(a[keyPath: path], b[keyPath: path]) })
+  }
+
   /// Returns the set of elements in `self` that are not greater than any other element in `self`
   /// according to `areInIncreasingOrder`.
   public func minimalElements(by areInIncreasingOrder: (Element, Element) -> Bool) -> [Element] {

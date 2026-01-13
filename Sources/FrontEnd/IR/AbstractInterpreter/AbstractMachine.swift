@@ -1,5 +1,6 @@
 import Algorithms
 import DequeModule
+import Utilities
 
 /// A type representing the possible values of an object in an abstract interpreter.
 ///
@@ -7,7 +8,7 @@ import DequeModule
 /// the conservative superposition of two abstract values.
 internal protocol AbstractDomain: Hashable, Showable, Sendable {
 
-  /// Returns `lhs` merged with `rhs`.
+  /// Returns `l` merged with `r`.
   static func && (l: Self, r: Self) -> Self
 
 }
@@ -18,10 +19,21 @@ internal protocol AbstractTransferFunction {
   /// The domain of the values in the contexts transformed by this function.
   associatedtype Domain: AbstractDomain
 
-  /// Applies this function on each instruction in `b` of `f` to update the context `c`.
+  /// Applies this function on each instruction in `b` of `f` to update the context `c` and using
+  /// `typer` to compute type-related information.
+  ///
+  /// `c` is the context obtained by merging the contents of `predecessors`, which is a map from
+  /// a subset of the predecessors of `b` to their corresponding post-context. This map is only
+  /// defined for the basic blocks that have been visited at least once.
+  ///
+  /// The return value is a set containing the basic blocks that may have been modified during the
+  /// application of this method. Those blocks are placed back to the work list of the interpreter
+  /// during the computation of a fixed point.
   mutating func apply(
-    _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context, using typer: inout Typer
-  ) -> Void
+    _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
+    precededBy predecessors: SortedDictionary<IRBlock.ID, Context>,
+    using typer: inout Typer
+  ) -> [IRBlock.ID]
 
 }
 
@@ -30,6 +42,19 @@ extension AbstractTransferFunction {
   /// The context in which an instance of `Self` interprets instructions.
   internal typealias Context = AbstractContext<Domain>
 
+  /// Computes the post-contexts of the basic blocks in `f` until a fixed point is reached using
+  /// `typer` to compute type-related information.
+  ///
+  /// `initialContext` is the context of the abstract interpreter using this method before entering
+  /// the entry of the function.
+  internal mutating func fixedPoint(
+    interpreting f: inout IRFunction, startingFrom initialContext: Context,
+    using typer: inout Typer,
+  ) {
+    var m = AbstractMachine<Self>(interpreting: f)
+    m.fixedPoint(interpreting: &f, with: &self, &typer, startingFrom: initialContext)
+  }
+
 }
 
 /// A machine controlling the abstraction interpretation of an IR function.
@@ -37,13 +62,10 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
 
   /// The knowledge of the abstract interpreter about a single block.
   private typealias BlockState = (
-    sources: [IRBlock.ID], pre: Transfer.Context, post: Transfer.Context)
+    sources: SortedSet<IRBlock.ID>, pre: Transfer.Context, post: Transfer.Context)
 
   /// A map from basic block to the machine's state before and after the block's execution.
   private typealias State = [IRBlock.ID: BlockState]
-
-  /// The transfer function that is used to interpret the function.
-  private var interpret: Transfer
 
   /// The control flow graph of the function.
   private var cfg: ControlFlowGraph
@@ -61,24 +83,25 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
   private var done: IRBlockSet = []
 
   /// Creates an instance for interpreting `f` with transfer function `interpret`.
-  internal init(
-    interpreting f: IRFunction, with interpret: Transfer
-  ) {
-    self.interpret = interpret
+  fileprivate init(interpreting f: IRFunction) {
     self.cfg = f.controlFlow()
     self.dominance = DominatorTree(function: f, controlFlow: cfg)
   }
 
   /// Computes a fixed point on the state reached by this machine for each basic block in `f`,
-  /// starting from `initialContext` and using `typer` to compute type-related information.
-  mutating func fixedPoint(
-    of f: inout IRFunction, startingFrom initialContext: Transfer.Context,
-    using typer: inout Typer
+  /// starting from `initialContext`, using `interpret` to interpret IR and `typer` to compute
+  /// type-related information.
+  fileprivate mutating func fixedPoint(
+    interpreting f: inout IRFunction,
+    with interpret: inout Transfer, _ typer: inout Typer,
+    startingFrom initialContext: Transfer.Context
   ) {
     // Process the entry.
     let entry = dominance.root
-    let contextAfterEntry = postContext(
-      of: entry, in: &f, startingFrom: initialContext, using: &typer)
+    let (contextAfterEntry, _) = postContext(
+      of: entry, in: &f, precededBy: [:], mergedInto: initialContext,
+      using: &interpret, &typer)
+
     state = [entry: (sources: [], pre: initialContext, contextAfterEntry)]
     done.insert(entry)
 
@@ -93,23 +116,35 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
       }
 
       let (sources, before) = preContext(of: blockToProcess)
-      let after: Transfer.Context
-      let changed: Bool
 
-      // Interpret the block's IR unless we already reached a fixed point.
-      if let s = state[blockToProcess], (s.sources == sources) && (s.pre == before) {
-        after = s.post
-        changed = false
-      } else {
-        after = postContext(of: blockToProcess, in: &f, startingFrom: before, using: &typer)
-        state[blockToProcess] = (sources: sources, pre: before, post: after)
-        changed = true
+      // Did the initial conditions of the block changed since the last time we processed it?
+      if let s = state[blockToProcess], s.sources == sources.keys, s.pre == before {
+        if sources.count == cfg.predecessors(of: blockToProcess).count {
+          done.insert(blockToProcess)
+        } else {
+          work.append(blockToProcess)
+        }
       }
 
-      if !changed && (sources.count == cfg.predecessors(of: blockToProcess).count) {
-        done.insert(blockToProcess)
-      } else {
+      // If the initial conditions changed, interpret the block.
+      else {
+        let (after, updated) = postContext(
+          of: blockToProcess, in: &f, precededBy: sources, mergedInto: before,
+          using: &interpret, &typer)
+        state[blockToProcess] = (sources: sources.keys, pre: before, post: after)
         work.append(blockToProcess)
+
+        // `updated` contains the blocks that have been modified by the transfer function and must
+        // be re-inserted into the work list, along with their successors.
+        var ls: [IRBlock.ID] = []
+        for u in updated {
+          state[u] = nil
+          if done.remove(u) != nil { ls.append(u) }
+        }
+        while let u = ls.popLast() {
+          work.append(u)
+          ls.append(contentsOf: cfg.successors(of: u).filter(done.contains(_:)))
+        }
       }
     }
   }
@@ -138,23 +173,48 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
   /// Returns the pre-context of `b` and the predecessors from which it's been computed.
   ///
   /// - Requires: `isVisitable(b)` is `true`
-  private func preContext(of b: IRBlock.ID) -> (sources: [IRBlock.ID], pre: Transfer.Context) {
-    if b == dominance.root {
-      return ([], state[b]!.pre)
+  private func preContext(
+    of b: IRBlock.ID
+  ) -> (sources: SortedDictionary<IRBlock.ID, Transfer.Context>, pre: Transfer.Context) {
+    assert(b != dominance.root, "entry shouldn't have any predecessor")
+
+    // If no predecessor has been visited yet, just create an empty context.
+    let predecessors = cfg.predecessors(of: b)
+    guard let i = predecessors.firstIndex(where: { (p) in state[p] != nil }) else {
+      return ([:], .init())
     }
 
-    let sources = cfg.predecessors(of: b).filter({ state[$0] != nil })
-    return (sources, .init(merging: sources.lazy.map({ state[$0]!.post })))
+    // Otherwise, create a context merging that of all visited predecessor.
+    var sources: SortedDictionary = [predecessors[i]: state[predecessors[i]]!.post]
+    var context = state[predecessors[i]]!.post
+    for p in predecessors[(i + 1)...] {
+      guard let s = state[p] else { continue }
+      sources[p] = s.post
+      context.merge(s.post)
+    }
+
+    return (sources, context)
   }
 
-  /// Returns the post-context of `b` by processing it with `interpret` in `initialContext`.
+  /// Computes the post-context of `b` using `interpret` to interpret IR and `typer` to compute
+  /// type-related information.
+  ///
+  /// This method is called during the computation of a fixed point to interpret a basic block `b`
+  /// using `interpret`, which is the transfer function of the abstract machine. The interpreter is
+  /// initialized with `initialContext`, which is the result of merging the post-contexts of the
+  /// predecessors of `b` that have been visited, stored in `predecessors`.
+  ///
+  /// The return value is the post-context of `b` and a set containing the basic blocks that may
+  /// have been modified during the application of this method
   private mutating func postContext(
-    of b: IRBlock.ID, in f: inout IRFunction, startingFrom initialContext: Transfer.Context,
-    using typer: inout Typer
-  ) -> Transfer.Context {
+    of b: IRBlock.ID, in f: inout IRFunction,
+    precededBy predecessors: SortedDictionary<IRBlock.ID, Transfer.Context>,
+    mergedInto initialContext: Transfer.Context,
+    using interpret: inout Transfer, _ typer: inout Typer
+  ) -> (next: Transfer.Context, updated: [IRBlock.ID]) {
     var next = initialContext
-    interpret.apply(b, from: &f, in: &next, using: &typer)
-    return next
+    let updated = interpret.apply(b, from: &f, in: &next, precededBy: predecessors, using: &typer)
+    return (next, updated)
   }
 
 }

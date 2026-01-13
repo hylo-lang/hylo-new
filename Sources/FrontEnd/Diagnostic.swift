@@ -80,6 +80,12 @@ extension Diagnostic: CustomStringConvertible {
 
 extension Program {
 
+  /// Returns an error diagnosing a missing mutation marker on the left-hand side of an assignment.
+  internal func assignmentNotMarkedMutating(_ s: Assignment.ID) -> Diagnostic {
+    let site = spanForDiagnostic(about: self[s].lhs)
+    return .init(.error, "left-hand side of assignment must be marked for mutation", at: site)
+  }
+
   /// Returns an error diagnosing an illegal function application.
   internal func cannotCall(
     _ f: AnyTypeIdentity, _ s: Call.Style, at site: SourceSpan
@@ -250,6 +256,10 @@ extension Diagnostic {
 
   internal static func illegalMove(at site: SourceSpan) -> Diagnostic {
     .init(.error, "illegal move", at: site)
+  }
+
+  internal static func illegalMutableAccess(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "illegal mutable access", at: site)
   }
 
   internal static func uninitializedObject(at site: SourceSpan) -> Diagnostic {

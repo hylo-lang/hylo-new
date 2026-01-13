@@ -4,6 +4,9 @@ internal enum InsertionPoint {
   /// Before another instruction.
   case before(AnyInstructionIdentity)
 
+  /// After another instruction.
+  case after(AnyInstructionIdentity)
+
   /// The start of a basic block.
   case start(of: IRBlock.ID)
 

@@ -120,19 +120,10 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
   internal var locals: Locals = .init()
 
   /// The state of memory.
-  internal var memory: [AbstractPlace: AbstractObject<Domain>] = [:]
+  internal var memory: [IRValue: AbstractObject<Domain>] = [:]
 
   /// Creates an empty context.
   internal init() {}
-
-  /// Forms a context by merging the contents of `batch`.
-  internal init<T: Collection<Self>>(merging batch: T) {
-    if let (h, t) = batch.headAndTail {
-      self = t.reduce(into: h, { (a, b) in a.merge(b) })
-    } else {
-      self.init()
-    }
-  }
 
   /// Merges `other` into `self`.
   internal mutating func merge(_ other: Self) {
@@ -141,19 +132,19 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
   }
 
   /// Returns the result calling `action` with a projection of the object at `place`, using `typer`
-  /// to compute abstract layouts..
+  /// to compute abstract layouts.
   internal mutating func withObject<T>(
     at place: AbstractPlace, computingLayoutWith typer: inout Typer,
     _ action: (inout AbstractObject<Domain>, inout Typer) -> T
   ) -> T {
     switch place {
-    case .root:
-      return action(&memory[place]!, &typer)
+    case .root(let root):
+      return action(&memory[root]!, &typer)
     case .subplace(let root, let path):
       if path.isEmpty {
-        return action(&memory[place]!, &typer)
+        return action(&memory[root]!, &typer)
       } else {
-        return modify(&memory[.root(root)]!) { (o) in
+        return modify(&memory[root]!) { (o) in
           o.withSubobject(at: path, computingLayoutWith: &typer, action)
         }
       }
@@ -161,7 +152,7 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
   }
 
   /// Sets the value of the object at `place` using `typer` to compute abstract layouts.
-  internal mutating func setValue(
+  internal mutating func updateValue(
     _ value: AbstractObject<Domain>.Value, at place: AbstractPlace,
     computingLayoutWith typer: inout Typer
   ) {
@@ -195,9 +186,9 @@ extension AbstractContext: Showable {
   /// Returns a textual representation of `self` using `printer`.
   internal func show(using printer: inout TreePrinter) -> String {
     let ls = printer.show(locals)
-    let ms = memory.sorted(by: \.key).reduce(into: "") { (s, p) in
-      s += "\(printer.show(p.key)) ↦ \(printer.show(p.value))\n"
-    }
+    let ms = memory
+      .sorted(by: \.key, using: Self.areInIncreasingOrder(_:_:))
+      .reduce(into: "", { (s, p) in s += "\(printer.show(p.key)) ↦ \(printer.show(p.value))\n" })
 
     return """
       locals:
@@ -205,6 +196,22 @@ extension AbstractContext: Showable {
       memory:
       \(ms.indented)
       """
+  }
+
+  /// Returns `true` iff `l` precedes `r` when computing whether two abstract places are in order.
+  private static func areInIncreasingOrder(_ l: IRValue, _ r: IRValue) -> Bool {
+    switch (l, r) {
+    case (.parameter(let a), .parameter(let b)):
+      return a < b
+    case (.parameter, _):
+      return true
+    case (.register, .parameter):
+      return false
+    case (.register(let a), .register(let b)):
+      return a < b
+    default:
+      fatalError()
+    }
   }
 
 }

@@ -128,6 +128,34 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Returns `true` iff `v` cannot be used to modify or update a value.
+  public func isBoundImmutably(_ v: IRValue) -> Bool {
+    switch v {
+    case .parameter(let i):
+      return termParameters[i].access == .let
+    case .register(let i):
+      return isBoundImmutably(i)
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
+  public func isBoundImmutably(_ i: AnyInstructionIdentity) -> Bool {
+    switch at(i) {
+    case is IRAlloca:
+      return false
+    case let s as IRAccess:
+      return isBoundImmutably(s.source)
+    case let s as IRProject:
+      return s.access == .let
+    case let s as IRSubfield:
+      return isBoundImmutably(s.base)
+    default:
+      return true
+    }
+  }
+
   /// Returns the last use of `v` in `b`, if any.
   public func lastUse(of v: IRValue, in b: IRBlock.ID) -> Use? {
     for i in instructions(in: b).reversed() {
@@ -203,8 +231,8 @@ public struct IRFunction: Sendable {
   }
 
   /// Returns the basic block in which `i` is defined.
-  public func block(defining i: AnyInstructionIdentity) -> IRBlock.ID {
-    slots[i.address].parent
+  public func block<T: InstructionIdentity>(defining i: T) -> IRBlock.ID {
+    slots[i.erased.address].parent
   }
 
   /// Returns the basic block in which `v` is defined, if any.
@@ -216,6 +244,16 @@ public struct IRFunction: Sendable {
       return entry
     default:
       return nil
+    }
+  }
+
+  /// Returns the basic block in which `point` falls.
+  internal func block(containing point: InsertionPoint) -> IRBlock.ID {
+    switch point {
+    case .before(let i), .after(let i):
+      return block(defining: i)
+    case .end(let b), .start(let b):
+      return b
     }
   }
 
@@ -324,6 +362,15 @@ public struct IRFunction: Sendable {
   }
 
   /// Returns the instruction that follows `i`.
+  public func instruction(before i: AnyInstructionIdentity) -> AnyInstructionIdentity? {
+    if blocks[block(defining: i)].first != i {
+      return slots.address(before: i.address).map(AnyInstructionIdentity.init(address:))
+    } else {
+      return nil
+    }
+  }
+
+  /// Returns the instruction that follows `i`.
   public func instruction(after i: AnyInstructionIdentity) -> AnyInstructionIdentity? {
     if blocks[block(defining: i)].last != i {
       return slots.address(after: i.address).map(AnyInstructionIdentity.init(address:))
@@ -340,6 +387,15 @@ public struct IRFunction: Sendable {
   /// Returns the instructions in `b`.
   public func instructions(in b: IRBlock.ID) -> IRBlock.Iterator {
     .init(slots: slots, last: blocks[b].last, current: blocks[b].first)
+  }
+
+  /// Returns the contents of `b` iff it contains exactly one instruction.
+  public func uniqueInstruction(in b: IRBlock.ID) -> AnyInstructionIdentity? {
+    if !blocks[b].isEmpty && (blocks[b].first == blocks[b].last) {
+      return blocks[b].first
+    } else {
+      return nil
+    }
   }
 
   /// Returns the instructions that follows `i` in the block containing `i`.
@@ -483,6 +539,20 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Substitutes occurrences of `old` for `new` in the successors of `source`, returning `true`
+  /// iff `old` was a successor of `source`.
+  internal mutating func replaceSuccessor(
+    _ old: IRBlock.ID, of source: IRBlock.ID, for new: IRBlock.ID
+  ) -> Bool  {
+    let l = blocks[source].last!
+    if var s = at(l) as? any Terminator, s.replaceSuccessor(old, with: new) {
+      slots[l.address].assign(s)
+      return true
+    } else {
+      return false
+    }
+  }
+
   /// Removes `i` and updates use chains.
   ///
   /// - Requires: No instruction in `b` is used outside of `b`.
@@ -497,10 +567,11 @@ public struct IRFunction: Sendable {
     blocks.remove(at: b)
   }
 
-  /// Removes `i` and updates use chains.
+  /// Removes `i` and updates use chains, returning the instruction following `i`, if any.
   ///
   /// - Requires: `i` has no users.
-  public mutating func remove(_ i: AnyInstructionIdentity) {
+  @discardableResult
+  public mutating func remove(_ i: AnyInstructionIdentity) -> AnyInstructionIdentity? {
     assert(uses[.register(i), default: []].isEmpty)
     removeUses(by: i)
 
@@ -515,14 +586,8 @@ public struct IRFunction: Sendable {
       blocks[p].setLast(.init(address: slots.address(before: i.address)!))
     }
 
-    slots.remove(at: i.address)
-  }
-
-  /// Removes `i` from the use chains of its operands.
-  private mutating func removeUses(by i: AnyInstructionIdentity) {
-    for o in at(i).operands {
-      uses[o]?.removeAll(where: { $0.user == i })
-    }
+    defer { slots.remove(at: i.address) }
+    return instruction(after: i)
   }
 
   /// Removes all instructions that follow `i` from the block containing `i`.
@@ -534,6 +599,13 @@ public struct IRFunction: Sendable {
     while let k = j, k != i {
       j = slots.address(before: k.address).map(AnyInstructionIdentity.init(address:))
       remove(k)
+    }
+  }
+
+  /// Removes `i` from the use chains of its operands.
+  private mutating func removeUses(by i: AnyInstructionIdentity) {
+    for o in at(i).operands {
+      uses[o]?.removeAll(where: { $0.user == i })
     }
   }
 

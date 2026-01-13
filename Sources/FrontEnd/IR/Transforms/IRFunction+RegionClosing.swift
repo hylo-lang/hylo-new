@@ -11,21 +11,25 @@ extension IRFunction {
   ///
   /// This pass expects to run after dead access elimination.
   internal mutating func closeOpenEndedRegions() {
+    let g = controlFlow()
     for i in instructions() {
       switch tag(of: i) {
       case IRAccess.self:
-        close(IRAccess.self, i)
+        close(IRAccess.self, i, computingLivenessWith: g)
       case IRProject.self:
-        close(IRProject.self, i)
+        close(IRProject.self, i, computingLivenessWith: g)
       default:
         continue
       }
     }
   }
 
-  /// Closes the region opened by `i`, which is an instance of `T`, iff `i` it is open-ended.
-  private mutating func close<T: IRRegionEntry>(_ : T.Type, _ i: AnyInstructionIdentity) {
-    let r = extendedLiveRange(of: .register(i))
+  /// Closes the region opened by `i`, which is an instance of `T`, iff `i` it is open-ended,
+  /// using `g` to compute live ranges.
+  private mutating func close<T: IRRegionEntry>(
+    _ : T.Type, _ i: AnyInstructionIdentity, computingLivenessWith g: ControlFlowGraph
+  ) {
+    let r = extendedLiveRange(of: .register(i), controlFlow: g)
     for boundary in r.upperBoundaries {
       switch boundary {
       case .after(let u):
@@ -54,7 +58,7 @@ extension IRFunction {
   /// `d` is its live-range merged with the extended live-ranges of the definitions extending `d`.
   ///
   /// - Note: The definition of an operand `o` isn't part of `o`'s lifetime.
-  private func extendedLiveRange(of v: IRValue) -> Lifetime {
+  private func extendedLiveRange(of v: IRValue, controlFlow g: ControlFlowGraph) -> Lifetime {
     // Nothing to do if the operand has no use.
     guard let uses = self.uses[v] else { return Lifetime(operand: v) }
 
@@ -62,16 +66,19 @@ extension IRFunction {
     guard let b = block(defining: v) else { return Lifetime(operand: v) }
 
     // Compute the live-range of the definition and extend it with that of its extending uses.
-    var r = liveRange(of: v, definedIn: b)
+    var r = liveRange(of: v, definedIn: b, controlFlow: g)
     for use in uses where at(use.user).isExtendingOperandLifetimes {
-      r = extended(r, toCover: extendedLiveRange(of: .register(use.user)))
+      r = extended(r, toCover: extendedLiveRange(of: .register(use.user), controlFlow: g))
     }
 
     return r
   }
 
-  /// Returns the minimal lifetime containing all instructions using `v`, which is defined in `b`.
-  private func liveRange(of operand: IRValue, definedIn b: IRBlock.ID) -> Lifetime {
+  /// Returns the minimal lifetime containing all instructions using `v`, which is defined in basic
+  /// block `b` contained in control-flow graph `g`.
+  private func liveRange(
+    of operand: IRValue, definedIn b: IRBlock.ID, controlFlow g: ControlFlowGraph
+  ) -> Lifetime {
 
     // This implementation is a variant of Appel's path exploration algorithm found in Brandner et
     // al.'s "Computing Liveness Sets for SSA-Form Programs".
@@ -82,7 +89,6 @@ extension IRFunction {
     }
 
     // Propagate liveness starting from the blocks in which the operand is being used.
-    let g = controlFlow()
     var approximation: [IRBlock.ID: (liveIn: Bool, liveOut: Bool)] = [:]
     while true {
       guard let occurrence = occurrences.popFirst() else { break }

@@ -78,9 +78,39 @@ public struct SortedSet<Element: Comparable>: Equatable {
     return (k < elements.count) && (elements[k] == e) ? k : nil
   }
 
+  /// Inserts `e` in `self` if it wasn't already presents and returns a pair `(i, k)` where `k` is
+  /// the index of `e` and `i` is `true` iff `e` was inserted.
+  ///
+  /// - Complexity: O(n log n) where n is the length of `self`.
+  public mutating func index(insertingIfAbsent e: Element) -> (inserted: Bool, index: Int) {
+    let k = elements.partitioningIndex(where: { (x) in e <= x })
+    if (k >= elements.count) || (elements[k] != e) {
+      elements.insert(e, at: k)
+      return (true, k)
+    } else {
+      return (false, k)
+    }
+  }
+
+  /// Removes and returns the element at the specified position.
+  ///
+  /// - Complexity: O(n) where n is the length of `self`.
+  @discardableResult
+  public mutating func remove(at index: Index) -> Element {
+    elements.remove(at: index)
+  }
+
 }
 
-extension SortedSet: MutableCollection, RandomAccessCollection {
+extension SortedSet: ExpressibleByArrayLiteral {
+
+  public init(arrayLiteral members: Element...) {
+    self.init(members)
+  }
+
+}
+
+extension SortedSet: RandomAccessCollection {
 
   public typealias Index = Int
 
@@ -105,9 +135,7 @@ extension SortedSet: MutableCollection, RandomAccessCollection {
   }
 
   public subscript(i: Int) -> Element {
-    get { elements[i] }
-    set { elements[i] = newValue }
-    _modify { yield &elements[i] }
+    elements[i]
   }
 
 }
@@ -120,24 +148,18 @@ extension SortedSet: SetAlgebra {
 
   @discardableResult
   public mutating func insert(_ e: Element) -> (inserted: Bool, memberAfterInsert: Element) {
-    let k = elements.partitioningIndex(where: { (x) in e <= x })
-    if (k >= elements.count) || (elements[k] != e) {
-      elements.insert(e, at: k)
-      return (true, e)
-    } else {
-      return (false, elements[k])
-    }
+    let (inserted, k) = index(insertingIfAbsent: e)
+    return inserted ? (true, e) : (false, elements[k])
   }
 
   @discardableResult
   public mutating func update(with e: consuming Element) -> Element? {
-    let k = elements.partitioningIndex(where: { (x) in e <= x })
-    if (k >= elements.count) || (elements[k] != e) {
-      elements.insert(e, at: k)
-      return nil
-    } else {
+    let (inserted, k) = index(insertingIfAbsent: e)
+    if inserted {
       swap(&e, &elements[k])
       return e
+    } else {
+      return nil
     }
   }
 

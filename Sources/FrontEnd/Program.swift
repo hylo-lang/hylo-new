@@ -104,6 +104,7 @@ public struct Program: Sendable {
       // Mandatory intra-procedural passes.
       for i in work.indices where work[i].isDefined {
         work[i].foldRedundantInstructions()
+        work[i].simplifyControlFlow()
         work[i].removeCodeAfterCallsReturning(never: never.erased)
         work[i].removeUnreachableBlocks()
         work[i].removedUnusedDefinitions()
@@ -168,9 +169,14 @@ public struct Program: Sendable {
     return enumerator.children
   }
 
-  /// Returns a lambda accessing `path` on an instance of `T`.
-  public func read<T: Syntax, U>(_ path: KeyPath<T, U>) -> (_ n: T.ID) -> U {
-    { (n) in self[n][keyPath: path] }
+  /// Returns the value at `p` on the type identified by `n` if that type is an instance of `T`.
+  /// Otherwise, returns `nil`.
+  public func read<T: Syntax, U>(_ n: AnySyntaxIdentity, _ p: KeyPath<T, U>) -> U? {
+    if let t = self[n] as? T {
+      return t[keyPath: p]
+    } else {
+      return nil
+    }
   }
 
   /// Returns the elements in `ns` that identify nodes of type `T`.
@@ -398,7 +404,7 @@ public struct Program: Sendable {
         return true
       } else if let x = cast(q, to: NameExpression.self), let y = self[x].qualification {
         q = y
-      } else if let x = cast(q, to: Call.self), self[x].style == .parenthesized {
+      } else if let x = cast(q, to: Call.self), self[x].style == .bracketed {
         q = self[x].callee
       } else {
         return false
@@ -448,6 +454,28 @@ public struct Program: Sendable {
     }
 
     return x1.isTransitivelySynthetic
+  }
+
+  /// Returns `true` if the memory layout of `t` is visible from `scopeOfUse`.
+  public mutating func isInlineable(_ t: AnyTypeIdentity, in scopeOfUse: ScopeIdentity) -> Bool {
+    let u = types.dealiased(t)
+    switch types.tag(of: u) {
+    case Enum.self:
+      return isInlineable((types[u] as! Enum).declaration, in: scopeOfUse)
+    case Struct.self:
+      return isInlineable((types[u] as! Struct).declaration, in: scopeOfUse)
+    case Tuple.self:
+      return true
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` if the definition of `t` is visible from `scopeOfUse`.
+  public func isInlineable<T: ModifiableDeclaration>(
+    _ d: T.ID, in scopeOfUse: ScopeIdentity
+  ) -> Bool {
+    (d.module == scopeOfUse.module) || self[d].is(.inlineable)
   }
 
   /// Returns `n` if it identifies a node of type `U`; otherwise, returns `nil`.
@@ -522,6 +550,20 @@ public struct Program: Sendable {
     }
   }
 
+//  /// Returns `(n, p)` where `p` denotes the struct of which `n` is a member iff `n` declares a
+//  /// stored property.
+//  ///
+//  /// - Requires: The module containing `s` is scoped.
+//  public func asStoredPropertyDeclaration(
+//    _ n: DeclarationIdentity
+//  ) -> (declaration: VariableDeclaration.ID, parent: StructDeclaration.ID)? {
+//    guard
+//      let v = cast(n, to: VariableDeclaration.self),
+//      let p = parent(containing: v, as: StructDeclaration.self)
+//    else { return nil }
+//    return (v, p)
+//  }
+
   /// Returns the innermost scope that strictly contains `n`.
   ///
   /// - Requires: The module containing `s` is scoped.
@@ -578,6 +620,15 @@ public struct Program: Sendable {
   /// - Requires: The module containing `n` is typed.
   public func declaration(referredToBy n: NameExpression.ID) -> DeclarationReference {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
+  }
+
+  public func occurs<T: SyntaxIdentity>(referenceTo d: DeclarationIdentity, in n: T) -> Bool {
+    switch tag(of: n) {
+    case NameExpression.self:
+      return declaration(referredToBy: castUnchecked(n)).target == d
+    default:
+      return children(n).contains(where: { (c) in occurs(referenceTo: d, in: c) })
+    }
   }
 
   /// Returns the associated type and member requirements of `t`.
@@ -746,10 +797,7 @@ public struct Program: Sendable {
   /// necessarily matches the layout of the struct after code generation.
   public func storedProperties(of d: StructDeclaration.ID) -> [VariableDeclaration.ID] {
     var result: [VariableDeclaration.ID] = []
-    for m in self[d].members {
-      guard let b = cast(m, to: BindingDeclaration.self) else { continue }
-      forEachVariable(introducedBy: b, do: { (v, _) in result.append(v) })
-    }
+    forEachStoredProperty(of: d, do: { (v, _) in result.append(v) })
     return result
   }
 
@@ -770,6 +818,7 @@ public struct Program: Sendable {
     return result
   }
 
+  /// Returns a string describing the entity declared by `d`.
   public func debugName(of d: DeclarationIdentity) -> String {
     var result = [nameOrTag(of: d)]
     for s in scopes(from: self.parent(containing: d)) {
@@ -852,7 +901,7 @@ public struct Program: Sendable {
       return Name(identifier: "init", labels: .init(labels))
 
     case .simple(let x):
-      let labels = self[d].parameters.map(read(\.label?.value))
+      let labels = self[d].parameters.map({ (p) in self[p].label?.value })
       if let (l, ls) = labels.headAndTail, l == "self" {
         return Name(identifier: x, labels: .init(ls))
       } else {

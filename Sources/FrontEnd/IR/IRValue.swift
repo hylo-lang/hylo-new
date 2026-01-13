@@ -25,6 +25,15 @@ public enum IRValue: Hashable, Sendable {
     }
   }
 
+  /// The payload of `self` iff it denotes a parameter.
+  public var parameter: Int? {
+    if case .parameter(let i) = self {
+      return i
+    } else {
+      return nil
+    }
+  }
+
   /// The payload of `self` iff it denotes a register.
   public var register: AnyInstructionIdentity? {
     if case .register(let i) = self {

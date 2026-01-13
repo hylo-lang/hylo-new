@@ -1,7 +1,7 @@
-/// An instruction that causes control flow to transfer.
+/// An instruction that causes control flow to be transferred.
 public protocol Terminator: Instruction {
 
-  /// The basic blocks to which control flow may transfer.
+  /// The basic blocks to which control flow may be transferred.
   var successors: [IRBlock.ID] { get }
 
   /// Replaces `old` with `new` and returns `true` iff `old` is successor of `self`.

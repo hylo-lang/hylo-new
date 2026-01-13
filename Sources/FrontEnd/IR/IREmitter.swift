@@ -272,8 +272,14 @@ internal struct IREmitter {
   /// Generates the IR of `s`.
   private mutating func lower(_ s: StatementIdentity) -> ControlFlow {
     switch program.tag(of: s) {
+    case Assignment.self:
+      return lower(program.castUnchecked(s, to: Assignment.self))
+    case Block.self:
+      return lower(program.castUnchecked(s, to: Block.self))
     case Discard.self:
       return lower(program.castUnchecked(s, to: Discard.self))
+    case If.self:
+      return lowerAsStatement(program.castUnchecked(s, to: If.self))
     case Return.self:
       return lower(program.castUnchecked(s, to: Return.self))
 
@@ -302,9 +308,73 @@ internal struct IREmitter {
   }
 
   /// Generates the IR of `s`.
+  private mutating func lower(_ s: Assignment.ID) -> ControlFlow {
+    // The LHS should be an inout expression.
+    guard let target = program.read(program[s].lhs.erased, \InoutExpression.lvalue) else {
+      report(program.assignmentNotMarkedMutating(s))
+      return .next
+    }
+
+    // If the LHS does not occur in the RHS, we can build the RHS in place.
+    if let n = program.cast(target, to: NameExpression.self) {
+      if case .direct(let d) = program.declaration(referredToBy: n) {
+        if !program.occurs(referenceTo: d, in: program[s].rhs) {
+          let target = lowered(lvalue: target)
+          lowering(s) { (me) in me.lower(store: me.program[s].rhs, to: target) }
+          return .next
+        }
+      }
+    }
+
+    // Otherwise, the right-hand side stored to a temporary and then moved to the LHS.
+    lowering(s) { (me) in
+      let rhs = me._alloca(me.program.type(assignedTo: me.program[s].rhs))
+      me.lower(store: me.program[s].rhs, to: rhs)
+      let lhs = me.lowered(lvalue: me.program[s].lhs)
+      me._emitMove([.inout, .set], rhs, to: lhs)
+    }
+
+    return .next
+  }
+
+  /// Generates the IR of `s`.
+  private mutating func lower(_ s: Block.ID) -> ControlFlow {
+    within(.init(), { $0.lower(body: $0.program[s].statements) })
+  }
+
+  /// Generates the IR of `s`.
   private mutating func lower(_ s: Discard.ID) -> ControlFlow {
     let v = lowered(lvalue: program[s].value)
     lowering(s, { _ = $0._emitDeinitialize(v) })
+    return .next
+  }
+
+  /// Generates the IR of `s` lowered as a statement.
+  @discardableResult
+  private mutating func lowerAsStatement(_ s: If.ID) -> ControlFlow {
+    let onFailure = insertionContext.function!.addBlock()
+    let tail = insertionContext.function!.addBlock()
+
+    // Lower the conditions and the success branch.
+    within(.init()) { (me) in
+      for c in me.program[s].conditions {
+        me.insertionContext.point = .end(of: me.lowerCondition(c, onFailure: onFailure))
+      }
+
+      if me.lower(me.program[s].success) == .next {
+        me.lowering(after: me.program[s].success, { $0._br(tail) })
+      }
+    }
+
+    // Lower the failure branch.
+    insertionContext.point = .end(of: onFailure)
+    if lower(StatementIdentity(uncheckedFrom: program[s].failure.erased)) == .next {
+      lowering(after: program[s].failure, { $0._br(tail) })
+    }
+
+    // If neither branch returns control-flow (e.g., both branches return), then the tail won't
+    // have any predecessor and will be removed during dead code elimination.
+    insertionContext.point = .end(of: tail)
     return .next
   }
 
@@ -332,6 +402,8 @@ internal struct IREmitter {
     switch program.tag(of: e) {
     case Call.self:
       lower(store: program.castUnchecked(e, to: Call.self), to: target)
+    case If.self:
+      lower(store: program.castUnchecked(e, to: If.self), to: target)
     case IntegerLiteral.self:
       lower(store: program.castUnchecked(e, to: IntegerLiteral.self), to: target)
     case NameExpression.self:
@@ -413,10 +485,60 @@ internal struct IREmitter {
     }
   }
 
+  /// Implements `lower(store:to:)` for conditional expressions.
+  private mutating func lower(store e: If.ID, to target: IRValue) {
+    let onFailure = insertionContext.function!.addBlock()
+    let tail = insertionContext.function!.addBlock()
+
+    // Typer should have guaranteed that the expression is single-bodied.
+    let (e0, e1) = program.branches(of: e)!
+
+    within(.init()) { (me) in
+      for c in me.program[e].conditions {
+        me.insertionContext.point = .end(of: me.lowerCondition(c, onFailure: onFailure))
+      }
+      me.lower(store: e0, to: target)
+      me.lowering(after: e0, { $0._br(tail) })
+    }
+
+    insertionContext.point = .end(of: onFailure)
+    lower(store: e1, to: target)
+    lowering(after: e1, { $0._br(tail) })
+
+    insertionContext.point = .end(of: tail)
+  }
+
+  private mutating func lowerCondition(
+    _ n: ConditionIdentity, onFailure: IRBlock.ID
+  ) -> IRBlock.ID {
+    let onSuccess = insertionContext.function!.addBlock()
+
+    // Is the condition a simple Boolean expression?
+    if let e = program.castToExpression(n) {
+      let w = lowered(lvalue: e)
+      lowering(e) { (me) in
+        let b = me._loadWrappedBuiltin(w)
+        me._condbr(b, onSuccess, onFailure)
+      }
+      insertionContext.point = .end(of: onSuccess)
+    }
+
+    // Is the condition applying pattern matching?
+    else if program.tag(of: n) == BindingDeclaration.self {
+      fatalError("not implemented")
+    }
+
+    // Something's wrong.
+    else {
+      program.unexpected(n)
+    }
+
+    return onSuccess
+  }
+
   /// Implements `lower(store:to:)` for integer literals.
   private mutating func lower(store e: IntegerLiteral.ID, to target: IRValue) {
-    let t = program.type(assignedTo: e)
-    print(program.show(t))
+    fatalError("no implemented")
   }
 
   /// Implements `lower(store:to:)` for name expressions.
@@ -588,6 +710,8 @@ internal struct IREmitter {
   /// `e` computes a rvalue, this value is moved into a new stack allocation.
   private mutating func lowered(lvalue e: ExpressionIdentity) -> IRValue {
     switch program.tag(of: e) {
+    case InoutExpression.self:
+      return lowered(lvalue: program.castUnchecked(e, to: InoutExpression.self))
     case NameExpression.self:
       return lowered(lvalue: program.castUnchecked(e, to: NameExpression.self))
 
@@ -600,10 +724,32 @@ internal struct IREmitter {
     }
   }
 
+  /// Implements `lower(lvalue:)` for inout expressions.
+  private mutating func lowered(lvalue e: InoutExpression.ID) -> IRValue {
+    lowered(lvalue: program[e].lvalue)
+  }
+
   /// Implements `lower(lvalue:)` for name expressions.
   private mutating func lowered(lvalue e: NameExpression.ID) -> IRValue {
-    let r = program.declaration(referredToBy: e)
-    return lowering(e, { $0._emit(reference: r) })
+    switch program.declaration(referredToBy: e) {
+    case .direct(let d):
+      return lowering(e, { $0._emit(referenceTo: d) })
+
+    case .member(let d):
+      // Emit the receiver.
+      let q = lowered(lvalue: program[e].qualification!)
+
+      // Is `d` a stored property of a type whose layout is visible?
+      if let i = storedPropertyIndex(of: d, in: program.parent(containing: e)) {
+        return lowering(e, { $0._subfield(q, at: [i]) })
+      } else {
+        let t = program.type(assignedTo: e)
+        return lowering(e, { $0._property(d, of: q, withType: t) })
+      }
+
+    default:
+      fatalError()
+    }
   }
 
   /// Returns the value denoted by `e`, which applies a built-in constructor `f` for converting
@@ -758,7 +904,7 @@ internal struct IREmitter {
     .addressOf(program.types.dealiased(t))
   }
 
-  // MARK: Helpers
+  // MARK: Context
 
   /// The context in which instructions are inserted.
   private struct InsertionContext {
@@ -840,7 +986,7 @@ internal struct IREmitter {
     insertionContext.function!
   }
 
-  /// The site with which new instruction should be associated.
+  /// The site with which new instructions should be associated.
   private var currentAnchor: Anchor {
     insertionContext.anchor!
   }
@@ -887,8 +1033,7 @@ internal struct IREmitter {
     lowering(at: .empty(at: program[n].site.end), in: program.parent(containing: n), action)
   }
 
-  /// Returns the result of calling `action` on `self` with the insertion context anchored at the
-  /// site and scope.
+  /// Returns the result of calling `action` on `self` with the given insertion anchor.
   private mutating func lowering<R>(
     at site: SourceSpan, in scope: ScopeIdentity, _ action: (inout Self) -> R
   ) -> R {
@@ -899,17 +1044,40 @@ internal struct IREmitter {
     return r
   }
 
+
   /// Returns the result of calling `action` on `self` with the insertion context configured to
-  /// emit new instructions before `i`, which lies in `f`.
-  internal mutating func lowering<R>(
-    before i: AnyInstructionIdentity, in f: inout IRFunction, _ action: (inout Self) -> R
+  /// emit new instructions at `p` in `f`, anchoring them to `a`.
+  private mutating func lowering<R>(
+    _ p: InsertionPoint, anchoredTo a: Anchor, in f: inout IRFunction, _ action: (inout Self) -> R
   ) -> R {
     withClearContext { (me) in
-      me.insertionContext.point = .before(i)
-      me.insertionContext.anchor = f.at(i).anchor
+      me.insertionContext.point = p
+      me.insertionContext.anchor = a
       me.insertionContext.function = consume f
       defer { f = me.insertionContext.function.sink() }
       return action(&me)
+    }
+  }
+
+  /// Returns the result of calling `action` on `self` with the insertion context configured to
+  /// emit new instructions before `i`, which is in `f`.
+  internal mutating func lowering<R>(
+    before i: AnyInstructionIdentity, in f: inout IRFunction, _ action: (inout Self) -> R
+  ) -> R {
+    let a = f.at(i).anchor
+    return lowering(.before(i), anchoredTo: a, in: &f, action)
+  }
+
+  /// Returns the result of calling `action` on `self` with the insertion context configured to
+  /// emit new instructions after `i`, which is in `f`.
+  internal mutating func lowering<R>(
+    after i: AnyInstructionIdentity, in f: inout IRFunction, _ action: (inout Self) -> R
+  ) -> R {
+    let a = f.at(i).anchor
+    if let j = f.instruction(after: i) {
+      return lowering(.before(j), anchoredTo: a, in: &f, action)
+    } else {
+      return lowering(.end(of: f.block(defining: i)), anchoredTo: a, in: &f, action)
     }
   }
 
@@ -971,6 +1139,28 @@ internal struct IREmitter {
     }
   }
 
+  /// If `d` declares a stored property of in a type whose layout is visible from `scopeOfUse`,
+  /// returns that property's index. Otherwise, returns `nil`.
+  ///
+  /// The index of a stored property is used in instances of `IndexPath` to represent the location
+  /// of a part relative to the location of a whole. For example, if `S` is a struct with two
+  /// stored properties `x` and `y`, declared in that order, the index of `y` is 1.
+  ///
+  /// The layout of a type if visible if its declaration is in the same module as`scopeOfUse` or
+  /// if its declaration is marked `inlineable`.
+  private mutating func storedPropertyIndex(
+    of d: DeclarationIdentity, in scopeOfUse: ScopeIdentity
+  ) -> Int? {
+    guard
+      let v = program.cast(d, to: VariableDeclaration.self),
+      let p = program.parent(containing: v, as: StructDeclaration.self),
+      program.isInlineable(p, in: scopeOfUse)
+    else { return nil }
+
+    let properties = program.storedProperties(of: p)
+    return properties.firstIndex(of: v)
+  }
+
   /// Reports the diagnostic `d`.
   private mutating func report(_ d: Diagnostic) {
     program[module].addDiagnostic(d)
@@ -991,6 +1181,8 @@ internal struct IREmitter {
       let i: AnyInstructionIdentity = switch p {
       case .before(let i):
         f.insert(instruction, before: i)
+      case .after(let i):
+        f.insert(instruction, after: i)
       case .start(let b):
         f.prepend(instruction, to: b)
       case .end(let b):
@@ -1066,6 +1258,21 @@ internal struct IREmitter {
     insert(IRAssumeState(storage: s, initialized: initialized, anchor: currentAnchor))
   }
 
+  /// Inserts a `br` instruction.
+  internal mutating func _br(_ target: IRBlock.ID) {
+    insert(IRBranch(target: target, anchor: currentAnchor))
+  }
+
+  /// Inserts a `condbr` instruction.
+  internal mutating func _condbr(
+    _ condition: IRValue, _ onSuccess: IRBlock.ID, _ onFailure: IRBlock.ID
+  ) {
+    let s = IRConditionalBranch(
+      condition: condition, onSuccess: onSuccess, onFailure: onFailure,
+      anchor: currentAnchor)
+    insert(s)
+  }
+
   /// Inserts an `end` instruction.
   internal mutating func _end<T: IRRegionEntry>(_: T.Type, openedBy start: IRValue) {
     assert(currentFunction.at(start.register!) is T)
@@ -1076,6 +1283,13 @@ internal struct IREmitter {
   internal mutating func _load(_ source: IRValue) -> IRValue {
     assert(currentFunction.isAddress(source))
     return insert(IRLoad(source: source, anchor: currentAnchor))!
+  }
+
+  /// Inserts a `memcpy` instruction.
+  internal mutating func _memory_copy(_ source: IRValue, to target: IRValue) {
+    assert(currentFunction.isAddress(source))
+    assert(currentFunction.isAddress(target))
+    insert(IRMemoryCopy(source: source, target: target, anchor: currentAnchor))
   }
 
   /// Inserts a `move` instruction.
@@ -1174,14 +1388,15 @@ internal struct IREmitter {
     insert(IRYield(projectee: projectee, anchor: currentAnchor))
   }
 
-  /// Generates the IR of `r`, which computes a lvalue.
-  private mutating func _emit(reference r: DeclarationReference) -> IRValue {
-    switch r {
-    case .direct(let d):
-      return _emit(referenceTo: d)
-    default:
-      fatalError()
-    }
+  // MARK: Helpers
+
+  /// Inserts the IR for extracting the built-in value stored in an instance of `Hylo.Bool`.
+  private mutating func _loadWrappedBuiltin(_ wrapper: IRValue) -> IRValue {
+    let x0 = _subfield(wrapper, at: [0])
+    let x1 = _access([.let], from: x0)
+    let x2 = _load(x1)
+    _end(IRAccess.self, openedBy: x1)
+    return x2
   }
 
   /// Generates the IR for referring directly to `d`.
@@ -1229,7 +1444,8 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for deinitializing `source`.
+  /// Generates the IR for deinitializing `source` and returns `true` iff `source` can be
+  /// deinitialized. Otherwise, inserts a trap and returns `false`.
   internal mutating func _emitDeinitialize(_ source: IRValue) -> Bool {
     let (typeOfSource, _) = currentFunction.result(of: source) ?? badOperand()
 
@@ -1286,7 +1502,7 @@ internal struct IREmitter {
   /// `target`. Otherwise, the value is moved using the conformance of its type to `Hylo.Movable`.
   /// An error is reported at the current anchor if no such conformance can be resolved in the
   /// scope of that anchor and a call to `Builtin.trap` is generated.
-  private mutating func _emitMove(
+  internal mutating func _emitMove(
     _ semantics: AccessEffectSet, _ source: IRValue, to target: IRValue
   ) {
     if let k = semantics.uniqueElement {
@@ -1325,10 +1541,22 @@ internal struct IREmitter {
     }
 
     // Other types require a conformance to `Hylo.Movable`.
-    guard let movable = _emitWitness(of: typeOfSource, is: .movable) else {
+    guard let w = conformanceWitness(of: typeOfSource, is: .movable) else {
+      _ = _apply_builtin(.trap, to: [])
       return
     }
 
+    // Does the conformance have any operational semantics.
+    if program.isTransitivelySyntheticConformance(w) {
+      let x0 = _access([.sink], from: source)
+      let x1 = _access([.set], from: target)
+      _memory_copy(x0, to: x1)
+      _end(IRAccess.self, openedBy: x1)
+      _end(IRAccess.self, openedBy: x0)
+      return
+    }
+
+    let movable = _emit(witness: w)
     let member = program.variant(k, of: program.standardLibraryDeclaration(.movableTakeValue))!
     let t0 = program.types.demand(
       Arrow(
@@ -1336,12 +1564,12 @@ internal struct IREmitter {
         output: .void))
 
     let x0 = _alloca(.void)
-    let x1 = _access([k], from: target)
-    let x2 = _access([.sink], from: source)
+    let x1 = _access([.sink], from: source)
+    let x2 = _access([k], from: target)
     let x3 = _access([.set], from: x0)
     let x4 = _property(.init(member), of: movable, withType: t0.erased)
 
-    _apply(x4, to: [x1, x2], savingResultTo: x3)
+    _apply(x4, to: [x2, x1], savingResultTo: x3)
 
     _end(IRAccess.self, openedBy: x3)
     _end(IRAccess.self, openedBy: x2)
@@ -1357,23 +1585,6 @@ internal struct IREmitter {
     _store(x2, to: x0)
     _end(IRAccess.self, openedBy: x1)
     _end(IRAccess.self, openedBy: x0)
-  }
-
-  /// Inserts IR (if any) for getting the address of a  witness of `t`'s conformance to `p` at the
-  /// current insertion point, or a trap instruction if such a conformance cannot be derived.
-  private mutating func _emitWitness(
-    of t: AnyTypeIdentity, is p: Program.StandardLibraryEntity
-  ) -> IRValue? {
-    guard let w = conformanceWitness(of: t, is: p) else {
-      _ = _apply_builtin(.trap, to: [])
-      return nil
-    }
-
-    if program.isTransitivelySyntheticConformance(w) {
-      fatalError()
-    } else {
-      return _emit(witness: w)
-    }
   }
 
   private mutating func conformanceWitness(

@@ -19,6 +19,7 @@ If `m` denotes a trait requirement, then name resolution should bind it to the e
 [ ] Store the contents of "small" type trees in the inline storage of their identities.
 [x] Use a separate array to store the tag of each syntax tree rather than calling `tag(of:)`.
 [ ] Use out-of-line storage for data structures that have to be "moved" often (e.g., `Program` and `IRFunction`).
+[ ] Modify `replaceSuccessor` so that we can simply `condbr` into `br` when both branches are the same.
 
 ## Questions
 

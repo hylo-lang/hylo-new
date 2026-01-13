@@ -1,8 +1,8 @@
 /// Relocates a value to different storages.
 ///
 /// This instruction abstracts over either move-assignment or move-initialization, depending on the
-/// initialization state of the target. It is meant to be desugared to during definite state and
-/// must not occur in refined IR.
+/// initialization state of the target. It is desugared to during lifetime normalization state and
+/// does not occur in refined IR.
 ///
 /// The target refers to storage capable of holding an the value held in the source. The operation
 /// requires exclusive access on both the source and the target. The source must be initialized
@@ -29,12 +29,7 @@ public struct IRMove: Instruction {
 
   /// The address of the storage from which the value is written.
   public var target: IRValue {
-    operands[01]
-  }
-
-  /// The type of the value loaded by this instruction.
-  public var type: IRType {
-    .dereferenced(source)
+    operands[1]
   }
 
 }

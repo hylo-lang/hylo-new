@@ -241,8 +241,7 @@ public struct Typer {
 
   }
 
-  /// Returns a map from the declarations of the captures in `d` to a but indicating whether they
-  /// are captured mutabley.
+  /// Returns a map from the declarations of the captures in `d` to their occurrences.
   ///
   /// - Requires: `d` is a local function.
   private mutating func implicitCaptures(
@@ -1189,7 +1188,7 @@ public struct Typer {
     assert(d.module == module, "dependency is not typed")
 
     initializeContext(program[d].contextParameters)
-    let variants = AccessEffectSet(program[d].variants.map(program.read(\.effect.value)))
+    let variants = AccessEffectSet(program[d].variants.map({ (v) in program[v].effect.value }))
     let inputs = declaredTypes(of: program[d].parameters)
     let arrow = declaredArrowType(of: d, taking: inputs)
 
