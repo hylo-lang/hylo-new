@@ -1,8 +1,10 @@
 /// Loads a value from memory to register.
 ///
-/// The operation requires exclusive access to the source, which must be initialized before
-/// the operation and is left uninitialized after. The size of the value being loaded must be known
-/// at compile-time.
+/// If the source is not a machine type, the operation requires exclusive access to the source,
+/// which must be initialized before the operation and is left uninitialized after. For machine
+/// types, we always copy the values, so no consume semantics.
+/// 
+/// The size of the value being loaded must be known at compile-time.
 public struct IRLoad: Instruction {
 
   /// The operands of the instruction.
