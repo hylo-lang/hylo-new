@@ -22,6 +22,10 @@ public struct Int {
 
 public given Int is ExpressibleByIntegerLiteral { /* built-in */ }
 
+public given Int is Deinitializable {}
+
+public given Int is Movable {}
+
 public given Int is Equatable {
 
   public fun infix== (other: Self) -> Bool {
@@ -30,6 +34,26 @@ public given Int is Equatable {
 
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_word(self.value, other.value))
+  }
+
+}
+
+public given Int is Comparable {
+
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_slt_word(self.value, other.value))
+  }
+
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sle_word(self.value, other.value))
+  }
+
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sgt_word(self.value, other.value))
+  }
+
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_sge_word(self.value, other.value))
   }
 
 }

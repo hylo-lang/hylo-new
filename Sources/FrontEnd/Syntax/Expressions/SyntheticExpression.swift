@@ -2,44 +2,27 @@ import Archivist
 
 /// The expression of a value synthesized during elaboration.
 @Archivable
-public struct SynthethicExpression: Expression {
-
-  /// The value of a synthetic expression.
-  @Archivable
-  public enum Value: Equatable, Sendable {
-
-    /// A witness inferred by implicit resolution.
-    case witness(WitnessExpression)
-
-    /// A default argument.
-    case defaultArgument(ExpressionIdentity)
-
-  }
+public struct SyntheticExpression: Expression {
 
   /// The synthesized expression.
-  public let value: Value
+  public let value: WitnessExpression
 
-  /// The site at which the synthesized expression is anchored.
+  /// The site to which the synthesized expression is anchored.
   public let site: SourceSpan
 
   /// Creates an instance with the given properties.
-  public init(value: Value, site: SourceSpan) {
+  public init(value: WitnessExpression, site: SourceSpan) {
     self.value = value
     self.site = site
   }
 
 }
 
-extension SynthethicExpression: Showable {
+extension SyntheticExpression: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    switch value {
-    case .witness(let w):
-      return printer.show(w)
-    case .defaultArgument(let e):
-      return printer.show(e)
-    }
+    printer.show(value)
   }
 
 }

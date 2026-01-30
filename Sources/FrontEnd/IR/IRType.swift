@@ -2,7 +2,7 @@
 public enum IRType: Hashable, Sendable {
 
   /// A type expressed in source-level Hylo.
-  case hylo(AnyTypeIdentity, isAddress: Bool)
+  case lowered(AnyTypeIdentity, isAddress: Bool)
 
   /// The type of an IR value.
   case same(as: IRValue)
@@ -16,7 +16,7 @@ public enum IRType: Hashable, Sendable {
   /// Returns the type of an instance of `t`, which contains no aliases.
   public static func addressOf(_ t: AnyTypeIdentity) -> Self {
     assert(!t[.hasAliases])
-    return .hylo(t, isAddress: true)
+    return .lowered(t, isAddress: true)
   }
 
 }
@@ -26,9 +26,11 @@ extension IRType: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     switch self {
-    case .hylo(let t, let isAddress):
+    case .lowered(let t, isAddress: true):
       let s = printer.show(t)
-      return isAddress ? "(\(s))&" : s
+      return (s.contains(where: \.isWhitespace) && !s.isParenthesized) ? "(\(s))&" : "\(s)&"
+    case .lowered(let t, isAddress: false):
+      return printer.show(t)
     case .same(let i):
       return "$same(as: \(printer.show(i)))"
     case .dereferenced(let i):

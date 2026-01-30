@@ -19,7 +19,7 @@ extension Program {
     // No candidate is cheaper to elaborate?
     if lhs.reference.elaborationCost == rhs.reference.elaborationCost {
       switch (lhs.reference, rhs.reference) {
-      case (.inherited(_, let a), .inherited(_, let b)):
+      case (.inherited(_, let a, _), .inherited(_, let b, _)):
         // Members declared in extension are preferred over members inherited by conformance. The
         // rationale is that the former may serve as implementations for the latter.
         if isExtensionMember(a) && !isExtensionMember(b) {

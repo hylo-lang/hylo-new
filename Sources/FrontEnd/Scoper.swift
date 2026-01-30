@@ -66,6 +66,20 @@ public struct Scoper {
     mutating func willEnter(_ n: AnySyntaxIdentity, in program: Program) -> Bool {
       syntaxToParent[n.offset] = innermostScope
 
+      // Conditional expression require special handling.
+      if let e = program.cast(n, to: If.self) {
+        // The conditions and success branch are in the scope of the expression.
+        innermostScope = n.offset
+        scopeToDeclarations[innermostScope] = []
+        program.visit(program[e].conditions, calling: &self)
+        program.visit(program[e].success, calling: &self)
+
+        // The failure branch is in the scope of the expression's parent.
+        innermostScope = syntaxToParent[e.offset]
+        program.visit(program[e].failure, calling: &self)
+        return false
+      }
+
       switch program.tag(of: n) {
       case BindingDeclaration.self:
         bindingDeclarationsOnStack.append(.init(uncheckedFrom: n))

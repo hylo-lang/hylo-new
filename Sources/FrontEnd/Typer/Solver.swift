@@ -318,10 +318,11 @@ internal struct Solver {
     }
 
     // Argument list has the right shape?
-    let w = program.types.seenAsCallableAbstraction(callee)!
+    let w = program.types.seenAsTermAbstraction(callee)!
     guard let (bs, ss, inplace) = matches(k, w) else {
+      let expected = program.types[w].labels
       return .failure { (_, _, tp, ds) in
-        ds.insert(tp.program.incompatibleLabels(found: k.labels, expected: w.labels, at: k.site))
+        ds.insert(tp.program.incompatibleLabels(found: k.labels, expected: expected, at: k.site))
       }
     }
 
@@ -365,14 +366,14 @@ internal struct Solver {
   ///
   /// If the arguments in `k` do not match, this method returns `nil`.
   private mutating func matches(
-    _ k: CallConstraint, _ f: Callable
+    _ k: CallConstraint, _ f: Arrow.ID
   ) -> (bingings: ParameterBindings, subgoals: [CoercionConstraint], inplace: Bool)? {
     var bindings = ParameterBindings()
     var subgoals: [CoercionConstraint] = []
 
     var inplace = false
     var i = 0
-    for p in f.inputs {
+    for p in program.types[f].inputs {
       // Is there's an explicit argument with the right label?
       if (k.arguments.count > i) && (k.arguments[i].label == p.label) {
         let v = program[k.origin].arguments[i].value
@@ -397,7 +398,7 @@ internal struct Solver {
       else { return nil }
     }
 
-    assert(bindings.elements.count == f.inputs.count)
+    assert(bindings.elements.count == program.types[f].inputs.count)
     return i == k.arguments.count ? (bindings, subgoals, inplace) : nil
   }
 
@@ -427,7 +428,7 @@ internal struct Solver {
       }
 
       let ss = TypeArguments(mapping: u.parameters, to: k.arguments)
-      let t = program.types.substitute(ss, in: u.body)
+      let t = program.types.substitute(ss, in: u.head)
       let subgoal = schedule(EqualityConstraint(lhs: k.output, rhs: t, site: k.site))
       return delegate([subgoal])
     }

@@ -1,19 +1,23 @@
-/// An instruction that causes control flow to transfer.
+/// An instruction that causes control flow to be transferred.
 public protocol Terminator: Instruction {
 
-  /// The basic blocks to which control flow may transfer.
-  var successors: [Block.ID] { get }
+  /// The basic blocks to which control flow may be transferred.
+  var successors: [IRBlock.ID] { get }
 
   /// Replaces `old` with `new` and returns `true` iff `old` is successor of `self`.
   @discardableResult
-  mutating func replaceSuccessor(_ old: Block.ID, with new: Block.ID) -> Bool
+  mutating func replaceSuccessor(_ old: IRBlock.ID, with new: IRBlock.ID) -> Bool
 
 }
 
 extension Terminator {
 
-  public var successors: [Block.ID] {
+  public var successors: [IRBlock.ID] {
     []
+  }
+
+  public mutating func replaceSuccessor(_ old: IRBlock.ID, with new: IRBlock.ID) -> Bool {
+    false
   }
 
 }

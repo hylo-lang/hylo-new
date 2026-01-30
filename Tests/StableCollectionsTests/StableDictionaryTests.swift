@@ -1,7 +1,7 @@
 import StableCollections
 import XCTest
 
-class StableDictionaryTests: XCTestCase {
+final class StableDictionaryTests: XCTestCase {
 
   func testInitWithMinimumCapacity() {
     let s = StableDictionary<String, Int>(minimumCapacity: 100)

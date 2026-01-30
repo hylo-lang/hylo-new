@@ -25,14 +25,28 @@ public struct InstructionTag: Sendable {
   }
 
   static let allValues: [any Instruction.Type] = [
-    // Instructions.
     IRAccess.self,
     IRAccess.End.self,
+    IRAlloca.self,
+    IRApply.self,
+    IRApplyBuiltin.self,
+    IRAssumeState.self,
+    IRBranch.self,
+    IRConditionalBranch.self,
     IRLoad.self,
     IRStore.self,
-
-    // Terminators.
+    IRMemoryCopy.self,
+    IRMove.self,
+    IRProject.self,
+    IRProject.End.self,
+    IRProperty.self,
     IRReturn.self,
+    IRStore.self,
+    IRSubfield.self,
+    IRTypeApply.self,
+    IRUnreachable.self,
+    IRWitnessTable.self,
+    IRYield.self,
   ]
 
   static let indices = Dictionary(

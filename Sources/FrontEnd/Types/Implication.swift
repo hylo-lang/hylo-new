@@ -9,18 +9,18 @@ public struct Implication: TypeTree {
   public let usings: [AnyTypeIdentity]
 
   /// The right-hand side of the implication.
-  public let body: AnyTypeIdentity
+  public let head: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
   public init(context: [AnyTypeIdentity], head: AnyTypeIdentity) {
     assert(!context.isEmpty)
     self.usings = context
-    self.body = head
+    self.head = head
   }
 
   /// Properties about `self`.
   public var properties: TypeProperties {
-    usings.reduce(body.properties, { (a, i) in a.union(i.properties) })
+    usings.reduce(head.properties, { (a, i) in a.union(i.properties) })
   }
 
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
@@ -30,7 +30,7 @@ public struct Implication: TypeTree {
   ) -> Implication {
     .init(
       context: usings.map({ (t) in store.map(t, transform) }),
-      head: store.map(body, transform))
+      head: store.map(head, transform))
   }
 
 }
@@ -40,9 +40,9 @@ extension Implication: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     if let t = usings.uniqueElement {
-      return "\(printer.show(t)) ==> \(printer.show(body))"
+      return "\(printer.show(t)) ==> \(printer.show(head))"
     } else {
-      return "(\(printer.show(usings))) ==> \(printer.show(body))"
+      return "(\(printer.show(usings))) ==> \(printer.show(head))"
     }
   }
 

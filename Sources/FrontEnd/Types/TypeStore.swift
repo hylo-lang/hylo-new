@@ -39,15 +39,24 @@ public struct TypeStore: Sendable {
   /// Returns the identity of `Hylo.Never`, which is equivalent to `<T> T`.
   public mutating func never() -> UniversalType.ID {
     let p = demand(GenericParameter.nth(0, .proper))
-    let t = demand(UniversalType(parameters: [p], body: p.erased))
+    let t = demand(UniversalType(parameters: [p], head: p.erased))
     return t
+  }
+
+  /// Returns the body of `f` with each parameter substituted for its corresponding argument.
+  public mutating func application(
+    of f: UniversalType.ID, to arguments: TypeArguments
+  ) -> AnyTypeIdentity {
+    let t = substitute(arguments, in: self[f].head)
+    let p = self[f].parameters.filter({ (p) in !arguments.parameters.contains(p) })
+    return introduce(parameters: p, into: t)
   }
 
   /// Returns the body of `f` with each parameter substituted for its corresponding argument.
   public mutating func application(
     of f: UniversalType.ID, to arguments: [AnyTypeIdentity]
   ) -> AnyTypeIdentity {
-    substitute(.init(mapping: self[f].parameters, to: arguments), in: self[f].body)
+    application(of: f, to: .init(mapping: self[f].parameters, to: arguments))
   }
 
   /// Inserts `t` in `self` it isn't already present and returns the identity of an equal tree.
@@ -76,6 +85,11 @@ public struct TypeStore: Sendable {
     .init(type(of: self[n]))
   }
 
+  /// Returns `true` iff `n` identifies a machine type.
+  public func isBuiltin<T: TypeIdentity>(_ n: T) -> Bool {
+    tag(of: n).value is MachineType.Type
+  }
+
   /// Returns `true` iff `n` identifies a generic type parameter.
   public func isParameter<T: TypeIdentity>(_ n: T) -> Bool {
     tag(of: n) == GenericParameter.self
@@ -99,8 +113,8 @@ public struct TypeStore: Sendable {
 
   /// Returns `true` iff `n` is the type of an entity callable with the given style.
   public func isCallable<T: TypeIdentity>(_ n: T, _ style: Call.Style) -> Bool {
-    if let w = seenAsCallableAbstraction(n) {
-      return w.style == style
+    if let w = seenAsTermAbstraction(n) {
+      return self[w].style == style
     } else {
       return false
     }
@@ -110,8 +124,17 @@ public struct TypeStore: Sendable {
   public func isCallable<T: TypeIdentity, S: Collection<String?>>(
     _ n: T, _ style: Call.Style, withLabels labels: S
   ) -> Bool {
-    if let w = seenAsCallableAbstraction(n) {
-      return (w.style == style) && w.labelsCompatible(with: labels)
+    if let w = seenAsTermAbstraction(n) {
+      return (self[w].style == style) && self[w].labelsCompatible(with: labels)
+    } else {
+      return false
+    }
+  }
+
+  /// Returns `true` iff `n` is possibly the type of a bound member function.
+  public func isLikeBoundMember<T: TypeIdentity>(_ n: T) -> Bool {
+    if let f = seenAsTermAbstraction(n) {
+      return tag(of: self[f].environment) == RemoteType.self
     } else {
       return false
     }
@@ -128,9 +151,9 @@ public struct TypeStore: Sendable {
     while true {
       switch self[h] {
       case let t as UniversalType:
-        h = t.body
+        h = t.head
       case let t as Implication:
-        h = t.body
+        h = t.head
       default:
         return h
       }
@@ -140,7 +163,7 @@ public struct TypeStore: Sendable {
   /// Returns the head and context clause of `n`.
   public func contextAndHead(
     _ n: AnyTypeIdentity
-  ) -> (context: ContextClause, body: AnyTypeIdentity) {
+  ) -> (context: ContextClause, head: AnyTypeIdentity) {
     var p: [GenericParameter.ID] = []
     var u: [AnyTypeIdentity] = []
     var h = n
@@ -149,10 +172,10 @@ public struct TypeStore: Sendable {
       switch self[h] {
       case let t as UniversalType:
         p.append(contentsOf: t.parameters)
-        h = t.body
+        h = t.head
       case let t as Implication:
         u.append(contentsOf: t.usings)
-        h = t.body
+        h = t.head
       default:
         return (.init(parameters: p, usings: u), h)
       }
@@ -169,10 +192,10 @@ public struct TypeStore: Sendable {
     while true {
       switch self[h] {
       case let t as UniversalType:
-        h = open(t.parameters, in: t.body)
+        h = open(t.parameters, in: t.head)
       case let t as Implication:
         u.append(contentsOf: t.usings)
-        h = t.body
+        h = t.head
       default:
         return (u, h)
       }
@@ -192,36 +215,36 @@ public struct TypeStore: Sendable {
     .init(mapping: ps, to: { _ in fresh().erased })
   }
 
-  /// Returns `body` as the head of a universal type and/or implication introducing `c`.
+  /// Returns `n` as the head of a universal type and/or implication introducing `c`.
   public mutating func introduce(
-    _ c: ContextClause, into body: AnyTypeIdentity
+    _ c: ContextClause, into n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    let t = introduce(usings: c.usings, into: body)
+    let t = introduce(usings: c.usings, into: n)
     let u = introduce(parameters: c.parameters, into: t)
     return u
   }
 
-  /// Returns `body` as the head of an implication having `lhs` on the left-hand side.
+  /// Returns `n` as the head of an implication having `lhs` on the left-hand side.
   public mutating func introduce(
-    usings lhs: [AnyTypeIdentity], into body: AnyTypeIdentity
+    usings lhs: [AnyTypeIdentity], into n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    lhs.isEmpty ? body : demand(Implication(context: lhs, head: body)).erased
+    lhs.isEmpty ? n : demand(Implication(context: lhs, head: n)).erased
   }
 
-  /// Returns `body` as the head of a universal type introducing `ps`.
+  /// Returns `n` as the head of a universal type introducing `ps`.
   public mutating func introduce(
-    parameters ps: [GenericParameter.ID], into body: AnyTypeIdentity
+    parameters ps: [GenericParameter.ID], into n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    ps.isEmpty ? body : demand(UniversalType(parameters: ps, body: body)).erased
+    ps.isEmpty ? n : demand(UniversalType(parameters: ps, head: n)).erased
   }
 
   /// Returns `n` without its first requirement.
   public mutating func dropFirstRequirement(_ n: Implication.ID) -> AnyTypeIdentity {
     let i = self[n]
     if i.usings.count == 1 {
-      return i.body
+      return i.head
     } else {
-      return demand(Implication(context: .init(i.usings.dropFirst()), head: i.body)).erased
+      return demand(Implication(context: .init(i.usings.dropFirst()), head: i.head)).erased
     }
   }
 
@@ -275,16 +298,67 @@ public struct TypeStore: Sendable {
     return (result, isOpenEnded: false)
   }
 
-  /// Returns the type of a pointer to a free-function implementing `a`'s interface.
-  public mutating func pointer(to a: Callable) -> FunctionPointer.ID {
-    let o = dealiased(a.output)
-    var i: [AnyTypeIdentity]
-    if a.environment != .void {
-      i = [dealiased(a.environment)]
-    } else {
-      i = []
+  /// Assuming `a` identifies the (possibly polymorphic) type of a callable abstraction with an
+  /// environement `e`, returns a copy of `a` where `e` is taken as first parameter if `e` is
+  /// non-empty or `a` unchanged otherwise.
+  ///
+  /// For example, if `a` is of the form `[let T]() let -> U`, the result is `[](let T) let -> U`.
+  public mutating func lifted<T: TypeIdentity>(_ a: T) -> AnyTypeIdentity {
+    switch tag(of: a) {
+    case Arrow.self:
+      return lifted(castUnchecked(a, to: Arrow.self)).erased
+    case Bundle.self:
+      return lifted(castUnchecked(a, to: Bundle.self)).erased
+    case Implication.self:
+      return lifted(castUnchecked(a, to: Implication.self)).erased
+    case UniversalType.self:
+      return lifted(castUnchecked(a, to: UniversalType.self)).erased
+    default:
+      preconditionFailure("not a callable abstraction")
     }
-    i.append(contentsOf: a.inputs.map({ (e) in dealiased(e.type) }))
+  }
+
+  /// Implements `lifted(_:)` for arrows.
+  public mutating func lifted(_ a: Arrow.ID) -> Arrow.ID {
+    let e = dealiased(self[a].environment)
+    let p: Parameter
+
+    if let r = self[e] as? RemoteType {
+      p = Parameter(access: r.access, type: r.projectee)
+    } else if e != .void {
+      p = Parameter(access: self[a].effect, type: e)
+    } else {
+      return a
+    }
+
+    let i = Array(p, prependedTo: self[a].inputs)
+    return demand(Arrow(effect: self[a].effect, inputs: i, output: self[a].output))
+  }
+
+  /// Implements `lifted(_:)` for bundles.
+  public mutating func lifted(_ a: Bundle.ID) -> Bundle.ID {
+    let s = lifted(self[a].shape)
+    return demand(Bundle(shape: s, variants: self[a].variants))
+  }
+
+  /// Implements `lifted(_:)` for implications.
+  public mutating func lifted(_ a: Implication.ID) -> Implication.ID {
+    let h = lifted(self[a].head)
+    return demand(Implication(context: self[a].usings, head: h))
+  }
+
+  /// Implements `lifted(_:)` for universal types.
+  public mutating func lifted(_ a: UniversalType.ID) -> UniversalType.ID {
+    let b = lifted(self[a].head)
+    return demand(UniversalType(parameters: self[a].parameters, head: b))
+  }
+
+  /// Returns the type of a pointer to a free-function implementing `a`'s interface.
+  public mutating func pointer(to a: Arrow.ID) -> FunctionPointer.ID {
+    let e = dealiased(self[a].environment)
+    let o = dealiased(self[a].output)
+    var i: [AnyTypeIdentity] = (e == .void) ? [] : [e]
+    i.append(contentsOf: self[a].inputs.map({ (e) in dealiased(e.type) }))
     return demand(FunctionPointer(inputs: i, output: o))
   }
 
@@ -303,13 +377,19 @@ public struct TypeStore: Sendable {
     return .init(uncheckedFrom: n.erased)
   }
 
-  /// Returns properties of `n` iff it identifies the type of a callable abstraction.
-  public func seenAsCallableAbstraction<T: TypeIdentity>(_ n: T) -> Callable? {
-    switch self[head(n)] {
-    case let t as Arrow:
-      return .init(t)
-    case let t as Bundle:
-      return seenAsCallableAbstraction(t.shape)
+  /// Returns the shape of the term abstraction that `n` identifies, if any.
+  ///
+  /// The result is non-`nil` iff `n` sans context identifies either an arrow or a bundle. For
+  /// example, if `n` has the form `<T, E> [E]() auto -> T { let, inout }` (i.e., a polymorphic
+  /// bundle), the result is `[E]() auto -> T`.
+  public func seenAsTermAbstraction<T: TypeIdentity>(_ n: T) -> Arrow.ID? {
+    let h = head(n)
+
+    switch tag(of: h) {
+    case Arrow.self:
+      return .init(uncheckedFrom: h)
+    case Bundle.self:
+      return seenAsTermAbstraction(self[Bundle.ID(uncheckedFrom: h)].shape)
     default:
       return nil
     }
@@ -362,7 +442,7 @@ public struct TypeStore: Sendable {
     // `n` identifies a function bundle?
     else if let b = cast(h, to: Bundle.self) {
       if let a = cast(self[b].shape, to: Arrow.self), let shape = asBoundMemberFunction(a) {
-        let adapted = demand(Bundle(shape: shape.erased, variants: self[b].variants))
+        let adapted = demand(Bundle(shape: shape, variants: self[b].variants))
         return introduce(c, into: adapted.erased)
       } else {
         return nil
@@ -414,7 +494,7 @@ public struct TypeStore: Sendable {
 
       // Otherwise, the result is the same as that of the underlying shape.
       else if !t.variants.intersection(.inplace).isEmpty {
-        return resultOfApplying(t.shape, mutably: isAppliedMutably)
+        return resultOfApplying(t.shape.erased, mutably: isAppliedMutably)
       } else {
         return nil
       }
@@ -540,8 +620,8 @@ public struct TypeStore: Sendable {
     switch r {
     case .builtin, .direct, .member, .synthetic:
       return r
-    case .inherited(let w, let d):
-      return .inherited(self.map(w, transform), d)
+    case .inherited(let w, let d, let s):
+      return .inherited(self.map(w, transform), d, statically: s)
     }
   }
 
@@ -565,9 +645,11 @@ public struct TypeStore: Sendable {
     case .assumed(let i):
       return .init(value: .assumed(i), type: t)
 
-    case .reference(let r):
-      let u = self.map(r, transform)
-      return .init(value: .reference(u), type: t)
+    case .builtin(let e):
+      return .init(value: .builtin(e), type: t)
+
+    case .reference(let d):
+      return .init(value: .reference(d), type: t)
 
     case .termApplication(let a, let b):
       let u = self.map(a, transform)
@@ -629,7 +711,7 @@ public struct TypeStore: Sendable {
     // Reduce type applications if the abstaction is a universal type.
     var t = substitutions[n]
     while let a = self[t] as? TypeApplication, let f = self[a.abstraction] as? UniversalType {
-      t = substitute(.init(mapping: f.parameters, to: a.arguments.values), in: f.body)
+      t = substitute(.init(mapping: f.parameters, to: a.arguments.values), in: f.head)
     }
 
     // Recurse if necessary.
@@ -823,7 +905,8 @@ public struct TypeStore: Sendable {
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
     (lhs.variants == rhs.variants)
-      && unifiable(lhs.shape, rhs.shape, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(
+        lhs.shape.erased, rhs.shape.erased, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.
@@ -853,7 +936,7 @@ public struct TypeStore: Sendable {
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
     unifiable(lhs.usings, rhs.usings, extending: &ss, handlingCoercionsWith: areCoercible)
-      && unifiable(lhs.body, rhs.body, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(lhs.head, rhs.head, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.
@@ -917,7 +1000,7 @@ public struct TypeStore: Sendable {
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
     lhs.parameters.elementsEqual(rhs.parameters)
-      && unifiable(lhs.body, rhs.body, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(lhs.head, rhs.head, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if the the pairwise elements of `lhs` and `rhs` are unifiable.

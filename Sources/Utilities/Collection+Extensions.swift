@@ -5,6 +5,17 @@ extension Collection {
     count == 1 ? self[startIndex] : nil
   }
 
+  /// Returns the index of the unique element that satisfies `predicate` if any.
+  ///
+  /// - Complexity: At most n applications of `preficate`, where n is the length of `self`.
+  public func uniqueIndex(where predicate: (Element) throws -> Bool) rethrows -> Index? {
+    if let i = try firstIndex(where: predicate) {
+      return try !suffix(from: i).contains(where: predicate) ? i : nil
+    } else {
+      return nil
+    }
+  }
+
   /// The first element of `self` and its suffix after its first index or `nil` if `self` is empty.
   public var headAndTail: (head: Element, tail: SubSequence)? {
     if isEmpty { return nil }

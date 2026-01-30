@@ -45,6 +45,11 @@ public struct IRAccess: IRRegionEntry {
     .same(as: source)
   }
 
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
+  }
+
 }
 
 extension IRAccess: Showable {

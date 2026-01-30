@@ -37,7 +37,6 @@ class IndexPathTests: XCTestCase {
     for i in 2 ..< 32 {
       p.append(i)
     }
-    print(Array(p))
     XCTAssert(p.elementsEqual(0 ..< 32))
   }
 

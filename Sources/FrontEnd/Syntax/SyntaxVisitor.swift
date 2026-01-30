@@ -114,7 +114,7 @@ extension Program {
       traverse(castUnchecked(n, to: StaticCall.self), calling: &v)
     case StringLiteral.self:
       break
-    case SynthethicExpression.self:
+    case SyntheticExpression.self:
       break
     case TupleLiteral.self:
       traverse(castUnchecked(n, to: TupleLiteral.self), calling: &v)

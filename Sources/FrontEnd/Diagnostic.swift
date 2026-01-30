@@ -80,6 +80,12 @@ extension Diagnostic: CustomStringConvertible {
 
 extension Program {
 
+  /// Returns an error diagnosing a missing mutation marker on the left-hand side of an assignment.
+  internal func assignmentNotMarkedMutating(_ s: Assignment.ID) -> Diagnostic {
+    let site = spanForDiagnostic(about: self[s].lhs)
+    return .init(.error, "left-hand side of assignment must be marked for mutation", at: site)
+  }
+
   /// Returns an error diagnosing an illegal function application.
   internal func cannotCall(
     _ f: AnyTypeIdentity, _ s: Call.Style, at site: SourceSpan
@@ -233,6 +239,43 @@ extension Program {
     _ n: Parsed<Name>, memberOf t: AnyTypeIdentity? = nil
   ) -> Diagnostic {
     undefinedSymbol(n.value, memberOf: t, at: n.site)
+  }
+
+  /// Returns a warning diagnosing an unused value.
+  internal func unusedValue(of t: AnyTypeIdentity, at site: SourceSpan) -> Diagnostic {
+    .init(.warning, format("unused value of type '%T'", [t]), at: site)
+  }
+
+}
+
+extension Diagnostic {
+
+  internal static func illegalConsumption(_ k: AccessEffect, at site: SourceSpan) -> Diagnostic {
+    .init(.error, "cannot consume '\(k)' projection", at: site)
+  }
+
+  internal static func illegalMove(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "illegal move", at: site)
+  }
+
+  internal static func illegalMutableAccess(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "illegal mutable access", at: site)
+  }
+
+  internal static func uninitializedObject(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "uninitialized object", at: site)
+  }
+
+  internal static func useOfConsumedObject(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "use of consumed object", at: site)
+  }
+
+  internal static func useOfPartialObject(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "use of partially initialized object", at: site)
+  }
+
+  internal static func useOfUninitializedObject(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "use of uninitialized object", at: site)
   }
 
 }
