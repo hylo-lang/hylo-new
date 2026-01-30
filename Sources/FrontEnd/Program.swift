@@ -823,7 +823,11 @@ public struct Program: Sendable {
     var result = [nameOrTag(of: d)]
     for s in scopes(from: self.parent(containing: d)) {
       if let n = s.node {
-        result.append(castToDeclaration(n).flatMap(name(of:))?.description ?? "\(tag(of: n))")
+        if let d = castToDeclaration(n), let s = name(of: d)?.description {
+          result.append(s)
+        } else {
+          result.append(tag(of: n).description)
+        }
       }
     }
     return result.reversed().joined(separator: ".")
