@@ -63,6 +63,7 @@ public struct Driver {
   }
 
   /// Lowers the contents of `module` to IR.
+  @discardableResult
   public mutating func lower(
     _ module: Module.ID
   ) async -> (elapsed: Duration, containsError: Bool) {

@@ -113,19 +113,23 @@ final class CompilerTests: XCTestCase {
 
   /// Compiles `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    let (program, _) = try await compile(input)
+    let (program, _) = try await compile(input, emitIR: false)
     assertSansError(program)
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    let (program, expectations) = try await compile(input)
+    let (program, expectations) = try await compile(input, emitIR: true)
     XCTAssert(program.containsError, "program compiled but an error was expected")
     assertExpectations(expectations, program.diagnostics)
   }
 
   /// Compiles `input` into `p` and returns expected diagnostics for each compiled source file.
-  private func compile(_ input: TestDescription) async throws -> (Program, [FileName: String]) {
+  ///
+  /// - TODO: Remove the `emitIR` parameter once IR lowering is expected to work on positive tests.
+  private func compile(
+    _ input: TestDescription, emitIR: Bool
+  ) async throws -> (Program, [FileName: String]) {
     var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
 
     let requiresStandardLibrary = input.requiresStandardLibrary
@@ -148,14 +152,27 @@ final class CompilerTests: XCTestCase {
       expectations[source.name] = expected
     }
 
+    func done() -> (Program, [FileName: String]) {
+      (driver.program, expectations)
+    }
+
     // Exit if there are parsing errors.
-    if driver.program[m].containsError { return (driver.program, expectations) }
+    if driver.program[m].containsError { return done() }
 
     // Semantic analysis.
-    await driver.assignScopes(of: m)
-    await driver.assignTypes(of: m)
+    if await driver.assignScopes(of: m).containsError { return done() }
+    if await driver.assignTypes(of: m).containsError { return done() }
 
-    return (driver.program, expectations)
+    // IR Lowering.
+    if emitIR {
+      await driver.lower(m)
+    }
+
+    return done()
+  }
+
+  private func compile(_ m: Module.ID, driver: inout Driver) {
+
   }
 
   /// Asserts that the expected `diagnostics` of each source file in `expectations` match those
