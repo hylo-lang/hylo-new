@@ -134,6 +134,7 @@ public struct Driver {
     }
   }
 
+  /// Throws the diagnostics of `m` if those contain an error.
   private func throwIfContainsError(_ m: Module.ID) throws {
     if program[m].containsError {
       throw CompilationError(diagnostics: .init(program[m].diagnostics))
