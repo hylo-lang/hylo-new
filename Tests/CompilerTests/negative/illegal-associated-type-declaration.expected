@@ -1,0 +1,6 @@
+negative/illegal-associated-type-declaration.hylo:5.1-5: error: declaration is not allowed here
+type X
+~~~~
+negative/illegal-associated-type-declaration.hylo:8.5: error: expected identifier
+type
+    ^
