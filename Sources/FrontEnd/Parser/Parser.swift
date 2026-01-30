@@ -1112,6 +1112,11 @@ public struct Parser {
       _ = sanitize(prologue.annotations, accepting: { _ in false })
       _ = sanitize(prologue.modifiers, accepting: { _ in false })
 
+      // An error has already been reported if the identifier is `$!`.
+      if (context != .typeBody) && (identifier.value != "$!") {
+        report(.init("declaration is not allowed here", at: introducer.site))
+      }
+
       let d = file.insert(
         AssociatedTypeDeclaration(
           introducer: introducer,
