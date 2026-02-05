@@ -73,6 +73,39 @@ public struct Driver {
     return (elapsed, program[module].containsError)
   }
 
+  /// Applies the transformation passes on the IR of `module`.
+  public mutating func applyTransformationPasses(
+    _ module: Module.ID
+  ) async -> (elapsed: Duration, containsError: Bool) {
+    let clock = ContinuousClock()
+    let elapsed = clock.measure {
+      program.applyTransformationPasses(module)
+    }
+    return (elapsed, program[module].containsError)
+  }
+
+  /// Generate LLVM code for `module`.
+  public mutating func generateCode(
+    _ module: Module.ID
+  ) async -> (elapsed: Duration, containsError: Bool) {
+    let clock = ContinuousClock()
+    let elapsed = clock.measure {
+      // TODO
+    }
+    return (elapsed, program[module].containsError)
+  }
+
+  /// Generate executable from `module`.
+  public mutating func generateExecutable(
+    _ module: Module.ID
+  ) async -> (elapsed: Duration, containsError: Bool) {
+    let clock = ContinuousClock()
+    let elapsed = clock.measure {
+      // TODO
+    }
+    return (elapsed, program[module].containsError)
+  }
+
   /// Loads `module`, whose sources are in `root`, into `program`.
   ///
   /// If `moduleCachePath` is set, the module is loaded from cache if an archive is found and its
