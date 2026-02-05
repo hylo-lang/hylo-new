@@ -73,12 +73,11 @@ public struct Driver {
     return (elapsed, program[module].containsError)
   }
 
-  /// Applies the transformation passes on the IR of `module`.
+  /// Applies mandatory transformation passes on the IR of `module`.
   public mutating func applyTransformationPasses(
     _ module: Module.ID
   ) async -> (elapsed: Duration, containsError: Bool) {
-    let clock = ContinuousClock()
-    let elapsed = clock.measure {
+    let elapsed = ContinuousClock().measure {
       program.applyTransformationPasses(module)
     }
     return (elapsed, program[module].containsError)

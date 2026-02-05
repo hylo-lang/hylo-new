@@ -92,7 +92,7 @@ public struct Program: Sendable {
     self = emitter.release()
   }
 
-  /// Applies the transformation passes on the IR of `m`.
+  /// Applies mandatory transformation passes on the IR of `m`.
   public mutating func applyTransformationPasses(_ m: Module.ID) {
     withTyper(typing: m) { (typer) in
       // Temporarily move all functions to a local work list.

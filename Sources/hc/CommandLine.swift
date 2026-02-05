@@ -42,7 +42,7 @@ import Utilities
   @Option(
     name: [.customLong("emit")],
     help: ArgumentHelp(
-      "Produce the specified output: Possible values are: ast, typed-ast, ir, raw-ir, llvm, intel-asm, binary.",
+      "Produce the specified output: Possible values are: \(OutputType.allValueStrings.joined(separator: ", ")).",
       valueName: "output-type"))
   private var outputType: OutputType = .ir
 
@@ -116,13 +116,13 @@ import Utilities
       return
     }
 
-    await perform("applying passes", { await driver.applyTransformationPasses(module) })
+    await perform("normalization", { await driver.applyTransformationPasses(module) })
     if outputType == .ir {
       try emitIR(module, in: driver.program, name: product)
       return
     }
 
-    await perform("generating code", { await driver.generateCode(module) })
+    await perform("code generation", { await driver.generateCode(module) })
     if outputType == .llvm {
       try emitLLVM(module, in: driver.program, name: product)
       return
