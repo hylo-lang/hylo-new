@@ -272,7 +272,7 @@ import Utilities
   }
 
   /// The type of the output files to generate.
-  private enum OutputType: String, ExpressibleByArgument {
+  private enum OutputType: String, ExpressibleByArgument, CaseIterable {
 
     /// Abstract syntax tree before typing.
     case ast = "ast"
