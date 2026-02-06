@@ -24,14 +24,7 @@ final class CompilerTests: XCTestCase {
     /// Creates an instance with the given properties.
     init(_ path: String) throws {
       self.root = URL(filePath: path)
-
-      if root.pathExtension == "package" {
-        self.manifest = try Self.manifest(root)
-      } else if let s = Self.firstLine(of: root), s.starts(with: "//!") {
-        self.manifest = try Manifest(options: s.split(separator: " ").dropFirst())
-      } else {
-        self.manifest = .init()
-      }
+      self.manifest = try Self.manifest(root)
     }
 
     /// `true` iff `self` describes a package.
