@@ -15,14 +15,6 @@ final class CompilerTests: XCTestCase {
   /// The input of a compiler test.
   struct TestDescription {
 
-    /// A test manifest.
-    struct Manifest: Decodable {
-
-      /// The options with which the input should be compiled.
-      let options: [String]?
-
-    }
-
     /// The root path of the program's sources.
     let root: URL
 
@@ -30,30 +22,21 @@ final class CompilerTests: XCTestCase {
     let manifest: Manifest
 
     /// Creates an instance with the given properties.
-    init(_ path: String) {
+    init(_ path: String) throws {
       self.root = URL(filePath: path)
 
       if root.pathExtension == "package" {
-        self.manifest = (try? Self.manifest(root)) ?? .init(options: [])
+        self.manifest = try Self.manifest(root)
       } else if let s = Self.firstLine(of: root), s.starts(with: "//!") {
-        self.manifest = .init(options: s.split(separator: " ").dropFirst().map(String.init(_:)))
+        self.manifest = try Manifest(options: s.split(separator: " ").dropFirst())
       } else {
-        self.manifest = .init(options: [])
+        self.manifest = .init()
       }
     }
 
     /// `true` iff `self` describes a package.
     var isPackage: Bool {
       root.pathExtension == "package"
-    }
-
-    /// `true` iff `self` requires a standard library.
-    var requiresStandardLibrary: Bool {
-      if let options = manifest.options {
-        return !options.contains("no-std")
-      } else {
-        return true
-      }
     }
 
     /// Calls `action` on each Hylo source URL in the program described by `self`.
@@ -75,12 +58,12 @@ final class CompilerTests: XCTestCase {
 
       // Try to read the manifest's properties from the first line.
       else if let s = firstLine(of: root), s.starts(with: "//!") {
-        return .init(options: s.split(separator: " ").dropFirst().map(String.init(_:)))
+        return try .init(options: s.split(separator: " ").dropFirst())
       }
 
       // Return a default manifest.
       else {
-        return .init(options: [])
+        return .init()
       }
     }
 
@@ -113,32 +96,27 @@ final class CompilerTests: XCTestCase {
 
   /// Compiles `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    let (program, _) = try await compile(input, emitIR: false)
+    let (program, _) = try await compile(input)
     assertSansError(program)
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    let (program, expectations) = try await compile(input, emitIR: true)
+    let (program, expectations) = try await compile(input)
     XCTAssert(program.containsError, "program compiled but an error was expected")
     assertExpectations(expectations, program.diagnostics)
   }
 
   /// Compiles `input` into `p` and returns expected diagnostics for each compiled source file.
-  ///
-  /// - TODO: Remove the `emitIR` parameter once IR lowering is expected to work on positive tests.
-  private func compile(
-    _ input: TestDescription, emitIR: Bool
-  ) async throws -> (Program, [FileName: String]) {
+  private func compile(_ input: TestDescription) async throws -> (Program, [FileName: String]) {
     var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
 
-    let requiresStandardLibrary = input.requiresStandardLibrary
-    if requiresStandardLibrary {
+    if input.manifest.requiresStandardLibrary {
       try await driver.load(.standardLibrary, withSourcesAt: standardLibrarySources)
     }
 
     let m = driver.program.demandModule(.init("Test"))
-    if requiresStandardLibrary {
+    if input.manifest.requiresStandardLibrary {
       driver.program[m].addDependency(.standardLibrary)
     }
 
@@ -156,18 +134,17 @@ final class CompilerTests: XCTestCase {
       (driver.program, expectations)
     }
 
-    // Exit if there are parsing errors.
-    if driver.program[m].containsError { return done() }
+    // Exit if there are parsing errors or if the stage is set to `parsing`.
+    if driver.program[m].containsError || (input.manifest.stage == .parsing) { return done() }
 
     // Semantic analysis.
     if await driver.assignScopes(of: m).containsError { return done() }
     if await driver.assignTypes(of: m).containsError { return done() }
+    if input.manifest.stage == .typing { return done() }
 
     // IR Lowering.
-    if emitIR {
-      await driver.lower(m)
-    }
-
+    assert(input.manifest.stage == .codegen)
+    await driver.lower(m)
     return done()
   }
 
