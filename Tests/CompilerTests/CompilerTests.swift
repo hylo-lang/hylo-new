@@ -24,7 +24,7 @@ final class CompilerTests: XCTestCase {
     /// Creates an instance with the given properties.
     init(_ path: String) throws {
       self.root = URL(filePath: path)
-      self.manifest = try Self.manifest(root)
+      self.manifest = try Manifest(contentsOf: root)
     }
 
     /// `true` iff `self` describes a package.
@@ -39,31 +39,6 @@ final class CompilerTests: XCTestCase {
       } else {
         try action(root)
       }
-    }
-
-    /// Returns the manifest of the test case at `root`.
-    private static func manifest(_ root: URL) throws -> Manifest {
-      // Try to read the actual manifest.
-      if root.pathExtension == "package" {
-        let json = try Data(contentsOf: root.appendingPathComponent("package.json"))
-        return try JSONDecoder().decode(Manifest.self, from: json)
-      }
-
-      // Try to read the manifest's properties from the first line.
-      else if let s = firstLine(of: root), s.starts(with: "//!") {
-        return try .init(options: s.split(separator: " ").dropFirst())
-      }
-
-      // Return a default manifest.
-      else {
-        return .init()
-      }
-    }
-
-    /// Returns the first line of the file at `url`, which is encoded in UTF-8, or `nil`if that
-    /// this file could not be read.
-    private static func firstLine(of url: URL) -> Substring? {
-      (try? String(contentsOf: url, encoding: .utf8))?.firstLine
     }
 
   }

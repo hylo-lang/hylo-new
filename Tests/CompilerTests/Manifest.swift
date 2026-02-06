@@ -34,6 +34,33 @@ struct Manifest {
     }
   }
 
+  /// Returns the manifest of the test case at `root`.
+  ///
+  /// If `root` is a directory, the manifest is parsed from the contents of a file `package.json`
+  /// at the root of this directory. Otherwise, if the first line of the contents of `root` starts
+  /// with `"//!"`, the manifest is parsed from the remainder of that line as a list of options,
+  /// separated by spaces. Otherwise, a default instance is created.
+  ///
+  /// An option is either a flag, represented as a character string (e.g., `"no-std"`), or a
+  /// key/value pair represented as two strings separated by a colon (e.g, `"stage:typing"`).
+  init(contentsOf root: URL) throws {
+    // Try to read the actual manifest.
+    if root.pathExtension == "package" {
+      let json = try Data(contentsOf: root.appendingPathComponent("package.json"))
+      self = try JSONDecoder().decode(Manifest.self, from: json)
+    }
+
+    // Try to read the manifest's properties from the first line.
+    else if let s = Self.firstLine(of: root), s.starts(with: "//!") {
+      self = try .init(options: s.split(separator: " ").dropFirst())
+    }
+
+    // Return a default manifest.
+    else {
+      self.init()
+    }
+  }
+
   /// Updates the configuration of `self` with the option parsed from `s`.
   private mutating func add<S: StringProtocol>(option s: S) throws {
     let i = s.firstIndex(of: ":") ?? s.endIndex
@@ -48,6 +75,12 @@ struct Manifest {
     default:
       throw ManifestError.unknownOption
     }
+  }
+
+  /// Returns the first line of the file at `url`, which is encoded in UTF-8, or `nil`if that
+  /// this file could not be read.
+  private static func firstLine(of url: URL) -> Substring? {
+    (try? String(contentsOf: url, encoding: .utf8))?.firstLine
   }
 
 }
