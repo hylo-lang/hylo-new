@@ -22,7 +22,7 @@ struct Manifest {
   private(set) var requiresStandardLibrary: Bool = true
 
   /// The stage up to which the input should be compiled.
-  private(set) var stage: Stage = .typing
+  private(set) var stage: Stage = .codegen
 
   /// Creates an instance with a default configuration.
   init() {}

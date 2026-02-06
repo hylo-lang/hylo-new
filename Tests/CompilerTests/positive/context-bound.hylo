@@ -1,4 +1,4 @@
-//! no-std
+//! stage:typing no-std
 
 trait P { fun f() }
 

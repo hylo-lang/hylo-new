@@ -1,3 +1,5 @@
+//! stage:typing
+
 struct A<T> {
   public init(x: T) {}
   public init() {}

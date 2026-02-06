@@ -1,3 +1,5 @@
+//! stage:typing
+
 fun check<T>(x: T) {}
 
 public fun main() {
