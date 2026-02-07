@@ -1,4 +1,4 @@
-//! no-std
+//! stage:typing no-std
 
 struct A { public memberwise init }
 struct B { public memberwise init }
