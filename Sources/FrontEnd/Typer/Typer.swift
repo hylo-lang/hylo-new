@@ -344,7 +344,7 @@ public struct Typer {
       if let i = program[d].initializer {
         check(i)
       } else {
-        report(.error, "binding declaration requires an initializer", about: d)
+        report(program.missingBindingInitializer(d))
       }
 
     case .using, .given, .unconditional:

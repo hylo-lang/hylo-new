@@ -15,6 +15,9 @@ public enum IRValue: Hashable, Sendable {
   /// A reference to a lowered function.
   indirect case function(IRFunction.Name, AnyTypeIdentity)
 
+  /// A "poison value", representing the result of an erroneous operation.
+  indirect case poison(IRType)
+
   /// `true` iff `self` is a constant.
   public var isConstant: Bool {
     switch self {
@@ -58,6 +61,8 @@ extension IRValue: Showable {
       return "\(printer.show(t)) \(n)"
     case .function(let n, _):
       return printer.show(n)
+    case .poison:
+      return "#!poison"
     }
   }
 

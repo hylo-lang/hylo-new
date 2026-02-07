@@ -170,6 +170,11 @@ extension Program {
     return .init(.error, "invalid redeclaration of '\(n)'", at: site, notes: notes)
   }
 
+  /// Returns an error diagnosing a missing binding initializer.
+  internal func missingBindingInitializer(_ d: BindingDeclaration.ID) -> Diagnostic {
+    .init(.error, "binding declaration requires an initializer", at: .empty(at: self[d].site.end))
+  }
+
   /// Returns an error diagnosing ambiguous implicit search results.
   internal func multipleGivenInstances(
     of t: AnyTypeIdentity, at site: SourceSpan
