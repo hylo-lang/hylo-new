@@ -46,14 +46,14 @@ let package = Package(
         .target(name: "Utilities"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
-      swiftSettings: commonSwiftSettings),
+      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
 
     .executableTarget(
       name: "hc-tests",
       dependencies: [
         .product(name: "ArgumentParser", package: "swift-argument-parser")
       ],
-      swiftSettings: commonSwiftSettings),
+      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
 
     .target(
       name: "Driver",
@@ -63,7 +63,7 @@ let package = Package(
         .target(name: "Utilities"),
         .product(name: "Archivist", package: "archivist"),
       ],
-      swiftSettings: commonSwiftSettings),
+      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
 
     .target(
       name: "FrontEnd",
@@ -75,7 +75,7 @@ let package = Package(
         .product(name: "Collections", package: "swift-collections"),
         .product(name: "BigInt", package: "BigInt"),
       ],
-      swiftSettings: commonSwiftSettings),
+      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
 
     .target(
       name: "StableCollections",
@@ -98,6 +98,23 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings),
 
+    .systemLibrary(name: "LLVM", pkgConfig: "llvm"),
+
+    .target(
+      name: "LLVMEmitter",
+      dependencies: [
+        .target(name: "LLVM"),
+        .target(name: "FrontEnd"),
+      ]),
+ 
+    .testTarget(
+      name: "LLVMEmitterTests",
+      dependencies: [
+        .target(name: "LLVMEmitter")
+      ],
+      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]
+    ),
+
     .testTarget(
       name: "CompilerTests",
       dependencies: [
@@ -106,7 +123,7 @@ let package = Package(
         .target(name: "Utilities"),
       ],
       exclude: ["negative", "positive", "README.md"],
-      swiftSettings: commonSwiftSettings,
+      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)],
       plugins: ["CompilerTestsPlugin"]),
 
     .testTarget(
@@ -114,7 +131,7 @@ let package = Package(
       dependencies: [
         .target(name: "FrontEnd")
       ],
-      swiftSettings: commonSwiftSettings),
+      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
 
     .testTarget(
       name: "StableCollectionsTests",
@@ -136,4 +153,6 @@ let package = Package(
       dependencies: [
         .target(name: "hc-tests")
       ]),
-  ])
+  ],
+  cxxLanguageStandard: .cxx20
+)

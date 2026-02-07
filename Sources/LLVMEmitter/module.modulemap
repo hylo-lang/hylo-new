@@ -1,0 +1,5 @@
+module LLVMEmitter {
+  requires cplusplus
+  umbrella header "module.hpp"
+  export *
+}
