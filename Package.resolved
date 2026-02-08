@@ -1,5 +1,5 @@
 {
-  "originHash" : "75b17b8526ad3ad9f138a9b48b7f2fd113a480c00660f1a38cf981f28cfd0b5f",
+  "originHash" : "7f730a3821c504782c0c3094fbff10c3fa4eb0758fe3cb8661744a670ee95ce9",
   "pins" : [
     {
       "identity" : "archivist",
@@ -17,6 +17,14 @@
       "state" : {
         "revision" : "e07e00fa1fd435143a2dcf8b7eec9a7710b2fdfe",
         "version" : "5.7.0"
+      }
+    },
+    {
+      "identity" : "clangswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tothambrus11/ClangSwift",
+      "state" : {
+        "revision" : "bcc5c536602fbd16a169fa218ffe4657451ce309"
       }
     },
     {

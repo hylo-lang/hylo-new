@@ -1,0 +1,5 @@
+module LLVM [system] {
+  requires cplusplus
+  header "module.hpp"
+  export *
+}

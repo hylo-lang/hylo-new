@@ -12,6 +12,9 @@ on:
       - "LICENSE"
       - ".gitignore"
       - ".editorconfig"
+env:
+  llvm-build-release: 20251018-115119
+  llvm-version: '20.1.6'
 
 jobs:
   test:
@@ -23,8 +26,25 @@ jobs:
         swift: ["6.2"]
         config: [release, debug]
 
+        include:
+          - config: release
+            llvm-build-type: MinSizeRel
+
+          - config: debug
+            llvm-build-type: Debug
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up LLVM
+        uses: hylo-lang/get-llvm@v0.3.0
+        id: get-llvm
+        with:
+          llvmVersion: ${{ env.llvm-version }}
+          llvmBuildRelease: ${{ env.llvm-build-release }}
+          llvmBuildConfig: ${{ matrix.llvm-build-type }}
+          addToPkgConfigPath: true
+          addToPath: true
 
       - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }}
         uses: SwiftyLab/setup-swift@latest
