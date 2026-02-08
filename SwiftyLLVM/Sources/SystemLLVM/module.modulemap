@@ -1,4 +1,4 @@
-module LLVM [system] {
+module SystemLLVM [system] {
   requires cplusplus
   header "module.hpp"
   export *

@@ -12,3 +12,4 @@
 #include <llvm/IR/DataLayout.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Remarks/RemarkStreamer.h>
+#include <llvm/Support/Error.h>

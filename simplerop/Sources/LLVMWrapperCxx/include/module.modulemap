@@ -1,0 +1,5 @@
+module LLVMWrapperCxx {
+  requires cplusplus
+  umbrella header "module.hpp"
+  export *
+}

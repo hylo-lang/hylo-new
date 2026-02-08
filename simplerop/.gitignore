@@ -1,0 +1,16 @@
+# Swift Package Manager
+/.build
+/.*-build
+/Packages
+
+# IDEs
+/.vscode
+/.swiftpm
+/.vscode/launch.json
+/.idea
+
+# macOS
+.DS_Store
+
+# Local development
+/Playground

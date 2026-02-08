@@ -1,12 +1,6 @@
 // swift-tools-version:6.2
 import PackageDescription
 
-#if os(Windows)
-  let onWindows = true
-#else
-  let onWindows = false
-#endif
-
 /// Settings common to all Swift targets.
 let commonSwiftSettings: [SwiftSetting] = [
   .unsafeFlags(["-warnings-as-errors"])
@@ -15,11 +9,10 @@ let commonSwiftSettings: [SwiftSetting] = [
 let package = Package(
   name: "Hylo",
   platforms: [
-    .macOS(.v13)
+    .macOS(.v15)
   ],
   products: [
     .executable(name: "hc", targets: ["hc"]),
-    .executable(name: "llvm-gen", targets: ["LLVMWrapperGenerator"]),
   ],
   dependencies: [
     .package(
@@ -37,10 +30,7 @@ let package = Package(
     .package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
-    .package(
-      url: "https://github.com/tothambrus11/ClangSwift",
-      revision: "bcc5c536602fbd16a169fa218ffe4657451ce309"
-    )
+    .package(path: "./SwiftyLLVM")
   ],
   targets: [
     .executableTarget(
@@ -51,14 +41,14 @@ let package = Package(
         .target(name: "Utilities"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
-      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
+      swiftSettings: commonSwiftSettings),
 
     .executableTarget(
       name: "hc-tests",
       dependencies: [
         .product(name: "ArgumentParser", package: "swift-argument-parser")
       ],
-      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
+      swiftSettings: commonSwiftSettings),
 
     .target(
       name: "Driver",
@@ -68,7 +58,7 @@ let package = Package(
         .target(name: "Utilities"),
         .product(name: "Archivist", package: "archivist"),
       ],
-      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
+      swiftSettings: commonSwiftSettings),
 
     .target(
       name: "FrontEnd",
@@ -80,7 +70,7 @@ let package = Package(
         .product(name: "Collections", package: "swift-collections"),
         .product(name: "BigInt", package: "BigInt"),
       ],
-      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
+      swiftSettings: commonSwiftSettings),
 
     .target(
       name: "StableCollections",
@@ -103,30 +93,6 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings),
 
-    .systemLibrary(name: "LLVM", pkgConfig: "llvm"),
-
-    .target(
-      name: "LLVMEmitter",
-      dependencies: [
-        .target(name: "LLVM"),
-        .target(name: "FrontEnd"),
-      ]),
- 
-    .testTarget(
-      name: "LLVMEmitterTests",
-      dependencies: [
-        .target(name: "LLVMEmitter")
-      ],
-      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]
-    ),
-
-    .executableTarget(
-      name: "LLVMWrapperGenerator",
-      dependencies: [
-        .product(name: "Clang", package: "ClangSwift")
-      ]
-    ),
-
     .testTarget(
       name: "CompilerTests",
       dependencies: [
@@ -135,7 +101,7 @@ let package = Package(
         .target(name: "Utilities"),
       ],
       exclude: ["negative", "positive", "README.md"],
-      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)],
+      swiftSettings: commonSwiftSettings,
       plugins: ["CompilerTestsPlugin"]), 
 
     .testTarget(
@@ -143,7 +109,7 @@ let package = Package(
       dependencies: [
         .target(name: "FrontEnd")
       ],
-      swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]),
+      swiftSettings: commonSwiftSettings),
 
     .testTarget(
       name: "StableCollectionsTests",
