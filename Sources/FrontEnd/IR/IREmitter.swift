@@ -73,14 +73,15 @@ internal struct IREmitter {
 
   /// Generates the IR of `d`, which declares stored local bindings.
   private mutating func lower(storedBinding d: BindingDeclaration.ID) {
+    let p = program[d].pattern
     assert(program.isLocal(d))
-    assert(program[program[d].pattern].introducer.value == anyOf(.var, .sinklet))
+    assert(program[p].introducer.value == anyOf(.var, .sinklet))
 
     // Allocate storage for all the names declared by `d` in a single aggregate.
     let storage = lowering(d, { $0._alloca($0.program.type(assignedTo: d)) })
+    let lhs = program[p].pattern
 
     // Declare all names introduced by the binding, initializing them if possible.
-    let lhs = program[program[d].pattern].pattern
     if let rhs = program[d].initializer {
       lowerInitialization(bindingsIn: lhs, storedIn: storage, consuming: rhs)
     } else {
@@ -90,13 +91,16 @@ internal struct IREmitter {
 
   /// Generates the IR of `d`, which declares remote local bindings.
   private mutating func lower(remoteBinding d: BindingDeclaration.ID) {
+    let p = program[d].pattern
     assert(program.isLocal(d))
-    assert(program[program[d].pattern].introducer.value == anyOf(.let, .set, .inout))
+    assert(program[p].introducer.value == anyOf(.let, .set, .inout))
 
     // Is there an initializer?
     if let rhs = program[d].initializer {
-      _ = rhs
-      fatalError()
+      let request = AccessEffect(program[p].introducer.value)
+      let x0 = lowered(lvalue: rhs)
+      let x1 = lowering(d, { (me) in  me._access([request], from: x0) })
+      declareBindings(in: program[p].pattern, relativeTo: x1)
     }
 
     // Otherwise report an error and introduce each declared symbol as a poison value.
