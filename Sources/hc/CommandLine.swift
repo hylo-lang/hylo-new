@@ -127,8 +127,8 @@ import Utilities
       try emitLLVM(module, in: driver.program, name: product)
       return
     }
-    if outputType == .intelAsm {
-      try emitIntelAsm(module, in: driver.program, name: product)
+    if outputType == .asm {
+      try emitAsm(module, in: driver.program, name: product)
       return
     }
 
@@ -155,10 +155,8 @@ import Utilities
     let target = astFile(name)
     let c = treePrinterConfiguration(for: treePrinterFlags)
     let a = program.select(from: module, .satisfies({ program.parent(containing: $0).isFile }))
-    let parts = a.map({ (d) in
-      program.show(d, configuration: c)
-    }).lazy
-    try parts.joined(separator: "\n").write(to: target, atomically: true, encoding: .utf8)
+    let r = a.joinedString(separator: "\n") { d in program.show(d, configuration: c) }
+    try r.write(to: target, atomically: true, encoding: .utf8)
     note("written AST to \(target.path)")
   }
 
@@ -167,8 +165,8 @@ import Utilities
     _ module: Module.ID, in program: Program, name: Module.Name
   ) throws {
     let target = irFile(name)
-    let parts = program[module].functions.map({ (f) in program.show(f) }).lazy
-    try parts.joined(separator: "\n").write(to: target, atomically: true, encoding: .utf8)
+    let r = program[module].functions.joinedString(separator: "\n") { f in program.show(f) }
+    try r.write(to: target, atomically: true, encoding: .utf8)
     note("written IR to \(target.path)")  
   }
 
@@ -179,8 +177,8 @@ import Utilities
     // TODO
   }
 
-  /// Emits the Intel-style assembly of `module` in `program` with name `name`.
-  private func emitIntelAsm(
+  /// Emits the assembly of `module` in `program` with name `name`.
+  private func emitAsm(
     _ module: Module.ID, in program: Program, name: Module.Name
   ) throws {
     // TODO
@@ -286,11 +284,11 @@ import Utilities
     /// Hylo IR.
     case ir = "ir"
 
-    /// LLVM IR
+    /// LLVM IR.
     case llvm = "llvm"
 
-    /// Intel ASM
-    case intelAsm = "intel-asm"
+    /// Assembly.
+    case asm = "asm"
 
     /// Executable binary.
     case binary = "binary"
@@ -314,9 +312,9 @@ import Utilities
     outputURL ?? URL(fileURLWithPath: productName.description + ".ll")
   }
 
-  /// Given the desired name of the compiler's product, returns the file to write when "intel-asm"
+  /// Given the desired name of the compiler's product, returns the file to write when "asm"
   /// is selected as the output type.
-  private func intelASMFile(_ productName: Module.Name) -> URL {
+  private func asmFile(_ productName: Module.Name) -> URL {
     outputURL ?? URL(fileURLWithPath: productName.description + ".s")
   }
 

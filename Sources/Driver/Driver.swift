@@ -83,7 +83,7 @@ public struct Driver {
     return (elapsed, program[module].containsError)
   }
 
-  /// Generate LLVM code for `module`.
+  /// Generate backend code for `module`.
   public mutating func generateCode(
     _ module: Module.ID
   ) async -> (elapsed: Duration, containsError: Bool) {
