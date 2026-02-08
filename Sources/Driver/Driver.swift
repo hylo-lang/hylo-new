@@ -75,6 +75,7 @@ public struct Driver {
   }
 
   /// Applies mandatory transformation passes on the IR of `module`.
+  @discardableResult
   public mutating func applyTransformationPasses(
     _ module: Module.ID
   ) async -> (elapsed: Duration, containsError: Bool) {

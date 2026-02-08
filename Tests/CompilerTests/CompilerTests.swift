@@ -113,6 +113,7 @@ final class CompilerTests: XCTestCase {
     // IR Lowering.
     assert(input.manifest.stage == .codegen)
     await driver.lower(m)
+    await driver.applyTransformationPasses(m)
     return done()
   }
 
