@@ -7,7 +7,7 @@ import PackageDescription
   let onWindows = false
 #endif
 
-/// Swttings common to all Swift targets.
+/// Settings common to all Swift targets.
 let commonSwiftSettings: [SwiftSetting] = [
   .unsafeFlags(["-warnings-as-errors"])
 ]
@@ -18,7 +18,8 @@ let package = Package(
     .macOS(.v13)
   ],
   products: [
-    .executable(name: "hc", targets: ["hc"])
+    .executable(name: "hc", targets: ["hc"]),
+    .executable(name: "llvm-gen", targets: ["LLVMWrapperGenerator"]),
   ],
   dependencies: [
     .package(
@@ -36,6 +37,10 @@ let package = Package(
     .package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
+    .package(
+      url: "https://github.com/tothambrus11/ClangSwift",
+      revision: "bcc5c536602fbd16a169fa218ffe4657451ce309"
+    )
   ],
   targets: [
     .executableTarget(
@@ -115,6 +120,13 @@ let package = Package(
       swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)]
     ),
 
+    .executableTarget(
+      name: "LLVMWrapperGenerator",
+      dependencies: [
+        .product(name: "Clang", package: "ClangSwift")
+      ]
+    ),
+
     .testTarget(
       name: "CompilerTests",
       dependencies: [
@@ -124,7 +136,7 @@ let package = Package(
       ],
       exclude: ["negative", "positive", "README.md"],
       swiftSettings: commonSwiftSettings + [.interoperabilityMode(.Cxx)],
-      plugins: ["CompilerTestsPlugin"]),
+      plugins: ["CompilerTestsPlugin"]), 
 
     .testTarget(
       name: "FrontEndTests",
