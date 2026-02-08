@@ -42,7 +42,7 @@ import Utilities
   @Option(
     name: [.customLong("emit")],
     help: ArgumentHelp(
-      "Produce the specified output: Possible values are: \(OutputType.allValueStrings.joined(separator: ", ")).",
+      "Produce the specified output: \(OutputType.allValueStrings.joined(separator: ", ")).",
       valueName: "output-type"))
   private var outputType: OutputType = .ir
 
