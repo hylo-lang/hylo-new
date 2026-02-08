@@ -15,14 +15,6 @@ final class CompilerTests: XCTestCase {
   /// The input of a compiler test.
   struct TestDescription {
 
-    /// A test manifest.
-    struct Manifest: Decodable {
-
-      /// The options with which the input should be compiled.
-      let options: [String]?
-
-    }
-
     /// The root path of the program's sources.
     let root: URL
 
@@ -30,30 +22,14 @@ final class CompilerTests: XCTestCase {
     let manifest: Manifest
 
     /// Creates an instance with the given properties.
-    init(_ path: String) {
+    init(_ path: String) throws {
       self.root = URL(filePath: path)
-
-      if root.pathExtension == "package" {
-        self.manifest = (try? Self.manifest(root)) ?? .init(options: [])
-      } else if let s = Self.firstLine(of: root), s.starts(with: "//!") {
-        self.manifest = .init(options: s.split(separator: " ").dropFirst().map(String.init(_:)))
-      } else {
-        self.manifest = .init(options: [])
-      }
+      self.manifest = try Manifest(contentsOf: root)
     }
 
     /// `true` iff `self` describes a package.
     var isPackage: Bool {
       root.pathExtension == "package"
-    }
-
-    /// `true` iff `self` requires a standard library.
-    var requiresStandardLibrary: Bool {
-      if let options = manifest.options {
-        return !options.contains("no-std")
-      } else {
-        return true
-      }
     }
 
     /// Calls `action` on each Hylo source URL in the program described by `self`.
@@ -63,31 +39,6 @@ final class CompilerTests: XCTestCase {
       } else {
         try action(root)
       }
-    }
-
-    /// Returns the manifest of the test case at `root`.
-    private static func manifest(_ root: URL) throws -> Manifest {
-      // Try to read the actual manifest.
-      if root.pathExtension == "package" {
-        let json = try Data(contentsOf: root.appendingPathComponent("package.json"))
-        return try JSONDecoder().decode(Manifest.self, from: json)
-      }
-
-      // Try to read the manifest's properties from the first line.
-      else if let s = firstLine(of: root), s.starts(with: "//!") {
-        return .init(options: s.split(separator: " ").dropFirst().map(String.init(_:)))
-      }
-
-      // Return a default manifest.
-      else {
-        return .init(options: [])
-      }
-    }
-
-    /// Returns the first line of the file at `url`, which is encoded in UTF-8, or `nil`if that
-    /// this file could not be read.
-    private static func firstLine(of url: URL) -> Substring? {
-      (try? String(contentsOf: url, encoding: .utf8))?.firstLine
     }
 
   }
@@ -128,13 +79,12 @@ final class CompilerTests: XCTestCase {
   private func compile(_ input: TestDescription) async throws -> (Program, [FileName: String]) {
     var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
 
-    let requiresStandardLibrary = input.requiresStandardLibrary
-    if requiresStandardLibrary {
+    if input.manifest.requiresStandardLibrary {
       try await driver.load(.standardLibrary, withSourcesAt: standardLibrarySources)
     }
 
     let m = driver.program.demandModule(.init("Test"))
-    if requiresStandardLibrary {
+    if input.manifest.requiresStandardLibrary {
       driver.program[m].addDependency(.standardLibrary)
     }
 
@@ -148,14 +98,26 @@ final class CompilerTests: XCTestCase {
       expectations[source.name] = expected
     }
 
-    // Exit if there are parsing errors.
-    if driver.program[m].containsError { return (driver.program, expectations) }
+    func done() -> (Program, [FileName: String]) {
+      (driver.program, expectations)
+    }
+
+    // Exit if there are parsing errors or if the stage is set to `parsing`.
+    if driver.program[m].containsError || (input.manifest.stage == .parsing) { return done() }
 
     // Semantic analysis.
-    await driver.assignScopes(of: m)
-    await driver.assignTypes(of: m)
+    if await driver.assignScopes(of: m).containsError { return done() }
+    if await driver.assignTypes(of: m).containsError { return done() }
+    if input.manifest.stage == .typing { return done() }
 
-    return (driver.program, expectations)
+    // IR Lowering.
+    assert(input.manifest.stage == .codegen)
+    await driver.lower(m)
+    return done()
+  }
+
+  private func compile(_ m: Module.ID, driver: inout Driver) {
+
   }
 
   /// Asserts that the expected `diagnostics` of each source file in `expectations` match those
