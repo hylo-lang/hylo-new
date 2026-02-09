@@ -156,8 +156,7 @@ import Utilities
     let c = treePrinterConfiguration(for: treePrinterFlags)
     let a = program.select(from: module, .satisfies({ program.parent(containing: $0).isFile }))
     let r = a.joinedString(separator: "\n") { d in program.show(d, configuration: c) }
-    try r.write(to: target, atomically: true, encoding: .utf8)
-    note("written AST to \(target.path)")
+    try write(r, to: target)
   }
 
   /// Emits the IR of `module` in `program` with name `name`.
@@ -166,8 +165,7 @@ import Utilities
   ) throws {
     let target = irFile(name)
     let r = program[module].functions.joinedString(separator: "\n") { f in program.show(f) }
-    try r.write(to: target, atomically: true, encoding: .utf8)
-    note("written IR to \(target.path)")  
+    try write(r, to: target)
   }
 
   /// Emits the LLVM IR of `module` in `program` with name `name`.
@@ -182,6 +180,17 @@ import Utilities
     _ module: Module.ID, in program: Program, name: Module.Name
   ) throws {
     // TODO
+  }
+
+  /// Writes `content` to `url`, or to the standard output if `url` is "-".
+  private func write(_ content: String, to url: URL) throws {
+    if outputURL?.relativePath == "-" {
+      // User wants to write to the standard output.
+      print(content)
+    } else {
+      try content.write(to: url, atomically: true, encoding: .utf8)
+      note("written \(url.path)")
+    }
   }
 
   /// Sets up the value of search paths for locating libraries and cached artifacts.
