@@ -46,15 +46,23 @@ extension Sequence {
     minimalElements(by: areInIncreasingOrder).uniqueElement
   }
 
+  /// Returns the result of applying `transform` to each element in `self`, joined by the given
+  /// `separator`.
+  public func joinedString(
+    separator: String = "",
+    transform: (Element) throws -> String
+  ) rethrows -> String {
+    try self.reduce(into: "") { accumulator, element in
+      if !accumulator.isEmpty {
+        accumulator.append(separator)
+      }
+      accumulator.append(try transform(element))
+    }
+  }
+
   /// Returns the descriptions of all elements, joined by the given `separator`.
   public func descriptions(joinedBy separator: String = ", ") -> String {
-    var result = ""
-    var first = true
-    for x in self {
-      if first { first = false } else { result.append(separator) }
-      result.append(String(describing: x))
-    }
-    return result
+    joinedString(separator: separator) { String(describing: $0) }
   }
 
 }

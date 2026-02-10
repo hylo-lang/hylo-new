@@ -42,9 +42,17 @@ import Utilities
   @Option(
     name: [.customLong("emit")],
     help: ArgumentHelp(
-      "Produce the specified output: Possible values are: ast, typed-ast",
+      "Produce the specified output: \(OutputType.allValueStrings.joined(separator: ", ")).",
       valueName: "output-type"))
-  private var outputType: OutputType = .typedAST
+  private var outputType: OutputType = .ir
+
+  @Option(
+    name: [.customShort("o")],
+    help: ArgumentHelp(
+      "Write output to <file>.",
+      valueName: "file"),
+    transform: URL.init(fileURLWithPath:))
+  private var outputURL: URL?
 
   /// The configuration of the tree printer.
   @Flag(help: "Tree printer configuration")
@@ -91,24 +99,45 @@ import Utilities
     let sources = try sourceFiles(recursivelyContainedIn: inputs)
     await perform("parsing", { await driver.parse(sources, into: module) })
     await perform("scoping", { await driver.assignScopes(of: module) })
-    await perform("typing", { await driver.assignTypes(of: module) })
-    await perform("lowering", { await driver.lower(module) })
-
-//    let c = treePrinterConfiguration(for: treePrinterFlags)
-//    for d in driver.program.select(
-//      from: module, .satisfies({ driver.program.parent(containing: $0).isFile }))
-//    {
-//      print(driver.program.show(d, configuration: c))
-//    }
-
-    var first = true
-    for f in driver.program[module].functions {
-      if first { first = false } else { print() }
-      print(driver.program.show(f))
+    if outputType == .ast {
+      try emitAst(module, in: driver.program, name: product)
+      return
     }
 
+    await perform("typing", { await driver.assignTypes(of: module) })
+    if outputType == .typedAST {
+      try emitAst(module, in: driver.program, name: product)
+      return
+    }
+
+    await perform("lowering", { await driver.lower(module) })
+    if outputType == .rawIR {
+      try emitIR(module, in: driver.program, name: product)
+      return
+    }
+
+    await perform("normalization", { await driver.applyTransformationPasses(module) })
+    if outputType == .ir {
+      try emitIR(module, in: driver.program, name: product)
+      return
+    }
+
+    await perform("code generation", { await driver.generateCode(module) })
+    if outputType == .llvm {
+      try emitLLVM(module, in: driver.program, name: product)
+      return
+    }
+    if outputType == .asm {
+      try emitAsm(module, in: driver.program, name: product)
+      return
+    }
+
+    // Write the module to the cache for future runs.
     let a = try driver.program.archive(module: module)
-    print(a.count)
+    note("module archive size: \(a.count)")
+
+    assert(outputType == .binary)
+    await perform("generating executable", { await driver.generateExecutable(module) })
 
     func perform(
       _ phase: String, _ action: () async -> (elapsed: Duration, containsError: Bool)
@@ -116,6 +145,51 @@ import Utilities
       let a = await action()
       note("\(phase) completed in \(a.elapsed.human)")
       exitOnError(driver.program[module])
+    }
+  }
+
+  /// Emits the AST of `module` in `program` with name `name`, using the tree printer.
+  private func emitAst(
+    _ module: Module.ID, in program: Program, name: Module.Name
+  ) throws {
+    let target = astFile(name)
+    let c = treePrinterConfiguration(for: treePrinterFlags)
+    let a = program.select(from: module, .satisfies({ program.parent(containing: $0).isFile }))
+    let r = a.joinedString(separator: "\n") { d in program.show(d, configuration: c) }
+    try write(r, to: target)
+  }
+
+  /// Emits the IR of `module` in `program` with name `name`.
+  private func emitIR(
+    _ module: Module.ID, in program: Program, name: Module.Name
+  ) throws {
+    let target = irFile(name)
+    let r = program[module].functions.joinedString(separator: "\n") { f in program.show(f) }
+    try write(r, to: target)
+  }
+
+  /// Emits the LLVM IR of `module` in `program` with name `name`.
+  private func emitLLVM(
+    _ module: Module.ID, in program: Program, name: Module.Name
+  ) throws {
+    // TODO
+  }
+
+  /// Emits the assembly of `module` in `program` with name `name`.
+  private func emitAsm(
+    _ module: Module.ID, in program: Program, name: Module.Name
+  ) throws {
+    // TODO
+  }
+
+  /// Writes `content` to `url`, or to the standard output if `url` is "-".
+  private func write(_ content: String, to url: URL) throws {
+    if outputURL?.relativePath == "-" {
+      // User wants to write to the standard output.
+      print(content)
+    } else {
+      try content.write(to: url, atomically: true, encoding: .utf8)
+      note("written \(url.path)")
     }
   }
 
@@ -127,6 +201,7 @@ import Utilities
     } else {
       let m = fm.temporaryDirectory.appending(path: ".hylocache")
       try fm.createDirectory(at: m, withIntermediateDirectories: true)
+      note("using module cache path: \(m.path)")
       librarySearchPaths.append(m)
       moduleCachePath = m
     }
@@ -204,7 +279,7 @@ import Utilities
   }
 
   /// The type of the output files to generate.
-  private enum OutputType: String, ExpressibleByArgument {
+  private enum OutputType: String, ExpressibleByArgument, CaseIterable {
 
     /// Abstract syntax tree before typing.
     case ast = "ast"
@@ -212,6 +287,50 @@ import Utilities
     /// Abstract syntax tree after typing.
     case typedAST = "typed-ast"
 
+    /// Hylo IR before mandatory transformations.
+    case rawIR = "raw-ir"
+
+    /// Hylo IR.
+    case ir = "ir"
+
+    /// LLVM IR.
+    case llvm = "llvm"
+
+    /// Assembly.
+    case asm = "asm"
+
+    /// Executable binary.
+    case binary = "binary"
+  }
+
+  /// Given the desired name of the compiler's product, returns the file to write when "raw-ast" is
+  /// selected as the output type.
+  private func astFile(_ productName: Module.Name) -> URL {
+    outputURL ?? URL(fileURLWithPath: productName.description + ".ast")
+  }
+
+  /// Given the desired name of the compiler's product, returns the file to write when "ir" or
+  /// "raw-ir" is selected as the output type.
+  private func irFile(_ productName: Module.Name) -> URL {
+    outputURL ?? URL(fileURLWithPath: productName.description + ".ir")
+  }
+
+  /// Given the desired name of the compiler's product, returns the file to write when "llvm" is
+  /// selected as the output type.
+  private func llvmFile(_ productName: Module.Name) -> URL {
+    outputURL ?? URL(fileURLWithPath: productName.description + ".ll")
+  }
+
+  /// Given the desired name of the compiler's product, returns the file to write when "asm"
+  /// is selected as the output type.
+  private func asmFile(_ productName: Module.Name) -> URL {
+    outputURL ?? URL(fileURLWithPath: productName.description + ".s")
+  }
+
+  /// Given the desired name of the compiler's product, returns the file to write when "binary" is
+  /// selected as the output type.
+  private func binaryFile(_ productName: Module.Name) -> URL {
+    outputURL ?? URL(fileURLWithPath: productName.description)
   }
 
   /// Tree printing flags.

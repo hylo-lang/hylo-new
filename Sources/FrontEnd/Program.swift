@@ -90,8 +90,10 @@ public struct Program: Sendable {
     var emitter = IREmitter(insertingIn: m, of: consume self)
     emitter.incorporateTopLevelDeclarations()
     self = emitter.release()
+  }
 
-    // Apply transformation passes.
+  /// Applies mandatory transformation passes on the IR of `m`.
+  public mutating func applyTransformationPasses(_ m: Module.ID) {
     withTyper(typing: m) { (typer) in
       // Temporarily move all functions to a local work list.
       var work: [IRFunction] = []
