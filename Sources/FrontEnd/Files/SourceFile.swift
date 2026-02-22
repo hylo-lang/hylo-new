@@ -57,6 +57,11 @@ public struct SourceFile: Hashable, Sendable {
     self.init(name: .virtual(hasher.state), contents: contents)
   }
 
+  /// Creates an in-memory source file that represents a possibly non-existent file at `path`.
+  public init(representing path: URL, inMemoryContents: String) {
+    self.init(name: .localInMemory(path), contents: inMemoryContents)
+  }
+
   /// The name of the file that the source came from.
   public var name: FileName {
     properties.name
@@ -66,6 +71,8 @@ public struct SourceFile: Hashable, Sendable {
   public var baseName: String {
     switch name {
     case .local(let u):
+      return u.deletingPathExtension().lastPathComponent
+    case .localInMemory(let u):
       return u.deletingPathExtension().lastPathComponent
     case .virtual(let i):
       return String(UInt(bitPattern: i), radix: 36)
@@ -141,6 +148,13 @@ public struct SourceFile: Hashable, Sendable {
     let lineNumber = line(containing: i).number
     let columnNumber = text.distance(from: properties.lineStarts[lineNumber - 1], to: i) + 1
     return (lineNumber, columnNumber)
+  }
+
+  /// Returns the index in `text` corresponding to the 1-based `line` and `column`.
+  ///
+  /// - Requires: `line` and `column` describe a valid position in `self`.
+  public func index(line: Int, column: Int) -> Index {
+    text.index(properties.lineStarts[line - 1], offsetBy: column - 1)
   }
 
   /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`.
