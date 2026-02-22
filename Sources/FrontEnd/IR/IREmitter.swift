@@ -150,6 +150,9 @@ internal struct IREmitter {
         declareBindings(in: e, relativeTo: x)
       }
 
+    case WildcardLiteral.self:
+      break
+
     default:
       program.unexpected(p)
     }
