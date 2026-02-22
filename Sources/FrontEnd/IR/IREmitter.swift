@@ -143,6 +143,13 @@ internal struct IREmitter {
       let d = program.castUnchecked(p, to: VariableDeclaration.self)
       insertionContext.frames.top[.init(d)] = s
 
+    case TuplePattern.self:
+      let t = program.castUnchecked(p, to: TuplePattern.self)
+      for (i, e) in program[t].elements.enumerated() {
+        let x = lowering(e, { $0._subfield(s, at: [i]) })
+        declareBindings(in: e, relativeTo: x)
+      }
+
     default:
       program.unexpected(p)
     }
