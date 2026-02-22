@@ -857,10 +857,11 @@ internal struct IREmitter {
       let ps = termParameters(of: .init(d))
       return program[module].addFunction(
         IRFunction(
-          name: name, output: .register, typeParameters: ts, termParameters: ps))
+          name: name, output: .indirect, typeParameters: ts, termParameters: ps))
     }
   }
 
+  /// Returns the identity of the function lowering `d`, declaring it if needed.
   private mutating func demandLoweredDeclaration(
     syntheticImplementationOf d: DeclarationIdentity, for a: TypeArguments
   ) -> IRFunction.ID {
@@ -871,7 +872,7 @@ internal struct IREmitter {
 
     let ps = termParameters(of: d)
     return program[module].addFunction(
-      IRFunction(name: name, output: .register, typeParameters: [], termParameters: ps))
+      IRFunction(name: name, output: .indirect, typeParameters: [], termParameters: ps))
   }
 
   /// Returns the term parameters of `d`'s lowered representation, which includes `d`' explicit
