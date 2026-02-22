@@ -13,6 +13,9 @@ struct Manifest {
     /// After the abstract syntax tree has been typed.
     case typing
 
+    /// After IR lowering.
+    case lowering
+
     /// After the program has been compiled to binary.
     case codegen
 
