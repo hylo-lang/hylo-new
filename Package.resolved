@@ -1,13 +1,12 @@
 {
-  "originHash" : "75b17b8526ad3ad9f138a9b48b7f2fd113a480c00660f1a38cf981f28cfd0b5f",
+  "originHash" : "f51577c0b0ff18a2e20fd5e451f87e1bfb91f8ea992174a96866f5f1ffac8f3a",
   "pins" : [
     {
       "identity" : "archivist",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/kyouko-taiga/archivist.git",
+      "location" : "https://github.com/kyouko-taiga/Archivist.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "086c16e150ae2ea11bbdbe4546c3a6de6bd22a31"
+        "revision" : "0b66ecdb3a0da5a94af49274e2751e3332f12b90"
       }
     },
     {
@@ -60,8 +59,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-syntax",
       "state" : {
-        "revision" : "f99ae8aa18f0cf0d53481901f88a0991dc3bd4a2",
-        "version" : "601.0.1"
+        "revision" : "4799286537280063c85a32f09884cfbca301b1a1",
+        "version" : "602.0.0"
       }
     }
   ],
