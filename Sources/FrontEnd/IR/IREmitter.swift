@@ -744,6 +744,8 @@ internal struct IREmitter {
   /// `e` computes a rvalue, this value is moved into a new stack allocation.
   private mutating func lowered(lvalue e: ExpressionIdentity) -> IRValue {
     switch program.tag(of: e) {
+    case Conversion.self:
+      return lowered(lvalue: program.castUnchecked(e, to: Conversion.self))
     case InoutExpression.self:
       return lowered(lvalue: program.castUnchecked(e, to: InoutExpression.self))
     case NameExpression.self:
@@ -756,6 +758,18 @@ internal struct IREmitter {
       lower(store: e, to: s)
       return s
     }
+  }
+
+  /// Implements `lower(lvalue:)` for explicit conversions.
+  private mutating func lowered(lvalue e: Conversion.ID) -> IRValue {
+    // Is there any conversion required?
+    let t = program.types.dealiased(program.type(assignedTo: e))
+    let u = program.types.dealiased(program.type(assignedTo: program[e].source))
+    if t == u {
+      return lowered(lvalue: program[e].source)
+    }
+
+    unimplemented("conversions involving change of representation")
   }
 
   /// Implements `lower(lvalue:)` for inout expressions.
