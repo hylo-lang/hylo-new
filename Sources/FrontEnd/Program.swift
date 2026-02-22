@@ -855,6 +855,8 @@ public struct Program: Sendable {
     switch tag(of: d) {
     case AssociatedTypeDeclaration.self:
       return name(of: castUnchecked(d, to: AssociatedTypeDeclaration.self))
+    case ConformanceDeclaration.self:
+      return name(of: castUnchecked(d, to: ConformanceDeclaration.self))
     case EnumCaseDeclaration.self:
       return name(of: castUnchecked(d, to: EnumCaseDeclaration.self))
     case EnumDeclaration.self:
@@ -885,6 +887,11 @@ public struct Program: Sendable {
   /// Returns the name of `d`.
   public func name<T: TypeDeclaration>(of d: T.ID) -> Name {
     Name(identifier: self[d].identifier.value)
+  }
+
+  /// Returns the name of `d`, if any.
+  public func name(of d: ConformanceDeclaration.ID) -> Name? {
+    self[d].identifier.map({ (n) in Name(identifier: n.value) })
   }
 
   /// Returns the name of `d`.
