@@ -25,8 +25,8 @@ let package = Package(
       url: "https://github.com/attaswift/BigInt.git",
       from: "5.7.0"),
     .package(
-      url: "https://github.com/kyouko-taiga/archivist.git",
-      branch: "main"),
+      url: "https://github.com/kyouko-taiga/Archivist.git",
+      revision: "0b66ecdb3a0da5a94af49274e2751e3332f12b90"),
     .package(
       url: "https://github.com/apple/swift-algorithms.git",
       from: "1.2.0"),
