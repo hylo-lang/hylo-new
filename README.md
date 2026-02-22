@@ -24,3 +24,10 @@ If `m` denotes a trait requirement, then name resolution should bind it to the e
 ## Questions
 
 - Is it desirable to write extensions of context functions?
+
+## Development
+### Code formatting
+The project uses `swift-format` bundled by the Swift toolchain to enforce a consistent code style.
+
+- Use `./format.sh` to format the code.
+- Use `./lint.sh` to check the code.
