@@ -23,7 +23,7 @@ public struct IRProject: IRRegionEntry {
     access: AccessEffect,
     anchor: Anchor
   ) {
-    var operands = Array<IRValue>(minimumCapacity: arguments.count + 1)
+    var operands = [IRValue](minimumCapacity: arguments.count + 1)
     operands.append(callee)
     operands.append(contentsOf: arguments)
 

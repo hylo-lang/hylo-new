@@ -177,7 +177,9 @@ public struct Parser {
     }
 
     // None of the above.
-    else { throw expected("annotation argument") }
+    else {
+      throw expected("annotation argument")
+    }
   }
 
   /// Parses a sequence of declaration modifiers.
@@ -334,8 +336,7 @@ public struct Parser {
 
     // Are we parsing a trait extension?
     if let colon = take(.colon) {
-      if
-        let n = file[extendee] as? NameExpression,
+      if let n = file[extendee] as? NameExpression,
         n.isUnqualifiedIdentifier && contextParameters.isEmpty
       {
         let r = try parseExpression(in: &file)
@@ -423,7 +424,8 @@ public struct Parser {
       _ = try take(contextual: "is") ?? expected("'is'")
       let concept = try parseExpression(in: &file)
       let witness = file.desugaredConformance(of: lhs, to: concept)
-      let members = self.next(is: .leftBrace)
+      let members =
+        self.next(is: .leftBrace)
         ? try parseTypeBody(in: &file, accepting: \.isValidStructMember)
         : nil
 
@@ -563,7 +565,9 @@ public struct Parser {
           site: introducer.site))
     }
 
-    else { unreachable("invalid introducer") }
+    else {
+      unreachable("invalid introducer")
+    }
   }
 
   /// Parses the introducer of an initializer declaration.
@@ -1001,7 +1005,7 @@ public struct Parser {
     let parameters = try parseOptionalContextClause(in: &file)
 
     // Base traits are desugared as given requirements before other members.
-    var members = try parseOptionalRefinementList(of: identifier.value,  in: &file)
+    var members = try parseOptionalRefinementList(of: identifier.value, in: &file)
     try members.append(contentsOf: parseTypeBody(in: &file, accepting: \.isValidTraitMember))
 
     if let p = parameters.usings.first {
@@ -1229,7 +1233,7 @@ public struct Parser {
     in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity {
     // Is there a prefix operator? (note: `&` is not a prefix operator)
-    if let h = peek(), h.isOperatorHead, (h.tag != .ampersand) {
+    if let h = peek(), h.isOperatorHead, h.tag != .ampersand {
       let o = try parseOperator()
       if whitespaceBeforeNextToken() { report(separatedUnaryOperator(o)) }
 
@@ -1248,7 +1252,9 @@ public struct Parser {
     }
 
     // No prefix operator; simply parse a compound expression.
-    else { return try parseCompoundExpression(in: &file) }
+    else {
+      return try parseCompoundExpression(in: &file)
+    }
   }
 
   /// Parses an expression made of one or more components.
@@ -1411,7 +1417,7 @@ public struct Parser {
     case .auto, .inout, .let, .set, .sink:
       return try .init(parseRemoteTypeExpression(in: &file))
     case .leftBrace:
-        return try .init(parseTupleTypeExpression(in: &file))
+      return try .init(parseTupleTypeExpression(in: &file))
     case .leftBracket:
       return try .init(parseArrowExpression(in: &file))
     case .leftParenthesis:
@@ -1955,7 +1961,7 @@ public struct Parser {
   private mutating func parseBindingSubpattern(
     in file: inout Module.SourceContainer, role: BindingDeclaration.Role
   ) throws -> PatternIdentity {
-    if ((role == .given) || (role == .using)), let u = take(.underscore) {
+    if (role == .given) || (role == .using), let u = take(.underscore) {
       // Implicits always introduce a binding.
       return .init(file.synthesizeVariableDeclaration(at: u.site))
     } else {
@@ -2011,8 +2017,8 @@ public struct Parser {
         head = n
       } else if next(is: .leftParenthesis) && !whitespaceBeforeNextToken() {
         // Parse the last component as an unqualified deconstructing pattern.
-        let (e, _) = try inParentheses { (me) in try
-          me.parseLabeledPatternList(until: .rightParenthesis, in: &file)
+        let (e, _) = try inParentheses { (me) in
+          try me.parseLabeledPatternList(until: .rightParenthesis, in: &file)
         }
         let s = span(from: start)
         let n = file.insert(ExtractorPattern(extractor: head, elements: e, site: s))
@@ -2176,8 +2182,7 @@ public struct Parser {
   ///       identifier
   ///       operator-identifier
   ///
-  private mutating func parseFunctionIdentifier(
-  ) throws -> Parsed<FunctionIdentifier> {
+  private mutating func parseFunctionIdentifier() throws -> Parsed<FunctionIdentifier> {
     if let t = peek() {
       if t.isOperatorNotation {
         let i = try parseOperatorIdentifier()
@@ -2208,8 +2213,9 @@ public struct Parser {
   ///     operator-identifier ::= (token)
   ///       operator-notation operator
   ///
-  private mutating func parseOperatorIdentifier(
-  ) throws -> Parsed<(notation: OperatorNotation, identifier: String)> {
+  private mutating func parseOperatorIdentifier() throws -> Parsed<
+    (notation: OperatorNotation, identifier: String)
+  > {
     let n = try parseOperatorNotation()
     let i = try parseOperator()
 
@@ -2401,11 +2407,12 @@ public struct Parser {
       case .leftBrace:
         nesting += 1
       case .rightBrace where nesting <= 0:
-        _ = take(); return
+        _ = take()
+        return
       case .rightBrace:
         nesting -= 1
       default:
-         break
+        break
       }
       _ = take()
     }
@@ -2571,10 +2578,10 @@ public struct Parser {
   /// Returns a parse error reporting an unexpected wildcard at `site`.
   private func unexpectedWildcard(at site: SourceSpan) -> ParseError {
     let m = """
-    '_' can only appear as a pattern, as a compile-time argument, or on the left-hand side of an \
-    assignment
-    """
-    return .init(m, at:  site)
+      '_' can only appear as a pattern, as a compile-time argument, or on the left-hand side of an \
+      assignment
+      """
+    return .init(m, at: site)
   }
 
   /// Returns a parse error reporting inconsistent whitespaces surrounding an infix operator.
@@ -2717,7 +2724,7 @@ extension SyntaxTag {
 }
 
 /// A type whose instances can be created from a single token.
-fileprivate protocol ExpressibleByTokenTag {
+private protocol ExpressibleByTokenTag {
 
   /// Creates an instance from `tag`.
   init?(tag: Token.Tag)
@@ -2767,7 +2774,7 @@ extension OperatorNotation: ExpressibleByTokenTag {
 }
 
 /// A sequence of annotations and modifiers prefixing a declaration.
-fileprivate struct DeclarationPrologue {
+private struct DeclarationPrologue {
 
   /// The prefixing annotations.
   fileprivate let annotations: [Annotation]
@@ -2860,11 +2867,12 @@ extension Module.SourceContainer {
   ) -> BindingDeclaration.ID {
     let s = SourceSpan.empty(at: site.start)
 
-    let p: PatternIdentity = if let i = identifier {
-      .init(insert(VariableDeclaration(identifier: .init(i))))
-    } else {
-      .init(synthesizeVariableDeclaration(at: s))
-    }
+    let p: PatternIdentity =
+      if let i = identifier {
+        .init(insert(VariableDeclaration(identifier: .init(i))))
+      } else {
+        .init(synthesizeVariableDeclaration(at: s))
+      }
 
     let b = insert(
       BindingPattern(introducer: .init(.let, at: s), pattern: p, ascription: a, site: s))

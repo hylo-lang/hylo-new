@@ -365,7 +365,7 @@ public struct Program: Sendable {
       case _ where isTypeDeclaration(n) || isTypeExtendingDeclaration(n):
         return false
       default:
-         s = parent(containing: p)
+        s = parent(containing: p)
       }
     }
 
@@ -552,19 +552,19 @@ public struct Program: Sendable {
     }
   }
 
-//  /// Returns `(n, p)` where `p` denotes the struct of which `n` is a member iff `n` declares a
-//  /// stored property.
-//  ///
-//  /// - Requires: The module containing `s` is scoped.
-//  public func asStoredPropertyDeclaration(
-//    _ n: DeclarationIdentity
-//  ) -> (declaration: VariableDeclaration.ID, parent: StructDeclaration.ID)? {
-//    guard
-//      let v = cast(n, to: VariableDeclaration.self),
-//      let p = parent(containing: v, as: StructDeclaration.self)
-//    else { return nil }
-//    return (v, p)
-//  }
+  //  /// Returns `(n, p)` where `p` denotes the struct of which `n` is a member iff `n` declares a
+  //  /// stored property.
+  //  ///
+  //  /// - Requires: The module containing `s` is scoped.
+  //  public func asStoredPropertyDeclaration(
+  //    _ n: DeclarationIdentity
+  //  ) -> (declaration: VariableDeclaration.ID, parent: StructDeclaration.ID)? {
+  //    guard
+  //      let v = cast(n, to: VariableDeclaration.self),
+  //      let p = parent(containing: v, as: StructDeclaration.self)
+  //    else { return nil }
+  //    return (v, p)
+  //  }
 
   /// Returns the innermost scope that strictly contains `n`.
   ///
@@ -749,7 +749,9 @@ public struct Program: Sendable {
     }
 
     // Otherwise, they have the same distance.
-    else { return .equal }
+    else {
+      return .equal
+    }
   }
 
   /// Returns the result of the three-way comparison of the number of ancestors of `m` and `n`.
@@ -1509,7 +1511,7 @@ public indirect enum SyntaxFilter {
 }
 
 /// A syntax visitor that enumerates the immediate children of a node.
-fileprivate struct ChildrenEnumerator: SyntaxVisitor {
+private struct ChildrenEnumerator: SyntaxVisitor {
 
   /// The node whose children are being enumerated.
   fileprivate var parent: AnySyntaxIdentity

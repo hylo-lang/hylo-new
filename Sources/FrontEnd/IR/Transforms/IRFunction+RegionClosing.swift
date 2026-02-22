@@ -27,7 +27,7 @@ extension IRFunction {
   /// Closes the region opened by `i`, which is an instance of `T`, iff `i` it is open-ended,
   /// using `g` to compute live ranges.
   private mutating func close<T: IRRegionEntry>(
-    _ : T.Type, _ i: AnyInstructionIdentity, computingLivenessWith g: ControlFlowGraph
+    _: T.Type, _ i: AnyInstructionIdentity, computingLivenessWith g: ControlFlowGraph
   ) {
     let r = extendedLiveRange(of: .register(i), controlFlow: g)
     for boundary in r.upperBoundaries {

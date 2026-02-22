@@ -104,7 +104,7 @@ public struct IRFunction: Sendable {
     !blocks.isEmpty
   }
 
-   /// `true` iff the function returns a unit value (i.e., an isntance of `Hylo.Void`).
+  /// `true` iff the function returns a unit value (i.e., an isntance of `Hylo.Void`).
   public var isProcedure: Bool {
     returnRegister.flatMap(result(of:))?.type == .void
   }
@@ -475,7 +475,6 @@ public struct IRFunction: Sendable {
     }
   }
 
-
   /// Inserts `instruction` immediately after `j` and returns its identity.
   @discardableResult
   public mutating func insert<T: Instruction>(
@@ -543,7 +542,7 @@ public struct IRFunction: Sendable {
   /// iff `old` was a successor of `source`.
   internal mutating func replaceSuccessor(
     _ old: IRBlock.ID, of source: IRBlock.ID, for new: IRBlock.ID
-  ) -> Bool  {
+  ) -> Bool {
     let l = blocks[source].last!
     if var s = at(l) as? any Terminator, s.replaceSuccessor(old, with: new) {
       slots[l.address].assign(s)
@@ -623,7 +622,7 @@ extension IRFunction: Showable {
 
     result.append("(")
     for (i, p) in termParameters.enumerated() {
-      if (i != 0) { result.append(", ") }
+      if i != 0 { result.append(", ") }
       result.append("\(p.access) \(printer.show(IRValue.parameter(i))): \(printer.show(p.type))")
     }
     result.append(")")

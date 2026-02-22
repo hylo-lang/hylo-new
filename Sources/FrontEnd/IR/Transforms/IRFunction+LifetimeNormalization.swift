@@ -600,7 +600,7 @@ private struct Transfer: AbstractTransferFunction {
     context.withObject(at: a, computingLayoutWith: &typer) { (o, _) in
       switch o.value {
       case .uniform(.initialized):
-        o.value = .uniform(.consumed( [consumer]))
+        o.value = .uniform(.consumed([consumer]))
       default:
         d = .some(.illegalMove(at: f.at(consumer).anchor.site))
       }

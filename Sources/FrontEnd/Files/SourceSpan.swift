@@ -81,11 +81,12 @@ extension SourceSpan: CustomStringConvertible {
   /// [GNU coding standards](https://www.gnu.org/prep/standards/html_node/Errors.html) whose path
   /// is shown as `pathStyle`.
   public func gnuStandardText(showingPath pathStyle: FileName.PathStyle = .absolute) -> String {
-    let n: String = if case .relative(let u) = pathStyle {
-      source.name.gnuPath(relativeTo: u) ?? source.name.description
-    } else {
-      source.name.description
-    }
+    let n: String =
+      if case .relative(let u) = pathStyle {
+        source.name.gnuPath(relativeTo: u) ?? source.name.description
+      } else {
+        source.name.description
+      }
 
     let s = start.lineAndColumn
     let h = "\(n):\(s.line).\(s.column)"

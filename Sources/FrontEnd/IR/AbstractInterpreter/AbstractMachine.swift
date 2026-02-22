@@ -62,7 +62,8 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
 
   /// The knowledge of the abstract interpreter about a single block.
   private typealias BlockState = (
-    sources: SortedSet<IRBlock.ID>, pre: Transfer.Context, post: Transfer.Context)
+    sources: SortedSet<IRBlock.ID>, pre: Transfer.Context, post: Transfer.Context
+  )
 
   /// A map from basic block to the machine's state before and after the block's execution.
   private typealias State = [IRBlock.ID: BlockState]
