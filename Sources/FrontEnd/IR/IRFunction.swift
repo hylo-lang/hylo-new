@@ -25,11 +25,11 @@ public struct IRFunction: Sendable {
     case indirect
 
     /// The result is projected.
-    case projection(RemoteType.ID)
+    case remote(RemoteType.ID)
 
     /// The payload of `self` iff it denotes a projection.
-    public var projection: RemoteType.ID? {
-      if case .projection(let t) = self {
+    public var remote: RemoteType.ID? {
+      if case .remote(let t) = self {
         return t
       } else {
         return nil
@@ -176,7 +176,7 @@ public struct IRFunction: Sendable {
     switch output {
     case .indirect:
       a = Arrow(style: .parenthesized, inputs: Array(ps.dropLast()), output: ps.last!.type)
-    case .projection(let o):
+    case .remote(let o):
       a = Arrow(style: .bracketed, inputs: ps, output: o.erased)
     }
 
@@ -630,7 +630,7 @@ extension IRFunction: Showable {
     }
     result.append(")")
 
-    if case .projection(let t) = self.output {
+    if case .remote(let t) = self.output {
       result.append(" -> \(printer.show(t))")
     }
 

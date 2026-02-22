@@ -849,7 +849,7 @@ internal struct IREmitter {
 
       return program[module].addFunction(
         IRFunction(
-          name: name, output: .projection(output), typeParameters: ts, termParameters: []))
+          name: name, output: .remote(output), typeParameters: ts, termParameters: ps))
     }
 
     // Otherwise, assume `d` identifies the declaration of a function, subscript, or bundle.
