@@ -9,9 +9,9 @@ public struct ConformanceDeclaration: TypeExtendingDeclaration {
 
   /// The introducer of this declaration.
   ///
-  /// This token is a `given` keyword if the conformance is declared on its own, or a colon if it
-  /// is "adjunct" to a struct. In the latter case, the conformance declaration has no parameters
-  /// and no members; those belong to the struct declaration.
+  /// This token is either a `given` keyword if the conformance is declared on its own, or a `is`
+  /// keyword if it is "adjunct" to a struct. In the latter case, the conformance declaration has
+  /// no parameters and no members; those belong to the struct declaration.
   public let introducer: Token
 
   /// The name of the declared conformance, if any.
