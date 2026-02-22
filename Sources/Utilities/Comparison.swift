@@ -20,6 +20,6 @@ public struct ComparisonRHS<T: Sequence> where T.Element: Equatable {
 }
 
 /// Returns the right-hand-side of an expression comparing an instance of `T` to `values`.
-public func anyOf<T>(_ values: T...) -> ComparisonRHS<Array<T>> where T: Equatable {
+public func anyOf<T>(_ values: T...) -> ComparisonRHS<[T]> where T: Equatable {
   .init(values: values)
 }

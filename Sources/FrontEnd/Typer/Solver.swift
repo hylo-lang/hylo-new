@@ -190,7 +190,9 @@ internal struct Solver {
     }
 
     // Coercion failed.
-    else { return .failure(diagnoseInvalidCoercion(k)) }
+    else {
+      return .failure(diagnoseInvalidCoercion(k))
+    }
   }
 
   /// Returns the simplification of `k` as an equality between its operands.
@@ -395,7 +397,9 @@ internal struct Solver {
       }
 
       // Arguments do not match.
-      else { return nil }
+      else {
+        return nil
+      }
     }
 
     assert(bindings.elements.count == program.types[f].inputs.count)
@@ -455,17 +459,19 @@ internal struct Solver {
     _ k: StaticCallConstraint, expected: Int
   ) -> GoalOutcome {
     .failure { (ss, _, tp, ds) in
-      let f = if let n = tp.program.cast(tp.program[k.origin].callee, to: NameExpression.self) {
-        "'\(tp.program[n].name)'"
-      } else {
-        tp.program.format("value of type '%T'", [tp.program.types.reify(k.callee, applying: ss)])
-      }
+      let f =
+        if let n = tp.program.cast(tp.program[k.origin].callee, to: NameExpression.self) {
+          "'\(tp.program[n].name)'"
+        } else {
+          tp.program.format("value of type '%T'", [tp.program.types.reify(k.callee, applying: ss)])
+        }
 
-      let m = if expected == 0 {
-        "\(f) takes no compile-time arguments"
-      } else {
-        "\(f) takes \(expected) compile-time argument(s); found \(k.arguments.count)"
-      }
+      let m =
+        if expected == 0 {
+          "\(f) takes no compile-time arguments"
+        } else {
+          "\(f) takes \(expected) compile-time argument(s); found \(k.arguments.count)"
+        }
 
       ds.insert(
         .init(.error, m, at: tp.program.spanForDiagnostic(about: tp.program[k.origin].callee)))
@@ -689,14 +695,15 @@ internal struct Solver {
 
   /// Logs `o` to the standard output iff loggig is enabled.
   private func log(outcome o: GoalOutcome) {
-    log({
-      switch o {
-      case .pending: "- defer"
-      case .success: "- ok"
-      case .failure: "- fail"
-      case .forward: "- forward"
-      }
-    }())
+    log(
+      {
+        switch o {
+        case .pending: "- defer"
+        case .success: "- ok"
+        case .failure: "- fail"
+        case .forward: "- forward"
+        }
+      }())
   }
 
 }

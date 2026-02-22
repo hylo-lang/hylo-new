@@ -1,4 +1,4 @@
-/// Allocates and initializes a witness table. 
+/// Allocates and initializes a witness table.
 ///
 /// The witness table is allocated on the stack.
 public struct IRWitnessTable: Instruction {

@@ -542,11 +542,12 @@ public struct TypeStore: Sendable {
       }
     }
 
-    let output = if k.isMutating {
-      self[n].output
-    } else {
-      tuple(of: updates + [self[n].output]).erased
-    }
+    let output =
+      if k.isMutating {
+        self[n].output
+      } else {
+        tuple(of: updates + [self[n].output]).erased
+      }
 
     return demand(Arrow(effect: k, environment: environment, inputs: inputs, output: output))
   }
@@ -926,8 +927,8 @@ public struct TypeStore: Sendable {
     unifiable(
       lhs.inputs, rhs.inputs, extending: &ss,
       by: { (a, b, s) in unifiable(a, b, extending: &s, handlingCoercionsWith: areCoercible) })
-    && unifiable(
-      lhs.output, rhs.output, extending: &ss, handlingCoercionsWith: areCoercible)
+      && unifiable(
+        lhs.output, rhs.output, extending: &ss, handlingCoercionsWith: areCoercible)
   }
 
   /// Returns `true` if `lhs` and `rhs` are unifiable.

@@ -211,17 +211,19 @@ internal struct IREmitter {
       lowering(r, { $0._return() })
 
     case .next:
-      lowering(after: body.last!, { (me) in
-        // If the function returns `Void`, assume the return register is initialized to deal with
-        // elided return statements.
-        if me.currentFunction.isProcedure {
-          let r = me.currentFunction.returnRegister!
-          me._assume_state(r, initialized: true)
-        }
+      lowering(
+        after: body.last!,
+        { (me) in
+          // If the function returns `Void`, assume the return register is initialized to deal with
+          // elided return statements.
+          if me.currentFunction.isProcedure {
+            let r = me.currentFunction.returnRegister!
+            me._assumeState(r, initialized: true)
+          }
 
-        // Add a return statement to terminate the block.
-        me._return()
-      })
+          // Add a return statement to terminate the block.
+          me._return()
+        })
     }
 
     program[module][ir: f] = insertionContext.function.sink()
@@ -386,7 +388,7 @@ internal struct IREmitter {
     if let e = program[s].value {
       lower(store: e, to: r)
     } else if currentFunction.result(of: r)?.type == .void {
-      lowering(s, { $0._assume_state(r, initialized: true) })
+      lowering(s, { $0._assumeState(r, initialized: true) })
     }
 
     // The return instruction is emitted by the caller handling this control-flow effect.
@@ -559,7 +561,7 @@ internal struct IREmitter {
   private mutating func lower(store e: TupleLiteral.ID, to target: IRValue) {
     // Just mark the storage initialized if the literal is empty.
     if program[e].elements.isEmpty {
-      lowering(e, { $0._assume_state(target, initialized: true) })
+      lowering(e, { $0._assumeState(target, initialized: true) })
       return
     }
 
@@ -681,7 +683,7 @@ internal struct IREmitter {
 
     case .typeApplication(let f, let a):
       let poly = loweredCallee(f, at: site, in: scope)
-      let mono = lowering(at: site, in: scope) { (me) in me._type_apply(poly.value, to: a) }
+      let mono = lowering(at: site, in: scope) { (me) in me._typeApply(poly.value, to: a) }
       return LoweredCallee(value: mono, operands: poly.operands)
 
     default:
@@ -860,7 +862,7 @@ internal struct IREmitter {
     // Other declarations have capture and parameter lists.
     else {
       let parameters = program.parametersAndCaptures(of: d)
-      assert(parameters.captures.isEmpty) // TODO
+      assert(parameters.captures.isEmpty)  // TODO
 
       // Using parameters come first.
       for p in parameters.usings {
@@ -1044,7 +1046,6 @@ internal struct IREmitter {
     return r
   }
 
-
   /// Returns the result of calling `action` on `self` with the insertion context configured to
   /// emit new instructions at `p` in `f`, anchoring them to `a`.
   private mutating func lowering<R>(
@@ -1178,16 +1179,17 @@ internal struct IREmitter {
   @discardableResult
   private mutating func insert<T: Instruction>(_ instruction: T) -> IRValue? {
     modify(&insertionContext.function!) { [p = insertionContext.point!] (f) in
-      let i: AnyInstructionIdentity = switch p {
-      case .before(let i):
-        f.insert(instruction, before: i)
-      case .after(let i):
-        f.insert(instruction, after: i)
-      case .start(let b):
-        f.prepend(instruction, to: b)
-      case .end(let b):
-        f.append(instruction, to: b)
-      }
+      let i: AnyInstructionIdentity =
+        switch p {
+        case .before(let i):
+          f.insert(instruction, before: i)
+        case .after(let i):
+          f.insert(instruction, after: i)
+        case .start(let b):
+          f.prepend(instruction, to: b)
+        case .end(let b):
+          f.append(instruction, to: b)
+        }
       return f.definition(i)
     }
   }
@@ -1241,7 +1243,7 @@ internal struct IREmitter {
   }
 
   /// Inserts a `apply_builtin` instruction.
-  internal mutating func _apply_builtin(
+  internal mutating func _applyBuiltin(
     _ callee: BuiltinFunction, to arguments: [IRValue]
   ) -> IRValue {
     let f = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
@@ -1254,7 +1256,7 @@ internal struct IREmitter {
   }
 
   /// Inserts a `assume_state` instruction.
-  internal mutating func _assume_state(_ s: IRValue, initialized: Bool) {
+  internal mutating func _assumeState(_ s: IRValue, initialized: Bool) {
     insert(IRAssumeState(storage: s, initialized: initialized, anchor: currentAnchor))
   }
 
@@ -1286,7 +1288,7 @@ internal struct IREmitter {
   }
 
   /// Inserts a `memcpy` instruction.
-  internal mutating func _memory_copy(_ source: IRValue, to target: IRValue) {
+  internal mutating func _memoryCopy(_ source: IRValue, to target: IRValue) {
     assert(currentFunction.isAddress(source))
     assert(currentFunction.isAddress(target))
     insert(IRMemoryCopy(source: source, target: target, anchor: currentAnchor))
@@ -1351,7 +1353,7 @@ internal struct IREmitter {
   }
 
   /// Inserts a `type_apply` instruction.
-  internal mutating func _type_apply(
+  internal mutating func _typeApply(
     _ callee: IRValue, to arguments: TypeArguments
   ) -> IRValue {
     // The callee must have a universal type.
@@ -1437,7 +1439,7 @@ internal struct IREmitter {
 
     case .typeApplication(let f, let a):
       let x = _emit(witness: f)
-      return _type_apply(x, to: a)
+      return _typeApply(x, to: a)
 
     default:
       fatalError()
@@ -1451,19 +1453,19 @@ internal struct IREmitter {
 
     // Nothing to do for machine types.
     if program.types.tag(of: typeOfSource) == MachineType.self {
-      _assume_state(source, initialized: false)
+      _assumeState(source, initialized: false)
       return true
     }
 
     // Other types need a conformance to `Hylo.Deinitializable`.
     guard let w = conformanceWitness(of: typeOfSource, is: .deinitializable) else {
-      _ = _apply_builtin(.trap, to: [])
+      _ = _applyBuiltin(.trap, to: [])
       return false
     }
 
     // Does the conformance have any operational semantics.
     if program.isTransitivelySyntheticConformance(w) {
-      _assume_state(source, initialized: false)
+      _assumeState(source, initialized: false)
       return true
     }
 
@@ -1542,7 +1544,7 @@ internal struct IREmitter {
 
     // Other types require a conformance to `Hylo.Movable`.
     guard let w = conformanceWitness(of: typeOfSource, is: .movable) else {
-      _ = _apply_builtin(.trap, to: [])
+      _ = _applyBuiltin(.trap, to: [])
       return
     }
 
@@ -1550,7 +1552,7 @@ internal struct IREmitter {
     if program.isTransitivelySyntheticConformance(w) {
       let x0 = _access([.sink], from: source)
       let x1 = _access([.set], from: target)
-      _memory_copy(x0, to: x1)
+      _memoryCopy(x0, to: x1)
       _end(IRAccess.self, openedBy: x1)
       _end(IRAccess.self, openedBy: x0)
       return
@@ -1669,6 +1671,6 @@ extension Program {
 }
 
 /// Indicates an invalid IR operand.
-fileprivate func badOperand(file: StaticString = #file, line: UInt = #line) -> Never {
+private func badOperand(file: StaticString = #file, line: UInt = #line) -> Never {
   preconditionFailure("bad operand", file: file, line: line)
 }

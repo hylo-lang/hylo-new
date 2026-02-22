@@ -186,7 +186,8 @@ extension AbstractContext: Showable {
   /// Returns a textual representation of `self` using `printer`.
   internal func show(using printer: inout TreePrinter) -> String {
     let ls = printer.show(locals)
-    let ms = memory
+    let ms =
+      memory
       .sorted(by: \.key, using: Self.areInIncreasingOrder(_:_:))
       .reduce(into: "", { (s, p) in s += "\(printer.show(p.key)) ↦ \(printer.show(p.value))\n" })
 

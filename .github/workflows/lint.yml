@@ -1,0 +1,24 @@
+name: Lint
+on: 
+  push:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".editorconfig"
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Swift 6.2
+        uses: SwiftyLab/setup-swift@v1.12.0
+        with:
+          swift-version: "6.2"
+      
+      - name: Lint
+        run: ./lint.sh
+

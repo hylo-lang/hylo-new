@@ -2,10 +2,10 @@
 public struct FNV {
 
   #if arch(x86_64) || arch(arm64)
-    public static let basis = Int(bitPattern: 0xcbf29ce484222325)
-    public static let prime = Int(bitPattern: 0x100000001b3)
+    public static let basis = Int(bitPattern: 0xcbf2_9ce4_8422_2325)
+    public static let prime = Int(bitPattern: 0x100_0000_01b3)
   #elseif arch(i386) || arch(arm)
-    public static let basis = Int(bitPattern: 0x811c9dc5)
+    public static let basis = Int(bitPattern: 0x811c_9dc5)
     public static let prime = Int(bitPattern: 0x1000193)
   #endif
 

@@ -1,13 +1,13 @@
 /// Writes a value to memory.
 ///
 /// The target refers to storage capable of holding the value being stored.
-/// 
+///
 /// If the source is not a machine type, the operation requires exclusive access to the target,
 /// which must be uninitialized before the operation. If the value to write is held in a register,
 /// it is consumed and the register can no longer be used after the operation.
-/// 
+///
 /// For machine types, we always copy the values, so no consume semantics.
-/// 
+///
 /// Regardless of the type being stored, the target is in an initialized state after the operation.
 public struct IRStore: Instruction {
 

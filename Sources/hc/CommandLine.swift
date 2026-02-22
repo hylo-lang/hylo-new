@@ -361,6 +361,7 @@ extension ContinuousClock.Instant.Duration {
   fileprivate var ns: Int64 { components.attoseconds / 1_000_000_000 }
 
   /// The value of `self` in microseconds.
+  // swift-format-ignore: IdentifiersMustBeASCII
   fileprivate var μs: Int64 { ns / 1_000 }
 
   /// The value of `self` in milliseconds.

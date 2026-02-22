@@ -392,7 +392,7 @@ public struct Module: Sendable {
 extension Module: Archivable {
 
   /// A constant written at the beginning of an archive ("hylo" in hex).
-  private static let serializationMagicNumber: UInt32 = 0x68796c6f
+  private static let serializationMagicNumber: UInt32 = 0x6879_6c6f
 
   /// The version of a serialization scheme.
   private struct SerializationVersion: Archivable {

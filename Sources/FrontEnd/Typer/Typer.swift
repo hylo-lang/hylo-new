@@ -335,7 +335,7 @@ public struct Typer {
 
   /// Type checks `d`, which occurs as a condition item iff `conditional` is true.
   ///
-  /// If `conditional` is `true`, then `d` occurs in the condition of a 
+  /// If `conditional` is `true`, then `d` occurs in the condition of a
   private mutating func check(_ d: BindingDeclaration.ID) {
     let t = declaredType(of: d)
 
@@ -435,7 +435,7 @@ public struct Typer {
         let b = program.castUnchecked(r, to: FunctionBundleDeclaration.self)
         for v in program[b].variants {
           if let i = namedImplementation(of: .init(v)) {
-            implementations.assign(i, to: r )
+            implementations.assign(i, to: r)
           }
         }
 
@@ -924,11 +924,12 @@ public struct Typer {
   /// Reports a diagnostic iff `d` is not the first declaration of `identifier` in its scope.
   private mutating func checkUniqueDeclaration<T: Declaration>(_ d: T.ID, of identifier: String) {
     let parent = program.parent(containing: d)
-    var ts = if parent.isFile {
-      lookup(.init(identifier: identifier), atTopLevelOf: parent.module)
-    } else {
-      lookup(.init(identifier: identifier), lexicallyIn: parent)
-    }
+    var ts =
+      if parent.isFile {
+        lookup(.init(identifier: identifier), atTopLevelOf: parent.module)
+      } else {
+        lookup(.init(identifier: identifier), lexicallyIn: parent)
+      }
 
     if ts.count <= 1 { return }
 
@@ -1820,7 +1821,7 @@ public struct Typer {
 
     if let d = declaration(referredToBy: program[e].callee, in: context), d.targetIsTypeOperator {
       return inferredType(typeOperatorApplication: e, applying: f, in: &context)
-    } else if (program[e].style == .bracketed), let t = cast(type: f, to: Metatype.self) {
+    } else if program[e].style == .bracketed, let t = cast(type: f, to: Metatype.self) {
       return inferredType(bufferTypeExpression: e, element: t, in: &context)
     }
 
@@ -1908,8 +1909,7 @@ public struct Typer {
     // Set the type of the left-most symbol's qualification if it is implicit using the call's
     // expected type so that `f` in a call of the form `.f(x)` can be resolved as a member of the
     // call's expected type. The callee itself has no expected type; only its qualification.
-    if
-      let q = program.rootQualification(of: callee),
+    if let q = program.rootQualification(of: callee),
       let t = context.expectedType,
       program.tag(of: q) == ImplicitQualification.self
     {
@@ -1934,7 +1934,9 @@ public struct Typer {
     }
 
     // Otherwise, returns the inferred type as-is.
-    else { return f }
+    else {
+      return f
+    }
   }
 
   /// Returns the inferred type of `e`'s callee.
@@ -2203,7 +2205,8 @@ public struct Typer {
         if result != nil {
           return false
         } else if let s = program.cast(n, to: Return.self) {
-          result = s; return false
+          result = s
+          return false
         } else {
           return program.isExpression(n)
         }
@@ -2343,7 +2346,7 @@ public struct Typer {
   private mutating func inferredType(
     of e: StaticCall.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    if let computed =  context.obligations.syntaxToType[e.erased] { return computed }
+    if let computed = context.obligations.syntaxToType[e.erased] { return computed }
 
     // Abstraction is inferred in the same inference context.
     guard let abstraction = inferredType(of: program[e].callee, in: &context).unlessError else {
@@ -2417,43 +2420,43 @@ public struct Typer {
   }
 
   /// Returns the inferred type of `e`.
-   private mutating func inferredType(
-     of e: TupleTypeExpression.ID, in context: inout InferenceContext
-   ) -> AnyTypeIdentity {
-     let s = program[e].elements.map({ (e) in evaluateTypeAscription(e) })
+  private mutating func inferredType(
+    of e: TupleTypeExpression.ID, in context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    let s = program[e].elements.map({ (e) in evaluateTypeAscription(e) })
 
-     // Unit type?
-     if s.isEmpty {
-       assert(program[e].ellipsis == nil)
-       let t = metatype(of: Tuple.empty).erased
-       return context.obligations.assume(e, hasType: t, at: program[e].site)
-     }
+    // Unit type?
+    if s.isEmpty {
+      assert(program[e].ellipsis == nil)
+      let t = metatype(of: Tuple.empty).erased
+      return context.obligations.assume(e, hasType: t, at: program[e].site)
+    }
 
-     // Variable-length tuple (i.e., `{T, ...U}`)?
-     else if program[e].ellipsis != nil {
-       // Ill-formed tuple type expressions should be caught during parsing.
-       assert(s.count >= 2)
+    // Variable-length tuple (i.e., `{T, ...U}`)?
+    else if program[e].ellipsis != nil {
+      // Ill-formed tuple type expressions should be caught during parsing.
+      assert(s.count >= 2)
 
-       let t = s.dropLast().reversed().reduce(s.last!) { (t, h) in
-         demand(Tuple.cons(head: h, tail: t)).erased
-       }
+      let t = s.dropLast().reversed().reduce(s.last!) { (t, h) in
+        demand(Tuple.cons(head: h, tail: t)).erased
+      }
 
-       if program.types.tag(of: s.last!) != GenericParameter.self {
-         let m = program.format("open-ended tuple '%T' is uninhabited", [t])
-         report(.warning, m, about: e)
-       }
+      if program.types.tag(of: s.last!) != GenericParameter.self {
+        let m = program.format("open-ended tuple '%T' is uninhabited", [t])
+        report(.warning, m, about: e)
+      }
 
-       let u = demand(Metatype(inhabitant: t)).erased
-       return context.obligations.assume(e, hasType: u, at: program[e].site)
-     }
+      let u = demand(Metatype(inhabitant: t)).erased
+      return context.obligations.assume(e, hasType: u, at: program[e].site)
+    }
 
-     // Regular tuple type.
-     else {
-       let t = program.types.tuple(of: s)
-       let u = demand(Metatype(inhabitant: t)).erased
-       return context.obligations.assume(e, hasType: u, at: program[e].site)
-     }
-   }
+    // Regular tuple type.
+    else {
+      let t = program.types.tuple(of: s)
+      let u = demand(Metatype(inhabitant: t)).erased
+      return context.obligations.assume(e, hasType: u, at: program[e].site)
+    }
+  }
 
   /// Returns the inferred type of `e`.
   private mutating func inferredType(
@@ -3413,7 +3416,7 @@ public struct Typer {
     }
 
     // Resolution failed if nothing matches structurally.
-    else if let (x, y) = coercions.uniqueElement, (x == a), (y == b) {
+    else if let (x, y) = coercions.uniqueElement, x == a, y == b {
       return .next([])
     }
 
@@ -3628,7 +3631,7 @@ public struct Typer {
     var threads = [formThread(matching: root, to: goal, in: .empty)]
 
     if canDeriveCoercions(root.type, goal, in: scopeOfUse, where: .empty) {
-    // if canDeriveCoercions(in: scopeOfUse, where: .empty) {
+      // if canDeriveCoercions(in: scopeOfUse, where: .empty) {
       // Either the type of the elaborated witness is unifiable with the queried type or we need to
       // assume a coercion. Implicit resolution will figure out the "cheapest" alternative.
       let (environment, coercion) = ResolutionThread.Environment.empty.assuming(
@@ -3791,8 +3794,7 @@ public struct Typer {
   private mutating func enclosingTraitDeclaration(
     referredToBy e: ExpressionIdentity, in context: InferenceContext
   ) -> TraitDeclaration.ID? {
-    if
-      let n = program.cast(e, to: NameExpression.self),
+    if let n = program.cast(e, to: NameExpression.self),
       case .some(.direct(let d)) = context.obligations.bindings[n]
     {
       return program.cast(d, to: TraitDeclaration.self)
@@ -3904,7 +3906,9 @@ public struct Typer {
   /// Resolves `n` as a member of the built-in module.
   private mutating func resolve(builtin n: Name) -> [NameResolutionCandidate] {
     // Built-in names have no argument labels, operator notation, or introducer.
-    if !n.isSimple { return [] }
+    if !n.isSimple {
+      return []
+    }
 
     // Are we selecting a machine type?
     else if let m = MachineType(n.identifier) {
@@ -3923,7 +3927,9 @@ public struct Typer {
     }
 
     // Nothing that we know.
-    else { return [] }
+    else {
+      return []
+    }
   }
 
   /// Returns candidates for resolving `n` as a member of `q` in `scopeOfUse`.
@@ -3938,7 +3944,7 @@ public struct Typer {
     }
 
     var candidates: [NameResolutionCandidate] = []
-    let (type: r, isStatic: s) = qualificationForSelection(on: q)
+    let (type:r, isStatic:s) = qualificationForSelection(on: q)
 
     candidates.append(
       contentsOf: resolve(n, nativeMemberOf: r, statically: s))

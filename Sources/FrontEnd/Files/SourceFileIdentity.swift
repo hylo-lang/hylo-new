@@ -30,7 +30,7 @@ extension SourceFile {
 
     /// The file offset of the node represented by `self` in its containing collection.
     public var offset: Int {
-      .init((rawValue & 0xffff0000) >> 16)
+      .init((rawValue & 0xffff_0000) >> 16)
     }
 
     /// Returns the contents of `self`.

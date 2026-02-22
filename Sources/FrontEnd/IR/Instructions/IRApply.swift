@@ -19,7 +19,7 @@ public struct IRApply: Instruction {
     result: IRValue,
     anchor: Anchor
   ) {
-    var operands = Array<IRValue>(minimumCapacity: arguments.count + 2)
+    var operands = [IRValue](minimumCapacity: arguments.count + 2)
     operands.append(callee)
     operands.append(contentsOf: arguments)
     operands.append(result)
