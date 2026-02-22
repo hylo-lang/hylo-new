@@ -37,6 +37,11 @@ public struct BindingPattern: Pattern {
     self.site = site
   }
 
+  /// Returns `true` iff `self` introduces stored bindings.
+  public var introducesStoredBindings: Bool {
+    (introducer.value == .var) || (introducer.value == .sinklet)
+  }
+
 }
 
 extension BindingPattern: Showable {

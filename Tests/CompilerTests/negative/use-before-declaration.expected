@@ -1,0 +1,3 @@
+negative/use-before-declaration.hylo:4.7-8: error: use of 'x' before its declaration
+  use(x)
+      ^

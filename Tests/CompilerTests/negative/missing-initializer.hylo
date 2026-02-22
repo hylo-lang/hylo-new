@@ -1,0 +1,5 @@
+//! no-std
+
+public fun main() {
+  let x: Void
+}

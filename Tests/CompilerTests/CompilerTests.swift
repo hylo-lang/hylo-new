@@ -111,9 +111,12 @@ final class CompilerTests: XCTestCase {
     if input.manifest.stage == .typing { return done() }
 
     // IR Lowering.
+    if await driver.lower(m).containsError { return done() }
+    if await driver.applyTransformationPasses(m).containsError { return done() }
+    if input.manifest.stage == .lowering { return done() }
+
+    // Code generation.
     assert(input.manifest.stage == .codegen)
-    await driver.lower(m)
-    await driver.applyTransformationPasses(m)
     return done()
   }
 

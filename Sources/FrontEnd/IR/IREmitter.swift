@@ -58,11 +58,10 @@ internal struct IREmitter {
   private mutating func lower(_ d: BindingDeclaration.ID) {
     // Local binings can be stored or projected.
     if program.isLocal(d) {
-      switch program[program[d].pattern].introducer.value {
-      case .var, .sinklet:
-        lower(storageBinding: d)
-      case let i:
-        unimplemented("local '\(i)' declarations")
+      if program[program[d].pattern].introducesStoredBindings {
+        lower(storedBinding: d)
+      } else {
+        lower(remoteBinding: d)
       }
     }
 
@@ -73,19 +72,44 @@ internal struct IREmitter {
   }
 
   /// Generates the IR of `d`, which declares stored local bindings.
-  private mutating func lower(storageBinding d: BindingDeclaration.ID) {
+  private mutating func lower(storedBinding d: BindingDeclaration.ID) {
+    let p = program[d].pattern
     assert(program.isLocal(d))
-    assert(program[program[d].pattern].introducer.value == anyOf(.var, .sinklet))
+    assert(program[p].introducer.value == anyOf(.var, .sinklet))
 
     // Allocate storage for all the names declared by `d` in a single aggregate.
     let storage = lowering(d, { $0._alloca($0.program.type(assignedTo: d)) })
+    let lhs = program[p].pattern
 
     // Declare all names introduced by the binding, initializing them if possible.
-    let lhs = program[program[d].pattern].pattern
     if let rhs = program[d].initializer {
       lowerInitialization(bindingsIn: lhs, storedIn: storage, consuming: rhs)
     } else {
       declareBindings(in: lhs, relativeTo: storage)
+    }
+  }
+
+  /// Generates the IR of `d`, which declares remote local bindings.
+  private mutating func lower(remoteBinding d: BindingDeclaration.ID) {
+    let p = program[d].pattern
+    assert(program.isLocal(d))
+    assert(program[p].introducer.value == anyOf(.let, .set, .inout))
+
+    // Is there an initializer?
+    if let rhs = program[d].initializer {
+      let request = AccessEffect(program[p].introducer.value)
+      let x0 = lowered(lvalue: rhs)
+      let x1 = lowering(d, { (me) in  me._access([request], from: x0) })
+      declareBindings(in: program[p].pattern, relativeTo: x1)
+    }
+
+    // Otherwise report an error and introduce each declared symbol as a poison value.
+    else {
+      report(program.missingBindingInitializer(d))
+      program.forEachVariable(introducedBy: d) { (v, _) in
+        let t = program.type(assignedTo: v)
+        insertionContext.frames.top[.init(v)] = .poison(.lowered(t, isAddress: true))
+      }
     }
   }
 
@@ -118,6 +142,13 @@ internal struct IREmitter {
     case VariableDeclaration.self:
       let d = program.castUnchecked(p, to: VariableDeclaration.self)
       insertionContext.frames.top[.init(d)] = s
+
+    case TuplePattern.self:
+      let t = program.castUnchecked(p, to: TuplePattern.self)
+      for (i, e) in program[t].elements.enumerated() {
+        let x = lowering(e, { $0._subfield(s, at: [i]) })
+        declareBindings(in: e, relativeTo: x)
+      }
 
     default:
       program.unexpected(p)
@@ -733,7 +764,7 @@ internal struct IREmitter {
   private mutating func lowered(lvalue e: NameExpression.ID) -> IRValue {
     switch program.declaration(referredToBy: e) {
     case .direct(let d):
-      return lowering(e, { $0._emit(referenceTo: d) })
+      return lowering(e, { (me) in me._emit(referenceTo: d) })
 
     case .member(let d):
       // Emit the receiver.
@@ -1401,14 +1432,27 @@ internal struct IREmitter {
 
   /// Generates the IR for referring directly to `d`.
   private mutating func _emit(referenceTo d: DeclarationIdentity) -> IRValue {
-    // Is `d` a local declaration?
+    // Is `d` already inserted into the local symbol table?
     if let s = insertionContext.frames[d] {
       return s
     }
 
-    assert(!program.isLocal(d), "unhandled local declaration")
+    // Should `d` be hoisted?
+    else if program.isLocal(d) {
+      // Is `d` referring to a local variable that is not yet in scope?
+      if let v = program.cast(d, to: VariableDeclaration.self) {
+        // The only way to get here is if either `v` has not been defined yet.
+        let s = insertionContext.anchor!.site
+        let t = program.type(assignedTo: v)
+        report(.init(.error, "use of '\(program[v].identifier)' before its declaration", at: s))
+        return .poison(.lowered(t, isAddress: true))
+      }
 
-    if let c = program.cast(d, to: ConformanceDeclaration.self) {
+      fatalError()
+    }
+
+    // Is `d` a conformance declaration?
+    else if let c = program.cast(d, to: ConformanceDeclaration.self) {
       return _emit(referenceTo: c)
     }
 
