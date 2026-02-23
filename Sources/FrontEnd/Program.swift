@@ -434,6 +434,12 @@ public struct Program: Sendable {
   }
 
   /// Returns `true` iff `w` denotes a synthetic conformance that does not involve any user code.
+  ///
+  /// The result is a conservative overapproximation which does not take arguments to conditional
+  /// conformances into consideration. As a consequence, a witness of type `P<T> => P<U>` will not
+  /// be considered transitively synthetic even if `P<T>` results from a transitively conformance.
+  ///
+  /// Simplifying the use of transitively synthetic conformances in general requires inlining.
   public func isTransitivelySyntheticConformance(_ w: WitnessExpression) -> Bool {
     switch w.value {
     case .reference(let d):
