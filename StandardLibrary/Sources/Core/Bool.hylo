@@ -35,8 +35,6 @@ public struct Bool is Deinitializable {
 
 }
 
-public given Bool is Deinitializable {}
-
 public given Bool is Movable {}
 
 public given Bool is Equatable {
