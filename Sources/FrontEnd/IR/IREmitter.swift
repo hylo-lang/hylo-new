@@ -1272,7 +1272,7 @@ internal struct IREmitter {
   ///   - inEntry: `true` iff the instruction should be inserted at the start of the current
   ///     functions' entry rather than at the current insertion point.
   internal mutating func _alloca(
-    _ type: AnyTypeIdentity, alignment: IRAlignment? = nil, inEntry: Bool = true
+    _ type: AnyTypeIdentity, alignment: IRAlignment? = nil, inEntry: Bool = false
   ) -> IRValue {
     let t = program.types.dealiased(type)
     let a = alignment ?? .align(of: t)
