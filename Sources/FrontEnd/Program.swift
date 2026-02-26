@@ -96,30 +96,33 @@ public struct Program: Sendable {
   public mutating func applyTransformationPasses(_ m: Module.ID) {
     withTyper(typing: m) { (typer) in
       // Temporarily move all functions to a local work list.
-      var work: [IRFunction] = []
+      var work: [(id: IRFunction.ID, function: IRFunction)] = []
       modify(&typer.program[typer.module]) { (module) in
-        work = module.ir.values.indices.map({ (f) in module.takeFunction(f) })
+        work = module.ir.values.indices.map({ (i) in (i, module.takeFunction(i)) })
       }
 
       let never = typer.program.types.never()
 
       // Mandatory intra-procedural passes.
-      for i in work.indices where work[i].isDefined {
-        work[i].foldRedundantInstructions()
-        work[i].simplifyControlFlow()
-        work[i].removeCodeAfterCallsReturning(never: never.erased)
-        work[i].removeUnreachableBlocks()
-        work[i].removedUnusedDefinitions()
+      for i in work.indices where work[i].function.isDefined {
+        work[i].function.foldRedundantInstructions()
+        work[i].function.simplifyControlFlow()
+        work[i].function.removeCodeAfterCallsReturning(never: never.erased)
+        work[i].function.removeUnreachableBlocks()
+        work[i].function.removedUnusedDefinitions()
         // reifyBundles
         // reifyAccesses
-        work[i].closeOpenEndedRegions()
-        work[i].normalizeLifetimes(emittingInto: m, using: &typer)
+        work[i].function.closeOpenEndedRegions()
+        work[i].function.normalizeLifetimes(emittingInto: m, using: &typer)
       }
+
+      // It is possible new functions have been declared during lifetime normalization, e.g., for
+      // deinitializing outstanding values.
 
       // Move all functions back.
       modify(&typer.program[typer.module]) { (module) in
-        for f in module.ir.values.indices.reversed() {
-          module.reassignFunction(work.removeLast(), to: f)
+        while let (i, f) = work.popLast() {
+          module.reassignFunction(f, to: i)
         }
       }
     }
@@ -431,6 +434,12 @@ public struct Program: Sendable {
   }
 
   /// Returns `true` iff `w` denotes a synthetic conformance that does not involve any user code.
+  ///
+  /// The result is a conservative overapproximation which does not take arguments to conditional
+  /// conformances into consideration. As a consequence, a witness of type `P<T> => P<U>` will not
+  /// be considered transitively synthetic even if `P<T>` results from a transitively conformance.
+  ///
+  /// Simplifying the use of transitively synthetic conformances in general requires inlining.
   public func isTransitivelySyntheticConformance(_ w: WitnessExpression) -> Bool {
     switch w.value {
     case .reference(let d):
@@ -855,6 +864,8 @@ public struct Program: Sendable {
     switch tag(of: d) {
     case AssociatedTypeDeclaration.self:
       return name(of: castUnchecked(d, to: AssociatedTypeDeclaration.self))
+    case ConformanceDeclaration.self:
+      return name(of: castUnchecked(d, to: ConformanceDeclaration.self))
     case EnumCaseDeclaration.self:
       return name(of: castUnchecked(d, to: EnumCaseDeclaration.self))
     case EnumDeclaration.self:
@@ -885,6 +896,11 @@ public struct Program: Sendable {
   /// Returns the name of `d`.
   public func name<T: TypeDeclaration>(of d: T.ID) -> Name {
     Name(identifier: self[d].identifier.value)
+  }
+
+  /// Returns the name of `d`, if any.
+  public func name(of d: ConformanceDeclaration.ID) -> Name? {
+    self[d].identifier.map({ (n) in Name(identifier: n.value) })
   }
 
   /// Returns the name of `d`.

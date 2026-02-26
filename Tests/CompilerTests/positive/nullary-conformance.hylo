@@ -1,0 +1,14 @@
+//! stage:lowering
+
+trait P {}
+
+given a : Void is P {}
+given b : <T where T is P> Int is P {}
+
+fun use<T is P>(x: T) {}
+
+public fun main() {
+  // The call below elaborates to `use<Int>(b<Void>(a))(1 as Int)`, requiring the lowering of a
+  // term application.
+  use(1 as Int)
+}

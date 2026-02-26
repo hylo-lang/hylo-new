@@ -21,15 +21,15 @@ public struct IRFunction: Sendable {
   /// The way in which an IR function returns its result.
   public enum Output: Hashable, Sendable {
 
-    /// The result is returned in register.
-    case register
+    /// The result is written to an output parameter.
+    case indirect
 
     /// The result is projected.
-    case projection(RemoteType.ID)
+    case remote(RemoteType.ID)
 
     /// The payload of `self` iff it denotes a projection.
-    public var projection: RemoteType.ID? {
-      if case .projection(let t) = self {
+    public var remote: RemoteType.ID? {
+      if case .remote(let t) = self {
         return t
       } else {
         return nil
@@ -111,7 +111,7 @@ public struct IRFunction: Sendable {
 
   /// The register in which the function writes its result, if any.
   public var returnRegister: IRValue? {
-    (output == .register) ? .parameter(termParameters.count - 1) : nil
+    (output == .indirect) ? .parameter(termParameters.count - 1) : nil
   }
 
   /// The entry block of `self`.
@@ -174,9 +174,9 @@ public struct IRFunction: Sendable {
 
     var a: Arrow
     switch output {
-    case .register:
+    case .indirect:
       a = Arrow(style: .parenthesized, inputs: Array(ps.dropLast()), output: ps.last!.type)
-    case .projection(let o):
+    case .remote(let o):
       a = Arrow(style: .bracketed, inputs: ps, output: o.erased)
     }
 
@@ -630,7 +630,7 @@ extension IRFunction: Showable {
     }
     result.append(")")
 
-    if case .projection(let t) = self.output {
+    if case .remote(let t) = self.output {
       result.append(" -> \(printer.show(t))")
     }
 

@@ -102,6 +102,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRAlloca.self), from: &f)
       case IRApply.self:
         pc = interpret(f.castUnchecked(i, to: IRApply.self), from: &f)
+      case IRApplyBuiltin.self:
+        pc = interpret(f.castUnchecked(i, to: IRApplyBuiltin.self), from: &f)
       case IRAssumeState.self:
         pc = interpret(f.castUnchecked(i, to: IRAssumeState.self), from: &f)
       case IRBranch.self:
@@ -234,6 +236,17 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRAlloca.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     declare(i.erased, from: f, initially: .uninitialized)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRApplyBuiltin.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    for a in f.at(i).arguments {
+      consume(object: a, with: i.erased, in: f)
+    }
+    declare(i, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 
@@ -434,7 +447,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRYield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let o = f.output.projection!
+    let o = f.output.remote!
     passArgument(
       program.types[o].access, f.at(i).projectee,
       insertingDeinitializationBefore: i.erased, in: &f)

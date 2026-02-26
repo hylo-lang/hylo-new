@@ -35,6 +35,8 @@ public struct Bool is Deinitializable {
 
 }
 
+public given Bool is Movable {}
+
 public given Bool is Equatable {
 
   public fun infix== (other: Self) -> Bool {

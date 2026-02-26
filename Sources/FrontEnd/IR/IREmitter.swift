@@ -150,6 +150,9 @@ internal struct IREmitter {
         declareBindings(in: e, relativeTo: x)
       }
 
+    case WildcardLiteral.self:
+      break
+
     default:
       program.unexpected(p)
     }
@@ -741,6 +744,8 @@ internal struct IREmitter {
   /// `e` computes a rvalue, this value is moved into a new stack allocation.
   private mutating func lowered(lvalue e: ExpressionIdentity) -> IRValue {
     switch program.tag(of: e) {
+    case Conversion.self:
+      return lowered(lvalue: program.castUnchecked(e, to: Conversion.self))
     case InoutExpression.self:
       return lowered(lvalue: program.castUnchecked(e, to: InoutExpression.self))
     case NameExpression.self:
@@ -753,6 +758,18 @@ internal struct IREmitter {
       lower(store: e, to: s)
       return s
     }
+  }
+
+  /// Implements `lower(lvalue:)` for explicit conversions.
+  private mutating func lowered(lvalue e: Conversion.ID) -> IRValue {
+    // Is there any conversion required?
+    let t = program.types.dealiased(program.type(assignedTo: e))
+    let u = program.types.dealiased(program.type(assignedTo: program[e].source))
+    if t == u {
+      return lowered(lvalue: program[e].source)
+    }
+
+    unimplemented("conversions involving change of representation")
   }
 
   /// Implements `lower(lvalue:)` for inout expressions.
@@ -839,14 +856,17 @@ internal struct IREmitter {
 
     // Are we declaring a conformance?
     if program.tag(of: d) == ConformanceDeclaration.self {
-      let signature = program.type(assignedTo: d)
-      let witness = program.types.contextAndHead(signature)
-      let output = program.types.demand(RemoteType(projectee: witness.head, access: .let))
-      precondition(witness.context.isEmpty, "not implemented")
+      let witness = program.types.contextAndHead(program.type(assignedTo: d))
 
+      assert(witness.context.parameters.allSatisfy(ts.contains(_:)))
+      let ps = witness.context.usings.map { (u) in
+        IRParameter(type: .lowered(u, isAddress: true), access: .let, declaration: nil)
+      }
+
+      let output = program.types.demand(RemoteType(projectee: witness.head, access: .let))
       return program[module].addFunction(
         IRFunction(
-          name: name, output: .projection(output), typeParameters: ts, termParameters: []))
+          name: name, output: .remote(output), typeParameters: ts, termParameters: ps))
     }
 
     // Otherwise, assume `d` identifies the declaration of a function, subscript, or bundle.
@@ -854,10 +874,11 @@ internal struct IREmitter {
       let ps = termParameters(of: .init(d))
       return program[module].addFunction(
         IRFunction(
-          name: name, output: .register, typeParameters: ts, termParameters: ps))
+          name: name, output: .indirect, typeParameters: ts, termParameters: ps))
     }
   }
 
+  /// Returns the identity of the function lowering `d`, declaring it if needed.
   private mutating func demandLoweredDeclaration(
     syntheticImplementationOf d: DeclarationIdentity, for a: TypeArguments
   ) -> IRFunction.ID {
@@ -868,17 +889,18 @@ internal struct IREmitter {
 
     let ps = termParameters(of: d)
     return program[module].addFunction(
-      IRFunction(name: name, output: .register, typeParameters: [], termParameters: ps))
+      IRFunction(name: name, output: .indirect, typeParameters: [], termParameters: ps))
   }
 
-  /// Returns the term parameters of `d`'s lowered representation, which includes `d`' explicit
-  /// parameters, usings, and captures.
+  /// Returns the term parameters of `d`'s lowered representation.
   ///
-  /// IR functions can be generic. Type parameters are only lowered to term parameters in
-  /// existentialized functions.
+  /// `d` declares a function or bundle. The result includes `d`' explicit parameters, usings, and
+  /// captures. Type parameters are only lowered to term parameters in existentialized functions.
   private mutating func termParameters(of d: DeclarationIdentity) -> [IRParameter] {
     let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
     var result: [IRParameter] = []
+
+    precondition(program.tag(of: d) == FunctionDeclaration.self, "TODO")
 
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {
@@ -928,6 +950,13 @@ internal struct IREmitter {
     }
 
     return result
+  }
+
+  /// Returns a reference to the given lowered function.
+  private mutating func functionReference(referringTo f: IRFunction.ID) -> IRValue {
+    let n = program[module][ir: f].name
+    let t = program[module][ir: f].type(uniquedIn: &program).erased
+    return .function(n, t)
   }
 
   /// Returns the IR type of an address of an instance of `t`.
@@ -1243,7 +1272,7 @@ internal struct IREmitter {
   ///   - inEntry: `true` iff the instruction should be inserted at the start of the current
   ///     functions' entry rather than at the current insertion point.
   internal mutating func _alloca(
-    _ type: AnyTypeIdentity, alignment: IRAlignment? = nil, inEntry: Bool = true
+    _ type: AnyTypeIdentity, alignment: IRAlignment? = nil, inEntry: Bool = false
   ) -> IRValue {
     let t = program.types.dealiased(type)
     let a = alignment ?? .align(of: t)
@@ -1431,7 +1460,12 @@ internal struct IREmitter {
   }
 
   /// Generates the IR for referring directly to `d`.
-  private mutating func _emit(referenceTo d: DeclarationIdentity) -> IRValue {
+  ///
+  /// If `applyNullary` is `true` and `d` refers to a nullary conformance declaration, the result
+  /// is an application of corresponding lowered function.
+  private mutating func _emit(
+    referenceTo d: DeclarationIdentity, applyingNullary applyNullary: Bool = true
+  ) -> IRValue {
     // Is `d` already inserted into the local symbol table?
     if let s = insertionContext.frames[d] {
       return s
@@ -1453,34 +1487,61 @@ internal struct IREmitter {
 
     // Is `d` a conformance declaration?
     else if let c = program.cast(d, to: ConformanceDeclaration.self) {
-      return _emit(referenceTo: c)
+      return _emit(referenceTo: c, applyingNullary: applyNullary)
     }
 
     program.unexpected(d)
   }
 
   /// Generates the IR for referring directly to `d`.
-  private mutating func _emit(referenceTo d: ConformanceDeclaration.ID) -> IRValue {
-    let t = program.type(assignedTo: d)
-    precondition(!program.types.hasContext(t), "unsupported direct reference to non-simple given")
+  ///
+  /// If `applyNullary` is `true` and `d` refers to a nullary conformance declaration, the result
+  /// is an application of corresponding lowered function.
+  private mutating func _emit(
+    referenceTo d: ConformanceDeclaration.ID, applyingNullary applyNullary: Bool
+  ) -> IRValue {
+    let f = demandLoweredDeclaration(of: d)
+    let v = functionReference(referringTo: f)
 
-    let u = program.types.demand(RemoteType(projectee: t, access: .let)).erased
-    let f = program.types.demand(Arrow(style: .bracketed, inputs: [], output: u)).erased
-    let g = IRValue.function(.lowered(.init(d)), f)
-    return _project(with: g, [])
+    if program[module][ir: f].termParameters.isEmpty && applyNullary {
+      return _project(with: v, [])
+    } else {
+      return v
+    }
   }
 
-  /// Generates the IR for computing the lvalue referred to by `w`.
-  private mutating func _emit(witness w: WitnessExpression) -> IRValue {
-    switch w.value {
+  /// Generates the IR for computing the lvalue referred to by `witness`.
+  ///
+  /// If `applyNullary` is `true` and `witness` either refers to or is a type application of a
+  /// nullary conformance declaration, the corresponding lowered function is applied without any
+  /// argument in the result.
+  private mutating func _emit(
+    witness: WitnessExpression, applyingNullary applyNullary: Bool = true
+  ) -> IRValue {
+    switch witness.value {
     case .identity(let e):
       return lowered(lvalue: e)
 
     case .reference(let d):
-      return _emit(referenceTo: d)
+      return _emit(referenceTo: d, applyingNullary: applyNullary)
+
+    case .termApplication(let f, let a):
+      var stack = [_emit(witness: a)]
+      var abstraction: WitnessExpression? = f
+      while let w = abstraction.take() {
+        if case .termApplication(let g, let b) = w.value {
+          stack.append(_emit(witness: b))
+          abstraction = g
+        } else {
+          stack.append(_emit(witness: w, applyingNullary: false))
+        }
+      }
+
+      let (callee, arguments) = stack.reversed().headAndTail!
+      return _project(with: callee, Array(arguments))
 
     case .typeApplication(let f, let a):
-      let x = _emit(witness: f)
+      let x = _emit(witness: f, applyingNullary: applyNullary)
       return _type_apply(x, to: a)
 
     default:
