@@ -298,6 +298,22 @@ public struct TypeStore: Sendable {
     return (result, isOpenEnded: false)
   }
 
+  /// Returns the `i`-th member of `t`, if any.
+  public func member(_ i: consuming Int, of t: Tuple.ID) -> AnyTypeIdentity? {
+    var s = t
+    while case .cons(let a, let b) = self[s] {
+      if i == 0 {
+        return a
+      } else if let u = cast(b, to: Tuple.self) {
+        i -= 1
+        s = u
+      } else {
+        return nil
+      }
+    }
+    return nil
+  }
+
   /// Assuming `a` identifies the (possibly polymorphic) type of a callable abstraction with an
   /// environement `e`, returns a copy of `a` where `e` is taken as first parameter if `e` is
   /// non-empty or `a` unchanged otherwise.

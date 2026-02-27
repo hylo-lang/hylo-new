@@ -114,6 +114,8 @@ internal struct Solver {
             o = me.solve(staticCall: g)
           case is MemberConstraint:
             o = me.solve(member: g)
+          case is TupleMemberConstraint:
+            o = me.solve(tupleMember: g)
           case is OverloadConstraint:
             return me.solve(overload: g)
           default:
@@ -502,6 +504,37 @@ internal struct Solver {
 
     case .right(let e):
       return .failure { (_, _, _, d) in d.insert(e) }
+    }
+  }
+
+  /// Discharges `g`, which is a member constraint.
+  private mutating func solve(tupleMember g: GoalIdentity) -> GoalOutcome {
+    let k = goals[g] as! TupleMemberConstraint
+
+    // Can't do anything before we've inferred the type of the container.
+    if k.parent.isVariable || program.types.isMetatype(k.parent, of: \.isVariable) {
+      return postpone(g)
+    }
+
+    // Is the parent container a tuple?
+    else if let p = program.types.cast(k.parent, to: Tuple.self) {
+      if let t = program.types.member(k.member.value, of: p) {
+        let e = EqualityConstraint(lhs: t, rhs: k.type, site: k.site)
+        let s = schedule(e)
+        return delegate([s])
+      }
+    }
+
+    // Otherwise we're out of luck.
+    return invalidTupleMember(k)
+  }
+
+  /// Returns a failure to solve `k` due to an invalid member selection.
+  private func invalidTupleMember(_ k: TupleMemberConstraint) -> GoalOutcome {
+    .failure { (ss, _, tp, ds) in
+      let t = tp.program.types.reify(k.parent, applying: ss)
+      let m = tp.program.format("type '%T' has no member '\(k.member.value)'", [t])
+      ds.insert(.init(.error, m, at: k.site))
     }
   }
 

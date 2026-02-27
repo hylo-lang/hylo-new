@@ -66,6 +66,7 @@ public struct SyntaxTag: Sendable {
     StringLiteral.self,
     SyntheticExpression.self,
     TupleLiteral.self,
+    TupleMember.self,
     TupleTypeExpression.self,
     WildcardLiteral.self,
 
