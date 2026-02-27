@@ -99,7 +99,7 @@ internal struct IREmitter {
     if let rhs = program[d].initializer {
       let request = AccessEffect(program[p].introducer.value)
       let x0 = lowered(lvalue: rhs)
-      let x1 = lowering(d, { (me) in  me._access([request], from: x0) })
+      let x1 = lowering(rhs, { (me) in  me._access([request], from: x0) })
       declareBindings(in: program[p].pattern, relativeTo: x1)
     }
 
@@ -438,6 +438,8 @@ internal struct IREmitter {
       lower(store: program.castUnchecked(e, to: Call.self), to: target)
     case If.self:
       lower(store: program.castUnchecked(e, to: If.self), to: target)
+    case InoutExpression.self:
+      lower(store: program.castUnchecked(e, to: InoutExpression.self), to: target)
     case IntegerLiteral.self:
       lower(store: program.castUnchecked(e, to: IntegerLiteral.self), to: target)
     case NameExpression.self:
@@ -571,8 +573,14 @@ internal struct IREmitter {
   }
 
   /// Implements `lower(store:to:)` for integer literals.
+  private mutating func lower(store e: InoutExpression.ID, to target: IRValue) {
+    let m = "'&' may only be used to assign a variable, form a binding, or pass an argument"
+    report(.init(.error, m, at: program[e].marker.site))
+  }
+
+  /// Implements `lower(store:to:)` for integer literals.
   private mutating func lower(store e: IntegerLiteral.ID, to target: IRValue) {
-    fatalError("no implemented")
+    unreachable()
   }
 
   /// Implements `lower(store:to:)` for name expressions.

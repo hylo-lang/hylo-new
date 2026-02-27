@@ -1,0 +1,6 @@
+negative/illegal-mutation-marker.hylo:3.19-20: error: '&' may only be used to assign a variable, form a binding, or pass an argument
+  inout (y, z) = (&x, &x)
+                  ^
+negative/illegal-mutation-marker.hylo:3.23-24: error: '&' may only be used to assign a variable, form a binding, or pass an argument
+  inout (y, z) = (&x, &x)
+                      ^
