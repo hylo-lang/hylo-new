@@ -23,6 +23,16 @@ jobs:
         swift: ["6.2"]
         config: [release, debug]
 
+        include:
+          # Disable exporting code coverage by default.
+          - export-coverage: false
+
+          # Enable exporting code coverage in a single configuration.
+          - os: "ubuntu-24.04"
+            swift: "6.2"
+            config: debug
+            export-coverage: true
+
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +55,16 @@ jobs:
       # reuse the build cache from here, doubling the CI time.
 
       - name: Build and test for ${{ matrix.swift }} on ${{ matrix.os }} in ${{ matrix.config }} mode
-        run: swift test -c ${{ matrix.config }} --verbose
+        run: swift test -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+
+      - name: Export code coverage
+        if: ${{ matrix.export-coverage }}
+        run: llvm-cov export $(swift build --show-bin-path)/HyloPackageTests.xctest  --format="lcov" --instr-profile $(swift build --show-bin-path)/codecov/default.profdata > info.lcov
+
+      - name: Upload coverage report to Codecov
+        if: ${{ matrix.export-coverage }}
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
     runs-on: ${{ matrix.os }}
