@@ -1,0 +1,17 @@
+ignore:
+  - '!(Sources|StandardLibrary)/'
+
+comment:
+  require_changes: true
+
+coverage:
+  status:
+
+    project:
+      default:
+        threshold: 0%
+
+    patch:
+      default:
+        target: auto
+        threshold: 0%
