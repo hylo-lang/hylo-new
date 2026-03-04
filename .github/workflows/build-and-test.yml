@@ -6,12 +6,6 @@ on:
       - "LICENSE"
       - ".gitignore"
       - ".editorconfig"
-  pull_request:
-    paths-ignore:
-      - "**.md"
-      - "LICENSE"
-      - ".gitignore"
-      - ".editorconfig"
 
 jobs:
   test:
