@@ -1,5 +1,7 @@
 # Hylo
 
+[![codecov](https://codecov.io/github/hylo-lang/hylo-new/graph/badge.svg?token=2auHoqmMSq)](https://codecov.io/github/hylo-lang/hylo-new)
+
 ## Misc
 
 Nested types can only be declared in primary declaration.
