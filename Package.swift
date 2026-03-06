@@ -15,10 +15,12 @@ let commonSwiftSettings: [SwiftSetting] = [
 let package = Package(
   name: "Hylo",
   platforms: [
-    .macOS(.v13)
+    .macOS(.v15)
   ],
   products: [
-    .executable(name: "hc", targets: ["hc"])
+    .executable(name: "hc", targets: ["hc"]),
+    .library(name: "HyloStandardLibrary", targets: ["StandardLibrary"]),
+    .library(name: "HyloFrontEnd", targets: ["FrontEnd"]),
   ],
   dependencies: [
     .package(
