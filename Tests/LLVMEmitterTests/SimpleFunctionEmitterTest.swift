@@ -141,7 +141,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
   }
 }
 
-func assertNoDiagnostics(in program: Program, file: StaticString = #file, line: UInt = #line) throws
+func assertNoDiagnostics(in program: Program, file: StaticString = #fileID, line: UInt = #line) throws
 {
   if !program.diagnostics.isEmpty {
     XCTFail(
