@@ -1315,6 +1315,9 @@ extension Program {
     /// `Hylo.Int`.
     case int = "Int"
 
+    /// `Hylo.Int32`.
+    case int32 = "Int32"
+
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
