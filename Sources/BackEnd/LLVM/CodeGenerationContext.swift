@@ -96,7 +96,7 @@ public struct CodeGenerationContext: ~Copyable {
 
   /// The IR of the module being lowered.
   var sourceModule: FrontEnd.Module {
-    _read { yield program.modules.elements[moduleID].value }
+    get { program.modules.elements[moduleID].value }
   }
 
   mutating func incorporate(functionWithIndex i: Int) throws {
