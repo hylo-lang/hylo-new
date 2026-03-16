@@ -2,12 +2,14 @@
 /.build
 /.*-build
 /Packages
+default.profraw
 
 # IDEs
 /.vscode
 /.swiftpm
 /.vscode/launch.json
 /.idea
+/.sourcekit-lsp
 
 # macOS
 .DS_Store
