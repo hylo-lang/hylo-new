@@ -1,0 +1,26 @@
+//! stage:run stdlib:minimal
+
+struct Triple is Deinitializable {
+  let a: Int
+  let b: Int
+  let c: Int
+
+  init(_ a: sink Int, _ b: sink Int, _ c: sink Int) {
+    &self.a = a
+    &self.b = b
+    &self.c = c
+  }
+}
+
+
+public fun main() {
+  let c = Triple(
+    a: Int.zero().successor(),
+    b: Int.zero().successor().successor(),
+    c: Int.zero().successor().successor().successor()
+  )
+
+  print(c.a)
+  print(c.b)
+  print(c.c)
+}

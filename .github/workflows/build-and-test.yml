@@ -26,8 +26,16 @@ jobs:
             config: debug
             export-coverage: true
 
+          - config: release
+            llvm-build-type: MinSizeRel
+
+          - config: debug
+            llvm-build-type: Debug
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }}
         uses: SwiftyLab/setup-swift@latest
@@ -46,6 +54,16 @@ jobs:
       - name: Verify swift version
         run: swift --version && swift --version | grep -q ${{ matrix.swift }}
         shell: bash
+
+      - name: Set up LLVM
+        uses: hylo-lang/get-llvm@v0.3.0
+        id: get-llvm
+        with:
+          llvmVersion: "20.1.6"
+          llvmBuildRelease: "20260309-221030"
+          llvmBuildConfig: ${{ matrix.llvm-build-type }}
+          addToPkgConfigPath: true
+          addToPath: true
 
       # We disabled the separate build step, as it consumes extra CI time - building for testing apparently doesn't
       # reuse the build cache from here, doubling the CI time.

@@ -1,0 +1,11 @@
+//! stage:run stdlib:minimal
+
+fun double(x: Int) -> Int {
+  return x + x
+}
+
+public fun main() {
+  print(double(Int.zero()))
+  print(double(Int.one()))
+  print(double(Int.one() + Int.one()))
+}

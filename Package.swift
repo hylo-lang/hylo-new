@@ -1,5 +1,6 @@
 // swift-tools-version:6.2
 import PackageDescription
+import Foundation
 
 #if os(Windows)
   let onWindows = true
@@ -15,7 +16,7 @@ let commonSwiftSettings: [SwiftSetting] = [
 let package = Package(
   name: "Hylo",
   platforms: [
-    .macOS(.v13)
+    .macOS(.v15)
   ],
   products: [
     .executable(name: "hc", targets: ["hc"])
@@ -36,6 +37,7 @@ let package = Package(
     .package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
+    .package(path: "./Swifty-LLVM"),
   ],
   targets: [
     .executableTarget(
@@ -59,9 +61,11 @@ let package = Package(
       name: "Driver",
       dependencies: [
         .target(name: "FrontEnd"),
+        .target(name: "LLVMEmitter"),
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
         .product(name: "Archivist", package: "archivist"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -78,6 +82,17 @@ let package = Package(
       swiftSettings: commonSwiftSettings),
 
     .target(
+      name: "LLVMEmitter",
+      dependencies: [
+        .target(name: "FrontEnd"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
+        .target(name: "Utilities"),
+      ],
+      path: "Sources/BackEnd/LLVM",
+      swiftSettings: commonSwiftSettings,
+    ),
+
+    .target(
       name: "StableCollections",
       dependencies: [
         .target(name: "Utilities")
@@ -87,7 +102,8 @@ let package = Package(
     .target(
       name: "StandardLibrary",
       path: "StandardLibrary",
-      resources: [.copy("Sources")],
+      exclude: [],
+      resources: [.copy("Full"), .copy("Minimal")],
       swiftSettings: commonSwiftSettings),
 
     .target(
@@ -103,9 +119,10 @@ let package = Package(
       dependencies: [
         .target(name: "Driver"),
         .target(name: "FrontEnd"),
+        .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
       ],
-      exclude: ["negative", "positive", "README.md"],
+      exclude: ["README.md"] + allNonSwiftFiles(in: "Tests/CompilerTests"),
       swiftSettings: commonSwiftSettings,
       plugins: ["CompilerTestsPlugin"]),
 
@@ -113,6 +130,14 @@ let package = Package(
       name: "FrontEndTests",
       dependencies: [
         .target(name: "FrontEnd")
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
+      name: "LLVMEmitterTests",
+      dependencies: [
+        .target(name: "LLVMEmitter"),
+        .target(name: "Driver")
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -137,3 +162,29 @@ let package = Package(
         .target(name: "hc-tests")
       ]),
   ])
+
+/// Returns the list of relative urls of all non-swift files in the given directory.
+func allNonSwiftFiles(in directory: String) -> [String] {
+  guard let enumerator: FileManager.DirectoryEnumerator = FileManager.default.enumerator(atPath: directory) 
+  else { return [] }
+  
+  let l = enumerator.compactMap { $0 as? String }
+    .filter { !$0.hasSuffix(".swift") && !isDirectory(directory + "/" + $0) }
+
+  return l
+}
+
+func isDirectory(_ path: String) -> Bool {
+  // Heuristic for common file formats:
+  if path.hasSuffix(".hylo") || path.hasSuffix(".observed") || path.hasSuffix(".expected") ||
+    path.hasSuffix(".diagnostics") || path.hasSuffix(".c") {
+    return false
+  }
+
+  // Fallback to filesystem check
+  var isDirectory: ObjCBool = true
+  if !FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) {
+    fatalError("Expected file or directory at recently scanned path: \(path)\nPlease rerun the build.")
+  }
+  return isDirectory.boolValue
+}

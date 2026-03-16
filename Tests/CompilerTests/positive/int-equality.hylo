@@ -1,0 +1,18 @@
+//! stage:run stdlib:minimal
+
+
+public fun main() {
+  // Should print 1.
+  if Int.one().successor() == Int.zero().successor().successor() {
+    print(Int.one())
+  } else {
+    print(Int.zero())
+  }
+
+  // Should print 0.
+  if Int.one().successor() != Int.zero().successor().successor() {
+    print(Int.one())
+  } else {
+    print(Int.zero())
+  }
+}

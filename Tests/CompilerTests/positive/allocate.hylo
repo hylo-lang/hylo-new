@@ -1,0 +1,20 @@
+//! stage:run stdlib:minimal
+
+@extern("malloc_shim")
+fun malloc(bytes: Int) -> Int
+
+@extern("free_shim")
+fun free(ptr: Int) -> Void
+
+public fun main() {
+  let five = Int.zero().successor().successor().successor().successor().successor()
+  print(five)
+  
+  let ptr = malloc(five)
+  let ptr2 = malloc(five)
+  print(ptr)
+  print(ptr2)
+  free(ptr)
+  free(ptr2)
+  print(99)
+}

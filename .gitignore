@@ -2,19 +2,24 @@
 /.build
 /.*-build
 /Packages
+default.profraw
 
 # IDEs
 /.vscode
 /.swiftpm
 /.vscode/launch.json
 /.idea
+/.sourcekit-lsp
 
 # macOS
 .DS_Store
 
 # Generated tests
 Tests/CompilerTests/CompilerTests+GeneratedTests.swift
+
+# Observations during testing
 Tests/CompilerTests/**/*.observed
+StandardLibrary/**/*.observed
 
 # Local development
 /Playground

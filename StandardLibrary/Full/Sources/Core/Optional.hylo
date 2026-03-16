@@ -1,0 +1,13 @@
+/// A value of type `T` or the absence thereof.
+@_symbol("Optional")
+public enum Optional<T> {
+
+  /// An instance of `T`.
+  case some(wrapped: T)
+
+  /// The absence of a value.
+  case none()
+
+}
+
+public given <T is Deinitializable> Optional<T> is Deinitializable {}

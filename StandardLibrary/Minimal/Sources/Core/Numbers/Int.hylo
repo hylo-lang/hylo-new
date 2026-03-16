@@ -1,0 +1,75 @@
+/// A signed integer value.
+@_symbol("Int")
+public struct Int is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.word
+
+  /// Creates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  @extern("hylo_init_int")
+  public init()
+
+  @extern("hylo_init_int_from_raw")
+  public init(from_raw value: Builtin.word)
+
+  /// Returns 0.
+  /// 
+  /// Defined in shim.c.
+  @extern("hylo_make_zero_int")
+  public static fun zero() -> Self
+
+  /// Returns `self + 1`.
+  ///
+  /// Defined in shim.c.
+  @extern("hylo_successor_int") 
+  public fun successor() -> Self
+
+  /// Returns 1.
+  ///
+  /// Defined in shim.c.
+  @extern("hylo_make_one_int")
+  public static fun one() -> Self
+
+  @extern("hylo_int_get_value")
+  public fun get_value() -> Builtin.word
+
+  @extern("hylo_int_eq")
+  public fun infix== (other: Self) -> Bool
+
+  @extern("hylo_int_ne")
+  public fun infix!= (other: Self) -> Bool
+
+  @extern("hylo_int_lt")
+  public fun infix< (other: Self) -> Bool
+
+  @extern("hylo_int_le")
+  public fun infix<= (other: Self) -> Bool
+
+  @extern("hylo_int_gt")
+  public fun infix> (other: Self) -> Bool
+
+  @extern("hylo_int_ge")
+  public fun infix>= (other: Self) -> Bool
+
+  @extern("hylo_int_sge")
+  public fun infix>= (_ other: Self) -> Bool
+
+  @extern("hylo_int_infix_add")
+  fun infix+ (other: Self) -> Self
+
+  @extern("hylo_int_infix_subtract")
+  fun infix- (other: Self) -> Self
+
+  @extern("hylo_int_infix_multiply")
+  fun infix* (other: Self) -> Self
+}
+
+public given Int is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given Int is Movable {}
+
+
+

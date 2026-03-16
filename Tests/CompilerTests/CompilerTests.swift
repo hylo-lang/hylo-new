@@ -12,6 +12,43 @@ import XCTest
 /// manually invoking `hc-tests`.
 final class CompilerTests: XCTestCase {
 
+  /// Cleans up observation files from previous test runs.
+  /// 
+  /// This is done at most once, during the first test execution.
+  private static let initialObservationCleanup: Void = {
+    let root = URL(filePath: #filePath).deletingLastPathComponent()
+    FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.forEach { url in
+      if let url = url as? URL, url.pathExtension == "observed" {
+        try? FileManager.default.removeItem(at: url)
+      }
+    }
+  }()
+
+  private struct CompilationResult {
+
+    var driver: Driver
+
+    let module: FrontEnd.Module.ID
+
+    let expectations: [FileName: String]
+
+    /// The path to the generated executable, if applicable.
+    /// 
+    /// The caller is responsible for removing the file after execution.
+    let executable: URL?
+
+  }
+
+  private struct ExecutionResult {
+
+    let standardOutput: String
+
+    let standardError: String
+
+    let terminationStatus: Int32
+
+  }
+
   /// The input of a compiler test.
   struct TestDescription {
 
@@ -21,10 +58,21 @@ final class CompilerTests: XCTestCase {
     /// The manifest of the test.
     let manifest: Manifest
 
+    /// What the program is expected to print to stdout when `self` is a run-stage test.
+    var expectedStandardOutput: String?
+
     /// Creates an instance with the given properties.
     init(_ path: String) throws {
       self.root = URL(filePath: path)
       self.manifest = try Manifest(contentsOf: root)
+
+      self.expectedStandardOutput = try? String(
+        contentsOf: root.deletingPathExtension().appendingPathExtension("stdout.expected"),
+        encoding: .utf8)
+
+      if manifest.stage != .run && self.expectedStandardOutput != nil {
+        throw TestFailure.invalidTestDescription("stdout assertion requires stage:run")
+      }
     }
 
     /// `true` iff `self` describes a package.
@@ -64,23 +112,51 @@ final class CompilerTests: XCTestCase {
 
   /// Compiles `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    let (program, _) = try await compile(input)
-    assertSansError(program)
+    _ = CompilerTests.initialObservationCleanup
+    
+    do {
+      let result = try await compile(input)
+      defer { 
+        if let e = result.executable { 
+          try? FileManager.default.removeItem(at: e) 
+        }
+      }
+
+      try assertSansError(result.driver.program)
+
+      guard input.manifest.stage == .run else { return }
+
+      let execution: CompilerTests.ExecutionResult = try execute(result)
+      try execution.standardOutput.write(to: input.root.deletingPathExtension().appendingPathExtension("stdout.observed"), atomically: true, encoding: .utf8)
+
+      assertExitCode(input.manifest.assertedExitCode ?? 0, in: execution, contextRoot: input.root)
+      if let expected = input.expectedStandardOutput {
+        assertStandardOutput(expected, in: execution, contextRoot: input.root)
+      }
+    } catch let error as TestFailure {
+      XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
+    } 
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    let (program, expectations) = try await compile(input)
-    XCTAssert(program.containsError, "program compiled but an error was expected")
-    assertExpectations(expectations, program.diagnostics)
-  }
+    _ = CompilerTests.initialObservationCleanup
 
-  /// Compiles `input` into `p` and returns expected diagnostics for each compiled source file.
-  private func compile(_ input: TestDescription) async throws -> (Program, [FileName: String]) {
-    var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
+    let result = try await compile(input)
+    let program = result.driver.program
+    XCTAssert(program.containsError, "program compiled but an error was expected.\nSource: \(input.root.path)\n")
+    assertExpectations(result.expectations, program.diagnostics)
+
+  }
+  /// Compiles `input` into `outputDirectory` and returns expected diagnostics for each compiled source file.
+  private func compile(_ input: TestDescription) async throws -> CompilationResult {
+    var driver = Driver(
+      moduleCachePath: CompilerTests.moduleCachePath.url,
+      targetConfiguration: .init(),
+      standardLibrary: input.manifest.standardLibrary)
 
     if input.manifest.requiresStandardLibrary {
-      try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
+      try await driver.loadStandardLibrary()
     }
 
     let m = driver.program.demandModule(.init("Test"))
@@ -88,18 +164,24 @@ final class CompilerTests: XCTestCase {
       driver.program[m].addDependency(Module.standardLibraryName)
     }
 
-    var expectations: [FileName: String] = [:]
+    var expectedDiagnostics: [FileName: String] = [:]
     try input.forEachSourceURL { (u) in
       let source = try SourceFile(contentsOf: u)
       driver.program[m].addSource(source)
 
-      let v = u.deletingPathExtension().appendingPathExtension("expected")
+      let v = u.deletingPathExtension().appendingPathExtension("diagnostics.expected")
       let expected = try? String(contentsOf: v, encoding: .utf8)
-      expectations[source.name] = expected
+      expectedDiagnostics[source.name] = expected
     }
 
-    func done() -> (Program, [FileName: String]) {
-      (driver.program, expectations)
+    var executable: URL? = nil
+
+    func done() -> CompilationResult {
+      .init(
+        driver: driver,
+        module: m,
+        expectations: expectedDiagnostics,
+        executable: executable)
     }
 
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -112,16 +194,131 @@ final class CompilerTests: XCTestCase {
 
     // IR Lowering.
     if await driver.lower(m).containsError { return done() }
+    try saveObservedIR(of: m, in: driver.program, extension: "lowered-ir.observed")
     if await driver.applyTransformationPasses(m).containsError { return done() }
+    try saveObservedIR(of: m, in: driver.program, extension: "transformed-ir.observed")
     if input.manifest.stage == .lowering { return done() }
 
-    // Code generation.
-    assert(input.manifest.stage == .codegen)
+    // LLVM Lowering.
+    if (try driver.lowerToLLVM(m)).containsError { return done() }
+    try saveLLVM(llCode: driver.llvmIR(of: m)!, contextRoot: input.root)
+    if input.manifest.stage == .llvmLowering { return done() }
+
+    // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
+    if input.manifest.requiresStandardLibrary {
+      // let stdlibID = driver.program.demandModule(Module.standardLibraryName)
+      // if await driver.lower(stdlibID).containsError { return done() }
+      // if await driver.applyTransformationPasses(stdlibID).containsError { return done() }
+      // if (try driver.lowerToLLVM(stdlibID)).containsError { return done() }
+    }
+
+    if input.manifest.stage == .executableLinking || input.manifest.stage == .run {
+      let outputDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+      try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: false)
+
+      executable = outputDirectory.appendingPathComponent(driver.program[m].name)
+      _ = try driver.generateExecutable(for: m, writingTo: executable)
+    }
+
     return done()
   }
 
-  private func compile(_ m: Module.ID, driver: inout Driver) {
+  private func saveObservedIR(of m: Module.ID, in program: Program, extension: String) throws {
+    /// The IR functions corresponding to a given source file at url.
+    var sourceToIr: [URL : String] = [:]
 
+    var printer = TreePrinter(program: program)
+
+    for f in program[m].functions {
+      // FIXME: use mangled name instead of this incomplete hack.
+      // This doesn't 
+      let d = switch(f.name) {
+        case .lowered(let d): d
+        case .synthesized(let d, _): d
+        case .initializer(let d): DeclarationIdentity(d)
+        case .existentialized(let n): 
+          switch n {
+          case .lowered(let d): d
+          case .synthesized(let d, _): d
+          case .initializer(let d): DeclarationIdentity(d)
+          case .existentialized(_): fatalError("nested existentialized function")
+          }
+      }
+
+      guard case .local(let url) = program[d].site.source.name else { continue }
+
+      sourceToIr[url, default: ""] += printer.show(f) + "\n"
+    }
+
+    for (file, ir) in sourceToIr {
+      let o = file.deletingPathExtension().appendingPathExtension(`extension`)
+      try ir.write(to: o, atomically: false, encoding: .utf8)
+    }
+  }
+
+  /// Saves the LLVM code to a file in the test directory.
+  private func saveLLVM(llCode: String, contextRoot: URL) throws {
+    let o = contextRoot.deletingPathExtension().appendingPathExtension("ll.observed")
+    try llCode.write(to: o, atomically: false, encoding: .utf8)
+  }
+
+  private func execute(_ result: CompilationResult) throws -> ExecutionResult {
+    guard let executable = result.driver.executableURL(of: result.module) else {
+      XCTFail("missing executable output")
+      throw TestFailure.missingExecutableOutput
+    }
+
+    return try execute(executable)
+  }
+
+  private func assertExitCode(_ expected: Int32, in observed: ExecutionResult, contextRoot: URL) {
+    XCTAssertEqual(
+      observed.terminationStatus,
+      expected,
+      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)\nSource: \(contextRoot.path)\n")
+  }
+
+  private func assertStandardOutput(_ expected: String, in observed: ExecutionResult, contextRoot: URL) {
+    XCTAssertEqual(
+      observed.standardOutput,
+      expected,
+      "mismatched stdout.\nSource: \(contextRoot.path)\n")
+  }
+
+  private func execute(_ executable: URL) throws -> ExecutionResult {
+    let process = Process()
+    let standardOutput = Pipe()
+    let standardError = Pipe()
+    process.executableURL = executable
+    process.standardOutput = standardOutput
+    process.standardError = standardError
+    try process.run()
+    process.waitUntilExit()
+
+    let stdout = String(decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    let stderr = String(decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+
+    return .init(
+      standardOutput: stdout,
+      standardError: stderr,
+      terminationStatus: process.terminationStatus)
+  }
+
+  private enum TestFailure: Error {
+    case missingExecutableOutput
+    case compilationError(String)
+    case invalidTestDescription(String)
+
+    var localizedDescription: String {
+      switch self {
+      case .missingExecutableOutput:
+        return "missing executable output"
+      case .compilationError(let message):
+        return "Compilation failure:\n\(message)"
+      case .invalidTestDescription(let d):
+        return "Invalid test description (\(d))"
+      }
+    }
   }
 
   /// Asserts that the expected `diagnostics` of each source file in `expectations` match those
@@ -161,7 +358,7 @@ final class CompilerTests: XCTestCase {
   }
 
   /// Asserts that `program` does not contain any error.
-  private func assertSansError(_ program: Program) {
+  private func assertSansError(_ program: Program) throws {
     if !program.containsError { return }
 
     let root = URL(filePath: #filePath).deletingLastPathComponent()
@@ -174,13 +371,13 @@ final class CompilerTests: XCTestCase {
       for d in e.sorted() {
         d.render(into: &o, showingPaths: .relative(to: root), style: .unstyled)
         if case .local(let u) = n {
-          let v = u.deletingPathExtension().appendingPathExtension("observed")
+          let v = u.deletingPathExtension().appendingPathExtension("diagnostics.observed")
           try? o.write(to: v, atomically: true, encoding: .utf8)
         }
       }
       report.write(o)
     }
-    XCTFail(report)
+    throw TestFailure.compilationError(report)
   }
 
   /// Returns a message explaining `delta`, which is the result of comparing `expectation` to some

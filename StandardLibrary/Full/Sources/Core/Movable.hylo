@@ -1,4 +1,4 @@
-/// A type whose instances can be reloacted to different storage.
+/// A type whose instances can be relocated to different storage.
 @_symbol("Movable")
 public trait Movable {
 

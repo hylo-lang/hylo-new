@@ -28,6 +28,27 @@ import Utilities
     transform: URL.init(fileURLWithPath:))
   private var moduleCachePath: URL?
 
+  @Option(
+    name: [.customLong("target")],
+    help: ArgumentHelp(
+      "Specify the LLVM target triple or 'host'.",
+      valueName: "triple"))
+  private var targetTriple: Driver.TargetSelection = .host
+
+  @Option(
+    name: [.customLong("target-cpu")],
+    help: ArgumentHelp(
+      "Specify the target CPU or 'host'.",
+      valueName: "cpu"))
+  private var targetCPU: Driver.TargetSelection = .host
+
+  @Option(
+    name: [.customLong("target-features")],
+    help: ArgumentHelp(
+      "Specify the target CPU features or 'host'.",
+      valueName: "features"))
+  private var targetFeatures: Driver.TargetSelection = .host
+
   /// `true` iff the driver should not read/write modules from/to the cache.
   @Flag(help: "Disable caching.")
   private var noCaching: Bool = false
@@ -44,7 +65,7 @@ import Utilities
     help: ArgumentHelp(
       "Produce the specified output: \(OutputType.allValueStrings.joined(separator: ", ")).",
       valueName: "output-type"))
-  private var outputType: OutputType = .ir
+  private var outputType: OutputType = .binary
 
   /// The line at which type inference should be traced.
   @Option(
@@ -80,77 +101,98 @@ import Utilities
   /// Executes the command.
   public mutating func run() async throws {
     try configureSearchPaths()
-    var driver = Driver(moduleCachePath: noCaching ? nil : moduleCachePath!)
+    var driver = Driver(
+      moduleCachePath: noCaching ? nil : moduleCachePath!,
+      targetConfiguration: .init(targetTriple: targetTriple, cpu: targetCPU, features: targetFeatures),
+      librarySearchPaths: librarySearchPaths)
 
-    // Load the standard library.
-    if !noStandardLibrary {
-      note("load Hylo's standard library")
-      do {
+    do {
+      // Load the standard library.
+      if !noStandardLibrary {
+        note("load Hylo's standard library")
         try await driver.loadStandardLibrary()
-      } catch let e as CompilationError {
-        render(e.diagnostics.elements)
-        CommandLine.exit(withError: ExitCode.failure)
       }
+
+      // Create a module for the product being compiled.
+      let product = productName(inputs)
+      note("start compiling \(product)")
+      let module = driver.program.demandModule(product)
+      if !noStandardLibrary {
+        driver.program[module].addDependency(Module.standardLibraryName)
+      }
+
+      // Compile from sources.
+      let sources = try sourceFiles(recursivelyContainedIn: inputs)
+      await perform("parsing", for: module, { await driver.parse(sources, into: module) })
+      await perform("scoping", for: module, { await driver.assignScopes(of: module) })
+      if outputType == .ast {
+        try emitAst(module, in: driver.program, name: product)
+        return
+      }
+
+      await perform("typing", for: module, {
+        await driver.assignTypes(of: module, loggingInferenceWhere: inferenceLoggerFilter())
+      })
+      if outputType == .typedAST {
+        try emitAst(module, in: driver.program, name: product)
+        return
+      }
+
+      await perform("lowering", for: module, { await driver.lower(module) })
+      if outputType == .rawIR {
+        try emitIR(module, in: driver.program, name: product)
+        return
+      }
+
+      await perform("normalization", for: module, { await driver.applyTransformationPasses(module) })
+      if outputType == .ir {
+        try emitIR(module, in: driver.program, name: product)
+        return
+      }
+
+      try await perform("code generation", for: module, { try driver.lowerToLLVM(module) })
+      if outputType == .llvm {
+        try emitLLVM(module, from: driver, name: product)
+        return
+      }
+      if outputType == .asm {
+        try write(driver.assembly(of: module), to: asmFile(product))
+        return
+      }
+      if outputType == .object {
+        let modules = Array(driver.program.moduleIdentities)
+        for dependency in modules where dependency != module {
+          await perform("lowering", for: dependency, { await driver.lower(dependency) })
+          await perform(
+            "normalization",
+            for: dependency,
+            { await driver.applyTransformationPasses(dependency) })
+          try await perform(
+            "code generation",
+            for: dependency,
+            { try driver.lowerToLLVM(dependency) })
+        }
+        let directory = try objectFilesDirectory()
+        _ = try driver.writeObjectFiles(for: modules, into: directory)
+        note("written \(directory.path)")
+        return
+      }
+
+      // Write the module to the cache for future runs.
+      let a = try driver.program.archive(module: module)
+      note("module archive size: \(a.count)")
+
+      assert(outputType == .binary)
+      try await perform("generating executable", for: module,
+        { try driver.generateExecutable(for: module, writingTo: binaryFile(product)) })
+    } catch let e as CompilationError {
+      render(e.diagnostics.elements)
+      CommandLine.exit(withError: ExitCode.failure)
     }
 
-    // Create a module for the product being compiled.
-    let product = productName(inputs)
-    note("start compiling \(product)")
-    let module = driver.program.demandModule(product)
-    if !noStandardLibrary {
-      driver.program[module].addDependency(Module.standardLibraryName)
-    }
-
-    // Compile from sources.
-    let sources = try sourceFiles(recursivelyContainedIn: inputs)
-    await perform("parsing", { await driver.parse(sources, into: module) })
-    await perform("scoping", { await driver.assignScopes(of: module) })
-    if outputType == .ast {
-      try emitAst(module, in: driver.program, name: product)
-      return
-    }
-
-    await perform("typing") {
-      await driver.assignTypes(of: module, loggingInferenceWhere: inferenceLoggerFilter())
-    }
-    if outputType == .typedAST {
-      try emitAst(module, in: driver.program, name: product)
-      return
-    }
-
-    await perform("lowering", { await driver.lower(module) })
-    if outputType == .rawIR {
-      try emitIR(module, in: driver.program, name: product)
-      return
-    }
-
-    await perform("normalization", { await driver.applyTransformationPasses(module) })
-    if outputType == .ir {
-      try emitIR(module, in: driver.program, name: product)
-      return
-    }
-
-    await perform("code generation", { await driver.generateCode(module) })
-    if outputType == .llvm {
-      try emitLLVM(module, in: driver.program, name: product)
-      return
-    }
-    if outputType == .asm {
-      try emitAsm(module, in: driver.program, name: product)
-      return
-    }
-
-    // Write the module to the cache for future runs.
-    let a = try driver.program.archive(module: module)
-    note("module archive size: \(a.count)")
-
-    assert(outputType == .binary)
-    await perform("generating executable", { await driver.generateExecutable(module) })
-
-    func perform(
-      _ phase: String, _ action: () async -> (elapsed: Duration, containsError: Bool)
-    ) async {
-      let a = await action()
+    func perform(_ phase: String, for module: FrontEnd.Module.ID,
+      _ action: () async throws -> (elapsed: Duration, containsError: Bool)) async rethrows {
+      let a = try await action()
       note("\(phase) completed in \(a.elapsed.human)")
       exitOnError(driver.program[module])
     }
@@ -178,16 +220,12 @@ import Utilities
 
   /// Emits the LLVM IR of `module` in `program` with name `name`.
   private func emitLLVM(
-    _ module: Module.ID, in program: Program, name: Module.Name
+    _ module: Module.ID, from driver: Driver, name: Module.Name
   ) throws {
-    // TODO
-  }
-
-  /// Emits the assembly of `module` in `program` with name `name`.
-  private func emitAsm(
-    _ module: Module.ID, in program: Program, name: Module.Name
-  ) throws {
-    // TODO
+    guard let output = driver.llvmIR(of: module) else {
+      fatalError("missing LLVM output")
+    }
+    try write(output, to: llvmFile(name))
   }
 
   /// Writes `content` to `url`, or to the standard output if `url` is "-".
@@ -260,13 +298,6 @@ import Utilities
     }
   }
 
-  /// Writes `message` to the standard error and exit.
-  private func fatal(_ message: String) {
-    var stderr = StandardError()
-    print(message, to: &stderr)
-    CommandLine.exit(withError: ExitCode.failure)
-  }
-
   /// Returns the configuration corresponding to the given `flags`.
   private func treePrinterConfiguration(
     for flags: [TreePrinterFlag]
@@ -284,6 +315,34 @@ import Utilities
       }
     }
     return "Main"
+  }
+
+  /// The type of the output files to generate.
+  private enum OutputType: String, ExpressibleByArgument, CaseIterable {
+
+    /// Abstract syntax tree before typing.
+    case ast = "ast"
+
+    /// Abstract syntax tree after typing.
+    case typedAST = "typed-ast"
+
+    /// Hylo IR before mandatory transformations.
+    case rawIR = "raw-ir"
+
+    /// Hylo IR.
+    case ir = "ir"
+
+    /// LLVM IR.
+    case llvm = "llvm"
+
+    /// Assembly.
+    case asm = "asm"
+
+    /// Object file.
+    case object = "object"
+
+    /// Executable binary.
+    case binary = "binary"
   }
 
   /// Given the desired name of the compiler's product, returns the file to write when "raw-ast" is
@@ -310,10 +369,19 @@ import Utilities
     outputURL ?? URL(fileURLWithPath: productName.description + ".s")
   }
 
+  /// Returns the directory to write when "object" is selected as the output type.
+  private func objectFilesDirectory() throws -> URL {
+    guard outputURL?.relativePath != "-" else {
+      throw ValidationError("object files cannot be written to the standard output")
+    }
+    return outputURL ?? URL(fileURLWithPath: "./")
+  }
+
   /// Given the desired name of the compiler's product, returns the file to write when "binary" is
   /// selected as the output type.
   private func binaryFile(_ productName: Module.Name) -> URL {
-    outputURL ?? URL(fileURLWithPath: productName.description)
+    let base = outputURL ?? URL(fileURLWithPath: productName.description)
+    return base.withHostExecutableSuffix()
   }
 
   private func inferenceLoggerFilter() -> ((AnySyntaxIdentity, Program) -> Bool)? {
@@ -332,31 +400,6 @@ import Utilities
     }
   }
 
-  /// The type of the output files to generate.
-  private enum OutputType: String, ExpressibleByArgument, CaseIterable {
-
-    /// Abstract syntax tree before typing.
-    case ast = "ast"
-
-    /// Abstract syntax tree after typing.
-    case typedAST = "typed-ast"
-
-    /// Hylo IR before mandatory transformations.
-    case rawIR = "raw-ir"
-
-    /// Hylo IR.
-    case ir = "ir"
-
-    /// LLVM IR.
-    case llvm = "llvm"
-
-    /// Assembly.
-    case asm = "asm"
-
-    /// Executable binary.
-    case binary = "binary"
-  }
-
   /// Tree printing flags.
   private enum TreePrinterFlag: String, EnumerableFlag {
 
@@ -367,6 +410,15 @@ import Utilities
       .customLong(value.rawValue)
     }
 
+  }
+
+}
+
+extension Driver.TargetSelection: ExpressibleByArgument {
+
+  /// Creates an instance by parsing a command-line argument.
+  public init(argument: String) {
+    self = (argument == "host") ? .host : .specified(argument)
   }
 
 }
