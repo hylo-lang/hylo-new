@@ -1,0 +1,3 @@
+[submodule "Swifty-LLVM"]
+	path = Swifty-LLVM
+	url = https://github.com/hylo-lang/Swifty-LLVM

@@ -36,6 +36,7 @@ let package = Package(
     .package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
+    .package(path: "./Swifty-LLVM"),
   ],
   targets: [
     .executableTarget(
@@ -78,6 +79,17 @@ let package = Package(
       swiftSettings: commonSwiftSettings),
 
     .target(
+      name: "LLVMEmitter",
+      dependencies: [
+        .target(name: "FrontEnd"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
+        .target(name: "Utilities"),
+      ],
+      path: "Sources/BackEnd/LLVM",
+      swiftSettings: commonSwiftSettings,
+    ),
+
+    .target(
       name: "StableCollections",
       dependencies: [
         .target(name: "Utilities")
@@ -113,6 +125,13 @@ let package = Package(
       name: "FrontEndTests",
       dependencies: [
         .target(name: "FrontEnd")
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
+      name: "LLVMEmitterTests",
+      dependencies: [
+        .target(name: "LLVMEmitter")
       ],
       swiftSettings: commonSwiftSettings),
 
