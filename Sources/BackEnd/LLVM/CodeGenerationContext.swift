@@ -72,10 +72,10 @@ public struct CodeGenerationContext: ~Copyable {
     transpiling module: FrontEnd.Module.ID, in program: Program,
     compilingFor targetMachine: consuming SwiftyLLVM.TargetMachine
   ) throws {
-    self.llvm = try SwiftyLLVM.Module(
-      program.modules.elements[module].value.name.rawValue, targetMachine: consume targetMachine)
     self.program = program
     self.moduleID = module
+    self.llvm = try SwiftyLLVM.Module(
+      program.modules.elements[module].value.name.rawValue, targetMachine: consume targetMachine)
 
     // FIXME: avoid copying the whole array a second time. FrontEnd could expose an array instead of an opaque collection.
     self.functions = program.modules.elements[module].value.functions.map { $0 }
