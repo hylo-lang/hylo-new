@@ -72,10 +72,10 @@ public struct CodeGenerationContext: ~Copyable {
     transpiling module: FrontEnd.Module.ID, in program: Program,
     compilingFor targetMachine: consuming SwiftyLLVM.TargetMachine
   ) throws {
+    self.llvm = try SwiftyLLVM.Module(
+      program.modules.elements[module].value.name.rawValue, targetMachine: consume targetMachine)
     self.program = program
     self.moduleID = module
-    self.llvm = try SwiftyLLVM.Module(
-      program.modules.elements[module].value.name.rawValue, targetMachine: targetMachine)
 
     // FIXME: avoid copying the whole array a second time. FrontEnd could expose an array instead of an opaque collection.
     self.functions = program.modules.elements[module].value.functions.map { $0 }
@@ -122,7 +122,7 @@ public struct CodeGenerationContext: ~Copyable {
   mutating func declareFunction(transpiledFrom f: IRFunction) -> SwiftyLLVM.Function.UnsafeReference
   {
     // Parameters and return values are passed by reference.
-    let parameters = Array(repeating: llvm.ptr.erased, count: f.termParameters.count)
+    let parameters = Array(repeating: llvm.pointerType().erased, count: f.termParameters.count)
     let name = program.llvmName(of: f)
     let transpiledFunction = llvm.declareFunction(name, llvm.functionType(from: parameters))
 
@@ -141,35 +141,35 @@ public struct CodeGenerationContext: ~Copyable {
   /// function named "main", taking no parameter and returning either `Void` or `Int32`. `f` will
   /// be linked privately in `m`.
   private mutating func defineMain(calling f: IRFunction) {
-    let main = llvm.declareFunction("main", llvm.functionType(from: (), to: llvm.i32))
+    // let main = llvm.declareFunction("main", llvm.functionType(from: (), to: llvm.i32))
 
-    let b = llvm.appendBlock(to: main)
-    let p = llvm.endOf(b)
+    // let b = llvm.appendBlock(to: main)
+    // let p = llvm.endOf(b)
 
-    let transpilation = llvm.function(named: program.llvmName(of: f))!
-    llvm.setLinkage(.private, for: transpilation)
+    // let transpilation = llvm.function(named: program.llvmName(of: f))!
+    // llvm.setLinkage(.private, for: transpilation)
 
-    let int32 = program.standardLibraryType(.int32)  // todo coreType("Int32")!
+    // let int32 = program.standardLibraryType(.int32)  // todo coreType("Int32")!
 
-    if let r = f.returnRegister,
-      let rt = f.result(of: r),
-      rt.type == int32
-    {
-      // Calling as `fun main() -> Int32`
-      let t = StructType.UnsafeReference(program.llvmType(from: int32, in: &llvm))!
-      let s = llvm.insertAlloca(t, at: p)
-      _ = llvm.insertCall(transpilation, on: (s), at: p)
+    // if let r = f.returnRegister,
+    //   let rt = f.result(of: r),
+    //   rt.type == int32
+    // {
+    //   // Calling as `fun main() -> Int32`
+    //   let t = StructType.UnsafeReference(program.llvmType(from: int32, in: &llvm))!
+    //   let s = llvm.insertAlloca(t, at: p)
+    //   _ = llvm.insertCall(transpilation, on: (s), at: p)
 
-      let statusPointer = llvm.insertGetStructElementPointer(of: s, typed: t, index: 0, at: p)
-      let status = llvm.insertLoad(llvm.i32, from: statusPointer, at: p)
-      llvm.insertReturn(status, at: p)
-    } else {
-      // Calling as `fun main() -> Void`
-      let t = program.llvmType(from: AnyTypeIdentity.void, in: &llvm)
-      let s = llvm.insertAlloca(t, at: p)
-      _ = llvm.insertCall(transpilation, on: (s), at: p)
-      llvm.insertReturn(llvm.i32.unsafe[].zero, at: p)
-    }
+    //   let statusPointer = llvm.insertGetStructElementPointer(of: s, typed: t, index: 0, at: p)
+    //   let status = llvm.insertLoad(llvm.i32, from: statusPointer, at: p)
+    //   llvm.insertReturn(status, at: p)
+    // } else {
+    //   // Calling as `fun main() -> Void`
+    //   let t = program.llvmType(from: AnyTypeIdentity.void, in: &llvm)
+    //   let s = llvm.insertAlloca(t, at: p)
+    //   _ = llvm.insertCall(transpilation, on: (s), at: p)
+    //   llvm.insertReturn(llvm.i32.unsafe[].zero, at: p)
+    // }
   }
 
   /// Adds the function attributes to `llvmFunction` implied by its IR form `f`.
@@ -324,7 +324,7 @@ public struct CodeGenerationContext: ~Copyable {
       let s = f.at(i) as! IRAlloca
       let t = program.llvmType(from: s.storageType, in: &llvm)
       if llvm.layout.storageSize(of: t) == 0 {
-        register[.register(i)] = llvm.ptr.unsafe[].null.erased
+        register[.register(i)] = llvm.pointerType().unsafe[].null.erased
       } else {
         register[.register(i)] = llvm.insertAlloca(t, atEntryOf: transpiledFunction).erased
       }
@@ -368,16 +368,16 @@ public struct CodeGenerationContext: ~Copyable {
 
     /// Inserts the transpilation of `i` at `insertionPoint`.
     func insert(subfield i: AnyInstructionIdentity) {
-      let s = f.at(i) as! IRSubfield
+      // let s = f.at(i) as! IRSubfield
 
-      let base = llvmOperand(s.base)
-      let baseType = program.llvmType(from: f.result(of: s.base)!.type, in: &llvm)
-      let indices =
-        [llvm.i32.unsafe[].constant(0).erased]
-        + s.path.map { sf in llvm.i32.unsafe[].constant(UInt64(sf)).erased }
-      let v = llvm.insertGetElementPointerInBounds(
-        of: base, typed: baseType, indices: indices, at: insertionPoint)
-      register[.register(i)] = v.erased
+      // let base = llvmOperand(s.base)
+      // let baseType = program.llvmType(from: f.result(of: s.base)!.type, in: &llvm)
+      // let indices =
+      //   [llvm.i32.unsafe[].constant(0).erased]
+      //   + s.path.map { sf in llvm.i32.unsafe[].constant(UInt64(sf)).erased }
+      // let v = llvm.insertGetElementPointerInBounds(
+      //   of: base, typed: baseType, indices: indices, at: insertionPoint)
+      // register[.register(i)] = v.erased
     }
 
     /// Inserts the transpilation of `i` at `insertionPoint`.
@@ -1065,22 +1065,22 @@ public struct CodeGenerationContext: ~Copyable {
 
     /// Inserts the transpilation of `i` at `insertionPoint`.
     func insert(memoryCopy i: AnyInstructionIdentity) {
-      let s = f.at(i) as! IRMemoryCopy
+      let _ = f.at(i) as! IRMemoryCopy
 
-      let memcpy = llvm.intrinsic(
-        named: IntrinsicFunction.llvm.memcpy, for: (llvm.ptr, llvm.ptr, llvm.i32))!
-      let source = llvmOperand(s.source)
-      let target = llvmOperand(s.target)
+      // let _ = llvm.intrinsic(
+      //   named: IntrinsicFunction.llvm.memcpy, for: (llvm.pointerType(), llvm.pointerType(), llvm.integerType(32)))!
+      // let source = llvmOperand(s.source)
+      // let target = llvmOperand(s.target)
 
-      // let l = ConcreteTypeLayout(
-      //   of: f.result(of: s.source)!.type, definedIn: program, forUseIn: &self)
-      // let byteCount = llvm.i32.unsafe[].constant(l.size)
+      // // let l = ConcreteTypeLayout(
+      // //   of: f.result(of: s.source)!.type, definedIn: program, forUseIn: &self)
+      // // let byteCount = llvm.i32.unsafe[].constant(l.size)
 
-      let type = program.llvmType(from: f.result(of: s.source)!.type, in: &llvm)
-      let byteCount = llvm.i32.unsafe[].constant(llvm.layout.storageSize(of: type))
+      // let type = program.llvmType(from: f.result(of: s.source)!.type, in: &llvm)
+      // let byteCount = llvm.i32.unsafe[].constant(llvm.layout.storageSize(of: type))
 
-      _ = llvm.insertCall(
-        memcpy, on: (target, source, byteCount, llvm.i1.unsafe[].zero), at: insertionPoint)
+      // _ = llvm.insertCall(
+      //   memcpy, on: (target, source, byteCount, llvm.integerType(1).unsafe[].zero), at: insertionPoint)
     }
 
     // /// Inserts the transpilation of `i` at `insertionPoint`.
@@ -1157,7 +1157,7 @@ public struct CodeGenerationContext: ~Copyable {
       // The first element of the representation is the function pointer.
       var f = llvm.insertGetStructElementPointer(
         of: lambda, typed: llvmType, index: 0, at: insertionPoint)
-      f = llvm.insertLoad(llvm.ptr, from: f, at: insertionPoint)
+      f = llvm.insertLoad(llvm.pointerType(), from: f, at: insertionPoint)
 
       let e = llvm.insertGetStructElementPointer(
         of: lambda, typed: llvmType, index: 1, at: insertionPoint)
@@ -1173,7 +1173,7 @@ public struct CodeGenerationContext: ~Copyable {
         // Remote captures are passed dereferenced.
         if program.types.cast(c, to: RemoteType.self) != nil {
           // TODO see if this is still necessary after we have desugared projections.
-          x = llvm.insertLoad(llvm.ptr, from: x, at: insertionPoint)
+          x = llvm.insertLoad(llvm.pointerType(), from: x, at: insertionPoint)
         }
 
         environment.append(x.erased)
@@ -1199,7 +1199,7 @@ public struct CodeGenerationContext: ~Copyable {
       }
 
       return llvm.functionType(
-        from: Array(repeating: llvm.ptr.erased, count: parameters), to: llvm.void)
+        from: Array(repeating: llvm.pointerType().erased, count: parameters), to: llvm.void)
     }
   }
 }
