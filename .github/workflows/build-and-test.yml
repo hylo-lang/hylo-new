@@ -14,7 +14,7 @@ jobs:
       matrix:
         # Note: all combinations of the following will be run independently
         os: [macos-15, ubuntu-24.04, windows-2025]
-        swift: ["6.2"]
+        swift: ["6.2.4"]
         config: [release, debug]
 
         include:
@@ -23,7 +23,6 @@ jobs:
 
           # Enable exporting code coverage in a single configuration.
           - os: "ubuntu-24.04"
-            swift: "6.2"
             config: debug
             export-coverage: true
 
