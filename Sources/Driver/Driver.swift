@@ -148,20 +148,20 @@ public struct Driver {
 
     if cachingIsEnabled {
       let a = try program.archive(module: m)
-      let f = moduleCachePath!.appending(component: module.rawValue + ".hylomodule")
+      let f = moduleCachePath!.appending(component: module + ".hylomodule")
       try a.write(into: f)
     }
   }
 
   /// Loads the standard library with `load(_:withSourcesAt:)`.
   public mutating func loadStandardLibrary() async throws {
-    try await load(.standardLibrary, withSourcesAt: standardLibrarySources)
+    try await load(Module.standardLibraryName, withSourcesAt: standardLibrarySources)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
   public func archive(of module: Module.Name) -> Data? {
     if let prefix = moduleCachePath {
-      let path = prefix.appending(path: module.rawValue + ".hylomodule")
+      let path = prefix.appending(path: module + ".hylomodule")
       return try? Data(contentsOf: path)
     } else {
       return nil

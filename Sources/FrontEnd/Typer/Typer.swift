@@ -37,7 +37,7 @@ public struct Typer {
 
   /// Type checks the top-level declarations of `self.module`.
   public mutating func apply() {
-    if program[module].name == .standardLibrary {
+    if program[module].isStandardLibrary {
       program.initializeStandardLibraryCaches()
     }
     for d in program[module].topLevelDeclarations { check(d) }
@@ -4305,8 +4305,8 @@ public struct Typer {
       var table: [Module.ID] = []
 
       // Standard library is imported implicitly.
-      if program[f.module].dependencies.contains(.standardLibrary) {
-        let m = program.identity(module: .standardLibrary)
+      if program[f.module].dependencies.contains(Module.standardLibraryName) {
+        let m = program.identity(module: Module.standardLibraryName)
         assert(m != nil, "standard library is not loaded")
         table.append(m!)
       }

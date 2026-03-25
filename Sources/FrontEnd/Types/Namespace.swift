@@ -48,7 +48,7 @@ extension Namespace.Identifier: Showable {
     case .builtin:
       return "Builtin"
     case .module(let m):
-      return printer.program[m].name.rawValue
+      return printer.program[m].name
     }
   }
 

@@ -9,31 +9,7 @@ public struct Module: Sendable {
   public typealias ID = Int
 
   /// The name of a module.
-  @Archivable
-  public struct Name: Hashable, Sendable, CustomStringConvertible {
-
-    /// The raw value of this name.
-    public let rawValue: String
-
-    /// Creates an instance with the given raw value.
-    public init(_ rawValue: String) {
-      self.rawValue = rawValue
-    }
-
-    /// A textual description of this name.
-    public var description: String {
-      rawValue
-    }
-
-    /// Returns `true` iff `self` lexicographicaly precedes `other`.
-    public func lexicographicallyPrecedes(_ other: Self) -> Bool {
-      rawValue.lexicographicallyPrecedes(other.rawValue)
-    }
-
-    /// The name of Hylo's standard library.
-    public static let standardLibrary = Name("hylo.Hylo")
-
-  }
+  public typealias Name = String
 
   /// A source file added to a module.
   internal struct SourceContainer: Sendable {
@@ -151,6 +127,9 @@ public struct Module: Sendable {
 
   }
 
+  /// The name of Hylo's standard library.
+  public static let standardLibraryName = Name("Hylo")
+
   /// The name of the module.
   public let name: Name
 
@@ -174,7 +153,7 @@ public struct Module: Sendable {
 
   /// `true` iff `self` is Hylo's standard library.
   public var isStandardLibrary: Bool {
-    name == .standardLibrary
+    name == Module.standardLibraryName
   }
 
   /// Returns a hash of the module that suitable for determining whether its sources have changed.
