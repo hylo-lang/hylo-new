@@ -1262,11 +1262,6 @@ internal struct IREmitter {
 
   /// Inserts an `access` instruction.
   private mutating func _access(_ k: AccessEffectSet, from source: IRValue) -> IRValue {
-    if let s = (source.register >>= currentFunction.at(_:)) as? IRAccess {
-      // Reuse the source if we're just forming an access with the same capabilities.
-      if s.capabilities == k { return source }
-    }
-
     assert(currentFunction.isAddress(source))
     return insert(IRAccess(capabilities: k, source: source, anchor: currentAnchor))!
   }
