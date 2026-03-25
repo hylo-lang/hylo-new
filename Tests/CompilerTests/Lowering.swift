@@ -14,12 +14,11 @@ final class LoweringTests: XCTestCase {
         _ = d.program[m0].addSource(
             """
             fun create() -> Int {
-              // 4  // FrontEnd/Program.swift:666: Fatal error: untyped node at /home/ambrus/hylo-new/triage-crash-hn2/StandardLibrary/Sources/Core/Numbers/AdditiveArithmetic.hylo:2.41-50
-            
-              // .zero()  // FrontEnd/IREmitter.swift:450: Fatal error: unexpected node 'ImplicitQualification' at virtual://1rq7u984nxlse:4.3-4
+              // 4  // FrontEnd/IREmitter.swift:671: Fatal error: Unexpected builtin(FrontEnd.BuiltinEntity.function(FrontEnd.BuiltinFunction.zeroinitializer(FrontEnd.ConcreteTypeIdentity<FrontEnd.MachineType>(erased: 3)))))            
+             
+              //.zero()  // FrontEnd/IREmitter.swift:450: Fatal error: unexpected node 'ImplicitQualification' at virtual://1rq7u984nxlse:4.3-4
 
-              Int() // FrontEnd/Program.swift:666: Fatal error: untyped node at /home/ambrus/hylo-new/triage-crash-hn2/StandardLibrary/Sources/Core/Numbers/AdditiveArithmetic.hylo:2.41-50
-
+              Int() // FrontEnd/IREmitter.swift:671: Fatal error: Unexpected builtin(FrontEnd.BuiltinEntity.function(FrontEnd.BuiltinFunction.zeroinitializer(FrontEnd.ConcreteTypeIdentity<FrontEnd.MachineType>(erased: 3)))))
             }
 
             """)
