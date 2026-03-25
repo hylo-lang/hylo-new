@@ -1771,6 +1771,8 @@ public struct Typer {
       return inferredType(of: castUnchecked(e, to: StaticCall.self), in: &context)
     case TupleLiteral.self:
       return inferredType(of: castUnchecked(e, to: TupleLiteral.self), in: &context)
+    case TupleMember.self:
+      return inferredType(of: castUnchecked(e, to: TupleMember.self), in: &context)
     case TupleTypeExpression.self:
       return inferredType(of: castUnchecked(e, to: TupleTypeExpression.self), in: &context)
     case WildcardLiteral.self:
@@ -2417,43 +2419,59 @@ public struct Typer {
   }
 
   /// Returns the inferred type of `e`.
-   private mutating func inferredType(
-     of e: TupleTypeExpression.ID, in context: inout InferenceContext
-   ) -> AnyTypeIdentity {
-     let s = program[e].elements.map({ (e) in evaluateTypeAscription(e) })
+  private mutating func inferredType(
+    of e: TupleMember.ID, in context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    let parent = context.withSubcontext() { (ctx) in
+      inferredType(of: program[e].parent, in: &ctx)
+    }
 
-     // Unit type?
-     if s.isEmpty {
-       assert(program[e].ellipsis == nil)
-       let t = metatype(of: Tuple.empty).erased
-       return context.obligations.assume(e, hasType: t, at: program[e].site)
-     }
+    let s = program.spanForDiagnostic(about: e)
+    let t = fresh().erased
+    let k = TupleMemberConstraint(
+      member: program[e].member, parent: parent, type: t, site: s)
+    context.obligations.assume(k)
+    return context.obligations.assume(e, hasType: t, at: s)
+  }
 
-     // Variable-length tuple (i.e., `{T, ...U}`)?
-     else if program[e].ellipsis != nil {
-       // Ill-formed tuple type expressions should be caught during parsing.
-       assert(s.count >= 2)
+  /// Returns the inferred type of `e`.
+  private mutating func inferredType(
+    of e: TupleTypeExpression.ID, in context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    let s = program[e].elements.map({ (e) in evaluateTypeAscription(e) })
 
-       let t = s.dropLast().reversed().reduce(s.last!) { (t, h) in
-         demand(Tuple.cons(head: h, tail: t)).erased
-       }
+    // Unit type?
+    if s.isEmpty {
+      assert(program[e].ellipsis == nil)
+      let t = metatype(of: Tuple.empty).erased
+      return context.obligations.assume(e, hasType: t, at: program[e].site)
+    }
 
-       if program.types.tag(of: s.last!) != GenericParameter.self {
-         let m = program.format("open-ended tuple '%T' is uninhabited", [t])
-         report(.warning, m, about: e)
-       }
+    // Variable-length tuple (i.e., `{T, ...U}`)?
+    else if program[e].ellipsis != nil {
+      // Ill-formed tuple type expressions should be caught during parsing.
+      assert(s.count >= 2)
 
-       let u = demand(Metatype(inhabitant: t)).erased
-       return context.obligations.assume(e, hasType: u, at: program[e].site)
-     }
+      let t = s.dropLast().reversed().reduce(s.last!) { (t, h) in
+        demand(Tuple.cons(head: h, tail: t)).erased
+      }
 
-     // Regular tuple type.
-     else {
-       let t = program.types.tuple(of: s)
-       let u = demand(Metatype(inhabitant: t)).erased
-       return context.obligations.assume(e, hasType: u, at: program[e].site)
-     }
-   }
+      if program.types.tag(of: s.last!) != GenericParameter.self {
+        let m = program.format("open-ended tuple '%T' is uninhabited", [t])
+        report(.warning, m, about: e)
+      }
+
+      let u = demand(Metatype(inhabitant: t)).erased
+      return context.obligations.assume(e, hasType: u, at: program[e].site)
+    }
+
+    // Regular tuple type.
+    else {
+      let t = program.types.tuple(of: s)
+      let u = demand(Metatype(inhabitant: t)).erased
+      return context.obligations.assume(e, hasType: u, at: program[e].site)
+    }
+  }
 
   /// Returns the inferred type of `e`.
   private mutating func inferredType(

@@ -259,6 +259,10 @@ extension Diagnostic {
     .init(.error, "cannot consume '\(k)' projection", at: site)
   }
 
+  internal static func illegalImmutableAccess(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "illegal immutable access", at: site)
+  }
+
   internal static func illegalMove(at site: SourceSpan) -> Diagnostic {
     .init(.error, "illegal move", at: site)
   }

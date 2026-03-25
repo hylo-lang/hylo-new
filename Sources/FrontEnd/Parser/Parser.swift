@@ -1278,7 +1278,7 @@ public struct Parser {
     var h = head
     while true {
       // Qualifications and bracketed calls bind more tightly than mutation markers.
-      if let n = try appendNominalComponent(to: h, in: &file) {
+      if let n = try appendMemberSelection(to: h, in: &file) {
         h = n
       } else if let n = try appendBracketedArguments(to: h, in: &file) {
         h = n
@@ -1295,16 +1295,24 @@ public struct Parser {
     return h
   }
 
-  /// If the next token is a dot, parses a nominal component and returns a name expression
-  /// qualified by `head`. Otherwise, returns `nil`.
-  private mutating func appendNominalComponent(
+  /// If the next token is a dot, parses a nominal component or a tuple member index and returns a
+  /// name expression or a tuple member qualified by `head`. Otherwise, returns `nil`.
+  private mutating func appendMemberSelection(
     to head: ExpressionIdentity, in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity? {
     if take(.dot) == nil { return nil }
-    let n = try parseName()
-    let s = span(from: file[head].site.start)
-    let m = file.insert(NameExpression(qualification: head, name: n, site: s))
-    return .init(m)
+
+    if let i = take(.integerLiteral) {
+      let n = try Int(i.text) ?? illegalTupleMemberIndex(i)
+      let s = span(from: file[head].site.start)
+      let m = file.insert(TupleMember(parent: head, member: .init(n, at: i.site), site: s))
+      return .init(m)
+    } else {
+      let n = try parseName()
+      let s = span(from: file[head].site.start)
+      let m = file.insert(NameExpression(qualification: head, name: n, site: s))
+      return .init(m)
+    }
   }
 
   /// If the next token is a left angle, parses an argument list and returns a static call applying
@@ -2005,7 +2013,7 @@ public struct Parser {
     var head = q
 
     while true {
-      if let n = try appendNominalComponent(to: head, in: &file) {
+      if let n = try appendMemberSelection(to: head, in: &file) {
         head = n
       } else if let n = try appendAngledArguments(to: head, in: &file) {
         head = n
@@ -2585,6 +2593,11 @@ public struct Parser {
   /// Returns a parse error reporting an unary operator separated from its operand.
   private func separatedUnaryOperator(_ o: SourceSpan) -> ParseError {
     .init("unary operator '\(o.text)' cannot be separated from its operand", at: o)
+  }
+
+  /// Returns a parse error reporting a failure to parse a tuple member index.
+  private func illegalTupleMemberIndex(_ i: Token) -> ParseError {
+    .init("cannot parse '\(i.text)' as a tuple member index", at: i.site)
   }
 
   /// Reports `e` and returns `v`.

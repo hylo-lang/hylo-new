@@ -118,6 +118,8 @@ extension Program {
       break
     case TupleLiteral.self:
       traverse(castUnchecked(n, to: TupleLiteral.self), calling: &v)
+    case TupleMember.self:
+      traverse(castUnchecked(n, to: TupleMember.self), calling: &v)
     case TupleTypeExpression.self:
       traverse(castUnchecked(n, to: TupleTypeExpression.self), calling: &v)
     case WildcardLiteral.self:
@@ -344,6 +346,11 @@ extension Program {
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: TupleLiteral.ID, calling v: inout T) {
     visit(self[n].elements, calling: &v)
+  }
+
+  /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
+  public func traverse<T: SyntaxVisitor>(_ n: TupleMember.ID, calling v: inout T) {
+    visit(self[n].parent, calling: &v)
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
