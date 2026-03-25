@@ -113,7 +113,10 @@ public struct Program: Sendable {
         // reifyBundles
         // reifyAccesses
         work[i].function.closeOpenEndedRegions()
-        work[i].function.normalizeLifetimes(emittingInto: m, using: &typer)
+
+        // The following two passes may fail
+        if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
+        if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
       }
 
       // It is possible new functions have been declared during lifetime normalization, e.g., for
