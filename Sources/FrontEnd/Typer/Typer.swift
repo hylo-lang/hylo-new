@@ -1264,12 +1264,22 @@ public struct Typer {
     assert(d.module == module, "dependency is not typed")
 
     let n = program[d].identifier.value
+
+    // Are we importing a known dependency?
     if program[d.module].dependencies.contains(n) {
+      if n == Module.standardLibraryName {
+        let s = program.spanForDiagnostic(about: d)
+        report(.init(.warning, "module 'Hylo' is already implicitly imported", at: s))
+      }
+
       let m = program.identity(module: n)!
       let t = program.types.demand(Namespace(identifier: .module(m))).erased
       program[d.module].setType(t, for: d)
       return t
-    } else {
+    }
+
+    // Module is undefined.
+    else {
       report(.error, "undefined module '\(n)'", about: d)
       return .error
     }
@@ -4341,8 +4351,14 @@ public struct Typer {
       for d in program[f].topLevelDeclarations {
         // Imports precede all other declarations.
         guard let i = program.cast(d, to: ImportDeclaration.self) else { break }
+
         // Ignore invalid imports.
-        if let m = program.identity(module: .init(program[i].identifier.value)) { table.append(m) }
+        let t = declaredType(of: i)
+        if case .module(let m) = (program.types[t] as? Namespace)?.identifier {
+          // Avoid importing a module more than once. We're using a linear search because `table`
+          // is assumed to be small in practice.
+          if table.contains(m) { table.append(m) }
+        }
       }
 
       cache.sourceToImports[f.offset] = table
