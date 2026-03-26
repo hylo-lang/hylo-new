@@ -1,0 +1,3 @@
+negative/undefined-module.hylo:3.8-14: error: undefined module 'Jugemu'
+import Jugemu
+       ~~~~~~

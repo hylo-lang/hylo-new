@@ -312,6 +312,8 @@ public struct Typer {
       check(castUnchecked(d, to: FunctionDeclaration.self))
     case GenericParameterDeclaration.self:
       check(castUnchecked(d, to: GenericParameterDeclaration.self))
+    case ImportDeclaration.self:
+      check(castUnchecked(d, to: ImportDeclaration.self))
     case ParameterDeclaration.self:
       check(castUnchecked(d, to: ParameterDeclaration.self))
     case StructDeclaration.self:
@@ -576,12 +578,6 @@ public struct Typer {
     // TODO: Redeclarations
   }
 
-  /// Type checks `d`.
-  private mutating func check(_ d: GenericParameterDeclaration.ID) {
-    _ = declaredType(of: d)
-    checkUniqueDeclaration(d, of: program[d].identifier.value)
-  }
-
   /// Type checks `body` as the definition of `d`, which declares a function or susbscript that
   /// outputs an instance of `r`.
   private mutating func check(
@@ -631,6 +627,18 @@ public struct Typer {
         }
       }
     }
+  }
+
+  /// Type checks `d`.
+  private mutating func check(_ d: GenericParameterDeclaration.ID) {
+    _ = declaredType(of: d)
+    checkUniqueDeclaration(d, of: program[d].identifier.value)
+  }
+
+  /// Type checks `d`.
+  private mutating func check(_ d: ImportDeclaration.ID) {
+    _ = declaredType(of: d)
+    checkUniqueDeclaration(d, of: program[d].identifier.value)
   }
 
   /// Type checks `d`.
@@ -1078,6 +1086,8 @@ public struct Typer {
       return declaredType(of: castUnchecked(d, to: FunctionDeclaration.self))
     case GenericParameterDeclaration.self:
       return declaredType(of: castUnchecked(d, to: GenericParameterDeclaration.self))
+    case ImportDeclaration.self:
+      return declaredType(of: castUnchecked(d, to: ImportDeclaration.self))
     case ParameterDeclaration.self:
       return declaredType(of: castUnchecked(d, to: ParameterDeclaration.self))
     case StructDeclaration.self:
@@ -1246,6 +1256,23 @@ public struct Typer {
     let t = metatype(of: GenericParameter.user(d, k)).erased
     program[d.module].setType(t, for: d)
     return t
+  }
+
+  /// Returns the declared type of `d` without checking.
+  private mutating func declaredType(of d: ImportDeclaration.ID) -> AnyTypeIdentity {
+    if let memoized = program[d.module].type(assignedTo: d) { return memoized }
+    assert(d.module == module, "dependency is not typed")
+
+    let n = program[d].identifier.value
+    if program[d.module].dependencies.contains(n) {
+      let m = program.identity(module: n)!
+      let t = program.types.demand(Namespace(identifier: .module(m))).erased
+      program[d.module].setType(t, for: d)
+      return t
+    } else {
+      report(.error, "undefined module '\(n)'", about: d)
+      return .error
+    }
   }
 
   /// Returns the declared type of `d` without checking.
