@@ -90,12 +90,14 @@ public struct Parser {
       return try .init(parseEnumCaseDeclaration(after: prologue, in: &file))
     case .enum:
       return try .init(parseEnumDeclaration(after: prologue, in: &file))
+    case .extension:
+      return try .init(parseExtensionDeclaration(after: prologue, in: &file))
     case .fun:
       return try parseFunctionOrBundleDeclaration(after: prologue, in: &file)
     case .given:
       return try parseGivenDeclaration(after: prologue, in: &file)
-    case .extension:
-      return try .init(parseExtensionDeclaration(after: prologue, in: &file))
+    case .import:
+      return try .init(parseImportDeclaration(after: prologue, in: &file))
     case .`init`:
       return try .init(parseInitializerDeclaration(after: prologue, in: &file))
     case .struct:
@@ -368,6 +370,21 @@ public struct Parser {
         contextParameters: contextParameters,
         extendee: extendee,
         members: members,
+        site: span(from: introducer)))
+  }
+
+  /// Parses an import declaration.
+  private mutating func parseImportDeclaration(
+    after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
+  ) throws -> ImportDeclaration.ID {
+    let introducer = try take(.import) ?? expected("'import'")
+    let identifier = parseSimpleIdentifier()
+
+    return file.insert(
+      ImportDeclaration(
+        modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToImport),
+        introducer: introducer,
+        identifier: identifier,
         site: span(from: introducer)))
   }
 

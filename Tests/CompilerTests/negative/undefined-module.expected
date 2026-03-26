@@ -1,0 +1,6 @@
+negative/undefined-module.hylo:1.8-14: error: undefined module 'Jugemu'
+import Jugemu
+       ~~~~~~
+negative/undefined-module.hylo:2.8-12: warning: module 'Hylo' is already implicitly imported
+import Hylo
+       ~~~~

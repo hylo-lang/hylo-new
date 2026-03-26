@@ -42,27 +42,27 @@ public struct Program: Sendable {
 
   /// Returns `true` iff the module containing the the standard library is present.
   public var containsStandardLibrary: Bool {
-    if let i = identity(module: .standardLibrary) {
+    if let i = identity(module: Module.standardLibraryName) {
       return !self[i].sources.isEmpty
     } else {
       return false
     }
   }
 
-  /// Returns the identity of the module named `moduleName`.
-  public mutating func demandModule(_ moduleName: Module.Name) -> Module.ID {
-    if let m = modules.index(forKey: moduleName) {
+  /// Returns the identity of the module with the given `name`.
+  public mutating func demandModule(_ name: Module.Name) -> Module.ID {
+    if let m = modules.index(forKey: name) {
       return m
     } else {
       let m = modules.count
-      modules[moduleName] = Module(name: moduleName, identity: m)
+      modules[name] = Module(name: name, identity: m)
       return m
     }
   }
 
-  /// Returns the identity of the module named `moduleName` or `nil` if no such module exists.
-  public func identity(module moduleName: Module.Name) -> Module.ID? {
-    modules.index(forKey: moduleName)
+  /// Returns the identity of the module with the given `name` or `nil` if no such module exists.
+  public func identity(module name: Module.Name) -> Module.ID? {
+    modules.index(forKey: name)
   }
 
   /// Computes the scoping relationships in `m`.
@@ -552,7 +552,7 @@ public struct Program: Sendable {
     else { return nil }
 
     // Is the witness defined in the standard library?
-    if parent(containing: d).module != identity(module: .standardLibrary) {
+    if parent(containing: d).module != identity(module: Module.standardLibraryName) {
       return nil
     }
 
@@ -1389,7 +1389,7 @@ extension Program {
   internal mutating func initializeStandardLibraryCaches() {
     for n in Program.StandardLibraryEntity.allCases {
       guard
-        let a = identity(module: .standardLibrary),
+        let a = identity(module: Module.standardLibraryName),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
       else { fatalError("missing or corrupt standard library") }
@@ -1423,20 +1423,20 @@ extension Program {
     return w.finalize()
   }
 
-  /// Loads the module named `moduleName` from `archive`.
+  /// Loads the module with the given `name` from `archive`.
   ///
   /// - Note: `self` is not modified if an exception is thrown.
-  /// - Requires: `moduleName` is the name of the module stored in `archive`.
+  /// - Requires: `name` is the name of the module stored in `archive`.
   @discardableResult
   public mutating func load<A>(
-    module moduleName: Module.Name, from archive: inout ReadableArchive<A>
+    module name: Module.Name, from archive: inout ReadableArchive<A>
   ) throws -> (loaded: Bool, identity: Module.ID) {
     // Nothing to do if the module is already loaded.
-    if let m = identity(module: moduleName) { return (false, m) }
+    if let m = identity(module: name) { return (false, m) }
 
     // Reserve an identity for the new module.
     let m = modules.count
-    var c = Module.SerializationContext(identities: [moduleName: m], types: .init())
+    var c = Module.SerializationContext(identities: [name: m], types: .init())
 
     // Configure the serialization context.
     swap(&c.types, &types)
@@ -1447,11 +1447,11 @@ extension Program {
 
     // Deserialize the module.
     let instance = try c.withWrapped({ (ctx) in try archive.read(Module.self, in: &ctx) })
-    precondition(moduleName == instance.name)
-    modules[moduleName] = instance
+    precondition(name == instance.name)
+    modules[name] = instance
 
     // Initialize the standard library cache if necessary.
-    if moduleName == .standardLibrary {
+    if name == Module.standardLibraryName {
       initializeStandardLibraryCaches()
     }
 

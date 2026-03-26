@@ -65,6 +65,11 @@ public enum DeclarationModifier: UInt8, Sendable {
     isAccessModifier
   }
 
+  /// Returns `true` iff `self` can be applied to an import declaration.
+  public var isApplicableToImport: Bool {
+    isAccessModifier
+  }
+
   /// Returns `true` iff `self` can be applied on an initializer declaration.
   public var isApplicableToInitializer: Bool {
     isAccessModifier || self == .inlineable

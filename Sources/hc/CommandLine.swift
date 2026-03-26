@@ -92,7 +92,7 @@ import Utilities
     note("start compiling \(product)")
     let module = driver.program.demandModule(product)
     if !noStandardLibrary {
-      driver.program[module].addDependency(.standardLibrary)
+      driver.program[module].addDependency(Module.standardLibraryName)
     }
 
     // Compile from sources.
@@ -272,10 +272,10 @@ import Utilities
     if let u = inputs.uniqueElement {
       let n = u.deletingPathExtension().lastPathComponent.drop(while: { (c) in c == "." })
       if !n.isEmpty {
-        return .init(String(n))
+        return .init(n)
       }
     }
-    return .init("Main")
+    return "Main"
   }
 
   /// The type of the output files to generate.

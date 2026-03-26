@@ -45,6 +45,8 @@ internal struct IREmitter {
       lower(program.castUnchecked(d, to: ConformanceDeclaration.self))
     case FunctionDeclaration.self:
       lower(program.castUnchecked(d, to: FunctionDeclaration.self))
+    case ImportDeclaration.self:
+      break
     case StructDeclaration.self:
       lower(program.castUnchecked(d, to: StructDeclaration.self))
     case TraitDeclaration.self:

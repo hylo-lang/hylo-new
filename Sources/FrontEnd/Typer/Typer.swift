@@ -37,7 +37,7 @@ public struct Typer {
 
   /// Type checks the top-level declarations of `self.module`.
   public mutating func apply() {
-    if program[module].name == .standardLibrary {
+    if program[module].isStandardLibrary {
       program.initializeStandardLibraryCaches()
     }
     for d in program[module].topLevelDeclarations { check(d) }
@@ -312,6 +312,8 @@ public struct Typer {
       check(castUnchecked(d, to: FunctionDeclaration.self))
     case GenericParameterDeclaration.self:
       check(castUnchecked(d, to: GenericParameterDeclaration.self))
+    case ImportDeclaration.self:
+      check(castUnchecked(d, to: ImportDeclaration.self))
     case ParameterDeclaration.self:
       check(castUnchecked(d, to: ParameterDeclaration.self))
     case StructDeclaration.self:
@@ -576,12 +578,6 @@ public struct Typer {
     // TODO: Redeclarations
   }
 
-  /// Type checks `d`.
-  private mutating func check(_ d: GenericParameterDeclaration.ID) {
-    _ = declaredType(of: d)
-    checkUniqueDeclaration(d, of: program[d].identifier.value)
-  }
-
   /// Type checks `body` as the definition of `d`, which declares a function or susbscript that
   /// outputs an instance of `r`.
   private mutating func check(
@@ -631,6 +627,18 @@ public struct Typer {
         }
       }
     }
+  }
+
+  /// Type checks `d`.
+  private mutating func check(_ d: GenericParameterDeclaration.ID) {
+    _ = declaredType(of: d)
+    checkUniqueDeclaration(d, of: program[d].identifier.value)
+  }
+
+  /// Type checks `d`.
+  private mutating func check(_ d: ImportDeclaration.ID) {
+    _ = declaredType(of: d)
+    checkUniqueDeclaration(d, of: program[d].identifier.value)
   }
 
   /// Type checks `d`.
@@ -1078,6 +1086,8 @@ public struct Typer {
       return declaredType(of: castUnchecked(d, to: FunctionDeclaration.self))
     case GenericParameterDeclaration.self:
       return declaredType(of: castUnchecked(d, to: GenericParameterDeclaration.self))
+    case ImportDeclaration.self:
+      return declaredType(of: castUnchecked(d, to: ImportDeclaration.self))
     case ParameterDeclaration.self:
       return declaredType(of: castUnchecked(d, to: ParameterDeclaration.self))
     case StructDeclaration.self:
@@ -1246,6 +1256,33 @@ public struct Typer {
     let t = metatype(of: GenericParameter.user(d, k)).erased
     program[d.module].setType(t, for: d)
     return t
+  }
+
+  /// Returns the declared type of `d` without checking.
+  private mutating func declaredType(of d: ImportDeclaration.ID) -> AnyTypeIdentity {
+    if let memoized = program[d.module].type(assignedTo: d) { return memoized }
+    assert(d.module == module, "dependency is not typed")
+
+    let n = program[d].identifier.value
+
+    // Are we importing a known dependency?
+    if program[d.module].dependencies.contains(n) {
+      if n == Module.standardLibraryName {
+        let s = program.spanForDiagnostic(about: d)
+        report(.init(.warning, "module 'Hylo' is already implicitly imported", at: s))
+      }
+
+      let m = program.identity(module: n)!
+      let t = program.types.demand(Namespace(identifier: .module(m))).erased
+      program[d.module].setType(t, for: d)
+      return t
+    }
+
+    // Module is undefined.
+    else {
+      report(.error, "undefined module '\(n)'", about: d)
+      return .error
+    }
   }
 
   /// Returns the declared type of `d` without checking.
@@ -4305,8 +4342,8 @@ public struct Typer {
       var table: [Module.ID] = []
 
       // Standard library is imported implicitly.
-      if program[f.module].dependencies.contains(.standardLibrary) {
-        let m = program.identity(module: .standardLibrary)
+      if program[f.module].dependencies.contains(Module.standardLibraryName) {
+        let m = program.identity(module: Module.standardLibraryName)
         assert(m != nil, "standard library is not loaded")
         table.append(m!)
       }
@@ -4314,8 +4351,14 @@ public struct Typer {
       for d in program[f].topLevelDeclarations {
         // Imports precede all other declarations.
         guard let i = program.cast(d, to: ImportDeclaration.self) else { break }
+
         // Ignore invalid imports.
-        if let m = program.identity(module: .init(program[i].identifier.value)) { table.append(m) }
+        let t = declaredType(of: i)
+        if case .module(let m) = (program.types[t] as? Namespace)?.identifier {
+          // Avoid importing a module more than once. We're using a linear search because `table`
+          // is assumed to be small in practice.
+          if table.contains(m) { table.append(m) }
+        }
       }
 
       cache.sourceToImports[f.offset] = table

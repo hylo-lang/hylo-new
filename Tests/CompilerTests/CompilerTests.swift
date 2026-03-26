@@ -80,12 +80,12 @@ final class CompilerTests: XCTestCase {
     var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
 
     if input.manifest.requiresStandardLibrary {
-      try await driver.load(.standardLibrary, withSourcesAt: standardLibrarySources)
+      try await driver.load(Module.standardLibraryName, withSourcesAt: standardLibrarySources)
     }
 
     let m = driver.program.demandModule(.init("Test"))
     if input.manifest.requiresStandardLibrary {
-      driver.program[m].addDependency(.standardLibrary)
+      driver.program[m].addDependency(Module.standardLibraryName)
     }
 
     var expectations: [FileName: String] = [:]
