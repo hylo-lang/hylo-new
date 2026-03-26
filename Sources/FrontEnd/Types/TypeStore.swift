@@ -290,7 +290,7 @@ public struct TypeStore: Sendable {
       if let u = cast(b, to: Tuple.self) {
         s = u
       } else {
-        return (result + [b], isOpenEnded: true)
+        return (result.appending(b), isOpenEnded: true)
       }
     }
 
@@ -561,7 +561,7 @@ public struct TypeStore: Sendable {
     let output = if k.isMutating {
       self[n].output
     } else {
-      tuple(of: updates + [self[n].output]).erased
+      tuple(of: updates.appending(self[n].output)).erased
     }
 
     return demand(Arrow(effect: k, environment: environment, inputs: inputs, output: output))
