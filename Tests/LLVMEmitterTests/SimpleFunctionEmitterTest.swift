@@ -4,8 +4,8 @@ import LLVMEmitter
 import XCTest
 
 final class SimpleFunctionEmitterTest: XCTestCase {
-  func testSimpleFunction() async throws {
-    var d = Driver()
+  func testInt32Addition() async throws {
+    var d = Driver(moduleCachePath: nil, targetConfiguration: .init(), standardLibrary: .minimal())
     try await d.loadStandardLibrary()
 
     let m0 = d.program.demandModule(.init("M0"))
@@ -14,7 +14,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
 
     _ = d.program[m0].addSource(
       """
-      fun add(x: Simplint, y: Simplint) -> Simplint {
+      fun add(x: Int, y: Int) -> Int {
         x + y
       }
       """)
@@ -25,23 +25,22 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     try assertNoDiagnostics(in: d.program)
     d.program.lower(m0)
 
-    
     var p1 = TreePrinter(program: d.program)
     XCTAssertEqual(
-      d.program[m0].functions.map{ $0.show(using: &p1) }.joined(separator: "\n"),
+      d.program[m0].functions.map { $0.show(using: &p1) }.joined(separator: "\n"),
       """
-      fun add(_:_:)(let %p0: Simplint&, let %p1: Simplint&, set %p2: Simplint&) {
+      fun add(_:_:)(let %p0: Int&, let %p1: Int&, set %p2: Int&) {
       %b0:
         %r0 = access [let] %p0
         %r1 = access [let] %p1
         %r2 = access [set] %p2
-        %r3 = apply Simplint.infix+(%r0, %r1) => %r2
+        %r3 = apply Int.infix+(%r0, %r1) => %r2
         %r4 = end %r2
         %r5 = end %r1
         %r6 = end %r0
         %r7 = return
       }
-      fun Simplint.infix+(let %p0: Simplint&, let %p1: Simplint&, set %p2: Simplint&)
+      fun Int.infix+(let %p0: Int&, let %p1: Int&, set %p2: Int&)
       """)
 
     try assertNoDiagnostics(in: d.program)
@@ -50,20 +49,20 @@ final class SimpleFunctionEmitterTest: XCTestCase {
 
     var p = TreePrinter(program: d.program)
     XCTAssertEqual(
-      d.program[m0].functions.map{ $0.show(using: &p) }.joined(separator: "\n"),
+      d.program[m0].functions.map { $0.show(using: &p) }.joined(separator: "\n"),
       """
-      fun add(_:_:)(let %p0: Simplint&, let %p1: Simplint&, set %p2: Simplint&) {
+      fun add(_:_:)(let %p0: Int&, let %p1: Int&, set %p2: Int&) {
       %b0:
         %r0 = access [let] %p0
         %r1 = access [let] %p1
         %r2 = access [set] %p2
-        %r3 = apply Simplint.infix+(%r0, %r1) => %r2
+        %r3 = apply Int.infix+(%r0, %r1) => %r2
         %r4 = end %r2
         %r5 = end %r1
         %r6 = end %r0
         %r7 = return
       }
-      fun Simplint.infix+(let %p0: Simplint&, let %p1: Simplint&, set %p2: Simplint&)
+      fun Int.infix+(let %p0: Int&, let %p1: Int&, set %p2: Int&)
       """)
 
     let c = try CodeGenerationContext.transpiling(m0, in: d.program, compilingFor: .host())
@@ -78,17 +77,101 @@ final class SimpleFunctionEmitterTest: XCTestCase {
         br label %b0
 
       b0:                                               ; preds = %prologue
-        call void @"hylo_Simplint.infix+"(ptr %0, ptr %1, ptr %2)
+        call void @"hylo_Int.infix+"(ptr %0, ptr %1, ptr %2)
         ret void
       }
 
-      declare void @"hylo_Simplint.infix+"(ptr noalias nocapture nofree readonly, ptr noalias nocapture nofree readonly, ptr noalias nocapture nofree)
+      declare void @"hylo_Int.infix+"(ptr noalias nocapture nofree readonly, ptr noalias nocapture nofree readonly, ptr noalias nocapture nofree)
+
+      """)
+
+  }
+  func testInt32Creation() async throws {
+    var d = Driver(moduleCachePath: nil, targetConfiguration: .init(), standardLibrary: .minimal())
+    try await d.loadStandardLibrary()
+
+    let m0 = d.program.demandModule(.init("M0"))
+
+    d.program[m0].addDependency(.standardLibrary)
+
+    _ = d.program[m0].addSource(
+      """
+      fun create() -> Int32 {
+        Int32()
+      }
+      """)
+
+    await d.program.assignScopes(m0)
+    try assertNoDiagnostics(in: d.program)
+    d.program.assignTypes(m0)
+    try assertNoDiagnostics(in: d.program)
+    d.program.lower(m0)
+    // d.program.lower(d.program.modules[.standardLibrary]!.identity)
+
+    var p1 = TreePrinter(program: d.program)
+    XCTAssertEqual(
+      d.program[m0].functions.map { $0.show(using: &p1) }.joined(separator: "\n"),
+      """
+      fun create(set %p0: Int32&) {
+      %b0:
+        %r0 = alloca Void, #align(of: Void)
+        %r1 = access [set] %p0
+        %r2 = access [set] %r0
+        %r3 = apply Int32.init(%r1) => %r2
+        %r4 = end %r2
+        %r5 = end %r1
+        %r6 = return
+      }
+      fun Int32.init(set %p0: Int32&, set %p1: Void&)
+      """)
+
+    try assertNoDiagnostics(in: d.program)
+    d.program.applyTransformationPasses(m0)
+    d.program.applyTransformationPasses(d.program.modules[.standardLibrary]!.identity)
+
+    try assertNoDiagnostics(in: d.program)
+
+    var p = TreePrinter(program: d.program)
+    XCTAssertEqual(
+      d.program[m0].functions.map { $0.show(using: &p) }.joined(separator: "\n"),
+      """
+      fun create(set %p0: Int32&) {
+      %b0:
+        %r0 = alloca Void, #align(of: Void)
+        %r1 = access [set] %p0
+        %r2 = access [set] %r0
+        %r3 = apply Int32.init(%r1) => %r2
+        %r4 = end %r2
+        %r5 = end %r1
+        %r7 = assume_state %r0 uninitialized
+        %r6 = return
+      }
+      fun Int32.init(set %p0: Int32&, set %p1: Void&)
+      """)
+
+    let c = try CodeGenerationContext.transpiling(m0, in: d.program, compilingFor: .host())
+    XCTAssertEqual(
+      c.llvm.llCode(),
+      """
+      ; ModuleID = 'M0'
+      source_filename = "M0"
+
+      define void @hylo_create(ptr noalias nocapture nofree %0) {
+      prologue:
+        br label %b0
+
+      b0:                                               ; preds = %prologue
+        call void @hylo_Int32.init(ptr %0, ptr null)
+        ret void
+      }
+
+      declare void @hylo_Int32.init(ptr noalias nocapture nofree, ptr noalias nocapture nofree)
 
       """)
 
   }
 
-   func testMain() async throws {
+  func testMain() async throws {
     var d = Driver()
     try await d.loadStandardLibrary()
 
@@ -99,7 +182,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     _ = d.program[m0].addSource(
       """
       fun main() {
-      
+
       }
 
       """)
@@ -110,7 +193,6 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     try assertNoDiagnostics(in: d.program)
     d.program.lower(m0)
 
-    
     try assertNoDiagnostics(in: d.program)
     d.program.applyTransformationPasses(m0)
     try assertNoDiagnostics(in: d.program)
@@ -139,9 +221,60 @@ final class SimpleFunctionEmitterTest: XCTestCase {
       """)
 
   }
+
+  func stdlibLoweringCrashes() -> Bool {
+    true
+  }
+
+  func testLoweringStdlib() async throws {
+    if stdlibLoweringCrashes() {
+      throw XCTSkip()
+    }
+
+    var d = Driver(moduleCachePath: nil)
+    try await d.loadStandardLibrary()
+
+    let m0 = d.program.demandModule(.init("M0"))
+
+    d.program[m0].addDependency(.standardLibrary)
+
+    _ = d.program[m0].addSource(
+      """
+      fun create() -> Int32 {
+        Int32()
+      }
+      """)
+
+    await d.program.assignScopes(m0)
+    try assertNoDiagnostics(in: d.program)
+    d.program.assignTypes(m0)
+    try assertNoDiagnostics(in: d.program)
+    d.program.lower(m0)
+    d.program.lower(d.program.modules[.standardLibrary]!.identity)
+
+    var p1 = TreePrinter(program: d.program)
+    XCTAssertEqual(
+      d.program[m0].functions.map { $0.show(using: &p1) }.joined(separator: "\n"),
+      """
+      fun create(set %p0: Int32&) {
+      %b0:
+        %r0 = subfield %p0 at 0 as i32
+        %r1 = access [set] %r0
+        %r2 = store i32 42 to %r1
+        %r3 = end %r1
+        %r4 = return
+      }
+      """)
+
+    try assertNoDiagnostics(in: d.program)
+    d.program.applyTransformationPasses(m0)
+    d.program.applyTransformationPasses(d.program.modules[.standardLibrary]!.identity)
+
+  }
 }
 
-func assertNoDiagnostics(in program: Program, file: StaticString = #filePath, line: UInt = #line) throws
+func assertNoDiagnostics(in program: Program, file: StaticString = #filePath, line: UInt = #line)
+  throws
 {
   if !program.diagnostics.isEmpty {
     XCTFail(

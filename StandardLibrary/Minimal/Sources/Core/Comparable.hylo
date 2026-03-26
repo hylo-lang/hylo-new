@@ -1,0 +1,35 @@
+/// A type whose instances' values have a standard total ordering.
+///
+/// Types conforming to `Comparable` implement `infix==` and `infix<`. Together, these operations
+/// describe a **total order** on all instances of the conforming type. A total order is a binary
+/// relation that satisfies the following for all instances `a`, `b`, and `c`:
+///
+/// - `a < a` is always `false` (irreflexivity)
+/// - if `a < b` then `b < a` is `false` (antisymmetry)
+/// - if `a < b` and `b < b` then `a < c` (transitivity)
+/// - if `a == b` is `false` then either `a < b` or `b < a` (totality)
+///
+/// Making `T` conform to `Comparable` automatically equips `T` with members `infix>`, `infix>=`,
+/// and `infix<=`, which may be overridden for `T`.
+@_symbol("Comparable")
+public trait Comparable refines Equatable {
+
+  /// Returns `true` iff `self` is ordered before `other`.
+  fun infix< (other: Self) -> Bool
+
+  /// Returns `true` iff `self` is ordered before or equal to `other`.
+  fun infix<= (other: Self) -> Bool {
+    !(other < self)
+  }
+
+  /// Returns `true` iff `self` is ordered after `other`.
+  fun infix> (other: Self) -> Bool {
+    other < self
+  }
+
+  /// Returns `true` iff `self` is ordered after or equal to `other`.
+  fun infix>= (other: Self) -> Bool {
+    !(self < other)
+  }
+
+}

@@ -76,7 +76,6 @@ public struct CodeGenerationContext: ~Copyable {
       program.modules.elements[module].value.name.rawValue, targetMachine: targetMachine)
     self.program = program
     self.moduleID = module
-
     // FIXME: avoid copying the whole array a second time. FrontEnd could expose an array instead of an opaque collection.
     self.functions = program.modules.elements[module].value.functions.map { $0 }
     self.isFunctionTranspiled = Array(repeating: false, count: functions.count)
@@ -92,6 +91,11 @@ public struct CodeGenerationContext: ~Copyable {
       try context.incorporate(functionWithIndex: f)
     }
     return context
+  }
+
+  /// Extracts the LLVM module while consuming the code generation context.
+  public consuming func extractModule() -> SwiftyLLVM.Module {
+    consume llvm
   }
 
   /// The IR of the module being lowered.
@@ -149,7 +153,7 @@ public struct CodeGenerationContext: ~Copyable {
     let transpilation = llvm.function(named: program.llvmName(of: f))!
     llvm.setLinkage(.private, for: transpilation)
 
-    let int32 = program.standardLibraryType(.int32)  // todo coreType("Int32")!
+    let int32 = program.standardLibraryType(.int32)
 
     if let r = f.returnRegister,
       let rt = f.result(of: r),
@@ -587,8 +591,8 @@ public struct CodeGenerationContext: ~Copyable {
       //   register[.register(i)] =
       //     insertCall(x, on: (source, i1.unsafe[].zero), at: insertionPoint).erased
 
-      // case .zeroinitializer(let t):
-      //   register[.register(i)] = program.llvmType(from: t, in: &llvm).unsafe[].null.erased
+      case .zeroinitializer(let t):
+        register[.register(i)] = program.llvmType(from: t, in: &llvm).unsafe[].null.erased
 
       // case .advancedByBytes:
       //   let base = llvm(s.operands[0])

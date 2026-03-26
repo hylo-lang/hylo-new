@@ -1,0 +1,8 @@
+//! stage:run stdlib:minimal
+
+public fun main() {
+  print(Int.zero())
+  let z = Int.zero()
+  let v = z.successor().successor()
+  print(v)
+}

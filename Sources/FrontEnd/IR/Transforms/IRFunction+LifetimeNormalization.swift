@@ -735,7 +735,7 @@ private struct Transfer: AbstractTransferFunction {
     switch k {
     case .let, .inout, .sink:
       // All three effects require that the object be fully initialized.
-      let a = context.locals[v]!.place!
+      let a = context.locals[v]!.place! // <- HERE
       checkInitialized(place: v, in: f, at: f.at(i).anchor.site)
 
       // A `sink` access consumes its source.

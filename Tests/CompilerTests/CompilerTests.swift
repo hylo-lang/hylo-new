@@ -12,6 +12,28 @@ import XCTest
 /// manually invoking `hc-tests`.
 final class CompilerTests: XCTestCase {
 
+  private struct CompilationResult {
+
+    var driver: Driver
+
+    let module: FrontEnd.Module.ID
+
+    let expectations: [FileName: String]
+
+    let expectedStandardOutput: String?
+
+  }
+
+  private struct ExecutionResult {
+
+    let standardOutput: String
+
+    let standardError: String
+
+    let terminationStatus: Int32
+
+  }
+
   /// The input of a compiler test.
   struct TestDescription {
 
@@ -30,6 +52,12 @@ final class CompilerTests: XCTestCase {
     /// `true` iff `self` describes a package.
     var isPackage: Bool {
       root.pathExtension == "package"
+    }
+
+    var expectedStandardOutput: String? {
+      guard !isPackage else { return nil }
+      let path = root.deletingPathExtension().appendingPathExtension("stdout.expected")
+      return try? String(contentsOf: path, encoding: .utf8)
     }
 
     /// Calls `action` on each Hylo source URL in the program described by `self`.
@@ -64,20 +92,40 @@ final class CompilerTests: XCTestCase {
 
   /// Compiles `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    let (program, _) = try await compile(input)
-    assertSansError(program)
+    if input.manifest.assertedExitCode != nil, input.manifest.stage != .run {
+      XCTFail("assert-exit-code requires stage:run")
+      return
+    }
+    if input.expectedStandardOutput != nil, input.manifest.stage != .run {
+      XCTFail("stdout assertion requires stage:run")
+      return
+    }
+
+    let result = try await compile(input)
+    assertSansError(result.driver.program)
+    guard input.manifest.stage == .run else { return }
+
+    let r: CompilerTests.ExecutionResult = try execute(result)
+    assertExitCode(input.manifest.assertedExitCode ?? 0, in: r)
+    if let standardOutput = result.expectedStandardOutput {
+      assertStandardOutput(standardOutput, in: r)
+    }
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    let (program, expectations) = try await compile(input)
+    let result = try await compile(input)
+    let program = result.driver.program
     XCTAssert(program.containsError, "program compiled but an error was expected")
-    assertExpectations(expectations, program.diagnostics)
+    assertExpectations(result.expectations, program.diagnostics)
   }
 
   /// Compiles `input` into `p` and returns expected diagnostics for each compiled source file.
-  private func compile(_ input: TestDescription) async throws -> (Program, [FileName: String]) {
-    var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
+  private func compile(_ input: TestDescription) async throws -> CompilationResult {
+    var driver = Driver(
+      moduleCachePath: CompilerTests.moduleCachePath.url,
+      targetConfiguration: .init(),
+      standardLibrary: input.manifest.standardLibrary)
 
     if input.manifest.requiresStandardLibrary {
       try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
@@ -98,8 +146,12 @@ final class CompilerTests: XCTestCase {
       expectations[source.name] = expected
     }
 
-    func done() -> (Program, [FileName: String]) {
-      (driver.program, expectations)
+    func done() -> CompilationResult {
+      .init(
+        driver: driver,
+        module: m,
+        expectations: expectations,
+        expectedStandardOutput: input.expectedStandardOutput)
     }
 
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -112,16 +164,95 @@ final class CompilerTests: XCTestCase {
 
     // IR Lowering.
     if await driver.lower(m).containsError { return done() }
+    try saveObservedIR(of: m, in: driver.program, extension: "lowered-ir.observed")
     if await driver.applyTransformationPasses(m).containsError { return done() }
+    try saveObservedIR(of: m, in: driver.program, extension: "transformed-ir.observed")
     if input.manifest.stage == .lowering { return done() }
 
     // Code generation.
-    assert(input.manifest.stage == .codegen)
+    if (try await driver.lowerToLLVM(m)).containsError { return done() }
+    if input.manifest.stage == .codegen { return done() }
+
+    // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
+    if input.manifest.requiresStandardLibrary {
+      // let stdlibID = driver.program.demandModule(.standardLibrary)
+      // if await driver.lower(stdlibID).containsError { return done() }
+      // if await driver.applyTransformationPasses(stdlibID).containsError { return done() }
+      // if (try await driver.lowerToLLVM(stdlibID)).containsError { return done() }
+    }
+
+    if input.manifest.stage == .binary || input.manifest.stage == .run {
+      if (try await driver.generateExecutable(for: m)).containsError { return done() }
+    }
     return done()
   }
 
-  private func compile(_ m: Module.ID, driver: inout Driver) {
+  private func saveObservedIR(of m: Module.ID, in program: Program, extension: String) throws {
+    /// The IR functions corresponding to a given source file at url.
+    var sourceToIr: [URL : String] = [:]
 
+    var printer = TreePrinter(program: program)
+
+    for f in program[m].functions {
+      let d = switch(f.name) {
+        case .lowered(let d): d
+        case .synthesized(let d, _): d
+      }
+
+      guard case .local(let url) = program[d].site.source.name else { continue }
+
+      sourceToIr[url, default: ""] += printer.show(f) + "\n"
+    }
+
+    for (file, ir) in sourceToIr {
+      let o = file.appendingPathExtension(`extension`)
+      try ir.write(to: o, atomically: false, encoding: .utf8)
+    }
+  }
+
+  private func execute(_ result: CompilationResult) throws -> ExecutionResult {
+    guard let executable = result.driver.executableURL(of: result.module) else {
+      XCTFail("missing executable output")
+      throw TestFailure.missingExecutableOutput
+    }
+
+    return try execute(executable)
+  }
+
+  private func assertExitCode(_ expected: Int32, in observed: ExecutionResult) {
+    XCTAssertEqual(
+      observed.terminationStatus,
+      expected,
+      "expected exit code \(expected), got \(observed.terminationStatus)\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)")
+  }
+
+  private func assertStandardOutput(_ expected: String, in observed: ExecutionResult) {
+    XCTAssertEqual(
+      observed.standardOutput,
+      expected,
+      "expected stdout:\n\(expected)\nobserved stdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)")
+  }
+
+  private func execute(_ executable: URL) throws -> ExecutionResult {
+    let process = Process()
+    let standardOutput = Pipe()
+    let standardError = Pipe()
+    process.executableURL = executable
+    process.standardOutput = standardOutput
+    process.standardError = standardError
+    try process.run()
+    process.waitUntilExit()
+
+    return .init(
+      standardOutput: String(
+        decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self),
+      standardError: String(
+        decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self),
+      terminationStatus: process.terminationStatus)
+  }
+
+  private enum TestFailure: Error {
+    case missingExecutableOutput
   }
 
   /// Asserts that the expected `diagnostics` of each source file in `expectations` match those

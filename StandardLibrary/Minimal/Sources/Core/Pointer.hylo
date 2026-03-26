@@ -1,0 +1,16 @@
+/// A typed memory address whose contents can be read.
+public struct Pointer<Pointee> {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.ptr
+
+  /// Creates an instance with the given raw value.
+  internal memberwise init
+
+  /// Creates an instance that does not address any usable storage.
+  public static fun null() -> Self {
+    .new(value: Builtin.zeroinitializer_ptr())
+
+  }
+
+}

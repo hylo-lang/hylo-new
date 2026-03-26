@@ -1,0 +1,27 @@
+/// A type whose instances can be reloacted to different storage.
+@_symbol("Movable")
+public trait Movable {
+
+  /// Gives `self` the value of a consumed `source`.
+  @_symbol("Movable.take_value(from:)")
+  fun take_value(from source: sink Self) auto { set inout }
+
+}
+
+extension T : Movable {
+
+  /// Exchanges the value of `self` with that of `other`.
+  public fun swap(other: inout Self) inout {
+    var x: Self
+    &x.take_value@set(from: self)
+    &self.take_value@set(from: other)
+    &other.take_value@set(from: x)
+  }
+
+}
+
+/// A witness that `Void` is `Movable`.
+public given Void is Movable {}
+
+/// A witness that a tuple is `Movable` when its elements are too.
+public given <T is Movable, U is Movable> {T, ...U} is Movable {}

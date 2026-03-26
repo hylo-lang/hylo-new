@@ -52,3 +52,14 @@ git submodule update --init
 - Download and install [Hylo's LLVM build](https://github.com/hylo-lang/llvm-build)
 - `swift test`
 - TODO see if any dependencies are missing
+
+
+## Hylo Compiler's Runtime Dependencies
+### Linux
+- `clang++` on PATH
+
+### MacOS
+- `xcrun` on PATH
+
+### Windows
+- `lld-link` on PATH

@@ -15,6 +15,8 @@ extension Program {
       return llvmType(fromFunctionPointer: types.castUnchecked(t, to: FunctionPointer.self), in: &module).erased
     case MachineType.self:
       return llvmType(fromMachineType: types.castUnchecked(t, to: MachineType.self), in: &module).erased
+    case RemoteType.self:
+      return module.ptr.erased
     case Struct.self:
       return llvmType(fromStruct: types.castUnchecked(t, to: Struct.self), in: &module).erased
     case Tuple.self:

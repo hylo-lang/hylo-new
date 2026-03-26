@@ -1,0 +1,23 @@
+/// A type whose instances' values can be compared for equality.
+///
+/// Instances of types conforming to `Equatable` can be compared for equality with the infix `==`
+/// operator and for inequality with the infix `!=` operator (which by default is defined as the
+/// negation of the former).
+@_symbol("Equatable")
+public trait Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  ///
+  /// Let `a`, `b` and `c` be three arbitrary instances of `Self`. This method satisfies the
+  /// following properties:
+  /// - Reflexivity: `a == a` is `true`.
+  /// - Symmetry: if `a == b` is `true` then so is `b == a`.
+  /// - Transitivity: if `a == b` and `b == c` are `true` then so is `a == c`.
+  fun infix== (other: Self) -> Bool
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  fun infix!= (other: Self) -> Bool {
+    !(self == other)
+  }
+
+}

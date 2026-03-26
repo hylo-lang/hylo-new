@@ -1461,7 +1461,7 @@ extension Program {
         let a = identity(module: Module.standardLibraryName),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
-      else { fatalError("missing or corrupt standard library") }
+      else { fatalError("missing or corrupt standard library; missing '\(n.rawValue)'") }
       standardLibraryDeclarations[n] = d
     }
   }

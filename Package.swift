@@ -60,9 +60,11 @@ let package = Package(
       name: "Driver",
       dependencies: [
         .target(name: "FrontEnd"),
+        .target(name: "LLVMEmitter"),
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
         .product(name: "Archivist", package: "archivist"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -99,7 +101,8 @@ let package = Package(
     .target(
       name: "StandardLibrary",
       path: "StandardLibrary",
-      resources: [.copy("Sources")],
+      exclude: [],
+      resources: [.copy("Full"), .copy("Minimal")],
       swiftSettings: commonSwiftSettings),
 
     .target(
@@ -115,6 +118,7 @@ let package = Package(
       dependencies: [
         .target(name: "Driver"),
         .target(name: "FrontEnd"),
+        .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
       ],
       exclude: ["negative", "positive", "README.md"],
@@ -131,7 +135,8 @@ let package = Package(
     .testTarget(
       name: "LLVMEmitterTests",
       dependencies: [
-        .target(name: "LLVMEmitter")
+        .target(name: "LLVMEmitter"),
+        .target(name: "Driver")
       ],
       swiftSettings: commonSwiftSettings),
 

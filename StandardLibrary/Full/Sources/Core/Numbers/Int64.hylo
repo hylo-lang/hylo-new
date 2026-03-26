@@ -1,0 +1,18 @@
+/// A 64-bit signed integer value.
+@_symbol("Int64")
+public struct Int64 {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i64
+
+  /// Creates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i64()
+  }
+
+}
+
+public given Int64 is ExpressibleByIntegerLiteral { /* built-in */ }
