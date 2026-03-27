@@ -424,7 +424,18 @@ private struct Transfer: AbstractTransferFunction {
 
       // Ensure `set` parameters have been initialized.
       else if f.isParameter(v, .set) {
-        checkInitialized(place: v, in: f, at: f.at(i).anchor.site, beforeReturning: true)
+        let a = context.locals[v]!.place!
+        let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
+
+        // Report potential failures.
+        if o.value != .uniform(.initialized) {
+          let s = f.at(i).anchor.site
+          if v == f.returnRegister {
+            report(.init(.error, "missing return value", at: s))
+          } else {
+            report(.init(.error, "'set' parameter not initialized before exit", at: s))
+          }
+        }
       }
     }
 
@@ -551,29 +562,13 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Reports a diagnostic at `site` iff the object stored at `place`, which is in `f`, is not
   /// fully initialized.
-  ///
-  /// A specialized diagnostic is reported if `isBeforeReturning` is `true` and `place` denotes the
-  /// storage of a `set` parameter that is (partially) moved or uninitialized object.
-  private mutating func checkInitialized(
-    place: IRValue, in f: IRFunction, at site: SourceSpan,
-    beforeReturning isBeforeReturning: Bool = false
-  ) {
+  private mutating func checkInitialized(place: IRValue, in f: IRFunction, at site: SourceSpan) {
     let a = context.locals[place]!.place!
     let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
 
     switch o.value {
     case .uniform(.initialized):
-      // All is well if the object is indeed initialized.
       break
-
-    case _ where isBeforeReturning && (place.parameter != nil):
-      // Report a failure to initialize a `set` parameter before returning.
-      if place == f.returnRegister {
-        report(.init(.error, "missing return value", at: site))
-      } else {
-        report(.init(.error, "'set' parameter not initialized before exit", at: site))
-      }
-
     case .uniform(.uninitialized), .uniform(.phi):
       report(.useOfUninitializedObject(at: site))
     case .uniform(.consumed):
