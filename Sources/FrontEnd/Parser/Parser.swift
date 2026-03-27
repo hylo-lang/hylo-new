@@ -801,7 +801,7 @@ public struct Parser {
       case let n as NameExpression:
         return file.insert(StaticCall(callee: b, arguments: conformer(), site: n.site))
       case let n as StaticCall:
-        return file.replace(b, for: n.replacing(arguments: conformer() + n.arguments))
+        return file.replace(b, with: n.replacing(arguments: conformer() + n.arguments))
       case let n:
         throw ParseError("invalid context bound", at: n.site)
       }
@@ -2831,7 +2831,7 @@ extension Module.SourceContainer {
       let desugared = StaticCall(
         callee: rhs.callee, arguments: Array(conformer, prependedTo: rhs.arguments),
         site: self[concept].site)
-      return replace(concept, for: desugared)
+      return replace(concept, with: desugared)
     } else {
       return insert(StaticCall(callee: concept, arguments: [conformer], site: self[concept].site))
     }

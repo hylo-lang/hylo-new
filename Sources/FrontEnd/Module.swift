@@ -84,7 +84,7 @@ public struct Module: Sendable {
     ///
     /// - Requires: If `n` identifies a scope, then `T` must conform to `Scope`.
     internal mutating func replace<T: Expression>(
-      _ n: ExpressionIdentity, for newTree: T
+      _ n: ExpressionIdentity, with newTree: T
     ) -> T.ID {
       assert(n.file == identity)
       syntax[n.offset] = .init(newTree)
@@ -244,9 +244,9 @@ public struct Module: Sendable {
   ///
   /// - Requires: If `n` identifies a scope, then `T` must conform to `Scope`.
   @discardableResult
-  public mutating func replace<T: Expression>(_ n: ExpressionIdentity, for newTree: T) -> T.ID {
+  public mutating func replace<T: Expression>(_ n: ExpressionIdentity, with newTree: T) -> T.ID {
     assert(!(tag(of: n).value is any Scope.Type) || (T.self is any Scope))
-    return sources.values[n.file.offset].replace(n, for: newTree)
+    return sources.values[n.file.offset].replace(n, with: newTree)
   }
 
   /// The nodes in `self`'s abstract syntax tree.

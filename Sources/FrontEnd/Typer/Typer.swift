@@ -1966,7 +1966,7 @@ public struct Typer {
       let n = program[e.module].insert(
         NameExpression(qualification: callee, name: .init("new", at: site), site: site),
         in: program.parent(containing: e))
-      program[e.module].replace(.init(e), for: program[e].replacing(callee: .init(n)))
+      program[e.module].replace(.init(e), with: program[e].replacing(callee: .init(n)))
       return context.withSubcontext(role: r) { (ctx) in
         inferredType(of: n, in: &ctx)
       }
@@ -2137,7 +2137,7 @@ public struct Typer {
         New(qualification: .init(q), target: n, site: s), in: p)
       let c = program[e.module].replace(
         .init(e),
-        for: Call(
+        with: Call(
           callee: .init(m),
           arguments: [.init(label: Parsed("integer_literal", at: s), value: .init(literal))],
           style: .parenthesized,
@@ -2267,7 +2267,7 @@ public struct Typer {
         in: program.parent(containing: e))
       let m = program[e.module].replace(
         .init(e),
-        for: New(qualification: program[e].qualification!, target: n, site: program[e].site))
+        with: New(qualification: program[e].qualification!, target: n, site: program[e].site))
       return inferredType(of: m, in: &context)
     }
 
@@ -2833,16 +2833,16 @@ public struct Typer {
       if program.isScope(m) {
         program.reassignScopes(childrenOf: m)
       }
-      w = w.substituting(n, for: m)
+      w = w.substituting(n, with: m)
 
-      program[n.module].replace(n, for: SyntheticExpression(value: w, site: program[n].site))
+      program[n.module].replace(n, with: SyntheticExpression(value: w, site: program[n].site))
       let u = program.types.substituteVariableForError(in: w.type)
       program[n.module].updateType(u, for: n)
     }
 
     for (n, e) in s.argumentElaborations {
       let arguments = e.elements.map({ (b) in elaborate(b, in: n) })
-      program[n.module].replace(.init(n), for: program[n].replacing(arguments: arguments))
+      program[n.module].replace(.init(n), with: program[n].replacing(arguments: arguments))
     }
   }
 
@@ -3519,7 +3519,7 @@ public struct Typer {
   ) -> SummonResult {
     if let last = continuation.last {
       let r = applyContinuation(continuation.dropLast(), to: last.elaboration)
-      let x = r.witness.substituting(assumed: last.assumed, for: operand.witness.value)
+      let x = r.witness.substituting(assumed: last.assumed, with: operand.witness.value)
       let e = operand.substitutions.union(r.substitutions)
       return .init(
         witness: program.types.reify(x, applying: e, withVariables: .kept),

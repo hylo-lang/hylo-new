@@ -17,7 +17,7 @@ extension IRFunction {
         for p in ps {
           g.define(p, predecessorOf: t)
           g.remove(p, fromPredecessorsOf: b)
-          _ = replaceSuccessor(b, of: p, for: t)
+          _ = replaceSuccessor(b, of: p, with: t)
         }
 
         let ss = Array(g.successors(of: b))
