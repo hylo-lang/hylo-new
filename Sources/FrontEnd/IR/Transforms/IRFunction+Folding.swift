@@ -19,7 +19,7 @@ extension IRFunction {
       let folded = IRSubfield(
         base: s.base, path: s.path.appending(contentsOf: t.path),
         typeOfSubfield: t.typeOfSubfield, anchor: t.anchor)
-      replace(u.user, for: folded)
+      replace(u.user, with: folded)
       remove(i.erased)
     }
   }

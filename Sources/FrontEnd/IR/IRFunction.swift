@@ -524,14 +524,14 @@ public struct IRFunction: Sendable {
     return user
   }
 
-  /// Substitutes `old` for `new`.
+  /// Substitutes `old` with `new`.
   ///
   /// The use chains are updated so that the uses made by `old` are replaced by the uses made by
   /// `new` and all uses of `old` refer to `new`. After the call, `instruction(old) == new`.
   ///
   /// - Requires: The result of `new` has the same type as the result of old.
   internal mutating func replace<T: Instruction>(
-    _ old: AnyInstructionIdentity, for new: T
+    _ old: AnyInstructionIdentity, with new: T
   ) {
     assert(areEqual(at(old).type, new.type))
     removeUses(by: old)
@@ -541,10 +541,10 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Substitutes occurrences of `old` for `new` in the successors of `source`, returning `true`
+  /// Substitutes occurrences of `old` with `new` in the successors of `source`, returning `true`
   /// iff `old` was a successor of `source`.
   internal mutating func replaceSuccessor(
-    _ old: IRBlock.ID, of source: IRBlock.ID, for new: IRBlock.ID
+    _ old: IRBlock.ID, of source: IRBlock.ID, with new: IRBlock.ID
   ) -> Bool  {
     let l = blocks[source].last!
     if var s = at(l) as? any Terminator, s.replaceSuccessor(old, with: new) {
