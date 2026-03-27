@@ -470,6 +470,46 @@ public struct Program: Sendable {
     return x1.isTransitivelySynthetic
   }
 
+  /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
+  public mutating func isTriviallyInitializable(
+    _ t: AnyTypeIdentity, in s: ScopeIdentity
+  ) -> Bool {
+    let u = types.dealiased(t)
+    switch types.tag(of: u) {
+    case Struct.self:
+      return isTriviallyInitializable(types.castUnchecked(u, to: Struct.self), in: s)
+    case Tuple.self:
+      return isTriviallyInitializable(types.castUnchecked(u, to: Tuple.self), in: s)
+    case TypeApplication.self:
+      return isTriviallyInitializable(types.castUnchecked(u, to: TypeApplication.self), in: s)
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
+  public mutating func isTriviallyInitializable(
+    _ t: Struct.ID, in s: ScopeIdentity
+  ) -> Bool {
+    let d = types[t].declaration
+    return isInlineable(d, in: s) && storedProperties(of: d).isEmpty
+  }
+
+  /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
+  public mutating func isTriviallyInitializable(
+    _ t: Tuple.ID, in s: ScopeIdentity
+  ) -> Bool {
+    let ms = types.members(of: t)
+    return ms.types.isEmpty && !ms.isOpenEnded
+  }
+
+  /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
+  public mutating func isTriviallyInitializable(
+    _ t: TypeApplication.ID, in s: ScopeIdentity
+  ) -> Bool {
+    isTriviallyInitializable(types[t].abstraction, in: s)
+  }
+
   /// Returns `true` if the memory layout of `t` is visible from `scopeOfUse`.
   public mutating func isInlineable(_ t: AnyTypeIdentity, in scopeOfUse: ScopeIdentity) -> Bool {
     let u = types.dealiased(t)

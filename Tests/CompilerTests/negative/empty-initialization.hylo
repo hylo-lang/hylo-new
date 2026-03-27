@@ -1,0 +1,7 @@
+//! stage:lowering
+
+// OK, the tuple is empty.
+fun legal(x: set {}) {}
+
+// Not OK, the tuple is not empty.
+fun illegal<T, U>(xs: set {T, ...U}) {}

@@ -13,4 +13,14 @@ final class ArrayTests: XCTestCase {
     XCTAssert(a.elementsEqual(0 ..< 10))
   }
 
+  func testInitTerminatedBy() {
+    let a = Array(0 ..< 9, terminatedBy: 9)
+    XCTAssert(a.elementsEqual(0 ..< 10))
+  }
+
+  func testAppending() {
+    let a = Array(0 ..< 9)
+    XCTAssert(a.appending(9).elementsEqual(0 ..< 10))
+  }
+
 }

@@ -1783,7 +1783,7 @@ public struct Parser {
     // Check for spread operators.
     if lc != nil, let ellipsis = take(.ellipsis) {
       let last = try parseExpression(in: &file)
-      return (xs + [last], ellipsis)
+      return (xs.appending(last), ellipsis)
     } else {
       return (xs, nil)
     }

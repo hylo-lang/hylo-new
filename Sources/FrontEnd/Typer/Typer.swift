@@ -3258,7 +3258,7 @@ public struct Typer {
         let i = nextGivenIdentifier
         let g = Given.assumed(i, t)
         let e = Environment(
-          substitutions: substitutions, givens: givens + [g], nextGivenIdentifier: i + 1)
+          substitutions: substitutions, givens: givens.appending(g), nextGivenIdentifier: i + 1)
         return (e, .init(value: .assumed(i), type: t))
       }
 
