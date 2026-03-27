@@ -1,0 +1,9 @@
+//! stage:lowering
+
+struct S is Deinitializable {
+  public init<T>(x: T) {}
+}
+
+fun main() {
+  let z: S = S.new(())
+}

@@ -468,28 +468,13 @@ internal struct IREmitter {
       }
     }
 
-    let returnPlace: IRValue
-    let callee: LoweredCallee
+    // Otherwise, the callee is lowered as usual.
+    let f = loweredCallee(program[e].callee, writingTo: target)
 
     // There's at least one operand per argument and a return value. There might be more if the
     // callee accepts using parameters.
-    var operands: [IRValue] = .init(minimumCapacity: program[e].arguments.count + 1)
-
-    // If the callee is a new expression (e.g., `T.new(x)`) then `target` is passed as the first
-    // argument of the underlying initializer.
-    if let n = program.cast(program[e].callee, to: New.self) {
-      returnPlace = lowering(e, { (me) in me._alloca(.void) })
-      callee = loweredCallee(program[n].target)
-      operands.append(contentsOf: callee.operands)
-      operands.append(target)
-    }
-
-    // Otherwise, the callee is lowered as usual.
-    else {
-      returnPlace = target
-      callee = loweredCallee(program[e].callee)
-      operands.append(contentsOf: callee.operands)
-    }
+    var operands = Array(f.arguments)
+    operands.reserveCapacity(operands.count + program[e].arguments.count + 1)
 
     // We compute lvalues first and query accesses next, so that mutable accesses passed down to
     // the call are not formed prematurely. This behavior supports calls to mutating methods in
@@ -499,10 +484,10 @@ internal struct IREmitter {
     }
 
     // At this point the callee must be a monomorphic term abstraction.
-    let result = currentFunction.result(of: callee.value)!
-    let abstraction = program.types.seenAsTermAbstraction(result.type)!
-    let parameters = program.types[abstraction].inputs
-    assert(!program.types.hasContext(result.type))
+    let t = currentFunction.result(of: f.value)!
+    let u = program.types.seenAsTermAbstraction(t.type)!
+    let parameters = program.types[u].inputs
+    assert(!program.types.hasContext(t.type))
     assert(operands.count == parameters.count)
 
     lowering(e) { (me) in
@@ -510,10 +495,10 @@ internal struct IREmitter {
       for i in 0 ..< operands.count {
         operands[i] = me._access(.init(parameters[i].access), from: operands[i])
       }
-      let r = me._access([.set], from: returnPlace)
+      let r = me._access([.set], from: f.result)
 
       // Do the call.
-      me._apply(callee.value, to: operands, savingResultTo: r)
+      me._apply(f.value, to: operands, savingResultTo: r)
 
       // End accesses on the parameters.
       me._end(IRAccess.self, openedBy: r)
@@ -614,67 +599,95 @@ internal struct IREmitter {
     }
   }
 
-  /// The value and type of a lowered callee.
+  /// The notional value of a lowered callee as a possibly partially applied IR function together
+  /// with the place in which its result is written.
   private struct LoweredCallee {
 
+    /// The IR values in the representation of `self.`
+    private let properties: [IRValue]
+
+    /// Creates an instance with the given properties.
+    init<T: Sequence<IRValue>>(value: IRValue, arguments: T, result: IRValue) {
+      var vs: [IRValue] = .init(minimumCapacity: arguments.underestimatedCount + 2)
+      vs.append(value)
+      vs.append(result)
+      vs.append(contentsOf: arguments)
+      self.properties = vs
+    }
+
     /// The lowered value of the callee (e.g., a function pointer).
-    let value: IRValue
+    var value: IRValue {
+      properties[0]
+    }
+
+    /// The place in which the result of the call is written.
+    var result: IRValue {
+      properties[1]
+    }
 
     /// A sequence of arguments notionally applied to the callee if it is partially applied.
     ///
     /// This property is assigned to the using parameters passed to `value`. Moreover, if `value`
     /// is a bound member, this property includes the receiver of that member.
-    let operands: [IRValue]
+    var arguments: ArraySlice<IRValue> {
+      properties[2...]
+    }
 
     /// Returns `self` notionally applied to `a`.
     consuming func partiallyApplied(to a: IRValue) -> LoweredCallee {
-      var xs = operands
-      xs.append(a)
-      return .init(value: value, operands: xs)
+      .init(value: value, arguments: Array(arguments, terminatedBy: a), result: result)
     }
 
   }
 
-  /// Generates the IR for using `e` as a callee.
+  /// Generates the IR for using `e` as a callee in a call writing to `r`.
   ///
-  /// Let `r` be the result of this method. If `e` denotes a bound member, then `r.value` is an IR
-  /// function taking the bound receiver as its first (non-implicit) parameter and `r.receiver` is
-  /// the receiver itself, as a lvalue.
-  private mutating func loweredCallee(_ e: ExpressionIdentity) -> LoweredCallee {
+  /// Let `f` be the result of this method. `f.value` is the IR function implementing the callee
+  /// expressed by `e`. This function may be partially applied if `e` is a bound member and/or if
+  /// it involves implicit arguments, in which case `f.arguments` contain these arguments.
+  ///
+  /// `r` is the place in which the result of the call is written. If `e` denotes the application
+  ///  of a new expression, then `r` is appended to `f.arguments` and `f.result` is a new alloca.
+  ///  Otherwise, `f.result` is assigned to `r`.
+  private mutating func loweredCallee(
+    _ e: ExpressionIdentity, writingTo r: IRValue
+  ) -> LoweredCallee {
     switch program.tag(of: e) {
     case NameExpression.self:
-      return loweredCallee(program.castUnchecked(e, to: NameExpression.self))
+      return loweredCallee(program.castUnchecked(e, to: NameExpression.self), writingTo: r)
     case New.self:
-      unreachable("new expression should be handled in the lowering of the call")
+      return loweredCallee(program.castUnchecked(e, to: New.self), writingTo: r)
     case SyntheticExpression.self:
-      return loweredCallee(program.castUnchecked(e, to: SyntheticExpression.self))
+      return loweredCallee(program.castUnchecked(e, to: SyntheticExpression.self), writingTo: r)
     default:
       program.unexpected(e)
     }
   }
 
-  /// Implements `loweredCallee(_:)` for name expressions.
-  private mutating func loweredCallee(_ e: NameExpression.ID) -> LoweredCallee {
+  /// Implements `loweredCallee(_:writingTo)` for name expressions.
+  private mutating func loweredCallee(
+    _ e: NameExpression.ID, writingTo result: IRValue
+  ) -> LoweredCallee {
     switch program.declaration(referredToBy: e) {
     case .direct(let d):
       // The callee is referring to a function directly.
-      return loweredCallee(e, referringTo: d, boundTo: nil)
+      return loweredCallee(e, referringTo: d, boundTo: nil, writingTo: result)
 
     case .member(let d):
       // The callee is referring to a bound member.
       let q = lowered(lvalue: program[e].qualification!)
-      return loweredCallee(e, referringTo: d, boundTo: q)
+      return loweredCallee(e, referringTo: d, boundTo: q, writingTo: result)
 
     case .inherited(let w, let m, let statically):
       // The callee referring to a member declared in extension.
-      let r = statically ? nil : program[e].qualification.map({ (r) in lowered(lvalue: r) })
+      let s = statically ? nil : program[e].qualification.map({ (s) in lowered(lvalue: s) })
       let t = program.type(assignedTo: e)
       let u = program.types.lifted(t)
 
       return lowering(e) { (me) in
         let x0 = me._emit(witness: w)
         let x1 = me._property(m, of: x0, withType: u)
-        return LoweredCallee(value: x1, operands: .init(contentsOf: r))
+        return LoweredCallee(value: x1, arguments: Array(contentsOf: s), result: result)
       }
 
     default:
@@ -682,9 +695,10 @@ internal struct IREmitter {
     }
   }
 
-  /// Implements `loweredCallee(_:)` for direct declaration references.
+  /// Implements `loweredCallee(_:writingTo)` for direct declaration references.
   private mutating func loweredCallee(
-    _ e: NameExpression.ID, referringTo d: DeclarationIdentity, boundTo r: IRValue?
+    _ e: NameExpression.ID, referringTo d: DeclarationIdentity, boundTo receiver: IRValue?,
+    writingTo result: IRValue
   ) -> LoweredCallee {
     switch program.tag(of: d) {
     case FunctionDeclaration.self:
@@ -694,39 +708,54 @@ internal struct IREmitter {
 
       // TODO: Deal with the type of the receiver
       // Partial application tout ça tout ça
-      return LoweredCallee(value: .function(n, t), operands: .init(contentsOf: r))
+      return LoweredCallee(
+        value: .function(n, t), arguments: Array(contentsOf: receiver), result: result)
 
     default:
       program.unexpected(d)
     }
   }
 
-  /// Implements `loweredCallee(_:)` for new expressions.
-  private mutating func loweredCallee(_ e: New.ID) -> LoweredCallee {
-    loweredCallee(program[e].target)
-  }
-
-  /// Implements `loweredCallee(_:)` for synthetic expressions.
-  private mutating func loweredCallee(_ e: SyntheticExpression.ID) -> LoweredCallee {
-    loweredCallee(program[e].value, at: program[e].site, in: program.parent(containing: e))
-  }
-
+  /// Implements `loweredCallee(_:writingTo)` for new expressions.
   private mutating func loweredCallee(
-    _ e: WitnessExpression, at site: SourceSpan, in scope: ScopeIdentity
+    _ e: New.ID, writingTo result: IRValue
+  ) -> LoweredCallee {
+    // When the callee is a new expression (e.g., `T.new(x)`), then `result` is passed as the first
+    // argument of the underlying initializer.
+    let r = lowering(e, { (me) in me._alloca(.void) })
+    let f = loweredCallee(program[e].target, writingTo: result)
+    return LoweredCallee(
+      value: f.value, arguments: Array(f.arguments, terminatedBy: f.result), result: r)
+  }
+
+  /// Implements `loweredCallee(_:writingTo)` for synthetic expressions.
+  private mutating func loweredCallee(
+    _ e: SyntheticExpression.ID, writingTo result: IRValue
+  ) -> LoweredCallee {
+    loweredCallee(
+      program[e].value, writingTo: result,
+      at: program[e].site,
+      in: program.parent(containing: e))
+  }
+
+  /// Implements `loweredCallee(_:writingTo)` for witness expressions.
+  private mutating func loweredCallee(
+    _ e: WitnessExpression, writingTo result: IRValue,
+    at site: SourceSpan, in scope: ScopeIdentity
   ) -> LoweredCallee {
     switch e.value {
     case .identity(let e):
-      return loweredCallee(e)
+      return loweredCallee(e, writingTo: result)
 
     case .termApplication(let f, let a):
-      let x = loweredCallee(f, at: site, in: scope)
+      let x = loweredCallee(f, writingTo: result, at: site, in: scope)
       let y = lowering(at: site, in: scope, { (me) in me._emit(witness: a) })
       return x.partiallyApplied(to: y)
 
     case .typeApplication(let f, let a):
-      let poly = loweredCallee(f, at: site, in: scope)
+      let poly = loweredCallee(f, writingTo: result, at: site, in: scope)
       let mono = lowering(at: site, in: scope) { (me) in me._type_apply(poly.value, to: a) }
-      return LoweredCallee(value: mono, operands: poly.operands)
+      return LoweredCallee(value: mono, arguments: poly.arguments, result: poly.result)
 
     default:
       fatalError("not implemented")
