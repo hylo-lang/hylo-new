@@ -1,0 +1,3 @@
+negative/empty-initialization.hylo:7.40: error: 'set' parameter not initialized before exit
+fun illegal<T, U>(xs: set {T, ...U}) {}
+                                       ^
