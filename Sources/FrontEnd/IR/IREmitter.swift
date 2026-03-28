@@ -452,6 +452,8 @@ internal struct IREmitter {
     switch program.tag(of: e) {
     case Call.self:
       lower(store: program.castUnchecked(e, to: Call.self), to: target)
+    case Conversion.self:
+      lower(store: program.castUnchecked(e, to: Conversion.self), to: target)
     case If.self:
       lower(store: program.castUnchecked(e, to: If.self), to: target)
     case InoutExpression.self:
@@ -464,6 +466,8 @@ internal struct IREmitter {
       lower(store: program.castUnchecked(e, to: SyntheticExpression.self), to: target)
     case TupleLiteral.self:
       lower(store: program.castUnchecked(e, to: TupleLiteral.self), to: target)
+    case TupleMember.self:
+      lower(store: program.castUnchecked(e, to: TupleMember.self), to: target)
     default:
       program.unexpected(e)
     }
@@ -519,6 +523,23 @@ internal struct IREmitter {
       for o in operands.reversed() {
         me._end(IRAccess.self, openedBy: o)
       }
+    }
+  }
+
+  /// Implements `lower(store:to:)` for conversion expressions.
+  private mutating func lower(store e: Conversion.ID, to target: IRValue) {
+    let lhs = program.type(assignedTo: program[e].source)
+    let rhs = program.type(assignedTo: e)
+
+    // Trivial if the conversion does not involve any change of representation.
+    if let s = program.types.unifiable(lhs, rhs) {
+      assert(s.isEmpty)
+      lower(store: program[e].source, to: target)
+    }
+
+    // Otherwise, the semantics of the conversion depends on its direction.
+    else {
+      unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
     }
   }
 
@@ -611,6 +632,12 @@ internal struct IREmitter {
       let s = lowering(x, { $0._subfield(target, at: [i]) })
       lower(store: x, to: s)
     }
+  }
+
+  /// Implements `lower(store:to:)` for tuple member selections.
+  private mutating func lower(store e: TupleMember.ID, to target: IRValue) {
+    let v = lowered(lvalue: e)
+    lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
   }
 
   /// The notional value of a lowered callee as a possibly partially applied IR function together
@@ -803,6 +830,8 @@ internal struct IREmitter {
       return lowered(lvalue: program.castUnchecked(e, to: InoutExpression.self))
     case NameExpression.self:
       return lowered(lvalue: program.castUnchecked(e, to: NameExpression.self))
+    case TupleMember.self:
+      return lowered(lvalue: program.castUnchecked(e, to: TupleMember.self))
 
     default:
       // Write the value computed by `e` to temporary storage.
@@ -851,6 +880,13 @@ internal struct IREmitter {
     default:
       fatalError()
     }
+  }
+
+  /// Implements `lower(lvalue:)` for tuple member selections.
+  private mutating func lowered(lvalue e: TupleMember.ID) -> IRValue {
+    let v = lowered(lvalue: program[e].parent)
+    let i = program[e].member.value
+    return lowering(e, { $0._subfield(v, at: [i]) })
   }
 
   /// Returns the value denoted by `e`, which applies a built-in constructor `f` for converting
