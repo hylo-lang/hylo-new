@@ -127,6 +127,23 @@ public struct Module: Sendable {
 
   }
 
+  /// The lowered functions and static variables of a module.
+  internal struct IR: Sendable {
+
+    /// A mapping from a function name to its declaration (and possibly definition).
+    internal var functions: OrderedDictionary<IRFunction.Name, IRFunction?>
+
+    /// The static allocations in the module.
+    internal var allocations: [IRGlobal]
+
+    /// Creates an empty instance.
+    internal init() {
+      self.functions = [:]
+      self.allocations = []
+    }
+
+  }
+
   /// The name of Hylo's standard library.
   public static let standardLibraryName = Name("Hylo")
 
@@ -143,7 +160,7 @@ public struct Module: Sendable {
   internal private(set) var sources: OrderedDictionary<FileName, SourceContainer> = [:]
 
   /// The IR functions in the module.
-  internal private(set) var ir: OrderedDictionary<IRFunction.Name, IRFunction?> = [:]
+  internal private(set) var ir: IR = .init()
 
   /// Creates an empty module with the given name and identity.
   public init(name: Name, identity: Module.ID) {
@@ -205,11 +222,11 @@ public struct Module: Sendable {
   /// - Requires: `self` contains no IR function having the name of `f`.
   @discardableResult
   public mutating func addFunction(_ f: IRFunction) -> IRFunction.ID {
-    modify(&ir[f.name]) { (d) in
+    modify(&ir.functions[f.name]) { (d) in
       assert(d == nil, "function already declared")
       d = .some(f)
     }
-    return ir.index(forKey: f.name)!
+    return ir.functions.index(forKey: f.name)!
   }
 
   /// Inserts `child` into `self` in the bucket of `file`.
@@ -261,7 +278,7 @@ public struct Module: Sendable {
 
   /// The IR functions in `self`.
   public var functions: some Collection<IRFunction> {
-    ir.values.map({ (f) in f! })
+    ir.functions.values.map({ (f) in f! })
   }
 
   /// The identities of the source files in `self`.
@@ -300,8 +317,8 @@ public struct Module: Sendable {
 
   /// Projects the function identified by `f`.
   internal subscript(ir f: IRFunction.ID) -> IRFunction {
-    get { ir.values[f]! }
-    _modify { yield &ir.values[f]! }
+    get { ir.functions.values[f]! }
+    _modify { yield &ir.functions.values[f]! }
   }
 
   /// Returns the tag of `n`.
@@ -358,12 +375,12 @@ public struct Module: Sendable {
   }
 
   internal mutating func takeFunction(_ f: IRFunction.ID) -> IRFunction {
-    ir.values[f].sink()
+    ir.functions.values[f].sink()
   }
 
   internal mutating func reassignFunction(_ v: IRFunction, to f: IRFunction.ID) {
-    assert(ir.values[f] == nil)
-    ir.values[f] = v
+    assert(ir.functions.values[f] == nil)
+    ir.functions.values[f] = v
   }
 
 }

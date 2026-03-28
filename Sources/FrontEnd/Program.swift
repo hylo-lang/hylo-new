@@ -98,7 +98,7 @@ public struct Program: Sendable {
       // Temporarily move all functions to a local work list.
       var work: [(id: IRFunction.ID, function: IRFunction)] = []
       modify(&typer.program[typer.module]) { (module) in
-        work = module.ir.values.indices.map({ (i) in (i, module.takeFunction(i)) })
+        work = module.ir.functions.values.indices.map({ (i) in (i, module.takeFunction(i)) })
       }
 
       let never = typer.program.types.never()

@@ -937,7 +937,7 @@ internal struct IREmitter {
     of d: T.ID
   ) -> IRFunction.ID {
     let name = IRFunction.Name.lowered(.init(d))
-    if let i = program[module].ir.index(forKey: name) {
+    if let i = program[module].ir.functions.index(forKey: name) {
       return i
     }
 
@@ -974,7 +974,7 @@ internal struct IREmitter {
     syntheticImplementationOf d: DeclarationIdentity, for a: TypeArguments
   ) -> IRFunction.ID {
     let name = IRFunction.Name.synthesized(d, a)
-    if let i = program[module].ir.index(forKey: name) {
+    if let i = program[module].ir.functions.index(forKey: name) {
       return i
     }
 
