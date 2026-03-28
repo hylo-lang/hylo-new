@@ -237,17 +237,20 @@ internal struct IREmitter {
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
     var frame = Frame()
     for (i, p) in insertionContext.function!.termParameters.enumerated() {
-      if let local = p.declaration {
-        frame[local] = .parameter(i)
+      let v = IRValue.parameter(i)
 
-        // Assume `p` is initialized if it's a `set` parameter accessing the storage of a trivially
-        // initializable object (e.g., to initialize an empty struct).
-        if p.access == .set {
-          let t = insertionContext.function!.resolved(p.type)!.type
-          if program.isTriviallyInitializable(t, in: .init(node: d)) {
-            lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
-              me._assume_state(.parameter(i), initialized: true)
-            }
+      // Configure the base frame with the function's parameters.
+      if let local = p.declaration {
+        frame[local] = v
+      }
+
+      // Assume `p` is initialized if it's a `set` parameter other than the return register
+      // accessing the storage of a trivially initializable object (e.g., an empty struct).
+      if (p.access == .set) && (v != insertionContext.function!.returnRegister) {
+        let t = insertionContext.function!.resolved(p.type)!.type
+        if program.isTriviallyInitializable(t, in: .init(node: d)) {
+          lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
+            me._assume_state(v, initialized: true)
           }
         }
       }
