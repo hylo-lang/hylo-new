@@ -481,7 +481,7 @@ public struct Driver {
   }
 
   private func moduleName(_ module: Module.ID) -> String {
-    program.modules.elements[module].key.rawValue
+    program.modules.elements[module].key
   }
 
   private static func decode(_ buffer: borrowing SwiftyLLVM.MemoryBuffer) -> String {
@@ -506,20 +506,20 @@ public struct Driver {
     let terminationStatus: Int32
   }
 
-  private enum DriverFailure: LocalizedError {
+  private enum DriverFailure: LocalizedError, CustomStringConvertible {
 
     case commandFailed(String, [String], Int32, String)
     case missingBackendArtifact(String)
     case missingExecutable(String)
 
-    var errorDescription: String? {
+    var errorDescription: String {
       switch self {
       case .commandFailed(let executable, let arguments, let status, let output):
         let command = ([executable] + arguments).joined(separator: " ")
         if output.isEmpty {
           return "command failed with exit code \(status): \(command)"
         } else {
-          return "command failed with exit code \(status): \(command)\n\(output)"
+          return "command failed with exit code \(status): \n $ \(command)\n\(output)"
         }
       case .missingBackendArtifact(let module):
         return "missing backend artifact for module '\(module)'"
@@ -528,17 +528,27 @@ public struct Driver {
       }
     }
 
+    var description: String { "\n\(errorDescription)" }
+
   }
 
 }
 
 extension FileManager {
   /// Creates an empty temporary directory for the duration of the given observer.
-  func withUniqueTemporaryDirectory<T>(_ observer: (URL) throws -> T) throws -> T {
+  public func withUniqueTemporaryDirectory<T>(_ observer: (URL) throws -> T) throws -> T {
     let directory = temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     try createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? removeItem(at: directory) }
     return try observer(directory)
+  }  
+  
+  /// Creates an empty temporary directory for the duration of the given observer.
+  public func withUniqueTemporaryDirectory<T>(_ observer: (URL) async throws -> T) async throws -> T {
+    let directory = temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? removeItem(at: directory) }
+    return try await observer(directory)
   }
 }
 

@@ -22,6 +22,9 @@ final class CompilerTests: XCTestCase {
 
     let expectedStandardOutput: String?
 
+    /// The path to the generated executable, if applicable.
+    let executable: URL?
+
   }
 
   private struct ExecutionResult {
@@ -101,27 +104,36 @@ final class CompilerTests: XCTestCase {
       return
     }
 
-    let result = try await compile(input)
-    assertSansError(result.driver.program)
-    guard input.manifest.stage == .run else { return }
 
-    let r: CompilerTests.ExecutionResult = try execute(result)
-    assertExitCode(input.manifest.assertedExitCode ?? 0, in: r)
-    if let standardOutput = result.expectedStandardOutput {
-      assertStandardOutput(standardOutput, in: r)
+    do {
+    try await FileManager.default.withUniqueTemporaryDirectory{ d in
+      let result = try await compile(input, outputDirectory: d)
+      try assertSansError(result.driver.program)
+
+      guard input.manifest.stage == .run else { return }
+
+      let r: CompilerTests.ExecutionResult = try execute(result)
+      assertExitCode(input.manifest.assertedExitCode ?? 0, in: r)
+      if let standardOutput = result.expectedStandardOutput {
+        assertStandardOutput(standardOutput, in: r)
+      }
+    }
+    } catch let error as TestFailure {
+      XCTFail(error.localizedDescription)
     }
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    let result = try await compile(input)
-    let program = result.driver.program
-    XCTAssert(program.containsError, "program compiled but an error was expected")
-    assertExpectations(result.expectations, program.diagnostics)
+    try await FileManager.default.withUniqueTemporaryDirectory{ d in
+      let result = try await compile(input, outputDirectory: d)
+      let program = result.driver.program
+      XCTAssert(program.containsError, "program compiled but an error was expected")
+      assertExpectations(result.expectations, program.diagnostics)
+    }
   }
-
-  /// Compiles `input` into `p` and returns expected diagnostics for each compiled source file.
-  private func compile(_ input: TestDescription) async throws -> CompilationResult {
+  /// Compiles `input` into `outputDirectory` and returns expected diagnostics for each compiled source file.
+  private func compile(_ input: TestDescription, outputDirectory: URL) async throws -> CompilationResult {
     var driver = Driver(
       moduleCachePath: CompilerTests.moduleCachePath.url,
       targetConfiguration: .init(),
@@ -146,12 +158,15 @@ final class CompilerTests: XCTestCase {
       expectations[source.name] = expected
     }
 
+    var executable: URL? = nil
+
     func done() -> CompilationResult {
       .init(
         driver: driver,
         module: m,
         expectations: expectations,
-        expectedStandardOutput: input.expectedStandardOutput)
+        expectedStandardOutput: input.expectedStandardOutput,
+        executable: executable)
     }
 
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -182,8 +197,10 @@ final class CompilerTests: XCTestCase {
     }
 
     if input.manifest.stage == .binary || input.manifest.stage == .run {
-      if (try await driver.generateExecutable(for: m)).containsError { return done() }
+      executable = outputDirectory.appendingPathComponent(driver.program[m].name)
+      _ = try await driver.generateExecutable(for: m, writingTo: executable)
     }
+
     return done()
   }
 
@@ -223,14 +240,14 @@ final class CompilerTests: XCTestCase {
     XCTAssertEqual(
       observed.terminationStatus,
       expected,
-      "expected exit code \(expected), got \(observed.terminationStatus)\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)")
+      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)")
   }
 
   private func assertStandardOutput(_ expected: String, in observed: ExecutionResult) {
     XCTAssertEqual(
       observed.standardOutput,
       expected,
-      "expected stdout:\n\(expected)\nobserved stdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)")
+      "mismatched stdout.")
   }
 
   private func execute(_ executable: URL) throws -> ExecutionResult {
@@ -253,6 +270,16 @@ final class CompilerTests: XCTestCase {
 
   private enum TestFailure: Error {
     case missingExecutableOutput
+    case compilationError(String)
+
+    var localizedDescription: String {
+      switch self {
+      case .missingExecutableOutput:
+        return "missing executable output"
+      case .compilationError(let message):
+        return "Compilation failure:\n\(message)"
+      }
+    }
   }
 
   /// Asserts that the expected `diagnostics` of each source file in `expectations` match those
@@ -292,7 +319,7 @@ final class CompilerTests: XCTestCase {
   }
 
   /// Asserts that `program` does not contain any error.
-  private func assertSansError(_ program: Program) {
+  private func assertSansError(_ program: Program) throws {
     if !program.containsError { return }
 
     let root = URL(filePath: #filePath).deletingLastPathComponent()
@@ -311,7 +338,7 @@ final class CompilerTests: XCTestCase {
       }
       report.write(o)
     }
-    XCTFail(report)
+    throw TestFailure.compilationError(report)
   }
 
   /// Returns a message explaining `delta`, which is the result of comparing `expectation` to some

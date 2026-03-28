@@ -73,7 +73,7 @@ public struct CodeGenerationContext: ~Copyable {
     compilingFor targetMachine: consuming SwiftyLLVM.TargetMachine
   ) throws {
     self.llvm = try SwiftyLLVM.Module(
-      program.modules.elements[module].value.name.rawValue, targetMachine: targetMachine)
+      program.modules.elements[module].key, targetMachine: targetMachine)
     self.program = program
     self.moduleID = module
     // FIXME: avoid copying the whole array a second time. FrontEnd could expose an array instead of an opaque collection.
@@ -112,6 +112,13 @@ public struct CodeGenerationContext: ~Copyable {
 
     /// Don't transpile generic functions.
     if f.isGeneric { return }
+
+    // Don't transpile projections.
+    guard let _ = f.returnRegister else {
+      var p = TreePrinter(program: program)
+      print("WARNING: function \(p.show(f.name)) has no return register, probably it's a subscript that we didn't lower yet.")
+      return
+    }
 
     let transpiledFunction = declareFunction(transpiledFrom: f)
 
