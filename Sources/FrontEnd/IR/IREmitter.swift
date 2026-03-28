@@ -982,7 +982,7 @@ internal struct IREmitter {
 
       // If `d` is a trait requirement, the trait receiver comes next.
       if let c = program.traitRequiring(d) {
-        let t = withTyper { (tp) in tp.typeOfTraitSelf(in: c) }
+        let t = program.withTyper(typing: c.module, { (tp) in tp.typeOfTraitSelf(in: c) })
         let u = loweredType(addressOf: t)
         result.append(IRParameter(type: u, access: .let, declaration: nil))
       }
@@ -1101,11 +1101,6 @@ internal struct IREmitter {
   /// The site with which new instructions should be associated.
   private var currentAnchor: Anchor {
     insertionContext.anchor!
-  }
-
-  /// Returns the result of calling `action` on a typer configured with `self.module`.
-  private mutating func withTyper<T>(_ action: (inout Typer) -> T) -> T {
-    program.withTyper(typing: module, action)
   }
 
   /// Returns the result of calling `action` on a copy of `self` with a cleared insertion context.
@@ -1450,7 +1445,10 @@ internal struct IREmitter {
     if path.isEmpty { return base }
 
     let (root, _) = currentFunction.result(of: base) ?? badOperand()
-    let typeOfSubfield = withTyper({ (tp) in tp.field(of: root, at: path) })
+    let typeOfSubfield = program.withTyper(typing: module) { (tp) in
+      tp.field(of: root, at: path)
+    }
+
     let s = IRSubfield(
       base: base, path: path, typeOfSubfield: typeOfSubfield!,
       anchor: currentAnchor)
@@ -1744,7 +1742,7 @@ internal struct IREmitter {
   ) -> WitnessExpression? {
     let goal = program.typeOfWitness(of: t, is: p)
     let scopeOfUse = insertionContext.anchor!.scope
-    let candidates = withTyper { (tp) in
+    let candidates = program.withTyper(typing: module) { (tp) in
       tp.summon(goal, in: scopeOfUse)
     }
 
