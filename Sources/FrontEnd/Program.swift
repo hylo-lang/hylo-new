@@ -1093,10 +1093,10 @@ public struct Program: Sendable {
   /// Returns the adjunct conformances of `d`, if any.
   public func adjuncts(of d: DeclarationIdentity) -> [ConformanceDeclaration.ID]? {
     switch tag(of: d) {
-    case StructDeclaration.self:
-      return self[castUnchecked(d, to: StructDeclaration.self)].conformances
     case EnumDeclaration.self:
       return self[castUnchecked(d, to: EnumDeclaration.self)].conformances
+    case StructDeclaration.self:
+      return self[castUnchecked(d, to: StructDeclaration.self)].conformances
     default:
       return nil
     }

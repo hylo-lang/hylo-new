@@ -237,17 +237,20 @@ internal struct IREmitter {
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
     var frame = Frame()
     for (i, p) in insertionContext.function!.termParameters.enumerated() {
-      if let local = p.declaration {
-        frame[local] = .parameter(i)
+      let v = IRValue.parameter(i)
 
-        // Assume `p` is initialized if it's a `set` parameter accessing the storage of a trivially
-        // initializable object (e.g., to initialize an empty struct).
-        if p.access == .set {
-          let t = insertionContext.function!.resolved(p.type)!.type
-          if program.isTriviallyInitializable(t, in: .init(node: d)) {
-            lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
-              me._assume_state(.parameter(i), initialized: true)
-            }
+      // Configure the base frame with the function's parameters.
+      if let local = p.declaration {
+        frame[local] = v
+      }
+
+      // Assume `p` is initialized if it's a `set` parameter other than the return register
+      // accessing the storage of a trivially initializable object (e.g., an empty struct).
+      if (p.access == .set) && (v != insertionContext.function!.returnRegister) {
+        let t = insertionContext.function!.resolved(p.type)!.type
+        if program.isTriviallyInitializable(t, in: .init(node: d)) {
+          lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
+            me._assume_state(v, initialized: true)
           }
         }
       }
@@ -902,7 +905,9 @@ internal struct IREmitter {
       return i
     }
 
-    let ts = program.accumulatedGenericParameters(visibleFrom: .init(node: d))
+    let ts = program.withTyper(typing: d.module) { (tp) in
+      tp.accumulatedGenericParameters(visibleFrom: .init(node: d))
+    }
 
     // Are we declaring a conformance?
     if program.tag(of: d) == ConformanceDeclaration.self {
@@ -980,7 +985,7 @@ internal struct IREmitter {
 
       // If `d` is a trait requirement, the trait receiver comes next.
       if let c = program.traitRequiring(d) {
-        let t = withTyper { (tp) in tp.typeOfTraitSelf(in: c) }
+        let t = program.withTyper(typing: c.module, { (tp) in tp.typeOfTraitSelf(in: c) })
         let u = loweredType(addressOf: t)
         result.append(IRParameter(type: u, access: .let, declaration: nil))
       }
@@ -1099,11 +1104,6 @@ internal struct IREmitter {
   /// The site with which new instructions should be associated.
   private var currentAnchor: Anchor {
     insertionContext.anchor!
-  }
-
-  /// Returns the result of calling `action` on a typer configured with `self.module`.
-  private mutating func withTyper<T>(_ action: (inout Typer) -> T) -> T {
-    program.withTyper(typing: module, action)
   }
 
   /// Returns the result of calling `action` on a copy of `self` with a cleared insertion context.
@@ -1448,7 +1448,10 @@ internal struct IREmitter {
     if path.isEmpty { return base }
 
     let (root, _) = currentFunction.result(of: base) ?? badOperand()
-    let typeOfSubfield = withTyper({ (tp) in tp.field(of: root, at: path) })
+    let typeOfSubfield = program.withTyper(typing: module) { (tp) in
+      tp.field(of: root, at: path)
+    }
+
     let s = IRSubfield(
       base: base, path: path, typeOfSubfield: typeOfSubfield!,
       anchor: currentAnchor)
@@ -1742,7 +1745,7 @@ internal struct IREmitter {
   ) -> WitnessExpression? {
     let goal = program.typeOfWitness(of: t, is: p)
     let scopeOfUse = insertionContext.anchor!.scope
-    let candidates = withTyper { (tp) in
+    let candidates = program.withTyper(typing: module) { (tp) in
       tp.summon(goal, in: scopeOfUse)
     }
 
@@ -1795,25 +1798,6 @@ extension Program {
     let p = parent(containing: d, as: FunctionBundleDeclaration.self)!
     return .init(
       explicit: self[p].parameters, usings: self[p].contextParameters.usings, captures: [])
-  }
-
-  /// Returns generic parameters captured by `s` and the scopes semantically containing `s`.
-  fileprivate func accumulatedGenericParameters(
-    visibleFrom s: ScopeIdentity
-  ) -> [GenericParameter.ID] {
-    var accumulator: [GenericParameter.ID] = []
-    var p = s
-    while let n = p.node {
-      // If `n` is a declaration that forms a scope and that has a universal type, then we assume
-      // these parameters are introduced by `n`.
-      if isDeclaration(n) {
-        let t = type(assignedTo: n)
-        let u = types.select(t, \Metatype.inhabitant) ?? t
-        accumulator.append(contentsOf: types.contextAndHead(u).context.parameters.reversed())
-      }
-      p = parent(containing: n)
-    }
-    return accumulator.reversed()
   }
 
 }

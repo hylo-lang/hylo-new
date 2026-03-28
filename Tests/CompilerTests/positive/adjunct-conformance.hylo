@@ -3,17 +3,29 @@
 trait P {
   fun f()
 }
+
 trait Q<T> {
-  fun g() -> T
+  fun g(x: T)
 }
 
-struct S is P & Q<Void> {
+struct S1 is P & Q<Void> {
   public fun f() {}
-  public fun g() {}
+  public fun g(x: Void) {}
+}
+
+struct S2<T> is P & Q<T> {
+  public fun f() {}
+  public fun g(x: T) {}
 }
 
 fun f<T where T is P>() {}
 
+fun g<T, U where T is Q<U>>() {}
+
 public fun main() {
-  f<S>()
+  f<S1>()
+  f<S2<Void>>()
+
+  g<S1, _>()
+  g<S2<_>, Void>()
 }
