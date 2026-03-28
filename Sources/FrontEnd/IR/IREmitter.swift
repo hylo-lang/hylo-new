@@ -174,9 +174,9 @@ internal struct IREmitter {
   /// Generates the IR of the subscript that projects the witness declared by `d`.
   private mutating func lowerDefinitionInClearContext(_ d: ConformanceDeclaration.ID) {
     let f = demandLoweredDeclaration(of: d)
-    assert(!program[module][ir: f].isDefined, "conformance already lowered")
+    assert(!program[module].ir[f].isDefined, "conformance already lowered")
 
-    insertionContext.function = program[module][ir: f]
+    insertionContext.function = program[module].ir[f]
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
 
     // TODO: Construct a witness table
@@ -190,8 +190,8 @@ internal struct IREmitter {
       switch table.member(implementing: r)! {
       case .synthetic(let m, _):
         let f = demandLoweredDeclaration(syntheticImplementationOf: m, for: table.arguments)
-        let n = program[module][ir: f].name
-        let t = program[module][ir: f].type(uniquedIn: &program).erased
+        let n = program[module].ir[f].name
+        let t = program[module].ir[f].type(uniquedIn: &program).erased
         members.append(.function(n, t))
 
       default:
@@ -212,7 +212,7 @@ internal struct IREmitter {
       me._return()
     }
 
-    program[module][ir: f] = insertionContext.function.sink()
+    program[module].ir[f] = insertionContext.function.sink()
   }
 
   /// Generates the IR of `d`.
@@ -223,7 +223,7 @@ internal struct IREmitter {
   /// Generates the IR of `d` assuming the insertion context is clear.
   private mutating func lowerInClearContext(_ d: FunctionDeclaration.ID) {
     let f = demandLoweredDeclaration(of: d)
-    assert(!program[module][ir: f].isDefined, "function already lowered")
+    assert(!program[module].ir[f].isDefined, "function already lowered")
 
     // Is there a body to lower?
     guard let body = program[d].body else {
@@ -233,7 +233,7 @@ internal struct IREmitter {
     }
 
     // Lower the function's definition.
-    insertionContext.function = program[module][ir: f]
+    insertionContext.function = program[module].ir[f]
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
     var frame = Frame()
     for (i, p) in insertionContext.function!.termParameters.enumerated() {
@@ -274,7 +274,7 @@ internal struct IREmitter {
       })
     }
 
-    program[module][ir: f] = insertionContext.function.sink()
+    program[module].ir[f] = insertionContext.function.sink()
   }
 
   /// Generates the IR of the members in `d`.
@@ -744,8 +744,8 @@ internal struct IREmitter {
     switch program.tag(of: d) {
     case FunctionDeclaration.self:
       let f = demandLoweredDeclaration(of: program.castUnchecked(d, to: FunctionDeclaration.self))
-      let n = program[module][ir: f].name
-      let t = program[module][ir: f].type(uniquedIn: &program).erased
+      let n = program[module].ir[f].name
+      let t = program[module].ir[f].type(uniquedIn: &program).erased
 
       // TODO: Deal with the type of the receiver
       // Partial application tout ça tout ça
@@ -955,7 +955,7 @@ internal struct IREmitter {
       }
 
       let output = program.types.demand(RemoteType(projectee: witness.head, access: .let))
-      return program[module].addFunction(
+      return program[module].ir.addFunction(
         IRFunction(
           name: name, output: .remote(output), typeParameters: ts, termParameters: ps))
     }
@@ -963,7 +963,7 @@ internal struct IREmitter {
     // Otherwise, assume `d` identifies the declaration of a function, subscript, or bundle.
     else {
       let ps = termParameters(of: .init(d))
-      return program[module].addFunction(
+      return program[module].ir.addFunction(
         IRFunction(
           name: name, output: .indirect, typeParameters: ts, termParameters: ps))
     }
@@ -979,7 +979,7 @@ internal struct IREmitter {
     }
 
     let ps = termParameters(of: d)
-    return program[module].addFunction(
+    return program[module].ir.addFunction(
       IRFunction(name: name, output: .indirect, typeParameters: [], termParameters: ps))
   }
 
@@ -1045,8 +1045,8 @@ internal struct IREmitter {
 
   /// Returns a reference to the given lowered function.
   private mutating func functionReference(referringTo f: IRFunction.ID) -> IRValue {
-    let n = program[module][ir: f].name
-    let t = program[module][ir: f].type(uniquedIn: &program).erased
+    let n = program[module].ir[f].name
+    let t = program[module].ir[f].type(uniquedIn: &program).erased
     return .function(n, t)
   }
 
@@ -1587,7 +1587,7 @@ internal struct IREmitter {
     let f = demandLoweredDeclaration(of: d)
     let v = functionReference(referringTo: f)
 
-    if program[module][ir: f].termParameters.isEmpty && applyNullary {
+    if program[module].ir[f].termParameters.isEmpty && applyNullary {
       return _project(with: v, [])
     } else {
       return v

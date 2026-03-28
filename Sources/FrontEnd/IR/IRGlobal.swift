@@ -1,5 +1,8 @@
-/// A global constant in Hylo IR.
+/// A global variable in Hylo IR.
 public struct IRGlobal: Hashable, Sendable {
+
+  /// The identity of a global variable in a module.
+  public typealias ID = Int
 
   /// The type of the allocated storage.
   public let storageType: AnyTypeIdentity

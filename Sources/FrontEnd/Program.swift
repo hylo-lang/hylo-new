@@ -98,7 +98,7 @@ public struct Program: Sendable {
       // Temporarily move all functions to a local work list.
       var work: [(id: IRFunction.ID, function: IRFunction)] = []
       modify(&typer.program[typer.module]) { (module) in
-        work = module.ir.functions.values.indices.map({ (i) in (i, module.takeFunction(i)) })
+        work = module.ir.functions.values.indices.map({ (i) in (i, module.ir.take(i)) })
       }
 
       let never = typer.program.types.never()
@@ -125,7 +125,7 @@ public struct Program: Sendable {
       // Move all functions back.
       modify(&typer.program[typer.module]) { (module) in
         while let (i, f) = work.popLast() {
-          module.reassignFunction(f, to: i)
+          module.ir.restore(f, identifiedBy: i)
         }
       }
     }
