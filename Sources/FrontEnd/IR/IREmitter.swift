@@ -1742,6 +1742,12 @@ internal struct IREmitter {
       return _emit(referenceTo: c, applyingNullary: applyNullary)
     }
 
+    // Is `d` a type declaration?
+    else if program.isTypeDeclaration(d) {
+      let t = program.type(assignedTo: d, assuming: Metatype.self)
+      return .metatype(t)
+    }
+
     switch program.tag(of: d) {
     case ConformanceDeclaration.self:
       let e = program.castUnchecked(d, to: ConformanceDeclaration.self)

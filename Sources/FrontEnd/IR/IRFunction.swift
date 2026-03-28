@@ -343,6 +343,8 @@ public struct IRFunction: Sendable {
       return (t.erased, false)
     case .function(_, let t):
       return (t, true)
+    case .metatype(let t):
+      return (t.erased, true)
     case .poison(let t):
       return resolved(t)
     }

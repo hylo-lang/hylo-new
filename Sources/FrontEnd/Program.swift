@@ -117,10 +117,13 @@ public struct Program: Sendable {
         // The following two passes may fail
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
+
+        work[i].function.depolymorphize()
       }
 
-      // It is possible new functions have been declared during lifetime normalization, e.g., for
-      // deinitializing outstanding values.
+      // Note that new functions may have been introduced during lifetime normalization (e.g., for
+      // deinitializing outstanding values) and/or depolymorphization. Those functions are assumed
+      // to be canonical and therefore do not have to go through mandatory passes.
 
       // Move all functions back.
       modify(&typer.program[typer.module]) { (module) in
