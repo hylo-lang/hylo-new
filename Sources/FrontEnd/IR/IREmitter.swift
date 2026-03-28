@@ -902,7 +902,9 @@ internal struct IREmitter {
       return i
     }
 
-    let ts = program.accumulatedGenericParameters(visibleFrom: .init(node: d))
+    let ts = program.withTyper(typing: d.module) { (tp) in
+      tp.accumulatedGenericParameters(visibleFrom: .init(node: d))
+    }
 
     // Are we declaring a conformance?
     if program.tag(of: d) == ConformanceDeclaration.self {
@@ -1795,25 +1797,6 @@ extension Program {
     let p = parent(containing: d, as: FunctionBundleDeclaration.self)!
     return .init(
       explicit: self[p].parameters, usings: self[p].contextParameters.usings, captures: [])
-  }
-
-  /// Returns generic parameters captured by `s` and the scopes semantically containing `s`.
-  fileprivate func accumulatedGenericParameters(
-    visibleFrom s: ScopeIdentity
-  ) -> [GenericParameter.ID] {
-    var accumulator: [GenericParameter.ID] = []
-    var p = s
-    while let n = p.node {
-      // If `n` is a declaration that forms a scope and that has a universal type, then we assume
-      // these parameters are introduced by `n`.
-      if isDeclaration(n) {
-        let t = type(assignedTo: n)
-        let u = types.select(t, \Metatype.inhabitant) ?? t
-        accumulator.append(contentsOf: types.contextAndHead(u).context.parameters.reversed())
-      }
-      p = parent(containing: n)
-    }
-    return accumulator.reversed()
   }
 
 }

@@ -1156,9 +1156,24 @@ public struct Typer {
 
       initializeContext(program[d].contextParameters)
       let t = evaluateTypeAscription(.init(program[d].witness))
-      let u = introduce(program[d].contextParameters, into: t)
-      program[d.module].setType(u, for: d)
-      return u
+
+      // If the conformance is adjunct, then it is defined under the generic parameters introduced
+      // by the associated type declaration.
+      if program[d].isAdjunct {
+        assert(program[d].contextParameters.isEmpty)
+        let s = program.castToDeclaration(program.parent(containing: d).node!)!
+        let g = genericParameters(s)
+        let u = program.types.introduce(parameters: g, into: t)
+        program[d.module].setType(u, for: d)
+        return u
+      }
+
+      // Otherwise, the conformance may have its own context parameters.
+      else {
+        let u = introduce(program[d].contextParameters, into: t)
+        program[d.module].setType(u, for: d)
+        return u
+      }
     }
 
     // Cyclic reference detected.
@@ -1734,6 +1749,69 @@ public struct Typer {
     program[lhs].elements.elementsEqual(rhs) { (l, r) in
       (l.label == nil) || (l.label?.value == r.label)
     }
+  }
+
+  /// Returns the generic parameters of the entity declared by `d`.
+  internal mutating func genericParameters(_ d: DeclarationIdentity) -> [GenericParameter.ID] {
+    switch program.tag(of: d) {
+    case ConformanceDeclaration.self:
+      return genericParameters(castUnchecked(d, to: ConformanceDeclaration.self))
+    case ExtensionDeclaration.self:
+      return genericParameters(castUnchecked(d, to: ExtensionDeclaration.self))
+    case FunctionDeclaration.self:
+      return genericParameters(castUnchecked(d, to: FunctionDeclaration.self))
+    case FunctionBundleDeclaration.self:
+      return genericParameters(castUnchecked(d, to: FunctionBundleDeclaration.self))
+    default:
+      // By default, if `d` declares an entity having a universal type, then we assume that the
+      // parameters of that type are introduced by `d`.
+      let t = declaredType(of: d)
+      if let u = program.types.select(t, \Metatype.inhabitant) {
+        return program.types.contextAndHead(u).context.parameters
+      } else {
+        return []
+      }
+    }
+  }
+
+  /// Returns the generic parameters of the entity declared by `d`.
+  private mutating func genericParameters<T: RoutineDeclaration>(
+    _ d: T.ID
+  ) -> [GenericParameter.ID] {
+    declaredTypes(of: program[d].contextParameters.types)
+  }
+
+  /// Returns the generic parameters of the entity declared by `d`.
+  private mutating func genericParameters(
+    _ d: ConformanceDeclaration.ID
+  ) -> [GenericParameter.ID] {
+    if program[d].isAdjunct {
+      return []
+    } else {
+      return declaredTypes(of: program[d].contextParameters.types)
+    }
+  }
+
+  /// Returns the generic parameters of the entity declared by `d`.
+  private mutating func genericParameters(
+    _ d: ExtensionDeclaration.ID
+  ) -> [GenericParameter.ID] {
+    declaredTypes(of: program[d].contextParameters.types)
+  }
+
+  /// Returns generic parameters captured by `s` and the scopes semantically containing `s`.
+  internal mutating func accumulatedGenericParameters(
+    visibleFrom s: ScopeIdentity
+  ) -> [GenericParameter.ID] {
+    var accumulator: [GenericParameter.ID] = []
+    var p = s
+    while let n = p.node {
+      if let d = program.castToDeclaration(n) {
+        accumulator.append(contentsOf: genericParameters(d).reversed())
+      }
+      p = program.parent(containing: n)
+    }
+    return accumulator.reversed()
   }
 
   // MARK: Type inference
