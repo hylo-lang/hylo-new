@@ -1,0 +1,6 @@
+//! stage:lowering
+
+public fun main() {
+  var x: Int[3] = (42, -23, 1337) as Int[3]
+  _ = x.0
+}

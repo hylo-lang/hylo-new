@@ -452,6 +452,8 @@ internal struct IREmitter {
     switch program.tag(of: e) {
     case Call.self:
       lower(store: program.castUnchecked(e, to: Call.self), to: target)
+    case Conversion.self:
+      lower(store: program.castUnchecked(e, to: Conversion.self), to: target)
     case If.self:
       lower(store: program.castUnchecked(e, to: If.self), to: target)
     case InoutExpression.self:
@@ -521,6 +523,23 @@ internal struct IREmitter {
       for o in operands.reversed() {
         me._end(IRAccess.self, openedBy: o)
       }
+    }
+  }
+
+  /// Implements `lower(store:to:)` for conversion expressions.
+  private mutating func lower(store e: Conversion.ID, to target: IRValue) {
+    let lhs = program.type(assignedTo: program[e].source)
+    let rhs = program.type(assignedTo: e)
+
+    // Trivial if the conversion does not involve any change of representation.
+    if let s = program.types.unifiable(lhs, rhs) {
+      assert(s.isEmpty)
+      lower(store: program[e].source, to: target)
+    }
+
+    // Otherwise, the semantics of the conversion depends on its direction.
+    else {
+      unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
     }
   }
 
