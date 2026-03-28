@@ -633,6 +633,8 @@ internal struct IREmitter {
     insertionContext.point = .end(of: tail)
   }
 
+  /// Generates the IR for using `n` as a condition of a test jumping to `onFailure` if the
+  /// condition does not hold or the return value if it does.
   private mutating func lowerCondition(
     _ n: ConditionIdentity, onFailure: IRBlock.ID
   ) -> IRBlock.ID {
