@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <stdlib.h>
 
 /// Prints the Hylo `Int32` pointed to by `x` followed by a newline.
 ///
@@ -28,4 +29,12 @@ void hylo_successor_int(intptr_t const* self, intptr_t* result) {
 /// Definition of `Hylo.Int32.zero(:) -> Int32`.
 void hylo_make_zero_i32(int32_t* result) {
     *result = 0;
+}
+
+void malloc_shim(intptr_t const* size, void** result) {
+    *result = malloc(*size);
+}
+
+void free_shim(void** ptr) {
+    free(*ptr);
 }
