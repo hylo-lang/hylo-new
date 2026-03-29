@@ -134,7 +134,7 @@ public struct Module: Sendable {
     internal private(set) var functions: OrderedDictionary<IRFunction.Name, IRFunction?>
 
     /// The global variables allocated in the static memory of the module.
-    internal private(set) var variables: OrderedDictionary<DeclarationIdentity, IRGlobal>
+    internal private(set) var variables: OrderedDictionary<IRGlobal.Name, IRGlobal>
 
     /// Creates an empty instance.
     internal init() {
@@ -163,8 +163,8 @@ public struct Module: Sendable {
     /// Assigns the global variables `g` to `d`.
     ///
     /// - Requires: `self` assigns no global variables to `d`.
-    internal mutating func addGlobal(_ g: IRGlobal, assignedTo d: DeclarationIdentity) {
-      modify(&variables[d]) { (slot) in
+    internal mutating func addGlobal(_ g: IRGlobal) {
+      modify(&variables[g.name]) { (slot) in
         assert(slot == nil, "variable already assigned")
         slot = g
       }

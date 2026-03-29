@@ -323,7 +323,7 @@ public struct IRFunction: Sendable {
     case .integer(_, let t):
       return (t.erased, false)
     case .function(_, let t):
-      return (t.erased, true)
+      return (t, true)
     case .poison(let t):
       return resolved(t)
     }

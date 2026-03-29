@@ -6,3 +6,9 @@ struct S {
 
 // As global bindings are never deinitialized, they can be assigned to indestructible data.
 let s = (123, S())
+
+fun use(x: Int) {}
+
+public fun main() {
+  use(s.0)
+}
