@@ -1,3 +1,6 @@
-negative/illegal-sink-global.hylo:6.11-17: error: illegal 'sink' access
-  var x = global
-          ~~~~~~
+negative/illegal-sink-global.hylo:8.11-14: error: illegal 'sink' access
+  var x = foo
+          ~~~
+negative/illegal-sink-global.hylo:9.11-16: error: illegal 'sink' access
+  var y = S.foo
+          ~~~~~

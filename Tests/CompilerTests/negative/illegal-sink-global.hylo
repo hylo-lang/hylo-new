@@ -1,7 +1,10 @@
 //! stage:lowering
 
-let global = ()
+let foo = ()
+
+struct S { public static let foo = () }
 
 public fun main() {
-  var x = global
+  var x = foo
+  var y = S.foo
 }

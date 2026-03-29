@@ -309,9 +309,12 @@ internal struct IREmitter {
     }
 
     for m in program[d].members {
-      // Nothing to do for binding declarations.
-      if program.tag(of: m) == BindingDeclaration.self { continue }
-      lower(m)
+      if let b = program.cast(m, to: BindingDeclaration.self) {
+        // Nothing to do for non-static binding declarations.
+        if program.isStatic(b) { lower(globalBinding: b) }
+      } else {
+        lower(m)
+      }
     }
   }
 
