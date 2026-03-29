@@ -51,6 +51,8 @@ internal struct IREmitter {
       lower(program.castUnchecked(d, to: StructDeclaration.self))
     case TraitDeclaration.self:
       lower(program.castUnchecked(d, to: TraitDeclaration.self))
+    case VariableDeclaration.self:
+      break
     default:
       program.unexpected(d)
     }
@@ -69,7 +71,7 @@ internal struct IREmitter {
 
     // Global bindings denote global constants computed lazily.
     else {
-      unimplemented("global binding declarations")
+      lower(globalBinding: d)
     }
   }
 
@@ -113,6 +115,38 @@ internal struct IREmitter {
         insertionContext.frames.top[.init(v)] = .poison(.lowered(t, isAddress: true))
       }
     }
+  }
+
+  /// Generates the IR of `d`, which declares remote local bindings.
+  private mutating func lower(globalBinding d: BindingDeclaration.ID) {
+    let p = program[d].pattern
+    assert(program[p].introducer.value == .let)
+
+    // Declare the global's initializer.
+    let t = program.types.dealiased(program.type(assignedTo: d))
+    let o = IRParameter(type: .lowered(t, isAddress: true), access: .set, declaration: nil)
+    var initializer = IRFunction(
+      name: .initializer(d), output: .indirect, typeParameters: [], termParameters: [o])
+
+    // Define the global's initializer.
+    if let rhs = program[d].initializer {
+      let lhs = program[p].pattern
+      initializer = withClearContext { (me) in
+        me.insertionContext.frames.push(.init())
+        me.insertionContext.function = initializer
+        me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
+        me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
+        me.lowering(rhs, { $0._return() })
+        return me.insertionContext.function.sink()
+      }
+    } else {
+      report(program.missingBindingInitializer(d))
+    }
+
+    let g = IRGlobal(
+      storageType: t, alignment: .align(of: t), initializer: initializer.name)
+    program[module].ir.addFunction(initializer)
+    program[module].ir.addGlobal(g, assignedTo: .init(d))
   }
 
   /// Generates IR for initializating the bindings declared in `lhs`, which refer to parts of

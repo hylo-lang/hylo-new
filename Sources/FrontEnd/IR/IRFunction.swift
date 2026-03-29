@@ -13,6 +13,9 @@ public struct IRFunction: Sendable {
     /// The identity of a function lowered from sources.
     case lowered(DeclarationIdentity)
 
+    /// The identity of a global initializer.
+    case initializer(BindingDeclaration.ID)
+
     /// The identity of a synthesized function.
     case synthesized(DeclarationIdentity, TypeArguments)
 
@@ -658,6 +661,8 @@ extension IRFunction.Name: Showable {
     switch self {
     case .lowered(let d):
       return printer.program.debugName(of: d)
+    case .initializer(let d):
+      return "\(printer.program.debugName(of: .init(d))).init"
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
       return "\(printer.program.debugName(of: d))<\(list: xs)>"
