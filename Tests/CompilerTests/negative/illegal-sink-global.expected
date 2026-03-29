@@ -1,0 +1,3 @@
+negative/illegal-sink-global.hylo:6.11-17: error: illegal 'sink' access
+  var x = global
+          ~~~~~~

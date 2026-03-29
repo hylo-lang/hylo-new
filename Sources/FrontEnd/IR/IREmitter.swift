@@ -395,19 +395,18 @@ internal struct IREmitter {
       if case .direct(let d) = program.declaration(referredToBy: n) {
         if !program.occurs(referenceTo: d, in: program[s].rhs) {
           let target = lowered(lvalue: target)
-          lowering(s) { (me) in me.lower(store: me.program[s].rhs, to: target) }
+          lower(store: program[s].rhs, to: target)
           return .next
         }
       }
     }
 
     // Otherwise, the right-hand side stored to a temporary and then moved to the LHS.
-    lowering(s) { (me) in
-      let rhs = me._alloca(me.program.type(assignedTo: me.program[s].rhs))
-      me.lower(store: me.program[s].rhs, to: rhs)
-      let lhs = me.lowered(lvalue: me.program[s].lhs)
-      me._emitMove([.inout, .set], rhs, to: lhs)
-    }
+    let t = program.type(assignedTo: program[s].rhs)
+    let r = lowering(program[s].rhs, { $0._alloca(t) })
+    lower(store: program[s].rhs, to: r)
+    let l = lowered(lvalue: program[s].lhs)
+    lowering(program[s].rhs, { $0._emitMove([.inout, .set], r, to: l) })
 
     return .next
   }
@@ -420,7 +419,7 @@ internal struct IREmitter {
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Discard.ID) -> ControlFlow {
     let v = lowered(lvalue: program[s].value)
-    lowering(s, { _ = $0._emitDeinitialize(v) })
+    lowering(program[s].value, { _ = $0._emitDeinitialize(v) })
     return .next
   }
 
@@ -1449,7 +1448,9 @@ internal struct IREmitter {
 
   /// Inserts a `assume_state` instruction.
   internal mutating func _assume_state(_ s: IRValue, initialized: Bool) {
-    insert(IRAssumeState(storage: s, initialized: initialized, anchor: currentAnchor))
+    let x = _access([initialized ? .set : .sink], from: s)
+    insert(IRAssumeState(storage: x, initialized: initialized, anchor: currentAnchor))
+    _end(IRAccess.self, openedBy: x)
   }
 
   /// Inserts a `br` instruction.

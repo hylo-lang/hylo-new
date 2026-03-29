@@ -208,18 +208,26 @@ private struct Transfer: AbstractTransferFunction {
 
     // Access is expected to be reified at this stage.
     let k = access.capabilities.uniqueElement!
+
+    // Check if the access is violating immutability. If it is, then report an illegal access and
+    // skip further changes to the context to avoid cascading diagnostics.
+    let isLegal = (k == .let) || !f.isBoundImmutably(access.source)
+    if !isLegal {
+      report(.illegalAccess(k, at: access.anchor.site))
+    }
+
     switch k {
     case .let, .inout, .sink:
-      checkInitialized(place: access.source, in: f, at: access.anchor.site)
+      if isLegal {
+        checkInitialized(place: access.source, in: f, at: access.anchor.site)
+        if k == .sink { consume(place: access.source, with: i.erased, in: f) }
+      }
       context.declare(i, from: f, initially: .initialized)
 
-      // A `sink` access consumes its source.
-      if k == .sink {
-        consume(place: access.source, with: i.erased, in: f)
-      }
-
     case .set:
-      ensureDeinitialized(place: access.source, before: i.erased, in: &f)
+      if isLegal {
+        ensureDeinitialized(place: access.source, before: i.erased, in: &f)
+      }
       context.declare(i, from: f, initially: .uninitialized)
 
     case .auto:

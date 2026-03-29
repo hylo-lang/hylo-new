@@ -1,0 +1,7 @@
+//! stage:lowering
+
+let global = ()
+
+public fun main() {
+  var x = global
+}

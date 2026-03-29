@@ -145,18 +145,27 @@ public struct IRFunction: Sendable {
 
   /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
   public func isBoundImmutably(_ i: AnyInstructionIdentity) -> Bool {
-    switch at(i) {
-    case is IRAlloca:
+    switch tag(of: i) {
+    case IRAlloca.self:
       return false
-    case let s as IRAccess:
-      return isBoundImmutably(s.source)
-    case let s as IRProject:
-      return s.access == .let
-    case let s as IRSubfield:
-      return isBoundImmutably(s.base)
+    case IRAccess.self:
+      return (at(i) as! IRAccess).capabilities == [.let]
+    case IRProject.self:
+      return (at(i) as! IRProject).access == .let
+    case IRSubfield.self:
+      return isBoundImmutably((at(i) as! IRSubfield).base)
     default:
       return true
     }
+  }
+
+  /// Returns the value defining the root of the place on which `i` forms an access.
+  public func source(_ i: IRAccess.ID) -> IRValue {
+    var s = at(i).source
+    while let r = s.register, let q = cast(r, to: IRSubfield.self) {
+      s = at(q).base
+    }
+    return s
   }
 
   /// Returns the last use of `v` in `b`, if any.
