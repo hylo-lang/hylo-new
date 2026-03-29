@@ -1,5 +1,6 @@
 // swift-tools-version:6.2
 import PackageDescription
+import Foundation
 
 #if os(Windows)
   let onWindows = true
@@ -121,7 +122,7 @@ let package = Package(
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
       ],
-      exclude: ["negative", "positive", "README.md"],
+      exclude: ["README.md"] + allNonSwiftFiles(in: "Tests/CompilerTests"),
       swiftSettings: commonSwiftSettings,
       plugins: ["CompilerTestsPlugin"]),
 
@@ -161,3 +162,28 @@ let package = Package(
         .target(name: "hc-tests")
       ]),
   ])
+
+/// Returns the list of relative urls of all non-swift files in the given directory.
+func allNonSwiftFiles(in directory: String) -> [String] {
+  guard let enumerator: FileManager.DirectoryEnumerator = FileManager.default.enumerator(atPath: directory) 
+  else { return [] }
+  
+  let l = enumerator.compactMap { $0 as? String }
+    .filter { !$0.hasSuffix(".swift") && !isDirectory(directory + "/" + $0) }
+
+  print(l.joined(separator: "\n"))
+  return l
+}
+
+func isDirectory(_ path: String) -> Bool {
+  // Heuristic for common fle formats:
+  if path.hasSuffix(".hylo") || path.hasSuffix(".observed") || path.hasSuffix(".expected") ||
+    path.hasSuffix(".diagnostics") || path.hasSuffix(".c") {
+    return false
+  }
+
+  // Fallback to filesystem check
+  var isDirectory: ObjCBool = true
+  precondition(FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory))
+  return isDirectory.boolValue
+}
