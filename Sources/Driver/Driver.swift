@@ -252,17 +252,13 @@ public struct Driver {
       try llvmModules[module]!.module.write(.objectFile, to: object.path)
       return object
     }
-    #if os(Linux)
     if !isFreestanding {
       let shimsObject = directory.appendingPathComponent("stdlib_shims.o", isDirectory: false)
       _ = try runCommand(
-        try findExecutable(invokedAs: "clang"),
+        try findExecutable("clang"),
         arguments: ["-c", standardLibrary.shim.path, "-o", shimsObject.path])
       objectFiles.append(shimsObject)
     }
-    #else
-      #error("Unsupported platform")
-    #endif
     return objectFiles
   }
 
@@ -365,48 +361,20 @@ public struct Driver {
   }
 
   private func linkExecutable(at output: URL, with objectFiles: [URL]) throws {
+    var arguments = ["-fuse-ld=lld", "-o", output.path]
+    arguments.append(contentsOf: librarySearchPaths.map({ "-L\($0.path)" }))
+    arguments.append(contentsOf: objectFiles.map(\.path))
     #if os(macOS)
-      try linkMacOSExecutable(at: output, with: objectFiles)
-    #elseif os(Linux)
-      try linkLinuxExecutable(at: output, with: objectFiles)
-    #elseif os(Windows)
-      try linkWindowsExecutable(at: output, with: objectFiles)
-    #else
-      #error("Unsupported platform")
-    #endif
-  }
-
-  private func linkMacOSExecutable(at output: URL, with objectFiles: [URL]) throws {
-    let xcrun = try findExecutable(invokedAs: "xcrun")
-    let sdk = try runCommand(xcrun, arguments: ["--sdk", "macosx", "--show-sdk-path"]).standardOutput
+    let sdk = try runCommand(
+      try findExecutable("xcrun"),
+      arguments: ["--sdk", "macosx", "--show-sdk-path"]).standardOutput
       .trimmingCharacters(in: .whitespacesAndNewlines)
-
-    var arguments = ["-r", "ld", "-o", output.path, "-L\(sdk)/usr/lib"]
-    arguments.append(contentsOf: librarySearchPaths.map({ "-L\($0.path)" }))
-    arguments.append(contentsOf: objectFiles.map(\.path))
-    arguments.append("-lSystem")
+    arguments += ["-isysroot", sdk, "-lSystem"]
+    #elseif os(Windows)
+    arguments.append("-lucrt")
+    #endif
     arguments.append(contentsOf: libraries.map({ "-l\($0)" }))
-    _ = try runCommand(xcrun, arguments: arguments)
-  }
-
-  private func linkLinuxExecutable(at output: URL, with objectFiles: [URL]) throws {
-    var arguments = ["-o", output.path]
-    arguments.append(contentsOf: librarySearchPaths.map({ "-L\($0.path)" }))
-    arguments.append(contentsOf: objectFiles.map(\.path))
-    arguments.append(contentsOf: libraries.map({ "-l\($0)" }))
-    _ = try runCommand(try findExecutable(invokedAs: "clang++"), arguments: arguments)
-  }
-
-  private func linkWindowsExecutable(at output: URL, with objectFiles: [URL]) throws {
-    var arguments = [
-      "-defaultlib:pthreadVCE3",
-      "-defaultlib:msvcrt",
-      "-force:multiple",
-      "-out:\(output.path)",
-    ]
-    arguments.append(contentsOf: librarySearchPaths.map({ "-libpath:\($0.path)" }))
-    arguments.append(contentsOf: objectFiles.map(\.path))
-    _ = try runCommand(try findExecutable(invokedAs: "lld-link"), arguments: arguments)
+    _ = try runCommand(try findExecutable("clang"), arguments: arguments)
   }
 
   private func resolvedExecutableURL(for module: Module.ID, writingTo output: URL?) -> URL {
@@ -423,7 +391,7 @@ public struct Driver {
     #endif
   }
 
-  private func findExecutable(invokedAs invocationName: String) throws -> URL {
+  private func findExecutable(_ invocationName: String) throws -> URL {
     let executableName = hostExecutableExtension.isEmpty
       ? invocationName
       : invocationName + ".\(hostExecutableExtension)"

@@ -2,8 +2,6 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#if defined(__linux__)
-
 /// Prints the Hylo `Int32` pointed to by `x` followed by a newline.
 ///
 /// `result` is the Hylo output parameter for the `Void` return value; it is ignored.
@@ -31,8 +29,3 @@ void hylo_successor_int(intptr_t const* self, intptr_t* result) {
 void hylo_make_zero_i32(int32_t* result) {
     *result = 0;
 }
-
-
-#else
-#error "Unsupported platform: minimal stdlib shim is only implemented for Linux"
-#endif
