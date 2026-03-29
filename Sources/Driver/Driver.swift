@@ -370,8 +370,8 @@ public struct Driver {
       arguments: ["--sdk", "macosx", "--show-sdk-path"]).standardOutput
       .trimmingCharacters(in: .whitespacesAndNewlines)
     arguments += ["-isysroot", sdk, "-lSystem"]
-    #elseif os(Windows)
-    arguments.append("-lucrt")
+    // #elseif os(Windows)
+    // arguments.append("-lucrt")
     #endif
     arguments.append(contentsOf: libraries.map({ "-l\($0)" }))
     _ = try runCommand(try findExecutable("clang"), arguments: arguments)
