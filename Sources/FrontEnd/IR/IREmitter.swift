@@ -126,8 +126,8 @@ internal struct IREmitter {
     if let rhs = program[d].initializer {
       // Retrieve the declaration of the global's initializer.
       let g = demandLoweredDeclaration(variable: d)
-      var initializer = program[d.module].ir.take(g.initializer)
-      defer { program[d.module].ir.restore(initializer, identifiedBy: g.initializer) }
+      var initializer = program[d.module].ir[g.initializer].move()
+      defer { program[d.module].ir[g.initializer].take(definition: initializer) }
 
       // Emit the definition of the global's initializer.
       let lhs = program[program[d].pattern].pattern
@@ -219,12 +219,11 @@ internal struct IREmitter {
       switch table.member(implementing: r)! {
       case .synthetic(let m, _):
         let f = demandLoweredDeclaration(syntheticImplementationOf: m, for: table.arguments)
-        let n = program[module].ir[f].name
-        let t = program[module].ir[f].type(uniquedIn: &program).erased
-        members.append(.function(n, t))
+        let v = functionReference(referringTo: f)
+        members.append(v)
 
       default:
-        fatalError("not implemented")
+        unimplemented("custom implementation")
       }
     }
 
@@ -242,6 +241,33 @@ internal struct IREmitter {
     }
 
     program[module].ir[f] = insertionContext.function.sink()
+  }
+
+  /// Generates the IR of `d`.
+  private mutating func lower(_ d: EnumCaseDeclaration.ID) {
+    withClearContext({ (me) in me.lowerInClearContext(d) })
+  }
+
+  /// Generates the IR of `d` assuming the insertion context is clear.
+  private mutating func lowerInClearContext(_ d: EnumCaseDeclaration.ID) {
+    let f = demandLoweredDeclaration(constructor: d)
+    assert(!program[module].ir[f].isDefined, "function already lowered")
+  }
+
+  /// Generates the IR of `d`.
+  private mutating func lower(_ d: EnumDeclaration.ID) {
+    for c in program[d].conformances {
+      lower(c)
+    }
+
+    for m in program[d].members {
+      if let b = program.cast(m, to: BindingDeclaration.self) {
+        // We can assume the member is static, otherwise typer would have complained.
+        lower(globalBinding: b)
+      } else {
+        lower(m)
+      }
+    }
   }
 
   /// Generates the IR of `d`.
@@ -776,17 +802,27 @@ internal struct IREmitter {
     case FunctionDeclaration.self:
       let f = demandLoweredDeclaration(
         function: program.castUnchecked(d, to: FunctionDeclaration.self))
-      let n = program[module].ir[f].name
-      let t = program[module].ir[f].type(uniquedIn: &program).erased
+      return loweredCallee(referringTo: f, boundTo: receiver, writingTo: result)
 
-      // TODO: Deal with the type of the receiver
-      // Partial application tout ça tout ça
-      return LoweredCallee(
-        value: .function(n, t), arguments: Array(contentsOf: receiver), result: result)
+    case EnumCaseDeclaration.self:
+      let f = demandLoweredDeclaration(
+        constructor: program.castUnchecked(d, to: EnumCaseDeclaration.self))
+      return loweredCallee(referringTo: f, boundTo: receiver, writingTo: result)
 
     default:
       program.unexpected(d)
     }
+  }
+
+  /// Returns the IR of `function` used in a call writing to `result`, partially applied to
+  /// `receiver` iff the latter is defined.
+  private mutating func loweredCallee(
+    referringTo function: IRFunction.ID, boundTo receiver: IRValue?, writingTo result: IRValue
+  ) -> LoweredCallee {
+    // TODO: Deal with the type of the receiver
+    // Partial application tout ça tout ça
+    let v = functionReference(referringTo: function)
+    return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
   }
 
   /// Implements `loweredCallee(_:writingTo)` for new expressions.
@@ -1013,6 +1049,37 @@ internal struct IREmitter {
     let ps = termParameters(of: d)
     return program[module].ir.addFunction(
       IRFunction(name: name, output: .indirect, typeParameters: [], termParameters: ps))
+  }
+
+  /// Returns the identity of the constructor lowering `d`, declaring it if necessary.
+  private mutating func demandLoweredDeclaration(
+    constructor d: EnumCaseDeclaration.ID
+  ) -> IRFunction.ID {
+    let name = IRFunction.Name.lowered(.init(d))
+    if let i = program[module].ir.functions.index(forKey: name) {
+      return i
+    }
+
+    let ts = program.withTyper(typing: d.module) { (tp) in
+      tp.accumulatedGenericParameters(visibleFrom: .init(node: d))
+    }
+
+    // The constructor takes each associated value as a sink parameter.
+    var ps: [IRParameter] = .init(minimumCapacity: program[d].parameters.count + 1)
+    for p in program[d].parameters {
+      let t = program.type(assignedTo: p, assuming: RemoteType.self)
+      let u = loweredType(addressOf: program.types[t].projectee)
+      ps.append(IRParameter(type: u, access: program.types[t].access, declaration: .init(p)))
+    }
+
+    // The constructor returns an instance of the containing enum.
+    let e = program.type(assignedTo: program.parent(containing: d).node!, assuming: Metatype.self)
+    let o = loweredType(addressOf: program.types[e].inhabitant)
+    ps.append(.init(type: o, access: .set, declaration: nil))
+
+    return program[module].ir.addFunction(
+      IRFunction(
+        name: name, output: .indirect, typeParameters: ts, termParameters: ps))
   }
 
   /// Returns the IR variable lowering the global binding `d`, declaring it if necessary.
