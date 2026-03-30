@@ -13,6 +13,9 @@ public struct IRFunction: Sendable {
     /// The identity of a function lowered from sources.
     case lowered(DeclarationIdentity)
 
+    /// The identity of a global initializer.
+    case initializer(BindingDeclaration.ID)
+
     /// The identity of a synthesized function.
     case synthesized(DeclarationIdentity, TypeArguments)
 
@@ -142,18 +145,27 @@ public struct IRFunction: Sendable {
 
   /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
   public func isBoundImmutably(_ i: AnyInstructionIdentity) -> Bool {
-    switch at(i) {
-    case is IRAlloca:
+    switch tag(of: i) {
+    case IRAlloca.self:
       return false
-    case let s as IRAccess:
-      return isBoundImmutably(s.source)
-    case let s as IRProject:
-      return s.access == .let
-    case let s as IRSubfield:
-      return isBoundImmutably(s.base)
+    case IRAccess.self:
+      return (at(i) as! IRAccess).capabilities == [.let]
+    case IRProject.self:
+      return (at(i) as! IRProject).access == .let
+    case IRSubfield.self:
+      return isBoundImmutably((at(i) as! IRSubfield).base)
     default:
       return true
     }
+  }
+
+  /// Returns the value defining the root of the place on which `i` forms an access.
+  public func source(_ i: IRAccess.ID) -> IRValue {
+    var s = at(i).source
+    while let r = s.register, let q = cast(r, to: IRSubfield.self) {
+      s = at(q).base
+    }
+    return s
   }
 
   /// Returns the last use of `v` in `b`, if any.
@@ -320,7 +332,7 @@ public struct IRFunction: Sendable {
     case .integer(_, let t):
       return (t.erased, false)
     case .function(_, let t):
-      return (t.erased, true)
+      return (t, true)
     case .poison(let t):
       return resolved(t)
     }
@@ -658,6 +670,8 @@ extension IRFunction.Name: Showable {
     switch self {
     case .lowered(let d):
       return printer.program.debugName(of: d)
+    case .initializer(let d):
+      return "\(printer.program.debugName(of: .init(d))).init"
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
       return "\(printer.program.debugName(of: d))<\(list: xs)>"

@@ -28,11 +28,7 @@ extension IRFunction {
 
   /// Returns the access instruction from which `i` reborrows, if any.
   fileprivate func reborrowedSource(_ i: IRAccess.ID) -> IRAccess.ID? {
-    var source = at(i).source
-    while let r = source.register, let s = cast(r, to: IRSubfield.self) {
-      source = at(s).base
-    }
-    return source.register.flatMap({ (r) in cast(r, to: IRAccess.self) })
+    source(i).register.flatMap({ (r) in cast(r, to: IRAccess.self) })
   }
 
   /// Returns `true` iff it is legal to form an immutable access on a place bound by `bs` with an
@@ -113,6 +109,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRAccess.End.self), from: &f)
       case IRAlloca.self:
         pc = interpret(f.castUnchecked(i, to: IRAlloca.self), from: &f)
+      case IRGlobalAccess.self:
+        pc = interpret(f.castUnchecked(i, to: IRGlobalAccess.self), from: &f)
       case IRProject.self:
         pc = interpret(f.castUnchecked(i, to: IRProject.self), from: &f)
       case IRProject.End.self:
@@ -140,26 +138,23 @@ private struct Transfer: AbstractTransferFunction {
     let s = f.reborrowedSource(i)
     let a = context.locals[access.source]!.place!
     let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) -> Diagnostic? in
-      switch access.capabilities.uniqueElement! {
+      let k = access.capabilities.uniqueElement!
+      switch k {
       case .let:
         if f.isValidImmutableAccess(reborrowingFrom: s, sharedBy: borrowers(o.value)) {
           insertBorrower(i, into: &o.value)
           return nil
         } else {
-          return .illegalImmutableAccess(at: access.anchor.site)
+          return .illegalAccess(.let, at: access.anchor.site)
         }
 
       case .inout, .set, .sink:
-        if f.isBoundImmutably(access.source) {
-          return .illegalMutableAccess(at: access.anchor.site)
-        }
-
         if f.isValidMutableAccess(reborrowingFrom: s, sharedBy: borrowers(o.value)) {
           if let former = s { removeBorrower(former, from: &o.value) }
           insertBorrower(i, into: &o.value)
           return nil
         } else {
-          return .illegalMutableAccess(at: access.anchor.site)
+          return .illegalAccess(k, at: access.anchor.site)
         }
 
       case .auto:
@@ -194,6 +189,14 @@ private struct Transfer: AbstractTransferFunction {
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
     _ i: IRAlloca.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRGlobalAccess.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     context.declare(i.erased, from: f, initially: .unique)
     return f.instruction(after: i.erased)

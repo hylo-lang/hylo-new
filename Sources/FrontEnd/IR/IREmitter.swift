@@ -51,6 +51,8 @@ internal struct IREmitter {
       lower(program.castUnchecked(d, to: StructDeclaration.self))
     case TraitDeclaration.self:
       lower(program.castUnchecked(d, to: TraitDeclaration.self))
+    case VariableDeclaration.self:
+      break
     default:
       program.unexpected(d)
     }
@@ -69,7 +71,7 @@ internal struct IREmitter {
 
     // Global bindings denote global constants computed lazily.
     else {
-      unimplemented("global binding declarations")
+      lower(globalBinding: d)
     }
   }
 
@@ -112,6 +114,29 @@ internal struct IREmitter {
         let t = program.type(assignedTo: v)
         insertionContext.frames.top[.init(v)] = .poison(.lowered(t, isAddress: true))
       }
+    }
+  }
+
+  /// Generates the IR of `d`, which declares remote local bindings.
+  private mutating func lower(globalBinding d: BindingDeclaration.ID) {
+    if let rhs = program[d].initializer {
+      // Retrieve the declaration of the global's initializer.
+      let g = demandLoweredDeclaration(variable: d)
+      var initializer = program[d.module].ir.take(g.initializer)
+      defer { program[d.module].ir.restore(initializer, identifiedBy: g.initializer) }
+
+      // Emit the definition of the global's initializer.
+      let lhs = program[program[d].pattern].pattern
+      initializer = withClearContext { (me) in
+        me.insertionContext.frames.push(.init())
+        me.insertionContext.function = initializer
+        me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
+        me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
+        me.lowering(rhs, { $0._return() })
+        return me.insertionContext.function.sink()
+      }
+    } else {
+      report(program.missingBindingInitializer(d))
     }
   }
 
@@ -173,10 +198,10 @@ internal struct IREmitter {
 
   /// Generates the IR of the subscript that projects the witness declared by `d`.
   private mutating func lowerDefinitionInClearContext(_ d: ConformanceDeclaration.ID) {
-    let f = demandLoweredDeclaration(of: d)
-    assert(!program[module][ir: f].isDefined, "conformance already lowered")
+    let f = demandLoweredDeclaration(function: d)
+    assert(!program[module].ir[f].isDefined, "conformance already lowered")
 
-    insertionContext.function = program[module][ir: f]
+    insertionContext.function = program[module].ir[f]
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
 
     // TODO: Construct a witness table
@@ -190,8 +215,8 @@ internal struct IREmitter {
       switch table.member(implementing: r)! {
       case .synthetic(let m, _):
         let f = demandLoweredDeclaration(syntheticImplementationOf: m, for: table.arguments)
-        let n = program[module][ir: f].name
-        let t = program[module][ir: f].type(uniquedIn: &program).erased
+        let n = program[module].ir[f].name
+        let t = program[module].ir[f].type(uniquedIn: &program).erased
         members.append(.function(n, t))
 
       default:
@@ -212,7 +237,7 @@ internal struct IREmitter {
       me._return()
     }
 
-    program[module][ir: f] = insertionContext.function.sink()
+    program[module].ir[f] = insertionContext.function.sink()
   }
 
   /// Generates the IR of `d`.
@@ -222,8 +247,8 @@ internal struct IREmitter {
 
   /// Generates the IR of `d` assuming the insertion context is clear.
   private mutating func lowerInClearContext(_ d: FunctionDeclaration.ID) {
-    let f = demandLoweredDeclaration(of: d)
-    assert(!program[module][ir: f].isDefined, "function already lowered")
+    let f = demandLoweredDeclaration(function: d)
+    assert(!program[module].ir[f].isDefined, "function already lowered")
 
     // Is there a body to lower?
     guard let body = program[d].body else {
@@ -233,7 +258,7 @@ internal struct IREmitter {
     }
 
     // Lower the function's definition.
-    insertionContext.function = program[module][ir: f]
+    insertionContext.function = program[module].ir[f]
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
     var frame = Frame()
     for (i, p) in insertionContext.function!.termParameters.enumerated() {
@@ -274,7 +299,7 @@ internal struct IREmitter {
       })
     }
 
-    program[module][ir: f] = insertionContext.function.sink()
+    program[module].ir[f] = insertionContext.function.sink()
   }
 
   /// Generates the IR of the members in `d`.
@@ -284,9 +309,12 @@ internal struct IREmitter {
     }
 
     for m in program[d].members {
-      // Nothing to do for binding declarations.
-      if program.tag(of: m) == BindingDeclaration.self { continue }
-      lower(m)
+      if let b = program.cast(m, to: BindingDeclaration.self) {
+        // Nothing to do for non-static binding declarations.
+        if program.isStatic(b) { lower(globalBinding: b) }
+      } else {
+        lower(m)
+      }
     }
   }
 
@@ -370,19 +398,18 @@ internal struct IREmitter {
       if case .direct(let d) = program.declaration(referredToBy: n) {
         if !program.occurs(referenceTo: d, in: program[s].rhs) {
           let target = lowered(lvalue: target)
-          lowering(s) { (me) in me.lower(store: me.program[s].rhs, to: target) }
+          lower(store: program[s].rhs, to: target)
           return .next
         }
       }
     }
 
     // Otherwise, the right-hand side stored to a temporary and then moved to the LHS.
-    lowering(s) { (me) in
-      let rhs = me._alloca(me.program.type(assignedTo: me.program[s].rhs))
-      me.lower(store: me.program[s].rhs, to: rhs)
-      let lhs = me.lowered(lvalue: me.program[s].lhs)
-      me._emitMove([.inout, .set], rhs, to: lhs)
-    }
+    let t = program.type(assignedTo: program[s].rhs)
+    let r = lowering(program[s].rhs, { $0._alloca(t) })
+    lower(store: program[s].rhs, to: r)
+    let l = lowered(lvalue: program[s].lhs)
+    lowering(program[s].rhs, { $0._emitMove([.inout, .set], r, to: l) })
 
     return .next
   }
@@ -395,7 +422,7 @@ internal struct IREmitter {
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Discard.ID) -> ControlFlow {
     let v = lowered(lvalue: program[s].value)
-    lowering(s, { _ = $0._emitDeinitialize(v) })
+    lowering(program[s].value, { _ = $0._emitDeinitialize(v) })
     return .next
   }
 
@@ -743,9 +770,10 @@ internal struct IREmitter {
   ) -> LoweredCallee {
     switch program.tag(of: d) {
     case FunctionDeclaration.self:
-      let f = demandLoweredDeclaration(of: program.castUnchecked(d, to: FunctionDeclaration.self))
-      let n = program[module][ir: f].name
-      let t = program[module][ir: f].type(uniquedIn: &program).erased
+      let f = demandLoweredDeclaration(
+        function: program.castUnchecked(d, to: FunctionDeclaration.self))
+      let n = program[module].ir[f].name
+      let t = program[module].ir[f].type(uniquedIn: &program).erased
 
       // TODO: Deal with the type of the receiver
       // Partial application tout ça tout ça
@@ -930,14 +958,14 @@ internal struct IREmitter {
     }
   }
 
-  /// Returns the identity of the function lowering `d`, declaring it if needed.
+  /// Returns the identity of the function lowering `d`, declaring it if necessary.
   ///
   /// `d` identifies the declaration of a function, subscript, bundle, or conformance.
   private mutating func demandLoweredDeclaration<T: Declaration & Scope>(
-    of d: T.ID
+    function d: T.ID
   ) -> IRFunction.ID {
     let name = IRFunction.Name.lowered(.init(d))
-    if let i = program[module].ir.index(forKey: name) {
+    if let i = program[module].ir.functions.index(forKey: name) {
       return i
     }
 
@@ -955,7 +983,7 @@ internal struct IREmitter {
       }
 
       let output = program.types.demand(RemoteType(projectee: witness.head, access: .let))
-      return program[module].addFunction(
+      return program[module].ir.addFunction(
         IRFunction(
           name: name, output: .remote(output), typeParameters: ts, termParameters: ps))
     }
@@ -963,24 +991,51 @@ internal struct IREmitter {
     // Otherwise, assume `d` identifies the declaration of a function, subscript, or bundle.
     else {
       let ps = termParameters(of: .init(d))
-      return program[module].addFunction(
+      return program[module].ir.addFunction(
         IRFunction(
           name: name, output: .indirect, typeParameters: ts, termParameters: ps))
     }
   }
 
-  /// Returns the identity of the function lowering `d`, declaring it if needed.
+  /// Returns the identity of the function lowering `d`, declaring it if necessary.
   private mutating func demandLoweredDeclaration(
     syntheticImplementationOf d: DeclarationIdentity, for a: TypeArguments
   ) -> IRFunction.ID {
     let name = IRFunction.Name.synthesized(d, a)
-    if let i = program[module].ir.index(forKey: name) {
+    if let i = program[module].ir.functions.index(forKey: name) {
       return i
     }
 
     let ps = termParameters(of: d)
-    return program[module].addFunction(
+    return program[module].ir.addFunction(
       IRFunction(name: name, output: .indirect, typeParameters: [], termParameters: ps))
+  }
+
+  /// Returns the IR variable lowering the global binding `d`, declaring it if necessary.
+  private mutating func demandLoweredDeclaration(
+    variable d: BindingDeclaration.ID
+  ) -> IRGlobal {
+    let name = IRGlobal.Name.lowered(d)
+    if let g = program[module].ir.variables[name] {
+      return g
+    }
+
+    let p = program[d].pattern
+    assert(!program.isLocal(d))
+    assert(program[p].introducer.value == .let)
+
+    // Declare the global's initializer.
+    let t = program.types.dealiased(program.type(assignedTo: d))
+    let o = IRParameter(type: .lowered(t, isAddress: true), access: .set, declaration: nil)
+    let i = IRFunction(
+      name: .initializer(d), output: .indirect, typeParameters: [], termParameters: [o])
+    let f = program[module].ir.addFunction(i)
+
+    // Declare the global itself.
+    let g = IRGlobal(
+      name: name, storageType: t, alignment: .align(of: t), initializer: f)
+    program[module].ir.addGlobal(g)
+    return g
   }
 
   /// Returns the term parameters of `d`'s lowered representation.
@@ -1045,8 +1100,8 @@ internal struct IREmitter {
 
   /// Returns a reference to the given lowered function.
   private mutating func functionReference(referringTo f: IRFunction.ID) -> IRValue {
-    let n = program[module][ir: f].name
-    let t = program[module][ir: f].type(uniquedIn: &program).erased
+    let n = program[module].ir[f].name
+    let t = program[module].ir[f].type(uniquedIn: &program).erased
     return .function(n, t)
   }
 
@@ -1396,7 +1451,9 @@ internal struct IREmitter {
 
   /// Inserts a `assume_state` instruction.
   internal mutating func _assume_state(_ s: IRValue, initialized: Bool) {
-    insert(IRAssumeState(storage: s, initialized: initialized, anchor: currentAnchor))
+    let x = _access([initialized ? .set : .sink], from: s)
+    insert(IRAssumeState(storage: x, initialized: initialized, anchor: currentAnchor))
+    _end(IRAccess.self, openedBy: x)
   }
 
   /// Inserts a `br` instruction.
@@ -1418,6 +1475,11 @@ internal struct IREmitter {
   internal mutating func _end<T: IRRegionEntry>(_: T.Type, openedBy start: IRValue) {
     assert(currentFunction.at(start.register!) is T)
     insert(T.End(start: start, anchor: currentAnchor))
+  }
+
+  /// Inserts a `global_access` instruction.
+  internal mutating func _global_access(_ source: IRGlobal) -> IRValue {
+    insert(IRGlobalAccess(source: source, anchor: currentAnchor))!
   }
 
   /// Inserts a `load` instruction.
@@ -1574,7 +1636,18 @@ internal struct IREmitter {
       return _emit(referenceTo: c, applyingNullary: applyNullary)
     }
 
-    program.unexpected(d)
+    switch program.tag(of: d) {
+    case ConformanceDeclaration.self:
+      let e = program.castUnchecked(d, to: ConformanceDeclaration.self)
+      return _emit(referenceTo: e, applyingNullary: applyNullary)
+
+    case VariableDeclaration.self:
+      // Since `d` wasn't in the local symbol table, we can assume it's a global symbol.
+      return _emit(referenceToGlobal: program.castUnchecked(d, to: VariableDeclaration.self))
+
+    default:
+      program.unexpected(d)
+    }
   }
 
   /// Generates the IR for referring directly to `d`.
@@ -1584,14 +1657,34 @@ internal struct IREmitter {
   private mutating func _emit(
     referenceTo d: ConformanceDeclaration.ID, applyingNullary applyNullary: Bool
   ) -> IRValue {
-    let f = demandLoweredDeclaration(of: d)
+    let f = demandLoweredDeclaration(function: d)
     let v = functionReference(referringTo: f)
 
-    if program[module][ir: f].termParameters.isEmpty && applyNullary {
+    if program[module].ir[f].termParameters.isEmpty && applyNullary {
       return _project(with: v, [])
     } else {
       return v
     }
+  }
+
+  /// Generates the IR for referring to the global binding `d`.
+  private mutating func _emit(
+    referenceToGlobal d: VariableDeclaration.ID
+  ) -> IRValue {
+    assert(!program.isLocal(d))
+    let b = program.bindingDeclaration(containing: d)!
+
+    // Find the path from the root of the allocation to the variable being referred to. Note that
+    // we can assume the recursive visit to be short since as global binding declarations usually
+    // do not involve deep binding patterns.
+    var p: IndexPath? = nil
+    program.forEachVariable(introducedBy: b) { (v, q) in
+      if d == v { p = q }
+    }
+
+    let g = demandLoweredDeclaration(variable: b)
+    let x = _global_access(g)
+    return _subfield(x, at: p!)
   }
 
   /// Generates the IR for computing the lvalue referred to by `witness`.

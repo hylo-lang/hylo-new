@@ -98,7 +98,7 @@ public struct Program: Sendable {
       // Temporarily move all functions to a local work list.
       var work: [(id: IRFunction.ID, function: IRFunction)] = []
       modify(&typer.program[typer.module]) { (module) in
-        work = module.ir.values.indices.map({ (i) in (i, module.takeFunction(i)) })
+        work = module.ir.functions.values.indices.map({ (i) in (i, module.ir.take(i)) })
       }
 
       let never = typer.program.types.never()
@@ -125,7 +125,7 @@ public struct Program: Sendable {
       // Move all functions back.
       modify(&typer.program[typer.module]) { (module) in
         while let (i, f) = work.popLast() {
-          module.reassignFunction(f, to: i)
+          module.ir.restore(f, identifiedBy: i)
         }
       }
     }
@@ -874,17 +874,22 @@ public struct Program: Sendable {
 
   /// Returns a string describing the entity declared by `d`.
   public func debugName(of d: DeclarationIdentity) -> String {
-    var result = [nameOrTag(of: d)]
+    var result = [unqualifiedDebugName(of: d)]
     for s in scopes(from: self.parent(containing: d)) {
-      if let n = s.node {
-        if let d = castToDeclaration(n), let s = name(of: d)?.description {
-          result.append(s)
-        } else {
-          result.append(tag(of: n).description)
-        }
+      if let n = s.node.flatMap(castToDeclaration(_:)) {
+        result.append(unqualifiedDebugName(of: n))
       }
     }
     return result.reversed().joined(separator: ".")
+  }
+
+  /// Returns a string describing the entity declared by `d`, sans qualification.
+  public func unqualifiedDebugName(of d: DeclarationIdentity) -> String {
+    if let b = cast(d, to: BindingDeclaration.self) {
+      return names(introducedBy: b).uniqueElement?.description ?? tag(of: d).description
+    } else {
+      return nameOrTag(of: d)
+    }
   }
 
   /// Returns the name of the unique entity declared by `d` or a description of `d`'s tag if it

@@ -106,6 +106,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRBranch.self), from: &f)
       case IRConditionalBranch.self:
         pc = interpret(f.castUnchecked(i, to: IRConditionalBranch.self), from: &f)
+      case IRGlobalAccess.self:
+        pc = interpret(f.castUnchecked(i, to: IRGlobalAccess.self), from: &f)
       case IRLoad.self:
         pc = interpret(f.castUnchecked(i, to: IRLoad.self), from: &f)
       case IRMemoryCopy.self:
@@ -206,18 +208,26 @@ private struct Transfer: AbstractTransferFunction {
 
     // Access is expected to be reified at this stage.
     let k = access.capabilities.uniqueElement!
+
+    // Check if the access is violating immutability. If it is, then report an illegal access and
+    // skip further changes to the context to avoid cascading diagnostics.
+    let isLegal = (k == .let) || !f.isBoundImmutably(access.source)
+    if !isLegal {
+      report(.illegalAccess(k, at: access.anchor.site))
+    }
+
     switch k {
     case .let, .inout, .sink:
-      checkInitialized(place: access.source, in: f, at: access.anchor.site)
+      if isLegal {
+        checkInitialized(place: access.source, in: f, at: access.anchor.site)
+        if k == .sink { consume(place: access.source, with: i.erased, in: f) }
+      }
       context.declare(i, from: f, initially: .initialized)
 
-      // A `sink` access consumes its source.
-      if k == .sink {
-        consume(place: access.source, with: i.erased, in: f)
-      }
-
     case .set:
-      ensureDeinitialized(place: access.source, before: i.erased, in: &f)
+      if isLegal {
+        ensureDeinitialized(place: access.source, before: i.erased, in: &f)
+      }
       context.declare(i, from: f, initially: .uninitialized)
 
     case .auto:
@@ -314,6 +324,14 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRConditionalBranch.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     assert(context.locals[f.at(i).condition]!.object!.value == .uniform(.initialized))
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRGlobalAccess.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 

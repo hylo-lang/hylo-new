@@ -127,6 +127,62 @@ public struct Module: Sendable {
 
   }
 
+  /// The lowered functions and static variables of a module.
+  internal struct IR: Sendable {
+
+    /// A mapping from a function name to its declaration (and possibly definition).
+    internal private(set) var functions: OrderedDictionary<IRFunction.Name, IRFunction?>
+
+    /// The global variables allocated in the static memory of the module.
+    internal private(set) var variables: OrderedDictionary<IRGlobal.Name, IRGlobal>
+
+    /// Creates an empty instance.
+    internal init() {
+      self.functions = [:]
+      self.variables = [:]
+    }
+
+    /// Projects the function identified by `f`.
+    internal subscript(f: IRFunction.ID) -> IRFunction {
+      get { functions.values[f]! }
+      _modify { yield &functions.values[f]! }
+    }
+
+    /// Adds `f` to this module.
+    ///
+    /// - Requires: `self` contains no IR function having the name of `f`.
+    @discardableResult
+    internal mutating func addFunction(_ f: IRFunction) -> IRFunction.ID {
+      modify(&functions[f.name]) { (slot) in
+        assert(slot == nil, "function already declared")
+        slot = .some(f)
+      }
+      return functions.index(forKey: f.name)!
+    }
+
+    /// Assigns the global variables `g` to `d`.
+    ///
+    /// - Requires: `self` assigns no global variables to `d`.
+    internal mutating func addGlobal(_ g: IRGlobal) {
+      modify(&variables[g.name]) { (slot) in
+        assert(slot == nil, "variable already assigned")
+        slot = g
+      }
+    }
+
+    /// Returns the function identified by `f`, moving it out of `self`.
+    internal mutating func take(_ f: IRFunction.ID) -> IRFunction {
+      functions.values[f].sink()
+    }
+
+    /// Moves `v`, which is identified by `f`, back into `self`.
+    internal mutating func restore(_ v: IRFunction, identifiedBy f: IRFunction.ID) {
+      assert(functions.values[f] == nil)
+      functions.values[f] = v
+    }
+
+  }
+
   /// The name of Hylo's standard library.
   public static let standardLibraryName = Name("Hylo")
 
@@ -143,7 +199,7 @@ public struct Module: Sendable {
   internal private(set) var sources: OrderedDictionary<FileName, SourceContainer> = [:]
 
   /// The IR functions in the module.
-  internal private(set) var ir: OrderedDictionary<IRFunction.Name, IRFunction?> = [:]
+  internal var ir: IR = .init()
 
   /// Creates an empty module with the given name and identity.
   public init(name: Name, identity: Module.ID) {
@@ -200,18 +256,6 @@ public struct Module: Sendable {
     }
   }
 
-  /// Adds `f` to this module.
-  ///
-  /// - Requires: `self` contains no IR function having the name of `f`.
-  @discardableResult
-  public mutating func addFunction(_ f: IRFunction) -> IRFunction.ID {
-    modify(&ir[f.name]) { (d) in
-      assert(d == nil, "function already declared")
-      d = .some(f)
-    }
-    return ir.index(forKey: f.name)!
-  }
-
   /// Inserts `child` into `self` in the bucket of `file`.
   public mutating func insert<T: Syntax>(_ child: T, in file: SourceFile.ID) -> T.ID {
     sources.values[file.offset].insert(child)
@@ -261,7 +305,7 @@ public struct Module: Sendable {
 
   /// The IR functions in `self`.
   public var functions: some Collection<IRFunction> {
-    ir.values.map({ (f) in f! })
+    ir.functions.values.map({ (f) in f! })
   }
 
   /// The identities of the source files in `self`.
@@ -296,12 +340,6 @@ public struct Module: Sendable {
   internal subscript<T: Syntax>(n: T.ID) -> T {
     assert(n.module == identity)
     return sources.values[n.file.offset].syntax[n.offset].wrapped as! T
-  }
-
-  /// Projects the function identified by `f`.
-  internal subscript(ir f: IRFunction.ID) -> IRFunction {
-    get { ir.values[f]! }
-    _modify { yield &ir.values[f]! }
   }
 
   /// Returns the tag of `n`.
@@ -355,15 +393,6 @@ public struct Module: Sendable {
   internal func implementations(definedBy d: ConformanceDeclaration.ID) -> WitnessTable? {
     assert(d.module == identity)
     return sources.values[d.file.offset].witnessTables[d.offset]
-  }
-
-  internal mutating func takeFunction(_ f: IRFunction.ID) -> IRFunction {
-    ir.values[f].sink()
-  }
-
-  internal mutating func reassignFunction(_ v: IRFunction, to f: IRFunction.ID) {
-    assert(ir.values[f] == nil)
-    ir.values[f] = v
   }
 
 }

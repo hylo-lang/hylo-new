@@ -18,9 +18,7 @@ public struct IRAlloca: Instruction {
   public let alignment: IRAlignment
 
   /// Creates an instance with the given properties.
-  public init(
-    storageType: AnyTypeIdentity, alignment: IRAlignment, anchor: Anchor
-  ) {
+  public init(storageType: AnyTypeIdentity, alignment: IRAlignment, anchor: Anchor) {
     self.anchor = anchor
     self.storageType = storageType
     self.alignment = alignment
