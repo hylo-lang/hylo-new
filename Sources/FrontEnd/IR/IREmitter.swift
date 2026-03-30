@@ -43,6 +43,10 @@ internal struct IREmitter {
       lower(program.castUnchecked(d, to: BindingDeclaration.self))
     case ConformanceDeclaration.self:
       lower(program.castUnchecked(d, to: ConformanceDeclaration.self))
+    case EnumCaseDeclaration.self:
+      lower(program.castUnchecked(d, to: EnumCaseDeclaration.self))
+    case EnumDeclaration.self:
+      lower(program.castUnchecked(d, to: EnumDeclaration.self))
     case FunctionDeclaration.self:
       lower(program.castUnchecked(d, to: FunctionDeclaration.self))
     case ImportDeclaration.self:

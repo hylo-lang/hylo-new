@@ -4,7 +4,7 @@ import Utilities
 public struct Parser {
 
   /// The context in which a parser is being used.
-  private enum Context {
+  private enum Context: Equatable {
 
     /// The default context.
     case `default`
@@ -13,7 +13,7 @@ public struct Parser {
     case functionBody
 
     /// The parsing of member declarations.
-    case typeBody
+    case typeBody(SyntaxTag)
 
     /// The parsing of the subpattern of a binding pattern.
     case bindingSubpattern
@@ -21,6 +21,11 @@ public struct Parser {
     /// `true` iff `self` denotes a local scope.
     var isLocal: Bool {
       (self == .functionBody) || (self == .bindingSubpattern)
+    }
+
+    /// Returns `true` iff `self` denotes the body of at type declaration.
+    var isTypeBody: Bool {
+      if case .typeBody = self { return true } else { return false }
     }
 
   }
@@ -222,7 +227,7 @@ public struct Parser {
     // Contextual keywords.
     else if let t = peek(), t.tag == .name {
       switch t.text {
-      case "indirect" where context == .typeBody:
+      case "indirect" where context.isTypeBody:
         _ = take()
         return .init(.indirect, at: t.site)
 
@@ -318,7 +323,8 @@ public struct Parser {
     let parameters = try parseOptionalTypeParameterClause(in: &file)
     let representation = try next(is: .leftParenthesis) ? parseExpression(in: &file) : nil
     let conformances = try parseOptionalAdjunctConformanceList(until: .leftBrace, in: &file)
-    let members = try parseTypeBody(in: &file, accepting: \.isValidEnumMember)
+    let members = try parseTypeBody(
+      of: EnumDeclaration.self, in: &file, accepting: \.isValidEnumMember)
 
     return file.insert(
       EnumDeclaration(
@@ -370,7 +376,8 @@ public struct Parser {
       }
     }
 
-    let members = try parseTypeBody(in: &file, accepting: \.isValidStructMember)
+    let members = try parseTypeBody(
+      of: ExtensionDeclaration.self, in: &file, accepting: \.isValidStructMember)
 
     // No modifiers or annotations allowed on extensions.
     _ = sanitize(prologue.annotations, accepting: { _ in false })
@@ -452,9 +459,7 @@ public struct Parser {
       _ = try take(contextual: "is") ?? expected("'is'")
       let concept = try parseExpression(in: &file)
       let witness = file.desugaredConformance(of: lhs, to: concept)
-      let members = self.next(is: .leftBrace)
-        ? try parseTypeBody(in: &file, accepting: \.isValidStructMember)
-        : nil
+      let members = try parseOptionalConformanceBody(in: &file)
 
       // No annotations allowed on given declarations.
       _ = sanitize(prologue.annotations, accepting: { _ in false })
@@ -469,6 +474,18 @@ public struct Parser {
           members: members,
           site: span(from: introducer)))
       return .init(d)
+    }
+  }
+
+  /// Parses the body of a type declaration iff the next token is a left brace.
+  private mutating func parseOptionalConformanceBody(
+    in file: inout Module.SourceContainer
+  ) throws -> [DeclarationIdentity]? {
+    if next(is: .leftBrace) {
+      return try parseTypeBody(
+        of: ConformanceDeclaration.self, in: &file, accepting: \.isValidStructMember)
+    } else {
+      return nil
     }
   }
 
@@ -494,7 +511,7 @@ public struct Parser {
 
     // Insert the self-parameter of non-static member declarations.
     var p: [ParameterDeclaration.ID] = []
-    if (context == .typeBody) && !prologue.contains(.static) {
+    if context.isTypeBody && !prologue.contains(.static) {
       p = Array(file.synthesizeSelfParameter(effect: effect), prependedTo: parameters)
     } else {
       p = parameters
@@ -577,6 +594,11 @@ public struct Parser {
 
     // Are we parsing a memberwise initializer?
     else if introducer.value == .memberwiseinit {
+      if context != .typeBody(.init(StructDeclaration.self)) {
+        let m = "memberwise initializer can only occur in the declaration of a struct"
+        throw ParseError(m, at: introducer.site)
+      }
+
       return file.insert(
         FunctionDeclaration(
           annotations: prologue.annotations,
@@ -1003,7 +1025,8 @@ public struct Parser {
     let identifier = parseSimpleIdentifier()
     let parameters = try parseOptionalTypeParameterClause(in: &file)
     let conformances = try parseOptionalAdjunctConformanceList(until: .leftBrace, in: &file)
-    let members = try parseTypeBody(in: &file, accepting: \.isValidStructMember)
+    let members = try parseTypeBody(
+      of: StructDeclaration.self, in: &file, accepting: \.isValidStructMember)
 
     return file.insert(
       StructDeclaration(
@@ -1031,7 +1054,9 @@ public struct Parser {
 
     // Base traits are desugared as given requirements before other members.
     var members = try parseOptionalRefinementList(of: identifier.value,  in: &file)
-    try members.append(contentsOf: parseTypeBody(in: &file, accepting: \.isValidTraitMember))
+    try members.append(
+      contentsOf: parseTypeBody(
+        of: TraitDeclaration.self, in: &file, accepting: \.isValidTraitMember))
 
     if let p = parameters.usings.first {
       report(.init("constraints on trait parameters are not supported yet", at: file[p].site))
@@ -1077,17 +1102,18 @@ public struct Parser {
     }
   }
 
-  /// Parses a the body of a type declaration.
+  /// Parses the body of a type declaration.
   ///
   ///     type-body ::=
   ///       '{' ';'* type-members? '}'
   ///     type-members ::=
   ///       type-members? ';'* declaration ';'*
   ///
-  private mutating func parseTypeBody(
+  private mutating func parseTypeBody<T: Scope>(
+    of: T.Type,
     in file: inout Module.SourceContainer, accepting isValid: (SyntaxTag) -> Bool
   ) throws -> [DeclarationIdentity] {
-    try entering(.typeBody) { (m0) in
+    try entering(.typeBody(.init(T.self))) { (m0) in
       try m0.inBraces { (m1) in
         try m1.semicolonSeparated(until: .rightBrace) { (m2) in
           let d = try m2.parseDeclaration(in: &file)
@@ -1142,7 +1168,7 @@ public struct Parser {
       _ = sanitize(prologue.modifiers, accepting: { _ in false })
 
       // An error has already been reported if the identifier is `$!`.
-      if (context != .typeBody) && (identifier.value != "$!") {
+      if !context.isTypeBody && (identifier.value != "$!") {
         report(.init("declaration is not allowed here", at: introducer.site))
       }
 

@@ -1,0 +1,12 @@
+negative/illegal-memberwise-init.hylo:4.3-18: error: memberwise initializer can only occur in the declaration of a struct
+  memberwise init
+  ~~~~~~~~~~~~~~~
+negative/illegal-memberwise-init.hylo:8.3-18: error: memberwise initializer can only occur in the declaration of a struct
+  memberwise init
+  ~~~~~~~~~~~~~~~
+negative/illegal-memberwise-init.hylo:12.3-18: error: memberwise initializer can only occur in the declaration of a struct
+  memberwise init
+  ~~~~~~~~~~~~~~~
+negative/illegal-memberwise-init.hylo:16.3-18: error: memberwise initializer can only occur in the declaration of a struct
+  memberwise init
+  ~~~~~~~~~~~~~~~
