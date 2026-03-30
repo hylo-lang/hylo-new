@@ -44,7 +44,10 @@ extension EnumCaseDeclaration: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    var result = "case \(identifier.value)(\(printer.show(parameters)))"
+    var result = "case \(identifier.value)"
+    if !parameters.isEmpty {
+      result.append("(\(printer.show(parameters)))")
+    }
     if let b = body {
       result.append(" = \(printer.show(b))")
     }

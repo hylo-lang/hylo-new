@@ -1,0 +1,17 @@
+//! no-std
+
+enum E {
+  memberwise init
+}
+
+trait P {
+  memberwise init
+}
+
+extension Void {
+  memberwise init
+}
+
+given Void is P {
+  memberwise init
+}

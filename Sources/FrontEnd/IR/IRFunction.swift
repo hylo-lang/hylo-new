@@ -81,13 +81,13 @@ public struct IRFunction: Sendable {
   public let termParameters: [IRParameter]
 
   /// The instructions in the function.
-  private var slots: List<Slot> = []
+  private var slots: List<Slot>
 
   /// The basic blocks in the function, the first of which being the function's entry.
-  public private(set) var blocks: List<IRBlock> = []
+  public private(set) var blocks: List<IRBlock>
 
   /// The use chains of the values in this function.
-  public private(set) var uses: [IRValue: [Use]] = [:]
+  public private(set) var uses: [IRValue: [Use]]
 
   /// Creates an instance with the given properties.
   public init(
@@ -100,6 +100,7 @@ public struct IRFunction: Sendable {
     self.termParameters = termParameters
     self.slots = []
     self.blocks = []
+    self.uses = [:]
   }
 
   /// `true` iff the function has an entry.
@@ -621,6 +622,35 @@ public struct IRFunction: Sendable {
     for o in at(i).operands {
       uses[o]?.removeAll(where: { $0.user == i })
     }
+  }
+
+  /// Returns an instance consuming the definition of `self` but leaving other properties intact.
+  ///
+  /// This method is similar to a "non-destructive" move extracting the definition of `self` (i.e.,
+  /// its instructions) but leaving a valid function declaration behind. The moved definition can
+  /// moved back into `self` using `take(definition:)`.
+  public mutating func move() -> IRFunction {
+    var other = IRFunction(
+      name: name, output: output,
+      typeParameters: typeParameters,
+      termParameters: termParameters)
+
+    swap(&self.slots, &other.slots)
+    swap(&self.blocks, &other.blocks)
+    swap(&self.uses, &other.uses)
+    return other
+  }
+
+  /// Assigns the definition of `self` to that of `other`, which has the same signature.
+  ///
+  /// `other` is the (possibly modofied) result of `self.move()` and `self` has not have been
+  /// modified in the meantime.
+  public mutating func take(definition other: consuming IRFunction) {
+    assert((self.name == other.name) && !isDefined)
+
+    swap(&self.slots, &other.slots)
+    swap(&self.blocks, &other.blocks)
+    swap(&self.uses, &other.uses)
   }
 
 }

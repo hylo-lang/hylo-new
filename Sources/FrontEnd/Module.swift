@@ -131,7 +131,7 @@ public struct Module: Sendable {
   internal struct IR: Sendable {
 
     /// A mapping from a function name to its declaration (and possibly definition).
-    internal private(set) var functions: OrderedDictionary<IRFunction.Name, IRFunction?>
+    internal private(set) var functions: OrderedDictionary<IRFunction.Name, IRFunction>
 
     /// The global variables allocated in the static memory of the module.
     internal private(set) var variables: OrderedDictionary<IRGlobal.Name, IRGlobal>
@@ -144,8 +144,8 @@ public struct Module: Sendable {
 
     /// Projects the function identified by `f`.
     internal subscript(f: IRFunction.ID) -> IRFunction {
-      get { functions.values[f]! }
-      _modify { yield &functions.values[f]! }
+      get { functions.values[f] }
+      _modify { yield &functions.values[f] }
     }
 
     /// Adds `f` to this module.
@@ -168,17 +168,6 @@ public struct Module: Sendable {
         assert(slot == nil, "variable already assigned")
         slot = g
       }
-    }
-
-    /// Returns the function identified by `f`, moving it out of `self`.
-    internal mutating func take(_ f: IRFunction.ID) -> IRFunction {
-      functions.values[f].sink()
-    }
-
-    /// Moves `v`, which is identified by `f`, back into `self`.
-    internal mutating func restore(_ v: IRFunction, identifiedBy f: IRFunction.ID) {
-      assert(functions.values[f] == nil)
-      functions.values[f] = v
     }
 
   }
@@ -304,8 +293,8 @@ public struct Module: Sendable {
   }
 
   /// The IR functions in `self`.
-  public var functions: some Collection<IRFunction> {
-    ir.functions.values.map({ (f) in f! })
+  public var functions: OrderedDictionary<IRFunction.Name, IRFunction>.Values {
+    ir.functions.values
   }
 
   /// The identities of the source files in `self`.

@@ -437,7 +437,7 @@ public struct Typer {
         let b = program.castUnchecked(r, to: FunctionBundleDeclaration.self)
         for v in program[b].variants {
           if let i = namedImplementation(of: .init(v)) {
-            implementations.assign(i, to: r )
+            implementations.assign(i, to: r)
           }
         }
 
@@ -533,9 +533,37 @@ public struct Typer {
       report(.init(.error, "raw representations are not supported yet", at: s))
     }
 
-    for m in program[d].members { check(m) }
+    for m in program[d].members { checkEnumMember(m) }
     for c in program[d].conformances { check(c) }
     checkUniqueDeclaration(d, of: program[d].identifier.value)
+  }
+
+  /// Type checks `d`, which is the declaration of a member in an enum.
+  private mutating func checkEnumMember(_ d: DeclarationIdentity) {
+    // Enforce syntactic restrictions.
+    switch program.tag(of: d) {
+    case BindingDeclaration.self:
+      let m = program.castUnchecked(d, to: BindingDeclaration.self)
+      if !checkValidEnumMember(m) { return }
+
+    default:
+      break
+    }
+
+    // Type check the member.
+    check(d)
+  }
+
+  /// Returns `true` iff `d` is a valid enum member; otherwise, returns `false` and reports a
+  /// diagnostic.
+  private mutating func checkValidEnumMember(_ d: BindingDeclaration.ID) -> Bool {
+    if program[d].is(.static) {
+      return checkValidStaticStoredProperty(d)
+    } else {
+      let m = "enums cannot contained stored properties"
+      report(.init(.error, m, at: program.spanForDiagnostic(about: d)))
+      return false
+    }
   }
 
   /// Type checks `d`.
@@ -659,9 +687,24 @@ public struct Typer {
   /// Type checks `d`.
   private mutating func check(_ d: StructDeclaration.ID) {
     _ = declaredType(of: d)
-    for m in program[d].members { check(m) }
+    for m in program[d].members { checkStructMember(m) }
     for c in program[d].conformances { check(c) }
     checkUniqueDeclaration(d, of: program[d].identifier.value)
+  }
+
+  /// Type checks `d`, which is the declaration of a member in a struct.
+  private mutating func checkStructMember(_ d: DeclarationIdentity) {
+    // Enforce syntactic restrictions.
+    switch program.tag(of: d) {
+    case BindingDeclaration.self:
+      let m = program.castUnchecked(d, to: BindingDeclaration.self)
+      if program[m].is(.static) && !checkValidStaticStoredProperty(m) { return }
+    default:
+      break
+    }
+
+    // Type check the member.
+    check(d)
   }
 
   /// Type checks `d`.
@@ -730,6 +773,20 @@ public struct Typer {
       check(e, requiring: t)
     } else {
       program.unexpected(n)
+    }
+  }
+
+  /// Returns `true` iff `d` is a valid static stored property; otherwise, returns `false` and
+  /// reports a diagnostic.
+  private mutating func checkValidStaticStoredProperty(_ d: BindingDeclaration.ID) -> Bool {
+    assert(program[d].is(.static))
+    if !accumulatedGenericParameters(visibleFrom: program.parent(containing: d)).isEmpty {
+      let m = "generic types cannot contain static stored properties"
+      let s = program[d].spanForModifier(.static)!
+      report(.init(.error, m, at: s))
+      return false
+    } else {
+      return true
     }
   }
 
