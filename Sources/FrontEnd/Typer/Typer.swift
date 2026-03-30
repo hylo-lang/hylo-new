@@ -533,9 +533,29 @@ public struct Typer {
       report(.init(.error, "raw representations are not supported yet", at: s))
     }
 
-    for m in program[d].members { check(m) }
+    for m in program[d].members { checkEnumMember(m) }
     for c in program[d].conformances { check(c) }
     checkUniqueDeclaration(d, of: program[d].identifier.value)
+  }
+
+  /// Type checks `d`, which is the declaration of a member in an enum.
+  private mutating func checkEnumMember(_ d: DeclarationIdentity) {
+    check(d)
+
+    // Enforce syntactic restrictions on stored properties.
+    if let m = program.cast(d, to: BindingDeclaration.self) {
+      checkValidEnumMember(m)
+    }
+  }
+
+  /// Checks that `d` is a valid enum member and reports a diagnostic if isn't.
+  private mutating func checkValidEnumMember(_ d: BindingDeclaration.ID) {
+    if program[d].is(.static) {
+      checkValidStaticStoredProperty(d)
+    } else {
+      let m = "enums cannot contained stored properties"
+      report(.init(.error, m, at: program.spanForDiagnostic(about: d)))
+    }
   }
 
   /// Type checks `d`.
@@ -659,9 +679,19 @@ public struct Typer {
   /// Type checks `d`.
   private mutating func check(_ d: StructDeclaration.ID) {
     _ = declaredType(of: d)
-    for m in program[d].members { check(m) }
+    for m in program[d].members { checkStructMember(m) }
     for c in program[d].conformances { check(c) }
     checkUniqueDeclaration(d, of: program[d].identifier.value)
+  }
+
+  /// Type checks `d`, which is the declaration of a member in a struct.
+  private mutating func checkStructMember(_ d: DeclarationIdentity) {
+    check(d)
+
+    // Enforce syntactic restrictions on stored properties.
+    if let m = program.cast(d, to: BindingDeclaration.self), program[m].is(.static) {
+      checkValidStaticStoredProperty(m)
+    }
   }
 
   /// Type checks `d`.
@@ -730,6 +760,16 @@ public struct Typer {
       check(e, requiring: t)
     } else {
       program.unexpected(n)
+    }
+  }
+
+  /// Checks that `d` is a valid static stored property and reports a diagnostic if isn't.
+  private mutating func checkValidStaticStoredProperty(_ d: BindingDeclaration.ID) {
+    assert(program[d].is(.static))
+    if !accumulatedGenericParameters(visibleFrom: program.parent(containing: d)).isEmpty {
+      let m = "generic types cannot contain static stored properties"
+      let s = program[d].spanForModifier(.static)!
+      report(.init(.error, m, at: s))
     }
   }
 

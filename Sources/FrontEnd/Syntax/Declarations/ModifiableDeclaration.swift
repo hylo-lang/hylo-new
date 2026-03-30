@@ -9,8 +9,13 @@ public protocol ModifiableDeclaration: Declaration {
 extension ModifiableDeclaration {
 
   /// Returns `true` iff `self` has the given declaration modifier.
-  public func `is`(_ modifier: DeclarationModifier) -> Bool {
-    modifiers.contains(where: { (m) in m.value == modifier })
+  public func `is`(_ m: DeclarationModifier) -> Bool {
+    modifiers.contains(where: { (x) in x.value == m })
+  }
+
+  /// Returns the span of the given declaration modifier, if present.
+  public func spanForModifier(_ m: DeclarationModifier) -> SourceSpan? {
+    modifiers.first(where: { (x) in x.value == m })?.site
   }
 
 }

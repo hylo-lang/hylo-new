@@ -265,6 +265,7 @@ public struct Parser {
   /// Parses the declaration of an enum case.
   ///
   ///     enum-case-declaration ::=
+  ///       'case' identifier
   ///       'case' identifier '(' parameter-list? ')' ('=' expression)?
   ///
   private mutating func parseEnumCaseDeclaration(
@@ -272,7 +273,7 @@ public struct Parser {
   ) throws -> EnumCaseDeclaration.ID {
     let introducer = try take(.case) ?? expected("'case'")
     let identifier = parseSimpleIdentifier()
-    let parameters = try parseParenthesizedParameterList(in: &file)
+    let parameters = try parseOptionalEnumCasePayload(in: &file)
     let body: ExpressionIdentity?
     if let assign = take(.assign) {
       body = try parseExpression(in: &file)
@@ -295,6 +296,17 @@ public struct Parser {
         parameters: parameters,
         body: body,
         site: span(from: introducer)))
+  }
+
+  /// Parses declarations of case associated values iff the next token is a left parenthesis.
+  private mutating func parseOptionalEnumCasePayload(
+    in file: inout Module.SourceContainer
+  ) throws -> [ParameterDeclaration.ID] {
+    if next(is: .leftParenthesis) {
+      return try parseParenthesizedParameterList(in: &file)
+    } else {
+      return []
+    }
   }
 
   /// Parses an enum declaration.
