@@ -604,6 +604,14 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns the built-in function referred to by `n`, if any.
+  public func asBuiltinFunction(_ n: ExpressionIdentity) -> BuiltinFunction? {
+    if let e = cast(n, to: NameExpression.self) {
+      if case .builtin(.function(let f)) = declaration(referredToBy: e) { return f }
+    }
+    return nil
+  }
+
   /// Returns the innermost scope that strictly contains `n`.
   ///
   /// - Requires: The module containing `s` is scoped.

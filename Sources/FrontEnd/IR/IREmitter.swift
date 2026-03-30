@@ -543,6 +543,16 @@ internal struct IREmitter {
       }
     }
 
+    // Are we lowering a built-in call.
+    if let f = program.asBuiltinFunction(program[e].callee) {
+      return lowering(e) { (me) in
+        let x0 = me._lower(builtin: f, appliedTo: me.program[e].arguments)
+        let x1 = me._access([.set], from: target)
+        me._store(x0, to: x1)
+        me._end(IRAccess.self, openedBy: x1)
+      }
+    }
+
     // Otherwise, the callee is lowered as usual.
     let f = loweredCallee(program[e].callee, writingTo: target)
 
@@ -767,17 +777,21 @@ internal struct IREmitter {
     _ e: NameExpression.ID, writingTo result: IRValue
   ) -> LoweredCallee {
     switch program.declaration(referredToBy: e) {
+    case .builtin:
+      // Calls to built-in functions should be handled elsewhere.
+      fatalError("cannot create reference to built-in function")
+
     case .direct(let d):
-      // The callee is referring to a function directly.
+      // The callee refers to a function directly.
       return loweredCallee(e, referringTo: d, boundTo: nil, writingTo: result)
 
     case .member(let d):
-      // The callee is referring to a bound member.
+      // The callee refers to a bound member.
       let q = lowered(lvalue: program[e].qualification!)
       return loweredCallee(e, referringTo: d, boundTo: q, writingTo: result)
 
     case .inherited(let w, let m, let statically):
-      // The callee referring to a member declared in extension.
+      // The callee refers to a member declared in extension.
       let s = statically ? nil : program[e].qualification.map({ (s) in lowered(lvalue: s) })
       let t = program.type(assignedTo: e)
       let u = program.types.lifted(t)
@@ -789,7 +803,7 @@ internal struct IREmitter {
       }
 
     default:
-      fatalError()
+      program.unexpected(e)
     }
   }
 
@@ -884,6 +898,25 @@ internal struct IREmitter {
     } else {
       return t
     }
+  }
+
+  /// Generates the IR for loading the value denoted by `e` into a register.
+  private mutating func lowered(rvalue e: ExpressionIdentity) -> IRValue {
+    let v = lowered(lvalue: e)
+    return lowering(e) { (me) in
+      let x = me._access([.sink], from: v)
+      let y = me._load(v)
+      me._end(IRAccess.self, openedBy: x)
+      return y
+    }
+  }
+
+  /// Generates the IR for loading the result of `function` applied to `arguments` into a register.
+  private mutating func _lower(
+    builtin function: BuiltinFunction, appliedTo arguments: [LabeledExpression],
+  ) -> IRValue {
+    let xs = arguments.map({ (a) in lowered(rvalue: a.value) })
+    return _apply_builtin(function, to: xs)
   }
 
   /// Generates the IR for computing the address of the value denoted by `e`.
@@ -1511,7 +1544,7 @@ internal struct IREmitter {
   internal mutating func _apply_builtin(
     _ callee: BuiltinFunction, to arguments: [IRValue]
   ) -> IRValue {
-    let f = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
+    let f = callee.type(uniquingTypesWith: &program.types)
     assert(program.types[f].inputs.count == arguments.count)
 
     let s = IRApplyBuiltin(
