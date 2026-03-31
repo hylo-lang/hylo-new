@@ -604,19 +604,13 @@ public struct Program: Sendable {
     }
   }
 
-//  /// Returns `(n, p)` where `p` denotes the struct of which `n` is a member iff `n` declares a
-//  /// stored property.
-//  ///
-//  /// - Requires: The module containing `s` is scoped.
-//  public func asStoredPropertyDeclaration(
-//    _ n: DeclarationIdentity
-//  ) -> (declaration: VariableDeclaration.ID, parent: StructDeclaration.ID)? {
-//    guard
-//      let v = cast(n, to: VariableDeclaration.self),
-//      let p = parent(containing: v, as: StructDeclaration.self)
-//    else { return nil }
-//    return (v, p)
-//  }
+  /// Returns the built-in function referred to by `n`, if any.
+  public func asBuiltinFunction(_ n: ExpressionIdentity) -> BuiltinFunction? {
+    if let e = cast(n, to: NameExpression.self) {
+      if case .builtin(.function(let f)) = declaration(referredToBy: e) { return f }
+    }
+    return nil
+  }
 
   /// Returns the innermost scope that strictly contains `n`.
   ///

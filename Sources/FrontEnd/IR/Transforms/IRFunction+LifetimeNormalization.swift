@@ -209,6 +209,12 @@ private struct Transfer: AbstractTransferFunction {
     // Access is expected to be reified at this stage.
     let k = access.capabilities.uniqueElement!
 
+    // Built-in values are implictly copied.
+    if (k == .sink) && f.isBuiltinValue(access.source, using: program) {
+      context.declare(i, from: f, initially: .initialized)
+      return f.instruction(after: i.erased)
+    }
+
     // Check if the access is violating immutability. If it is, then report an illegal access and
     // skip further changes to the context to avoid cascading diagnostics.
     let isLegal = (k == .let) || !f.isBoundImmutably(access.source)

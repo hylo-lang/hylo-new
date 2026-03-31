@@ -160,6 +160,15 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Returns `true` iff `v` is a built-in value, using `program` to examine types.
+  public func isBuiltinValue(_ v: IRValue, using program: Program) -> Bool {
+    if let t = result(of: v) {
+      return program.types.isBuiltin(t.type)
+    } else {
+      return false
+    }
+  }
+
   /// Returns the value defining the root of the place on which `i` forms an access.
   public func source(_ i: IRAccess.ID) -> IRValue {
     var s = at(i).source

@@ -1,0 +1,6 @@
+//! stage:lowering
+
+public fun main() {
+  let x = Builtin.zeroinitializer_word()
+  let y = Builtin.icmp_slt_word(x, x)
+}

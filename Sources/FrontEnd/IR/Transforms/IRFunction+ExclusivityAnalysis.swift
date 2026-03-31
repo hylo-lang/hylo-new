@@ -135,10 +135,18 @@ private struct Transfer: AbstractTransferFunction {
   ) -> AnyInstructionIdentity? {
     let access = f.at(i)
 
+    // Access is expected to be reified at this stage.
+    let k = access.capabilities.uniqueElement!
+
+    // Built-in values are implictly copied.
+    if (k == .sink) && f.isBuiltinValue(access.source, using: program) {
+      context.declare(i.erased, from: f, initially: .unique)
+      return f.instruction(after: i.erased)
+    }
+
     let s = f.reborrowedSource(i)
     let a = context.locals[access.source]!.place!
     let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) -> Diagnostic? in
-      let k = access.capabilities.uniqueElement!
       switch k {
       case .let:
         if f.isValidImmutableAccess(reborrowingFrom: s, sharedBy: borrowers(o.value)) {
