@@ -615,7 +615,7 @@ internal struct IREmitter {
     let onFailure = insertionContext.function!.addBlock()
     let tail = insertionContext.function!.addBlock()
 
-    // Typer should have guaranteed that the expression is single-bodied.
+    // Typer should have guaranteed that the expression is single-expresion bodied.
     let (e0, e1) = program.branches(of: e)!
 
     within(.init()) { (me) in

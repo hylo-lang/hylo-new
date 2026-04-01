@@ -71,6 +71,37 @@ public struct Module: Sendable {
       return syntaxToTag[n.offset]
     }
 
+    /// Returns `true` iff `s` can be evaluated as an expression.
+    internal func isSingleExpressionBodied(_ s: AnySyntaxIdentity) -> Bool {
+      var work = [s]
+
+      while let w = work.popLast() {
+        switch tag(of: w) {
+        case If.self:
+          let n = self[w] as! If
+
+          if let s = (self[n.success] as! Block).statements.uniqueElement {
+            work.append(s.erased)
+          } else {
+            return false
+          }
+
+          if tag(of: n.failure) == If.self {
+            work.append(n.failure.erased)
+          } else if let s = (self[n.failure] as! Block).statements.uniqueElement {
+            work.append(s.erased)
+          } else {
+            return false
+          }
+
+        case let t:
+          return t.value is any Expression.Type
+        }
+      }
+
+      return true
+    }
+
     /// Inserts `child` into `self`.
     internal mutating func insert<T: Syntax>(_ child: T) -> T.ID {
       let d = syntax.count
