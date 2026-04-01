@@ -585,3 +585,26 @@ extension Module: Archivable {
   }
 
 }
+
+extension Module.IR: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  public func show(using printer: inout TreePrinter) -> String {
+    var result = ""
+    var first = true
+
+    for g in variables.values {
+      if first { first = false } else { result.write("\n") }
+      result.write(printer.show(g))
+      result.write("\n")
+    }
+    for f in functions.values {
+      if first { first = false } else { result.write("\n") }
+      result.write(printer.show(f))
+      result.write("\n")
+    }
+
+    return result
+  }
+
+}
