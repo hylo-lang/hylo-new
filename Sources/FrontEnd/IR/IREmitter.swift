@@ -507,6 +507,8 @@ internal struct IREmitter {
   /// storage before the value is stored.
   private mutating func lower(store e: ExpressionIdentity, to target: IRValue) {
     switch program.tag(of: e) {
+    case BooleanLiteral.self:
+      lower(store: program.castUnchecked(e, to: BooleanLiteral.self), to: target)
     case Call.self:
       lower(store: program.castUnchecked(e, to: Call.self), to: target)
     case Conversion.self:
@@ -528,6 +530,14 @@ internal struct IREmitter {
     default:
       program.unexpected(e)
     }
+  }
+
+  /// Implements `lower(store:to:)` for Booleanliterals.
+  private mutating func lower(store e: BooleanLiteral.ID, to target: IRValue) {
+    let v = IRValue.integer(
+      program[e].value ? 1 : 0,
+      program.types.demand(MachineType.i(1)))
+    lowering(e, { $0._emitInitialize(target, to: v) })
   }
 
   /// Implements `lower(store:to:)` for call expressions.
