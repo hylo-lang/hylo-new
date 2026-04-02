@@ -171,12 +171,11 @@ func allNonSwiftFiles(in directory: String) -> [String] {
   let l = enumerator.compactMap { $0 as? String }
     .filter { !$0.hasSuffix(".swift") && !isDirectory(directory + "/" + $0) }
 
-  print(l.joined(separator: "\n"))
   return l
 }
 
 func isDirectory(_ path: String) -> Bool {
-  // Heuristic for common fle formats:
+  // Heuristic for common file formats:
   if path.hasSuffix(".hylo") || path.hasSuffix(".observed") || path.hasSuffix(".expected") ||
     path.hasSuffix(".diagnostics") || path.hasSuffix(".c") {
     return false
@@ -184,6 +183,8 @@ func isDirectory(_ path: String) -> Bool {
 
   // Fallback to filesystem check
   var isDirectory: ObjCBool = true
-  precondition(FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory))
+  if !FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) {
+    fatalError("Expected file or directory at recently scanned path: \(path)\nPlease rerun the build.")
+  }
   return isDirectory.boolValue
 }

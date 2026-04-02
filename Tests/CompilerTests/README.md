@@ -50,6 +50,13 @@ Example package manifest:
 
 Omits loading and linking the standard library while compiling the test.
 
+### `stdlib:<variant>`
+Specifies the standard library variant to use link with the test.
+
+Supported variants:
+- `minimal`
+- `full` (default)
+
 ### `stage:<stage>`
 
 Selects how far the compiler should run before the test stops.
@@ -58,11 +65,9 @@ The supported stages are:
 - `parsing`
 - `typing`
 - `lowering`
-- `llvmLowering`
+- `llvmLowering` (default)
 - `executableLinking`
 - `run`
-
-If no stage is specified, the default is `codegen`.
 
 ### `assert-exit-code:<status>`
 

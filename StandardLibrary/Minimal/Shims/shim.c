@@ -3,10 +3,10 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
-/// Prints the Hylo `Int32` pointed to by `x` followed by a newline.
+/// Prints the Hylo `Int` pointed to by `x` followed by a newline.
 ///
 /// `result` is the Hylo output parameter for the `Void` return value; it is ignored.
-void hylo_print_int(intptr_t *x, void *result) {
+void hylo_print_int(const intptr_t *x, void *result) {
     printf("%" PRId64 "\n", *x);
 }
 
@@ -38,19 +38,23 @@ void hylo_successor_int(intptr_t const* self, intptr_t* result) {
     *result = *self + 1;
 }
 
-void hylo_int_infix_add(intptr_t* self, intptr_t* other, intptr_t* result) {
+/// Sets `result` to `self + other`.
+void hylo_int_infix_add(const intptr_t* self, const intptr_t* other, intptr_t* result) {
     *result = *self + *other;
 }
 
-void hylo_int_infix_subtract(intptr_t* self, intptr_t* other, intptr_t* result) {
+/// Sets `result` to `self - other`.
+void hylo_int_infix_subtract(const intptr_t* self, const intptr_t* other, intptr_t* result) {
     *result = *self - *other;
 }
 
-void hylo_int_infix_multiply(intptr_t* self, intptr_t* other, intptr_t* result) {
+/// Sets `result` to `self * other`.
+void hylo_int_infix_multiply(const intptr_t* self, const intptr_t* other, intptr_t* result) {
     *result = *self * *other;
 }
 
-void hylo_init_int_from_raw(intptr_t* self, intptr_t* value) {
+/// Initializes `self` with the raw integer value in `value`.
+void hylo_init_int_from_raw(intptr_t* self, const intptr_t* value) {
     *self = *value;
 }
 
@@ -61,10 +65,12 @@ void hylo_make_zero_i32(int32_t* result) {
     *result = 0;
 }
 
+/// Allocates `size` bytes and stores the address in `result`.
 void malloc_shim(intptr_t const* size, void** result) {
     *result = malloc(*size);
 }
 
+/// Frees the heap allocation referenced by `*ptr`.
 void free_shim(void** ptr) {
     free(*ptr);
 }
@@ -80,35 +86,42 @@ void hylo_make_true(char* result) {
     *result = 1;
 }
 
-
-void hylo_bool_memberwise_init(char* result, char* value) {
+/// Initializes `result` with `value`.
+void hylo_bool_memberwise_init(char* result, const char* value) {
     *result = *value;
 }
 
-void hylo_int_get_value(intptr_t* self, intptr_t* result) {
+/// Sets `result` to the value of `self`.
+void hylo_int_get_value(const intptr_t* self, intptr_t* result) {
     *result = *self;
 }
 
-void hylo_int_eq(intptr_t* self, intptr_t* other, char* result) {
-    *result = *self == *other;
+/// Sets `result` to `self == other`.
+void hylo_int_eq(const intptr_t* self, const intptr_t* other, char* result) {
+    *result = (char)(*self == *other);
 }
 
-void hylo_int_ne(intptr_t* self, intptr_t* other, char* result) {
-    *result = *self != *other;
+/// Sets `result` to `self != other`.
+void hylo_int_ne(const intptr_t* self, const intptr_t* other, char* result) {
+    *result = (char)(*self != *other);
 }
 
-void hylo_int_lt(intptr_t* self, intptr_t* other, char* result) {
-    *result = *self < *other;
+/// Sets `result` to `self < other`.
+void hylo_int_lt(const intptr_t* self, const intptr_t* other, char* result) {
+    *result = (char)(*self < *other);
 }
 
-void hylo_int_le(intptr_t* self, intptr_t* other, char* result) {
-    *result = *self <= *other;
+/// Sets `result` to `self <= other`.
+void hylo_int_le(const intptr_t* self, const intptr_t* other, char* result) {
+    *result = (char)(*self <= *other);
 }
 
-void hylo_int_gt(intptr_t* self, intptr_t* other, char* result) {
-    *result = *self > *other;
+/// Sets `result` to `self > other`.
+void hylo_int_gt(const intptr_t* self, const intptr_t* other, char* result) {
+    *result = (char)(*self > *other);
 }
 
-void hylo_int_ge(intptr_t* self, intptr_t* other, char* result) {
-    *result = *self >= *other;
+/// Sets `result` to `self >= other`.
+void hylo_int_ge(const intptr_t* self, const intptr_t* other, char* result) {
+    *result = (char)(*self >= *other);
 }

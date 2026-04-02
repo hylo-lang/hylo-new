@@ -30,7 +30,6 @@ public struct RemoteType: TypeTree {
   }
 
 }
-//Int, Movable, Regular
 
 extension RemoteType: Showable {
 

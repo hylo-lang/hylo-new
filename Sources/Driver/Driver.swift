@@ -196,13 +196,9 @@ public struct Driver {
     let fm = FileManager.default
 
     let elapsed = try ContinuousClock().measure {
-      var modulesToLink = [module]
+      let modulesToLink = [module]
       if !isFreestanding {
-
-        modulesToLink.append(module)
-        modulesToLink.removeLast() // dummy mutation
-
-        // modulesToLink.append(program.modules[.standardLibrary]!.identity) //todo enable this after we can lower the standard library
+        // modulesToLink.append(program.modules[.standardLibrary]!.identity) // todo enable this after we can lower the standard library
       }
 
       try fm.withUniqueTemporaryDirectory{ objectDirectory in
