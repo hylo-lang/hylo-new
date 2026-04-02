@@ -12,6 +12,18 @@ import XCTest
 /// manually invoking `hc-tests`.
 final class CompilerTests: XCTestCase {
 
+  /// Cleans up observation files from previous test runs.
+  /// 
+  /// This is done at most once, during the first test execution.
+  private static let initialObservationCleanup: Void = {
+    let root = URL(filePath: #filePath).deletingLastPathComponent()
+    FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.forEach { url in
+      if let url = url as? URL, url.pathExtension == "observed" {
+        try? FileManager.default.removeItem(at: url)
+      }
+    }
+  }()
+
   private struct CompilationResult {
 
     var driver: Driver
@@ -20,9 +32,9 @@ final class CompilerTests: XCTestCase {
 
     let expectations: [FileName: String]
 
-    let expectedStandardOutput: String?
-
     /// The path to the generated executable, if applicable.
+    /// 
+    /// The caller is responsible for removing the file after execution.
     let executable: URL?
 
   }
@@ -46,21 +58,26 @@ final class CompilerTests: XCTestCase {
     /// The manifest of the test.
     let manifest: Manifest
 
+    /// What the program is expected to print to stdout when `self` is a run-stage test.
+    var expectedStandardOutput: String?
+
     /// Creates an instance with the given properties.
     init(_ path: String) throws {
       self.root = URL(filePath: path)
       self.manifest = try Manifest(contentsOf: root)
+
+      self.expectedStandardOutput = try? String(
+        contentsOf: root.deletingPathExtension().appendingPathExtension("stdout.expected"),
+        encoding: .utf8)
+
+      if manifest.stage != .run && self.expectedStandardOutput != nil {
+        throw TestFailure.invalidTestDescription("stdout assertion requires stage:run")
+      }
     }
 
     /// `true` iff `self` describes a package.
     var isPackage: Bool {
       root.pathExtension == "package"
-    }
-
-    var expectedStandardOutput: String? {
-      guard !isPackage else { return nil }
-      let path = root.deletingPathExtension().appendingPathExtension("stdout.expected")
-      return try? String(contentsOf: path, encoding: .utf8)
     }
 
     /// Calls `action` on each Hylo source URL in the program described by `self`.
@@ -95,45 +112,44 @@ final class CompilerTests: XCTestCase {
 
   /// Compiles `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    if input.manifest.assertedExitCode != nil, input.manifest.stage != .run {
-      XCTFail("assert-exit-code requires stage:run")
-      return
-    }
-    if input.expectedStandardOutput != nil, input.manifest.stage != .run {
-      XCTFail("stdout assertion requires stage:run")
-      return
-    }
-
-
+    _ = CompilerTests.initialObservationCleanup
+    
     do {
-    try await FileManager.default.withUniqueTemporaryDirectory{ d in
-      let result = try await compile(input, outputDirectory: d)
+      let result = try await compile(input)
+      defer { 
+        if let e = result.executable { 
+          try? FileManager.default.removeItem(at: e) 
+        }
+      }
+
       try assertSansError(result.driver.program)
 
       guard input.manifest.stage == .run else { return }
 
-      let r: CompilerTests.ExecutionResult = try execute(result)
-      assertExitCode(input.manifest.assertedExitCode ?? 0, in: r)
-      if let standardOutput = result.expectedStandardOutput {
-        assertStandardOutput(standardOutput, in: r)
+      let execution: CompilerTests.ExecutionResult = try execute(result)
+      try execution.standardOutput.write(to: input.root.deletingPathExtension().appendingPathExtension("stdout.observed"), atomically: true, encoding: .utf8)
+
+      assertExitCode(input.manifest.assertedExitCode ?? 0, in: execution, contextRoot: input.root)
+      if let expected = input.expectedStandardOutput {
+        assertStandardOutput(expected, in: execution, contextRoot: input.root)
       }
-    }
     } catch let error as TestFailure {
-      XCTFail(error.localizedDescription)
-    }
+      XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
+    } 
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    try await FileManager.default.withUniqueTemporaryDirectory{ d in
-      let result = try await compile(input, outputDirectory: d)
-      let program = result.driver.program
-      XCTAssert(program.containsError, "program compiled but an error was expected")
-      assertExpectations(result.expectations, program.diagnostics)
-    }
+    _ = CompilerTests.initialObservationCleanup
+
+    let result = try await compile(input)
+    let program = result.driver.program
+    XCTAssert(program.containsError, "program compiled but an error was expected.\nSource: \(input.root.path)\n")
+    assertExpectations(result.expectations, program.diagnostics)
+
   }
   /// Compiles `input` into `outputDirectory` and returns expected diagnostics for each compiled source file.
-  private func compile(_ input: TestDescription, outputDirectory: URL) async throws -> CompilationResult {
+  private func compile(_ input: TestDescription) async throws -> CompilationResult {
     var driver = Driver(
       moduleCachePath: CompilerTests.moduleCachePath.url,
       targetConfiguration: .init(),
@@ -148,14 +164,14 @@ final class CompilerTests: XCTestCase {
       driver.program[m].addDependency(Module.standardLibraryName)
     }
 
-    var expectations: [FileName: String] = [:]
+    var expectedDiagnostics: [FileName: String] = [:]
     try input.forEachSourceURL { (u) in
       let source = try SourceFile(contentsOf: u)
       driver.program[m].addSource(source)
 
-      let v = u.deletingPathExtension().appendingPathExtension("expected")
+      let v = u.deletingPathExtension().appendingPathExtension("diagnostics.expected")
       let expected = try? String(contentsOf: v, encoding: .utf8)
-      expectations[source.name] = expected
+      expectedDiagnostics[source.name] = expected
     }
 
     var executable: URL? = nil
@@ -164,8 +180,7 @@ final class CompilerTests: XCTestCase {
       .init(
         driver: driver,
         module: m,
-        expectations: expectations,
-        expectedStandardOutput: input.expectedStandardOutput,
+        expectations: expectedDiagnostics,
         executable: executable)
     }
 
@@ -184,19 +199,23 @@ final class CompilerTests: XCTestCase {
     try saveObservedIR(of: m, in: driver.program, extension: "transformed-ir.observed")
     if input.manifest.stage == .lowering { return done() }
 
-    // Code generation.
+    // LLVM Lowering.
     if (try await driver.lowerToLLVM(m)).containsError { return done() }
-    if input.manifest.stage == .codegen { return done() }
+    try saveLLVM(llCode: driver.llvmIR(of: m)!, contextRoot: input.root)
+    if input.manifest.stage == .llvmLowering { return done() }
 
     // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
     if input.manifest.requiresStandardLibrary {
-      // let stdlibID = driver.program.demandModule(.standardLibrary)
+      // let stdlibID = driver.program.demandModule(Module.standardLibraryName)
       // if await driver.lower(stdlibID).containsError { return done() }
       // if await driver.applyTransformationPasses(stdlibID).containsError { return done() }
       // if (try await driver.lowerToLLVM(stdlibID)).containsError { return done() }
     }
 
-    if input.manifest.stage == .binary || input.manifest.stage == .run {
+    if input.manifest.stage == .executableLinking || input.manifest.stage == .run {
+      let outputDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+      try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: false)
+
       executable = outputDirectory.appendingPathComponent(driver.program[m].name)
       _ = try await driver.generateExecutable(for: m, writingTo: executable)
     }
@@ -214,6 +233,7 @@ final class CompilerTests: XCTestCase {
       let d = switch(f.name) {
         case .lowered(let d): d
         case .synthesized(let d, _): d
+        case .initializer(let d): DeclarationIdentity(d)
       }
 
       guard case .local(let url) = program[d].site.source.name else { continue }
@@ -222,9 +242,15 @@ final class CompilerTests: XCTestCase {
     }
 
     for (file, ir) in sourceToIr {
-      let o = file.appendingPathExtension(`extension`)
+      let o = file.deletingPathExtension().appendingPathExtension(`extension`)
       try ir.write(to: o, atomically: false, encoding: .utf8)
     }
+  }
+
+  /// Saves the LLVM code to a file in the test directory.
+  private func saveLLVM(llCode: String, contextRoot: URL) throws {
+    let o = contextRoot.deletingPathExtension().appendingPathExtension("ll.observed")
+    try llCode.write(to: o, atomically: false, encoding: .utf8)
   }
 
   private func execute(_ result: CompilationResult) throws -> ExecutionResult {
@@ -236,18 +262,18 @@ final class CompilerTests: XCTestCase {
     return try execute(executable)
   }
 
-  private func assertExitCode(_ expected: Int32, in observed: ExecutionResult) {
+  private func assertExitCode(_ expected: Int32, in observed: ExecutionResult, contextRoot: URL) {
     XCTAssertEqual(
       observed.terminationStatus,
       expected,
-      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)")
+      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)\nSource: \(contextRoot.path)\n")
   }
 
-  private func assertStandardOutput(_ expected: String, in observed: ExecutionResult) {
+  private func assertStandardOutput(_ expected: String, in observed: ExecutionResult, contextRoot: URL) {
     XCTAssertEqual(
       observed.standardOutput,
       expected,
-      "mismatched stdout.")
+      "mismatched stdout.\nSource: \(contextRoot.path)\n")
   }
 
   private func execute(_ executable: URL) throws -> ExecutionResult {
@@ -260,17 +286,19 @@ final class CompilerTests: XCTestCase {
     try process.run()
     process.waitUntilExit()
 
+    let stdout = String(decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    let stderr = String(decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+
     return .init(
-      standardOutput: String(
-        decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self),
-      standardError: String(
-        decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self),
+      standardOutput: stdout,
+      standardError: stderr,
       terminationStatus: process.terminationStatus)
   }
 
   private enum TestFailure: Error {
     case missingExecutableOutput
     case compilationError(String)
+    case invalidTestDescription(String)
 
     var localizedDescription: String {
       switch self {
@@ -278,6 +306,8 @@ final class CompilerTests: XCTestCase {
         return "missing executable output"
       case .compilationError(let message):
         return "Compilation failure:\n\(message)"
+      case .invalidTestDescription(let d):
+        return "Invalid test description (\(d))"
       }
     }
   }
@@ -332,7 +362,7 @@ final class CompilerTests: XCTestCase {
       for d in e.sorted() {
         d.render(into: &o, showingPaths: .relative(to: root), style: .unstyled)
         if case .local(let u) = n {
-          let v = u.deletingPathExtension().appendingPathExtension("observed")
+          let v = u.deletingPathExtension().appendingPathExtension("diagnostics.observed")
           try? o.write(to: v, atomically: true, encoding: .utf8)
         }
       }

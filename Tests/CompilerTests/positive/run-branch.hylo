@@ -1,0 +1,17 @@
+//! stage:run stdlib:minimal
+
+public fun main() {
+  // Should print 1.
+  if Bool.makeTrue() {
+    print(Int.one())
+  } else {
+    print(Int.zero())
+  }
+
+  // Should print 0.
+  if Bool.makeFalse() {
+    print(Int.one())
+  } else {
+    print(Int.zero())
+  }
+}

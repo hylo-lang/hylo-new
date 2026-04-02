@@ -9,9 +9,11 @@ public struct Int is Deinitializable {
   internal memberwise init
 
   /// Creates an instance equal to `false`.
-  public init() {
-    &self.value = Builtin.zeroinitializer_word()
-  }
+  @extern("hylo_init_int")
+  public init()
+
+  @extern("hylo_init_int_from_raw")
+  public init(from_raw value: Builtin.word)
 
   /// Returns 0.
   /// 
@@ -25,51 +27,44 @@ public struct Int is Deinitializable {
   @extern("hylo_successor_int") 
   public fun successor() -> Self
 
-  public fun infix== (other: Self) -> Bool {
-    .new(value: Builtin.icmp_eq_word(self.value, other.value))
-  }
+  /// Returns 1.
+  ///
+  /// Defined in shim.c.
+  @extern("hylo_make_one_int")
+  public static fun one() -> Self
 
-  public fun infix!= (other: Self) -> Bool {
-    .new(value: Builtin.icmp_ne_word(self.value, other.value))
-  }
+  @extern("hylo_int_get_value")
+  public fun get_value() -> Builtin.word
 
-  public fun infix< (other: Self) -> Bool {
-    .new(value: Builtin.icmp_slt_word(self.value, other.value))
-  }
+  @extern("hylo_int_eq")
+  public fun infix== (other: Self) -> Bool
 
-  public fun infix<= (other: Self) -> Bool {
-    .new(value: Builtin.icmp_sle_word(self.value, other.value))
-  }
+  @extern("hylo_int_ne")
+  public fun infix!= (other: Self) -> Bool
 
-  public fun infix> (other: Self) -> Bool {
-    .new(value: Builtin.icmp_sgt_word(self.value, other.value))
-  }
+  @extern("hylo_int_lt")
+  public fun infix< (other: Self) -> Bool
 
-  public fun infix>= (_ other: Self) -> Bool {
-    .new(value: Builtin.icmp_sge_word(self.value, other.value))
-  }
+  @extern("hylo_int_le")
+  public fun infix<= (other: Self) -> Bool
 
-  fun infix+ (other: Self) -> Self {
-    let (result, overflow) = Builtin.sadd_with_overflow_word(self.value, other.value)
-    if Bool(value: overflow) {
-      fatal_error()
-    } else {
-      return .new(value: result)
-    }
-  }
+  @extern("hylo_int_gt")
+  public fun infix> (other: Self) -> Bool
 
-  fun infix- (other: Self) -> Self {
-    let (result, overflow) = Builtin.ssub_with_overflow_word(self.value, other.value)
-    if Bool(value: overflow) {
-      fatal_error()
-    } else {
-      return .new(value: result)
-    }
-  }
+  @extern("hylo_int_ge")
+  public fun infix>= (other: Self) -> Bool
 
-  fun infix* (other: Self) -> Self {
-    .new(value: Builtin.mul_word(self.value, other.value))
-  }
+  @extern("hylo_int_sge")
+  public fun infix>= (_ other: Self) -> Bool
+
+  @extern("hylo_int_infix_add")
+  fun infix+ (other: Self) -> Self
+
+  @extern("hylo_int_infix_subtract")
+  fun infix- (other: Self) -> Self
+
+  @extern("hylo_int_infix_multiply")
+  fun infix* (other: Self) -> Self
 }
 
 public given Int is ExpressibleByIntegerLiteral { /* built-in */ }

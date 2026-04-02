@@ -58,8 +58,8 @@ The supported stages are:
 - `parsing`
 - `typing`
 - `lowering`
-- `codegen`
-- `binary`
+- `llvmLowering`
+- `executableLinking`
 - `run`
 
 If no stage is specified, the default is `codegen`.
@@ -71,36 +71,11 @@ The test passes only if the process exits with the specified integer status code
 
 This option requires `stage:run` to be set; omitting it is a test configuration error.
 
-## Compilation stages
-
-The stages correspond to the following checkpoints in the test runner:
-
-- `parsing`
-  - The source files are parsed into syntax trees.
-  - The test stops immediately after parsing unless parsing already produced an error.
-
-- `typing`
-  - Scope assignment and type assignment are run.
-  - The test stops after semantic analysis.
-
-- `lowering`
-  - Hylo IR is produced and mandatory IR passes are applied.
-  - The test stops after normalized Hylo IR is available.
-
-- `codegen` (default)
-  - LLVM lowering is performed.
-
-- `binary`
-  - The program is linked to an executable.
-
-- `run`
-  - The program is linked to an executable and run.
-
 ## Assertions performed by the test runner
 
 ### Positive tests
 
-Positive tests assert that compilation completes without diagnostics at the requested stage.
+Positive tests assert that compilation completes without fatal diagnostics until the requested stage.
 
 In the `run` stage, the exit code is checked to be 0 or the value specified by `assert-exit-code:<NUMBER>`.
 
@@ -108,9 +83,9 @@ In the `run` stage, the exit code is checked to be 0 or the value specified by `
 
 Negative tests assert that compilation produces at least one error.
 
-If one or more `.expected` files are present, the test runner also compares the rendered diagnostics for each source file with the contents of their corresponding `<SOURCE>.expected` file.
+If one or more `.diagnostics.expected` files are present, the test runner also compares the rendered diagnostics for each source file with the contents of their corresponding `<SOURCE>.diagnostics.expected` file.
 
-If the observed diagnostics do not match an expected file, the runner also writes a `.observed` file next to the source to help update the fixture.
+If the observed diagnostics do not match an expected file, the runner also writes a `.diagnostics.observed` file next to the source to help update the fixture.
 
 ## Writing expected diagnostics
 

@@ -18,10 +18,10 @@ struct Manifest {
     case lowering
 
     /// After LLVM lowering.
-    case codegen
+    case llvmLowering
 
     /// After the program has been linked into an executable.
-    case binary
+    case executableLinking
 
     /// After the program has been linked and executed.
     case run
@@ -35,7 +35,7 @@ struct Manifest {
   private(set) var standardLibrary: StandardLibraryDefinition = .full()
 
   /// The stage up to which the input should be compiled.
-  private(set) var stage: Stage = .codegen
+  private(set) var stage: Stage = .llvmLowering
 
   /// The expected exit code of the compiled program and run program, if applicable.
   private(set) var assertedExitCode: Int32?
@@ -75,6 +75,10 @@ struct Manifest {
     else {
       self.init()
     }
+
+    if assertedExitCode != nil && stage != .run {
+      throw ManifestError.invalidStage("assert-exit-code requires stage:run")
+    }
   }
 
   /// Updates the configuration of `self` with the option parsed from `s`.
@@ -95,9 +99,7 @@ struct Manifest {
     case "stage":
       stage = try Stage(rawValue: v).unwrapOrThrow(ManifestError.invalidStage(v))
     case "assert-exit-code":
-      assertedExitCode = v.isEmpty
-        ? 0
-        : try Int32(v).unwrapOrThrow(ManifestError.invalidExitCode(v))
+      assertedExitCode = try Int32(v).unwrapOrThrow(ManifestError.invalidExitCode(v))
     default:
       throw ManifestError.unknownOption
     }

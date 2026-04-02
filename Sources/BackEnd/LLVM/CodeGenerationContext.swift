@@ -1218,6 +1218,7 @@ public struct CodeGenerationContext: ~Copyable {
 extension Program {
   /// Returns true iff `f` is a file-scoped 0-parameter function named `main`.
   func isModuleEntry(_ f: IRFunction) -> Bool {
+    // TODO: add checks in the frontend to make sure its return type is either Void or Int or Int32
     guard case .lowered(let d) = f.name,
       parent(containing: d).isFile
     else { return false }

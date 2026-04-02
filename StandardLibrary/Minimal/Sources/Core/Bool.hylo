@@ -6,7 +6,8 @@ public struct Bool is Deinitializable {
   internal var value: Builtin.i1
 
   /// Creates an instance with its raw value.
-  internal memberwise init
+  @extern("hylo_bool_memberwise_init")
+  public init(_ value: Builtin.i1)
 
   /// Creates an instance equal to `false`.
   public init() {
@@ -41,6 +42,11 @@ public struct Bool is Deinitializable {
     Bool(value: Builtin.icmp_ne_i1(self.value, other.value))
   }
 
+  @extern("hylo_make_false")
+  public static fun makeFalse() -> Bool
+
+  @extern("hylo_make_true")
+  public static fun makeTrue() -> Bool
 }
 
 public given Bool is Movable {}

@@ -77,11 +77,11 @@ final class SimpleFunctionEmitterTest: XCTestCase {
         br label %b0
 
       b0:                                               ; preds = %prologue
-        call void @"hylo_Int.infix+"(ptr %0, ptr %1, ptr %2)
+        call void @hylo_int_infix_add(ptr %0, ptr %1, ptr %2)
         ret void
       }
 
-      declare void @"hylo_Int.infix+"(ptr noalias nocapture nofree readonly, ptr noalias nocapture nofree readonly, ptr noalias nocapture nofree)
+      declare void @hylo_int_infix_add(ptr noalias nocapture nofree readonly, ptr noalias nocapture nofree readonly, ptr noalias nocapture nofree)
 
       """)
 
@@ -143,7 +143,9 @@ final class SimpleFunctionEmitterTest: XCTestCase {
         %r3 = apply Int32.init(%r1) => %r2
         %r4 = end %r2
         %r5 = end %r1
-        %r7 = assume_state %r0 uninitialized
+        %r7 = access [sink] %r0
+        %r8 = assume_state %r7 uninitialized
+        %r9 = end %r7
         %r6 = return
       }
       fun Int32.init(set %p0: Int32&, set %p1: Void&)
