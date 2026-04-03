@@ -200,7 +200,7 @@ final class CompilerTests: XCTestCase {
     if input.manifest.stage == .lowering { return done() }
 
     // LLVM Lowering.
-    if (try await driver.lowerToLLVM(m)).containsError { return done() }
+    if (try driver.lowerToLLVM(m)).containsError { return done() }
     try saveLLVM(llCode: driver.llvmIR(of: m)!, contextRoot: input.root)
     if input.manifest.stage == .llvmLowering { return done() }
 
@@ -209,7 +209,7 @@ final class CompilerTests: XCTestCase {
       // let stdlibID = driver.program.demandModule(Module.standardLibraryName)
       // if await driver.lower(stdlibID).containsError { return done() }
       // if await driver.applyTransformationPasses(stdlibID).containsError { return done() }
-      // if (try await driver.lowerToLLVM(stdlibID)).containsError { return done() }
+      // if (try driver.lowerToLLVM(stdlibID)).containsError { return done() }
     }
 
     if input.manifest.stage == .executableLinking || input.manifest.stage == .run {
@@ -217,7 +217,7 @@ final class CompilerTests: XCTestCase {
       try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: false)
 
       executable = outputDirectory.appendingPathComponent(driver.program[m].name)
-      _ = try await driver.generateExecutable(for: m, writingTo: executable)
+      _ = try driver.generateExecutable(for: m, writingTo: executable)
     }
 
     return done()

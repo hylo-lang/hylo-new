@@ -169,7 +169,7 @@ public struct Driver {
   }
 
   /// Generates backend code for `module`.
-  public mutating func lowerToLLVM(_ module: Module.ID) async throws ->
+  public mutating func lowerToLLVM(_ module: Module.ID) throws ->
     (elapsed: Duration, containsError: Bool) {
     precondition(llvmModules[module] == nil, "LLVM code is already generated for module \(moduleName(module))")
 
@@ -191,7 +191,7 @@ public struct Driver {
   public mutating func generateExecutable(
     for module: Module.ID,
     writingTo output: URL? = nil
-  ) async throws -> (elapsed: Duration, containsError: Bool) {
+  ) throws -> (elapsed: Duration, containsError: Bool) {
 
     let fm = FileManager.default
 
@@ -202,7 +202,6 @@ public struct Driver {
       }
 
       try fm.withUniqueTemporaryDirectory{ objectDirectory in
-
         let objectFiles = try writeObjectFiles(for: modulesToLink, into: objectDirectory)
 
         let canonicalExecutable = output ?? URL(fileURLWithPath: moduleName(module))

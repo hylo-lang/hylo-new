@@ -142,7 +142,7 @@ import Utilities
         return
       }
 
-      try await perform("code generation", for: module, { try await driver.lowerToLLVM(module) })
+      try await perform("code generation", for: module, { try driver.lowerToLLVM(module) })
       if outputType == .llvm {
         try emitLLVM(module, from: driver, name: product)
         return
@@ -151,7 +151,7 @@ import Utilities
         try write(driver.assembly(of: module), to: asmFile(product))
         return
       }
-      if outputType == .objectFiles {
+      if outputType == .object {
         let modules = Array(driver.program.moduleIdentities)
         for dependency in modules where dependency != module {
           await perform("lowering", for: dependency, { await driver.lower(dependency) })
@@ -162,7 +162,7 @@ import Utilities
           try await perform(
             "code generation",
             for: dependency,
-            { try await driver.lowerToLLVM(dependency) })
+            { try driver.lowerToLLVM(dependency) })
         }
         let directory = try objectFilesDirectory()
         _ = try driver.writeObjectFiles(for: modules, into: directory)
@@ -176,7 +176,7 @@ import Utilities
 
       assert(outputType == .binary)
       try await perform("generating executable", for: module,
-        { try await driver.generateExecutable(for: module, writingTo: binaryFile(product)) })
+        { try driver.generateExecutable(for: module, writingTo: binaryFile(product)) })
     } catch let e as CompilationError {
       render(e.diagnostics.elements)
       CommandLine.exit(withError: ExitCode.failure)
@@ -330,8 +330,8 @@ import Utilities
     /// Assembly.
     case asm = "asm"
 
-    /// Object files.
-    case objectFiles = "object-files"
+    /// Object file.
+    case object = "object"
 
     /// Executable binary.
     case binary = "binary"
@@ -361,12 +361,12 @@ import Utilities
     outputURL ?? URL(fileURLWithPath: productName.description + ".s")
   }
 
-  /// Returns the directory to write when "object-files" is selected as the output type.
+  /// Returns the directory to write when "object" is selected as the output type.
   private func objectFilesDirectory() throws -> URL {
     guard outputURL?.relativePath != "-" else {
       throw ValidationError("object files cannot be written to the standard output")
     }
-    return outputURL ?? URL(fileURLWithPath: "./objects")
+    return outputURL ?? URL(fileURLWithPath: "./")
   }
 
   /// Given the desired name of the compiler's product, returns the file to write when "binary" is
