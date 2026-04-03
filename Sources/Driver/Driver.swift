@@ -174,9 +174,7 @@ public struct Driver {
     precondition(llvmModules[module] == nil, "LLVM code is already generated for module \(moduleName(module))")
 
     let elapsed = try ContinuousClock().measure {
-      let context = try CodeGenerationContext.transpiling(
-        module, in: program, compilingFor: try makeTargetMachine())
-      var m = context.extractModule()
+      var m = try transpileToLLVM(module, in: program, compilingFor: try makeTargetMachine())
       try m.verify()
       m.runDefaultModulePasses()
       try m.verify()
@@ -192,23 +190,20 @@ public struct Driver {
     for module: Module.ID,
     writingTo output: URL? = nil
   ) throws -> (elapsed: Duration, containsError: Bool) {
-
-    let fm = FileManager.default
-
     let elapsed = try ContinuousClock().measure {
       let modulesToLink = [module]
       if !isFreestanding {
         // modulesToLink.append(program.modules[.standardLibrary]!.identity) // todo enable this after we can lower the standard library
       }
 
-      try fm.withUniqueTemporaryDirectory{ objectDirectory in
+      try FileManager.default.withUniqueTemporaryDirectory{ objectDirectory in
         let objectFiles = try writeObjectFiles(for: modulesToLink, into: objectDirectory)
 
         let canonicalExecutable = output ?? URL(fileURLWithPath: moduleName(module))
         let executable = canonicalExecutable.withHostExecutableSuffix()
-        try fm.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
 
-        try linkExecutable(at: executable, with: objectFiles)
+        try linkExecutable(from: objectFiles, writingTo: executable)
 
         executableOutputs[module] = executable
       }
@@ -334,7 +329,8 @@ public struct Driver {
     }
   }
 
-  /// Creates a target machine according to the provided target configuration, resolving the host values when needed.
+  /// Creates a target machine according to the target configuration of `self`,
+  /// resolving the host values when needed.
   private func makeTargetMachine() throws -> SwiftyLLVM.TargetMachine {
     let host = try SwiftyLLVM.TargetMachine.host()
     let triple = targetConfiguration.targetTriple.resolvedWith(hostValue: host.triple)
@@ -355,29 +351,32 @@ public struct Driver {
     #endif
   }
 
-  private func linkExecutable(at output: URL, with objectFiles: [URL]) throws {
+  /// Links the provided object files into an executable at `output`, using lld.
+  private func linkExecutable(from objectFiles: [URL], writingTo output: URL) throws {
     var arguments = ["-fuse-ld=lld", "-o", output.path]
-    arguments.append(contentsOf: librarySearchPaths.map({ "-L\($0.path)" }))
-    arguments.append(contentsOf: objectFiles.map(\.path))
+    arguments += librarySearchPaths.map({ "-L\($0.path)" })
+    arguments += libraries.map({ "-l\($0)" })
+    arguments += objectFiles.map(\.path)
+
     #if os(macOS)
     let sdk = try runCommand(
       try findExecutable("xcrun"),
       arguments: ["--sdk", "macosx", "--show-sdk-path"]).standardOutput
       .trimmingCharacters(in: .whitespacesAndNewlines)
     arguments += ["-isysroot", sdk, "-lSystem"]
-    // #elseif os(Windows)
-    // arguments.append("-lucrt")
     #endif
-    arguments.append(contentsOf: libraries.map({ "-l\($0)" }))
+
     _ = try runCommand(try findExecutable("clang"), arguments: arguments)
   }
 
+  /// Returns where to write the final executable, applying a fallback based on module name.
   private func resolvedExecutableURL(for module: Module.ID, writingTo output: URL?) -> URL {
     let base = output ?? URL(fileURLWithPath: moduleName(module))
     if base.pathExtension == hostExecutableExtension { return base }
     return base.appendingPathExtension(hostExecutableExtension)
   }
 
+  /// The executable path extension on the host platform.
   private var hostExecutableExtension: String {
     #if os(Windows)
       "exe"

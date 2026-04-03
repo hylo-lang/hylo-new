@@ -60,13 +60,16 @@ extension SwiftyLLVM.FloatingPointPredicate {
 
 }
 
-public struct CodeGenerationContext: ~Copyable {
+/// Holds the LLVM IR and LLVM lowering state of a single LLVM module.
+///
+/// The LLVM lowering happens upon construction, after which you can extract the resulting module via `extractModule()`.
+private struct CodeGenerationContext: ~Copyable {
   private let program: Program
-  public var llvm: SwiftyLLVM.Module
+  private var llvm: SwiftyLLVM.Module
   private let moduleID: FrontEnd.Module.ID
 
-  public let functions: [FrontEnd.IRFunction]
-  public var isFunctionTranspiled: [Bool]
+  private let functions: [FrontEnd.IRFunction]
+  private var isFunctionTranspiled: [Bool]
 
   private init(
     transpiling module: FrontEnd.Module.ID, in program: Program,
@@ -1258,4 +1261,12 @@ extension Arrow {
     assert(!captureTypes.isOpenEnded)
     return captureTypes.types
   }
+}
+
+/// Transpiles the IR of `module` in `program` for the given target `t`.
+///
+/// - Requires: `module` has been lowered and all required passes have been run.
+public func transpileToLLVM(_ module: FrontEnd.Module.ID, in program: Program, compilingFor t: consuming TargetMachine) throws -> SwiftyLLVM.Module {
+  let context = try CodeGenerationContext.transpiling(module, in: program, compilingFor: t)
+  return context.extractModule()
 }

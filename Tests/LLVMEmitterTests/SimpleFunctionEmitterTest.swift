@@ -65,9 +65,9 @@ final class SimpleFunctionEmitterTest: XCTestCase {
       fun Int.infix+(let %p0: Int&, let %p1: Int&, set %p2: Int&)
       """)
 
-    let c = try CodeGenerationContext.transpiling(m0, in: d.program, compilingFor: .host())
+    let m = try transpileToLLVM(m0, in: d.program, compilingFor: .host())
     XCTAssertEqual(
-      c.llvm.llCode(),
+      m.llCode(),
       """
       ; ModuleID = 'M0'
       source_filename = "M0"
@@ -151,9 +151,9 @@ final class SimpleFunctionEmitterTest: XCTestCase {
       fun Int32.init(set %p0: Int32&, set %p1: Void&)
       """)
 
-    let c = try CodeGenerationContext.transpiling(m0, in: d.program, compilingFor: .host())
+    let m = try transpileToLLVM(m0, in: d.program, compilingFor: .host())
     XCTAssertEqual(
-      c.llvm.llCode(),
+      m.llCode(),
       """
       ; ModuleID = 'M0'
       source_filename = "M0"
@@ -199,9 +199,9 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     d.program.applyTransformationPasses(m0)
     try assertNoDiagnostics(in: d.program)
 
-    let c = try CodeGenerationContext.transpiling(m0, in: d.program, compilingFor: .host())
+    let m = try transpileToLLVM(m0, in: d.program, compilingFor: .host())
     XCTAssertEqual(
-      c.llvm.llCode(),
+      m.llCode(),
       """
       ; ModuleID = 'M0'
       source_filename = "M0"
