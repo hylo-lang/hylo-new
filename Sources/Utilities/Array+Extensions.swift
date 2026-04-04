@@ -36,11 +36,4 @@ extension Array {
     return xs
   }
 
-  /// Returns the contents of `self` concatenated with the contents in `suffix`.
-  public consuming func appending<S: Sequence<Element>>(contentsOf suffix: S) -> Self {
-    var xs = self
-    xs.append(contentsOf: suffix)
-    return xs
-  }
-
 }
