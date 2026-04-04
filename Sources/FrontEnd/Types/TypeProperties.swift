@@ -23,4 +23,7 @@ public struct TypeProperties: Hashable, OptionSet, Sendable {
   /// The value contains type aliasess.
   public static let hasAliases = TypeProperties(rawValue: 1 << 2)
 
+  /// The value contains generic type parameters.
+  public static let hasGenericParameter = TypeProperties(rawValue: 1 << 3)
+
 }
