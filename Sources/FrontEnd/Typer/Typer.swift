@@ -2277,7 +2277,7 @@ public struct Typer {
     return context.obligations.assume(e, hasType: t, at: program[e].site)
   }
 
-  /// Returns the inferred type of a primitive literal `e`, ensuring `e` is elaborated to a call 
+  /// Returns the inferred type of a primitive literal `e`, ensuring `e` is elaborated to a call
   /// to `.new(x: e)`, where `x` is the constructor label of `T`.
   private mutating func inferredType<T: LiteralExpression>(
     of e: T.ID, in context: inout InferenceContext
@@ -4670,7 +4670,7 @@ public struct Typer {
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
-    isStandardLibraryType(t, in: [.int, .int32, .int64])
+    isStandardLibraryType(t, in: Program.StandardLibraryEntity.allIntegerTypes)
   }
 
   /// Returns `true` iff `t` is a standard library floating point type (e.g., `Hylo.Float32`).
@@ -4678,7 +4678,7 @@ public struct Typer {
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryFloatingPointType(_ t: AnyTypeIdentity) -> Bool {
-    isStandardLibraryType(t, in: [.float32, .float64])
+    isStandardLibraryType(t, in: Program.StandardLibraryEntity.allFloatingPointTypes)
   }
 
   /// Returns `true` iff `t` is one of the standard library types `ts`.

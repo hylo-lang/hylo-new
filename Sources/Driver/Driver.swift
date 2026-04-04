@@ -247,9 +247,11 @@ public struct Driver {
   /// fingerprint matches the fingerprint of the source files in `root`. Otherwise, the module is
   /// compiled from sources and an archive is stored at `moduleCachePath`. If `moduleCachePath` is
   /// not set, the module is unconditionally compiled from sources and no archive is stored.
-  public mutating func load(_ module: Module.Name, withSourcesAt root: URL) async throws {
+  public mutating func load(
+    _ module: Module.Name, withSourcesAt root: URL, additionalSources: [SourceFile] = []
+  ) async throws {
     // Compute a fingerprint of all source files.
-    var sources: [SourceFile] = []
+    var sources: [SourceFile] = additionalSources
     try SourceFile.forEach(in: root) { (s) in
       sources.append(s)
     }
@@ -311,7 +313,8 @@ public struct Driver {
     #else
     let sourceRoot = localStandardLibrarySources
     #endif
-    try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
+    try await load(Module.standardLibraryName, withSourcesAt: sourceRoot, 
+      additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
