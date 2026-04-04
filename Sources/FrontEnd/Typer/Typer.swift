@@ -4592,9 +4592,12 @@ public struct Typer {
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
     guard program.containsStandardLibrary else { return false }
     switch program.types.dealiased(t) {
-    case standardLibraryType(.int),
-        standardLibraryType(.int32),
-        standardLibraryType(.int64):
+    case //
+      standardLibraryType(.int), standardLibraryType(.uint),
+      standardLibraryType(.int8), standardLibraryType(.uint8),
+      standardLibraryType(.int16), standardLibraryType(.uint16),
+      standardLibraryType(.int32), standardLibraryType(.uint32),
+      standardLibraryType(.int64), standardLibraryType(.uint64):
       return true
     default:
       return false

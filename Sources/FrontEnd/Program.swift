@@ -1384,11 +1384,32 @@ extension Program {
     /// `Hylo.Int`.
     case int = "Int"
 
+    /// `Hylo.UInt`.
+    case uint = "UInt"
+
+    /// `Hylo.Int8`.
+    case int8 = "Int8"
+
+    /// `Hylo.UInt8`.
+    case uint8 = "UInt8"
+
+    /// `Hylo.Int16`.
+    case int16 = "Int16"
+
+    /// `Hylo.UInt16`.
+    case uint16 = "UInt16"
+
     /// `Hylo.Int32`.
     case int32 = "Int32"
 
+    /// `Hylo.UInt32`.
+    case uint32 = "UInt32"
+
     /// `Hylo.Int64`.
     case int64 = "Int64"
+
+    /// `Hylo.UInt64`.
+    case uint64 = "UInt64"
 
     /// `Hylo.Deinitializable`.
     case deinitializable = "Deinitializable"

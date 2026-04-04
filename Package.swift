@@ -87,6 +87,7 @@ let package = Package(
     .target(
       name: "StandardLibrary",
       path: "StandardLibrary",
+      exclude: ["generator.swift"],
       resources: [.copy("Sources")],
       swiftSettings: commonSwiftSettings),
 
