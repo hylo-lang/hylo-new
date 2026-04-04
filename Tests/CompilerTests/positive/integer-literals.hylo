@@ -1,0 +1,7 @@
+//! stage:lowering
+
+fun integer_literal_conversions() {
+  let a1: Int32 = 1
+  let a2: Int64 = 1
+  let a3: Int = 1
+}
