@@ -24,6 +24,11 @@ public struct IRAlloca: Instruction {
     self.alignment = alignment
   }
 
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self = other
+  }
+
   /// The type of the value loaded by this instruction.
   public var type: IRType {
     .addressOf(storageType)

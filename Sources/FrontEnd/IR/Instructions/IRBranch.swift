@@ -15,6 +15,12 @@ public struct IRBranch: Terminator {
     self.successors = [target]
   }
 
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.anchor = other.anchor
+    self.successors = [ss[other.target]]
+  }
+
   /// The target of the branch.
   public var target: IRBlock.ID {
     successors[0]

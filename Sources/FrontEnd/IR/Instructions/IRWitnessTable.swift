@@ -19,6 +19,13 @@ public struct IRWitnessTable: Instruction {
     self.witnessType = witnessType
   }
 
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in ss[o] })
+    self.anchor = other.anchor
+    self.witnessType = other.witnessType
+  }
+
   /// The type of the value loaded by this instruction.
   public var type: IRType {
     .addressOf(witnessType)

@@ -12,8 +12,13 @@ public struct IRGlobalAccess: Instruction {
 
   /// Creates an instance with the given properties.
   public init(source: IRGlobal, anchor: Anchor) {
-    self.source = source
     self.anchor = anchor
+    self.source = source
+  }
+
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self = other
   }
 
   /// The type of the value loaded by this instruction.

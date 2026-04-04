@@ -19,6 +19,12 @@ public struct IRLoad: Instruction {
     self.anchor = anchor
   }
 
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = [ss[other.source]]
+    self.anchor = other.anchor
+  }
+
   /// The address of the storage from which the value is read.
   public var source: IRValue {
     operands[0]

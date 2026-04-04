@@ -13,12 +13,7 @@ public struct IRApply: Instruction {
   public let anchor: Anchor
 
   /// Creates an instance with the given properties.
-  public init(
-    callee: IRValue,
-    arguments: [IRValue],
-    result: IRValue,
-    anchor: Anchor
-  ) {
+  public init(callee: IRValue, arguments: [IRValue], result: IRValue, anchor: Anchor) {
     var operands = Array<IRValue>(minimumCapacity: arguments.count + 2)
     operands.append(callee)
     operands.append(contentsOf: arguments)
@@ -26,6 +21,12 @@ public struct IRApply: Instruction {
 
     self.operands = operands
     self.anchor = anchor
+  }
+
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in ss[o] })
+    self.anchor = other.anchor
   }
 
   /// The function being applied.
