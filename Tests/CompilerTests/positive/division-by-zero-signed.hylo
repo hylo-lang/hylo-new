@@ -1,0 +1,4 @@
+//! trap
+public fun main() {
+  _ = (1 as Int8) / (0 as Int8)
+}
