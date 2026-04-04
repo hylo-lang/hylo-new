@@ -874,6 +874,8 @@ public struct TypeStore: Sendable {
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as TypeApplication, let u as TypeApplication):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
+    case (_ as TypeWitness, _ as TypeWitness):
+      result = false
     case (let t as UniversalType, let u as UniversalType):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     default:
