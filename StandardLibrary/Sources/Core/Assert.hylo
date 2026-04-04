@@ -1,9 +1,11 @@
 /// Unconditionally stops execution.
+@inline(always)
 public fun fatal_error() -> Never {
   Builtin.trap()
 }
 
 /// Stops execution iff `condition` is false.
+@inline(always)
 public fun precondition(condition: Bool) -> Void {
-  if !condition { fatal_error() }
+  if !condition { Builtin.trap() }
 }

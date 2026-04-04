@@ -120,6 +120,8 @@ internal struct IREmitter {
       break
     case VariableDeclaration.self:
       break
+    case TypeAliasDeclaration.self:
+      break
     default:
       program.unexpected(d)
     }
@@ -1446,11 +1448,15 @@ internal struct IREmitter {
     let value = BigInt(hyloLiteral: program[source].value)!
 
     switch target {
-    case program.standardLibraryType(.int):
+    case program.standardLibraryType(.int), program.standardLibraryType(.uint):
       return .integer(value, program.types.demand(MachineType.word))
-    case program.standardLibraryType(.int32):
+    case program.standardLibraryType(.int8), program.standardLibraryType(.uint8):
+      return .integer(value, program.types.demand(MachineType.i(8)))
+    case program.standardLibraryType(.int16), program.standardLibraryType(.uint16):
+      return .integer(value, program.types.demand(MachineType.i(16)))
+    case program.standardLibraryType(.int32), program.standardLibraryType(.uint32):
       return .integer(value, program.types.demand(MachineType.i(32)))
-    case program.standardLibraryType(.int64):
+    case program.standardLibraryType(.int64), program.standardLibraryType(.uint64):
       return .integer(value, program.types.demand(MachineType.i(64)))
     default:
       program.unexpected(target)

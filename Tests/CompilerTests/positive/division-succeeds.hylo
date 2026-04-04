@@ -1,0 +1,8 @@
+public fun main() {
+  precondition((3 as UInt8) / (2 as UInt8) == (1 as UInt8))
+  precondition((3 as Int8) / (2 as Int8) == (1 as Int8))
+  precondition((-3 as Int8) / (2 as Int8) == (-1 as Int8))
+  precondition((3 as Int8) / (-2 as Int8) == (-1 as Int8))
+  precondition((-127 as Int8) / (-1 as Int8) == (127 as Int8))
+  precondition((127 as Int8) / (-1 as Int8) == (-127 as Int8))
+}

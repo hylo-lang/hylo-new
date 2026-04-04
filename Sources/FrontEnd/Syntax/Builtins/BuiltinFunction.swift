@@ -61,8 +61,8 @@ public enum BuiltinFunction: Hashable, Sendable {
   case mul(OverflowBehavior, MachineType.ID)
 
   //  case shl(OverflowBehavior, MachineType.ID)
-  //
-  //  case udiv(exact: Bool, MachineType.ID)
+
+  case udiv(exact: Bool, MachineType.ID)
 
   case sdiv(exact: Bool, MachineType.ID)
 
@@ -424,7 +424,9 @@ extension BuiltinFunction {
     //      return .init(^t, ^t, to: ^t)
     //    case .udiv(_, let t):
     //      return .init(^t, ^t, to: ^t)
-      case .sdiv(_, let t):
+    case .udiv(_, let t):
+      return s.demand(Arrow(t, t, to: t))
+    case .sdiv(_, let t):
       return s.demand(Arrow(t, t, to: t))
     //    case .lshr(_, let t):
     //      return .init(^t, ^t, to: ^t)
@@ -766,8 +768,8 @@ extension BuiltinFunction: Showable {
       return printer.format((p != .ignore) ? "mul_%S_%T" : "mul_%T", [p, t.erased])
     //    case .shl(let p, let t):
     //      return (p != .ignore) ? "shl_\(p)_\(t)" : "shl_\(t)"
-    //    case .udiv(let e, let t):
-    //      return e ? "udiv_exact_\(t)" : "udiv_\(t)"
+    case .udiv(let e, let t):
+      return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
     case .sdiv(let e, let t):
       return printer.format(e ? "sdiv_exact_%T" : "sdiv_%T", [t.erased])
     //    case .lshr(let e, let t):
@@ -1119,10 +1121,10 @@ extension BuiltinFunction {
     //    case "shl":
     //      guard let (p, t) = integerArithmeticTail(&tokens) else { return nil }
     //      self = .shl(p, t)
-    //
-    //    case "udiv":
-    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
-    //      self = .udiv(exact: p != nil, t)
+
+    case "udiv":
+      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
+      self = .udiv(exact: p != nil, s.demand(t))
     case "sdiv":
       guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
       self = .sdiv(exact: p != nil, s.demand(t))

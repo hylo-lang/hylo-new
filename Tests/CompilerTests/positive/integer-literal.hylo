@@ -6,6 +6,6 @@ public fun main() {
   let x0 = 10
   check<Int>(x0)
 
-  let x1 = 10 as Int64
-  check<Int64>(x1)
+  let x1 = 10 as Int32
+  check<Int32>(x1)
 }

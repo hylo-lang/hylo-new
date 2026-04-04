@@ -283,12 +283,16 @@ extension Program {
       insertTrap(in: &ctx)
     case .addressOf:
       ctx.value[v] = ctx.value[s.arguments[0]]!
-
+    case .zeroinitializer(let t):
+      ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
+    case .udiv(let e, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertUnsignedDiv(
+        exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
     case .sdiv(let e, let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertSignedDiv(
         exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
-
     case .signedAdditionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
@@ -1176,7 +1180,7 @@ extension Program {
       switch input.convention {
       case .erased:
         if case .lowered(let d) = self[ctx.hylo].ir[f].name {
-          self[ctx.hylo].addDiagnostic(.init(.error, 
+          self[ctx.hylo].addDiagnostic(.init(.error,
             "zero-sized types have no counterpart in C.", at: spanForDiagnostic(about: d)))
         } else {
           unreachable("@extern_c_indirect must have been lowered directly from a declaration")
