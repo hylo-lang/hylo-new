@@ -777,6 +777,8 @@ internal struct IREmitter {
       return loweredCallee(program.castUnchecked(e, to: NameExpression.self), writingTo: r)
     case New.self:
       return loweredCallee(program.castUnchecked(e, to: New.self), writingTo: r)
+    case StaticCall.self:
+      return loweredCallee(program.castUnchecked(e, to: StaticCall.self), writingTo: r)
     case SyntheticExpression.self:
       return loweredCallee(program.castUnchecked(e, to: SyntheticExpression.self), writingTo: r)
     default:
@@ -863,6 +865,28 @@ internal struct IREmitter {
       value: f.value, arguments: Array(f.arguments, terminatedBy: f.result), result: r)
   }
 
+  /// Implements `loweredCallee(_:writingTo)` for static calls.
+  private mutating func loweredCallee(
+    _ e: StaticCall.ID, writingTo result: IRValue
+  ) -> LoweredCallee {
+    let poly = loweredCallee(program[e].callee, writingTo: result)
+
+    // Gather the type parameters of the callee; there should be as many as arguments.
+    let f = currentFunction.result(of: poly.value)!.type
+    let (context, _) = program.types.contextAndHead(f)
+
+    // Construct a mapping from type parameter to its argument.
+    let a = TypeArguments(
+      mapping: context.parameters,
+      to: program[e].arguments.map({ (x) in
+        let t = program.type(assignedTo: x, assuming: Metatype.self)
+        return program.types[t].inhabitant
+      }))
+
+    let mono = lowering(e, { (me) in me._type_apply(poly.value, to: a) })
+    return LoweredCallee(value: mono, arguments: poly.arguments, result: poly.result)
+  }
+
   /// Implements `loweredCallee(_:writingTo)` for synthetic expressions.
   private mutating func loweredCallee(
     _ e: SyntheticExpression.ID, writingTo result: IRValue
@@ -889,7 +913,7 @@ internal struct IREmitter {
 
     case .typeApplication(let f, let a):
       let poly = loweredCallee(f, writingTo: result, at: site, in: scope)
-      let mono = lowering(at: site, in: scope) { (me) in me._type_apply(poly.value, to: a) }
+      let mono = lowering(at: site, in: scope, { (me) in me._type_apply(poly.value, to: a) })
       return LoweredCallee(value: mono, arguments: poly.arguments, result: poly.result)
 
     default:
