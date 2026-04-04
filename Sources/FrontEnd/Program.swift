@@ -1715,11 +1715,32 @@ extension Program {
     /// `Hylo.Int`.
     case int = "Int"
 
+    /// `Hylo.UInt`.
+    case uint = "UInt"
+
+    /// `Hylo.Int8`.
+    case int8 = "Int8"
+
+    /// `Hylo.UInt8`.
+    case uint8 = "UInt8"
+
+    /// `Hylo.Int16`.
+    case int16 = "Int16"
+
+    /// `Hylo.UInt16`.
+    case uint16 = "UInt16"
+
     /// `Hylo.Int32`.
     case int32 = "Int32"
 
+    /// `Hylo.UInt32`.
+    case uint32 = "UInt32"
+
     /// `Hylo.Int64`.
     case int64 = "Int64"
+
+    /// `Hylo.UInt64`.
+    case uint64 = "UInt64"
 
     /// `Hylo.Float32`.
     case float32 = "Float32"
@@ -1758,6 +1779,17 @@ extension Program {
     case expressibleByFloatingPointLiteralInit =
       "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
 
+    /// All standard library integer types.
+    static let allIntegerTypes: [StandardLibraryEntity] = [
+      .int, .uint,
+      .int8, .uint8,
+      .int16, .uint16,
+      .int32, .uint32,
+      .int64, .uint64,
+    ]
+
+    /// All standard library floating point types.
+    static let allFloatingPointTypes: [StandardLibraryEntity] = [.float32, .float64]
   }
 
   /// Returns the type of a term witnessing that `t` conforms to the core trait `p`.
@@ -1809,8 +1841,10 @@ extension Program {
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
       else {
-         precondition(allowPartialStandardLibrary, "missing or corrupt standard library")
-         continue
+        precondition(
+          allowPartialStandardLibrary,
+          "missing or corrupt standard library; missing \(n.rawValue)")
+        continue
       }
       standardLibraryDeclarations[n] = d
     }

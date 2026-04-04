@@ -68,6 +68,14 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings),
 
+    .executableTarget(
+      name: "hc-generate-stdlib",
+      dependencies: [
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .target(name: "Utilities")
+      ],
+      swiftSettings: commonSwiftSettings),
+
     .target(
       name: "Driver",
       dependencies: [
@@ -113,7 +121,8 @@ let package = Package(
       name: "StandardLibrary",
       path: "StandardLibrary",
       resources: [.copy("Sources")],
-      swiftSettings: commonSwiftSettings),
+      swiftSettings: commonSwiftSettings,
+      plugins: ["GenerateStandardLibraryPlugin"]),
 
     .target(
       name: "Utilities",
@@ -187,6 +196,14 @@ let package = Package(
       name: "CompilerTestsPlugin",
       capability: .buildTool(),
       dependencies: [
-        .target(name: "hc-tests")
+        .target(name: "hc-tests"),
+      ],
+      packageAccess: true),
+
+    .plugin(
+      name: "GenerateStandardLibraryPlugin",
+      capability: .buildTool(),
+      dependencies: [
+        .target(name: "hc-generate-stdlib"),
       ]),
   ])

@@ -16,5 +16,9 @@ public let localStandardLibrarySources = URL(fileURLWithPath: #filePath)
 public let bundledStandardLibrarySources = Bundle.module.url(
   forResource: "Sources", withExtension: nil)!
 
+/// The bundled path of the source file containing the generated parts of the standard library.
+public let generatedStandardLibrarySource = Bundle.module.url(
+  forResource: "Generated.hylo", withExtension: nil)!
+
 /// The file name of the standard library's C shim source file within the standard library root.
 package let cShimSource = "shims.c"

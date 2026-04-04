@@ -266,9 +266,9 @@ public struct Driver {
     let o = destinationDirectory.appendingPathComponent("\(uniquePrefix)-\(fileName))",
       isDirectory: false)
 
-    var a = ["-c", source.path, "-o", o.path]   
-    if let r = relocation.asClangArgument { a.append(r) } 
-    
+    var a = ["-c", source.path, "-o", o.path]
+    if let r = relocation.asClangArgument { a.append(r) }
+
     _ = try Process.executionOutput(
       try Host.findNativeExecutable(invokedAs: "clang"), arguments: a)
     return o
@@ -280,9 +280,11 @@ public struct Driver {
   /// fingerprint matches the fingerprint of the source files in `root`. Otherwise, the module is
   /// compiled from sources and an archive is stored at `moduleCachePath`. If `moduleCachePath` is
   /// not set, the module is unconditionally compiled from sources and no archive is stored.
-  public mutating func load(_ module: Module.Name, withSourcesAt root: URL) async throws {
+  public mutating func load(
+    _ module: Module.Name, withSourcesAt root: URL, additionalSources: [SourceFile] = []
+  ) async throws {
     // Compute a fingerprint of all source files.
-    var sources: [SourceFile] = []
+    var sources: [SourceFile] = additionalSources
     try SourceFile.forEach(in: root) { (s) in
       sources.append(s)
     }
@@ -334,12 +336,13 @@ public struct Driver {
     }
   }
 
-  /// Loads the standard library with `load(_:withSourcesAt:)`.
-  /// 
-  /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
+  /// Loads the standard library with `load(_:withSourcesAt:additionalSources:)`.
+  ///
+  /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot)
+    try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot,
+      additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
