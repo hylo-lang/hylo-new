@@ -2212,7 +2212,7 @@ public struct Typer {
       return context.obligations.assume(e, hasType: t, at: site)
     }
 
-    // Branches of nested conditional expressions must be single-bodied.
+    // Branches of nested conditional expressions must be single-expression bodied.
     else {
       report(.error, "branches of if-expression cannot contain statements", about: e)
       return context.obligations.assume(e, hasType: .error, at: site)

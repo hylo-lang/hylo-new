@@ -97,14 +97,17 @@ public struct Program: Sendable {
     withTyper(typing: m) { (typer) in
       // Temporarily move all functions to a local work list.
       var work: [(id: IRFunction.ID, function: IRFunction)] = []
-      modify(&typer.program[typer.module]) { (module) in
-        work = module.ir.functions.values.indices.map({ (i) in (i, module.ir[i].move()) })
+      let end = modify(&typer.program[m].ir) { (ir) in
+        for i in ir.functions.values.indices where ir[i].isDefined {
+          work.append((i, ir[i].move()))
+        }
+        return ir.functions.values.endIndex
       }
 
       let never = typer.program.types.never()
 
       // Mandatory intra-procedural passes.
-      for i in work.indices where work[i].function.isDefined {
+      for i in work.indices {
         work[i].function.foldRedundantInstructions()
         work[i].function.simplifyControlFlow()
         work[i].function.removeCodeAfterCallsReturning(never: never.erased)
@@ -117,16 +120,40 @@ public struct Program: Sendable {
         // The following two passes may fail
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
+
+        work[i].function.depolymorphize(emittingInto: m, using: &typer)
       }
 
-      // It is possible new functions have been declared during lifetime normalization, e.g., for
-      // deinitializing outstanding values.
-
       // Move all functions back.
-      modify(&typer.program[typer.module]) { (module) in
+      modify(&typer.program[m].ir) { (ir) in
         while let (i, f) = work.popLast() {
-          module.ir[i].take(definition: f)
+          ir[i].take(definition: f)
         }
+      }
+
+      // New functions may ave been introduced during the previous passes. Those that have been
+      // declared during depolymorphization must be defined in the current module unless they are
+      // behind a resilience boundary. Since this process may result in further new declarations,
+      // we must compute a fixed point on the number of functions.
+
+      var window = typer.program[m].ir.functions.values.indices[end...]
+      while !window.isEmpty {
+        // Look for functions that must be defined in the current module.
+        for i in window {
+          let module = typer.program[m]
+          guard
+            case .existentialized(let a) = module.ir[i].name,
+            case .some(let poly) = module.ir.functions.index(forKey: a),
+            module.ir[poly].isDefined
+          else { continue }
+
+          typer.program.withEmitter(insertingIn: m) { (emitter) in
+            emitter.existentialize(poly, into: i)
+          }
+        }
+
+        // New functions are those that are stored after the end of the current window.
+        window = typer.program[m].ir.functions.values.indices[window.endIndex...]
       }
     }
   }

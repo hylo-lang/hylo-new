@@ -507,6 +507,8 @@ internal struct IREmitter {
   /// storage before the value is stored.
   private mutating func lower(store e: ExpressionIdentity, to target: IRValue) {
     switch program.tag(of: e) {
+    case BooleanLiteral.self:
+      lower(store: program.castUnchecked(e, to: BooleanLiteral.self), to: target)
     case Call.self:
       lower(store: program.castUnchecked(e, to: Call.self), to: target)
     case Conversion.self:
@@ -528,6 +530,14 @@ internal struct IREmitter {
     default:
       program.unexpected(e)
     }
+  }
+
+  /// Implements `lower(store:to:)` for Booleanliterals.
+  private mutating func lower(store e: BooleanLiteral.ID, to target: IRValue) {
+    let v = IRValue.integer(
+      program[e].value ? 1 : 0,
+      program.types.demand(MachineType.i(1)))
+    lowering(e, { $0._emitInitialize(target, to: v) })
   }
 
   /// Implements `lower(store:to:)` for call expressions.
@@ -615,7 +625,7 @@ internal struct IREmitter {
     let onFailure = insertionContext.function!.addBlock()
     let tail = insertionContext.function!.addBlock()
 
-    // Typer should have guaranteed that the expression is single-bodied.
+    // Typer should have guaranteed that the expression is single-expresion bodied.
     let (e0, e1) = program.branches(of: e)!
 
     within(.init()) { (me) in
@@ -633,6 +643,8 @@ internal struct IREmitter {
     insertionContext.point = .end(of: tail)
   }
 
+  /// Generates the IR for using `n` as a condition of a test jumping to `onFailure` if the
+  /// condition does not hold or the return value if it does.
   private mutating func lowerCondition(
     _ n: ConditionIdentity, onFailure: IRBlock.ID
   ) -> IRBlock.ID {
@@ -765,6 +777,8 @@ internal struct IREmitter {
       return loweredCallee(program.castUnchecked(e, to: NameExpression.self), writingTo: r)
     case New.self:
       return loweredCallee(program.castUnchecked(e, to: New.self), writingTo: r)
+    case StaticCall.self:
+      return loweredCallee(program.castUnchecked(e, to: StaticCall.self), writingTo: r)
     case SyntheticExpression.self:
       return loweredCallee(program.castUnchecked(e, to: SyntheticExpression.self), writingTo: r)
     default:
@@ -851,6 +865,28 @@ internal struct IREmitter {
       value: f.value, arguments: Array(f.arguments, terminatedBy: f.result), result: r)
   }
 
+  /// Implements `loweredCallee(_:writingTo)` for static calls.
+  private mutating func loweredCallee(
+    _ e: StaticCall.ID, writingTo result: IRValue
+  ) -> LoweredCallee {
+    let poly = loweredCallee(program[e].callee, writingTo: result)
+
+    // Gather the type parameters of the callee; there should be as many as arguments.
+    let f = currentFunction.result(of: poly.value)!.type
+    let (context, _) = program.types.contextAndHead(f)
+
+    // Construct a mapping from type parameter to its argument.
+    let a = TypeArguments(
+      mapping: context.parameters,
+      to: program[e].arguments.map({ (x) in
+        let t = program.type(assignedTo: x, assuming: Metatype.self)
+        return program.types[t].inhabitant
+      }))
+
+    let mono = lowering(e, { (me) in me._type_apply(poly.value, to: a) })
+    return LoweredCallee(value: mono, arguments: poly.arguments, result: poly.result)
+  }
+
   /// Implements `loweredCallee(_:writingTo)` for synthetic expressions.
   private mutating func loweredCallee(
     _ e: SyntheticExpression.ID, writingTo result: IRValue
@@ -877,7 +913,7 @@ internal struct IREmitter {
 
     case .typeApplication(let f, let a):
       let poly = loweredCallee(f, writingTo: result, at: site, in: scope)
-      let mono = lowering(at: site, in: scope) { (me) in me._type_apply(poly.value, to: a) }
+      let mono = lowering(at: site, in: scope, { (me) in me._type_apply(poly.value, to: a) })
       return LoweredCallee(value: mono, arguments: poly.arguments, result: poly.result)
 
     default:
@@ -1138,8 +1174,7 @@ internal struct IREmitter {
     let f = program[module].ir.addFunction(i)
 
     // Declare the global itself.
-    let g = IRGlobal(
-      name: name, storageType: t, alignment: .align(of: t), initializer: f)
+    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: f)
     program[module].ir.addGlobal(g)
     return g
   }
@@ -1202,13 +1237,6 @@ internal struct IREmitter {
     }
 
     return result
-  }
-
-  /// Returns a reference to the given lowered function.
-  private mutating func functionReference(referringTo f: IRFunction.ID) -> IRValue {
-    let n = program[module].ir[f].name
-    let t = program[module].ir[f].type(uniquedIn: &program).erased
-    return .function(n, t)
   }
 
   /// Returns the IR type of an address of an instance of `t`.
@@ -1354,7 +1382,7 @@ internal struct IREmitter {
 
   /// Returns the result of calling `action` on `self` with the insertion context configured to
   /// emit new instructions at `p` in `f`, anchoring them to `a`.
-  private mutating func lowering<R>(
+  internal mutating func lowering<R>(
     _ p: InsertionPoint, anchoredTo a: Anchor, in f: inout IRFunction, _ action: (inout Self) -> R
   ) -> R {
     withClearContext { (me) in
@@ -1483,7 +1511,7 @@ internal struct IREmitter {
   /// Inserts `instruction` into `self.module` at `self.insertionContext.point` and returns its
   /// result the register assigned by `instruction`, if any.
   @discardableResult
-  private mutating func insert<T: Instruction>(_ instruction: T) -> IRValue? {
+  internal mutating func insert<T: Instruction>(_ instruction: T) -> IRValue? {
     modify(&insertionContext.function!) { [p = insertionContext.point!] (f) in
       let i: AnyInstructionIdentity = switch p {
       case .before(let i):
@@ -1500,34 +1528,42 @@ internal struct IREmitter {
   }
 
   /// Inserts an `access` instruction.
-  private mutating func _access(_ k: AccessEffectSet, from source: IRValue) -> IRValue {
+  internal mutating func _access(_ k: AccessEffectSet, from source: IRValue) -> IRValue {
     assert(currentFunction.isAddress(source))
     return insert(IRAccess(capabilities: k, source: source, anchor: currentAnchor))!
   }
 
-  /// Inserts a `alloca` instruction.
+  /// Inserts an `alloca` instruction.
   ///
   /// - Parameters:
-  ///   - storageType: The type of the values for which the storage is allocated.
+  ///   - storage: The type of the values for which the storage is allocated.
   ///   - alignment: The alignment of the allocated storage, which defaults to the preferred
-  ///     alignment of `storageType`.
+  ///     alignment of `storage` on the compilation target.
   ///   - inEntry: `true` iff the instruction should be inserted at the start of the current
   ///     functions' entry rather than at the current insertion point.
   internal mutating func _alloca(
-    _ type: AnyTypeIdentity, alignment: IRAlignment? = nil, inEntry: Bool = false
+    _ storage: AnyTypeIdentity, alignment: IRAlignment = .preferred, inEntry: Bool = false
   ) -> IRValue {
-    let t = program.types.dealiased(type)
-    let a = alignment ?? .align(of: t)
-    let i = IRAlloca(storageType: t, alignment: a, anchor: currentAnchor)
+    let t = program.types.dealiased(storage)
+    let s = IRAlloca(storage: t, alignment: alignment, anchor: currentAnchor)
 
     if inEntry {
       return modify(&insertionContext.function!) { (f) in
-        let i = f.prepend(i, to: f.entry!)
+        let i = f.prepend(s, to: f.entry!)
         return f.definition(i)!
       }
     } else {
-      return insert(i)!
+      return insert(s)!
     }
+  }
+
+  /// Inserts an `allocx` instruction.
+  internal mutating func _allocx(
+    _ type: IRValue, as storage: AnyTypeIdentity, alignment: IRAlignment = .preferred
+  ) -> IRValue {
+    let t = program.types.dealiased(storage)
+    let s = IRAllocx(storage: t, witness: type, alignment: alignment, anchor: currentAnchor)
+    return insert(s)!
   }
 
   /// Inserts a `apply` instruction.
@@ -1608,6 +1644,13 @@ internal struct IREmitter {
     insert(IRMove(source: source, target: target, anchor: currentAnchor))
   }
 
+  /// Inserts a `palce_cast` instruction.
+  internal mutating func _place_cast<T: TypeIdentity>(_ source: IRValue, as target: T) -> IRValue {
+    let t = program.types.dealiased(target.erased)
+    let s = IRPlaceCast(source: source, target: t, anchor: currentAnchor)
+    return insert(s)!
+  }
+
   /// Inserts a `project` instruction.
   internal mutating func _project(with callee: IRValue, _ arguments: [IRValue]) -> IRValue {
     guard
@@ -1683,6 +1726,18 @@ internal struct IREmitter {
     return insert(s)!
   }
 
+  /// Inserts a `type_witness` application.
+  internal mutating func _type_witness(
+    _ callee: UniversalType.ID, _ arguments: [IRValue]
+  ) -> IRValue {
+    assert(program.types[callee].parameters.count == arguments.count)
+    let t = program.types.demand(TypeWitness())
+    let s = IRTypeWitness(
+      constructor: callee, arguments: arguments, typeOfApplication: t,
+      anchor: currentAnchor)
+    return insert(s)!
+  }
+
   /// Insertes an `unreachable` instruction.
   internal mutating func _unreachable() {
     insert(IRUnreachable(anchor: currentAnchor))
@@ -1740,6 +1795,13 @@ internal struct IREmitter {
     // Is `d` a conformance declaration?
     else if let c = program.cast(d, to: ConformanceDeclaration.self) {
       return _emit(referenceTo: c, applyingNullary: applyNullary)
+    }
+
+    // Is `d` a type declaration?
+    else if program.isTypeDeclaration(d) {
+      let t = program.type(assignedTo: d, assuming: Metatype.self)
+      let u = program.types.dealiased(program.types[t].inhabitant)
+      return .type(u, program.types.demand(TypeWitness()))
     }
 
     switch program.tag(of: d) {
@@ -1830,6 +1892,25 @@ internal struct IREmitter {
     default:
       fatalError()
     }
+  }
+
+  /// Generates the IR for casting `source` to a place of type `target`.
+  internal mutating func _emitCast(
+    _ source: IRValue, to target: AnyTypeIdentity
+  ) -> IRValue {
+    if target[.hasGenericParameter] {
+      return _place_cast(source, as: target)
+    } else {
+      assert(target == currentFunction.result(of: source)!.type)
+      return source
+    }
+  }
+
+  // Generates the IR for storing `source` into `target`.
+  internal mutating func _emitInitialize(_ target: IRValue, to source: IRValue) {
+    let x0 = _access([.set], from: target)
+    _store(source, to: x0)
+    _end(IRAccess.self, openedBy: x0)
   }
 
   /// Generates the IR for deinitializing `source` and returns `true` iff `source` can be
@@ -1991,6 +2072,57 @@ internal struct IREmitter {
       report(program.noUniqueGivenInstance(of: goal, found: candidates, at: currentAnchor.site))
       return nil
     }
+  }
+
+  /// Generates the IR for accessing a run-time witness of `t`, caching results into `witnesses`.
+  ///
+  /// `witnesses` is a table mapping a type to a place containing a corresponding witness. It is
+  /// updated whenever generating a witness for `t` requires new IR. Instructions for allocating
+  /// and initializing storage for new witnesses are emitted in the entry of the current function
+  /// whereas the return value is always an access emitted at the current insertion point.
+  internal mutating func _emitTypeWitness(
+    of t: AnyTypeIdentity, reusing witnesses: inout [AnyTypeIdentity: IRValue]
+  ) -> IRValue {
+    // Trivial if the witness is already available.
+    if let a = witnesses[t] {
+      return _access([.let], from: a)
+    }
+
+    // Instructions for allocating/initializing the witness are emitted in the entry.
+    var p: InsertionPoint? = .some(.start(of: currentFunction.entry!))
+    swap(&insertionContext.point, &p)
+
+    let ps = program.types.parameters(freeIn: t)
+
+    // If `t` has no free type parameter, then we can just use a constant value.
+    if ps.isEmpty {
+      let u = program.types.demand(TypeWitness())
+      let a = _alloca(u.erased)
+      _emitInitialize(a, to: .type(t.erased, u))
+      witnesses[t.erased] = a
+
+      swap(&insertionContext.point, &p)
+      return _access([.let], from: a)
+    }
+
+    // Otherwise, we have to construct a new type witness.
+    else {
+      let u = program.types.demand(UniversalType(parameters: Array(ps), head: t))
+      let v = ps.map({ (p) in _emitTypeWitness(of: p.erased, reusing: &witnesses) })
+      let a = _type_witness(u, v)
+      witnesses[t.erased] = a
+
+      swap(&insertionContext.point, &p)
+      return _access([.let], from: a)
+    }
+  }
+
+  /// Returns a reference to the given lowered function.
+  internal mutating func functionReference(referringTo f: IRFunction.ID) -> IRValue {
+    let n = program[module].ir[f].name
+    let s = program[module].ir[f].signature()
+    let t = program.types.demand(s)
+    return .function(n, t)
   }
 
 }

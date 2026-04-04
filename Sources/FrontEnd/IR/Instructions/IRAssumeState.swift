@@ -17,6 +17,13 @@ public struct IRAssumeState: Instruction {
     self.initialized = initialized
   }
 
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = [ss[other.storage]]
+    self.anchor = other.anchor
+    self.initialized = other.initialized
+  }
+
   /// The address of the storage whose initialization state is assumed.
   public var storage: IRValue {
     operands[0]

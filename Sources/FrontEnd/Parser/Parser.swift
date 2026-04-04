@@ -976,7 +976,7 @@ public struct Parser {
     if ss.isEmpty {
       let r = file.insert(Return(introducer: nil, value: nil, site: .empty(at: position)))
       ss.append(.init(r))
-    } else if let s = ss.uniqueElement, file.tag(of: s).value is any Expression.Type {
+    } else if let s = ss.uniqueElement, file.isSingleExpressionBodied(s.erased) {
       let e = ExpressionIdentity(uncheckedFrom: s.erased)
       let r = file.insert(Return(introducer: nil, value: e, site: file[s].site))
       ss[0] = .init(r)

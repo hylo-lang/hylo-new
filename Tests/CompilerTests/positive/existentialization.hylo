@@ -1,0 +1,19 @@
+//! stage:lowering
+
+fun exit<T>() -> Bool { true }
+
+fun loop<T, U>() {
+  // Each recursive application requires a new type witness, unless `exit` is inlined and the
+  // compiler eliminates dead code. Regardless, `U` can be eliminated with monomorphization.
+  if !exit<T>() { loop<{T, T}, U>() }
+}
+
+let four: Int = 4
+
+public fun main() {
+  // Call to polymorphic function gets existentialized.
+  loop<Void, Void>()
+
+  // Call to monomorphic function gets copied.
+  _ = four == 4
+}

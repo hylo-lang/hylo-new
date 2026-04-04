@@ -24,6 +24,14 @@ public struct IRProperty: Instruction {
     self.propertyType = propertyType
   }
 
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = [ss[other.receiver]]
+    self.anchor = other.anchor
+    self.property = other.property
+    self.propertyType = other.propertyType
+  }
+
   /// The address of the record containing the property whose getter is returned.
   public var receiver: IRValue {
     operands[0]

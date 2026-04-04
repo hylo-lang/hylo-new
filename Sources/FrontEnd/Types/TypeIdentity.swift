@@ -2,7 +2,7 @@ import Archivist
 import Utilities
 
 /// A type denoting the identity of a type tree.
-public protocol TypeIdentity: Hashable, Showable, Archivable, Sendable {
+public protocol TypeIdentity: Comparable, Hashable, Showable, Archivable, Sendable {
 
   /// The type-erased value of this identity.
   var erased: AnyTypeIdentity { get }
@@ -17,6 +17,11 @@ extension TypeIdentity {
   /// Properties of the identified type.
   public var properties: TypeProperties {
     erased.properties
+  }
+
+  /// Returns `true` if `l` is ordered before `r`.
+  public static func < (l: Self, r: Self) -> Bool {
+    l.erased < r.erased
   }
 
   /// Returns a textual representation of `self` using `printer`.
@@ -121,6 +126,11 @@ extension AnyTypeIdentity: TypeIdentity {
   /// The type-erased value of this identity.
   public var erased: AnyTypeIdentity {
     self
+  }
+
+  /// Returns `true` if `l` is ordered before `r`.
+  public static func < (l: Self, r: Self) -> Bool {
+    l.bits < r.bits
   }
 
 }

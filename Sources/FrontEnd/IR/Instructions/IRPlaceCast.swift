@@ -1,11 +1,8 @@
-/// Loads a value from memory to register.
+/// Converts a place of type `A` to a place of type `B`.
 ///
-/// If the source is not a machine type, the operation requires exclusive access to the source,
-/// which must be initialized before the operation and is left uninitialized after. For machine
-/// types, we always copy the values, so no consume semantics.
-/// 
-/// The size of the value being loaded must be known at compile-time.
-public struct IRLoad: Instruction {
+/// The conversion is not checked. Accessing the resulting place has undefined behavior unless `B`
+/// is layout-compatible with `A`.
+public struct IRPlaceCast: Instruction {
 
   /// The operands of the instruction.
   public let operands: [IRValue]
@@ -13,35 +10,41 @@ public struct IRLoad: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
+  /// The type of the resulting place.
+  public let target: AnyTypeIdentity
+
   /// Creates an instance with the given properties.
-  public init(source: IRValue, anchor: Anchor) {
+  public init(source: IRValue, target: AnyTypeIdentity, anchor: Anchor) {
     self.operands = [source]
     self.anchor = anchor
+    self.target = target
   }
 
   /// Creates a copy of `other`, substituting its properities with `ss`.
   public init(_ other: Self, substituting ss: IRSubstitutionTable) {
     self.operands = [ss[other.source]]
     self.anchor = other.anchor
+    self.target = other.target
   }
 
-  /// The address of the storage from which the value is read.
+
+  /// The place being converted.
   public var source: IRValue {
     operands[0]
   }
 
-  /// The type of the value loaded by this instruction.
+  /// The type of the instruction's result.
   public var type: IRType {
-    .dereferenced(source)
+    .lowered(target, isAddress: true)
   }
 
 }
 
-extension IRLoad: Showable {
+extension IRPlaceCast: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "load \(printer.show(source))"
+    "place_cast \(printer.show(source)) to \(printer.show(target))"
   }
 
 }

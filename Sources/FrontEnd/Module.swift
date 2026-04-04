@@ -71,6 +71,37 @@ public struct Module: Sendable {
       return syntaxToTag[n.offset]
     }
 
+    /// Returns `true` iff `s` can be evaluated as an expression.
+    internal func isSingleExpressionBodied(_ s: AnySyntaxIdentity) -> Bool {
+      var work = [s]
+
+      while let w = work.popLast() {
+        switch tag(of: w) {
+        case If.self:
+          let n = self[w] as! If
+
+          if let s = (self[n.success] as! Block).statements.uniqueElement {
+            work.append(s.erased)
+          } else {
+            return false
+          }
+
+          if tag(of: n.failure) == If.self {
+            work.append(n.failure.erased)
+          } else if let s = (self[n.failure] as! Block).statements.uniqueElement {
+            work.append(s.erased)
+          } else {
+            return false
+          }
+
+        case let t:
+          return t.value is any Expression.Type
+        }
+      }
+
+      return true
+    }
+
     /// Inserts `child` into `self`.
     internal mutating func insert<T: Syntax>(_ child: T) -> T.ID {
       let d = syntax.count
@@ -582,6 +613,29 @@ extension Module: Archivable {
     let name = try archive.read(Name.self)
     let hash = try archive.read(UInt64.self, endianness: .little)
     return (name, hash)
+  }
+
+}
+
+extension Module.IR: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  public func show(using printer: inout TreePrinter) -> String {
+    var result = ""
+    var first = true
+
+    for g in variables.values {
+      if first { first = false } else { result.write("\n") }
+      result.write(printer.show(g))
+      result.write("\n")
+    }
+    for f in functions.values {
+      if first { first = false } else { result.write("\n") }
+      result.write(printer.show(f))
+      result.write("\n")
+    }
+
+    return result
   }
 
 }

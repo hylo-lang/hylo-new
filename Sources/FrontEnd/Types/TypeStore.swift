@@ -80,6 +80,12 @@ public struct TypeStore: Sendable {
     }
   }
 
+  /// Returns the unique type corresponding to the given signature, creating it if necessary.
+  internal mutating func demand(_ s: IRFunction.Signature) -> AnyTypeIdentity {
+    let t = demand(s.head).erased
+    return introduce(parameters: s.context, into: t)
+  }
+
   /// Returns the tag of `n`.
   public func tag<T: TypeIdentity>(of n: T) -> TypeTag {
     .init(type(of: self[n]))
@@ -257,6 +263,29 @@ public struct TypeStore: Sendable {
       k = b
     }
     return p
+  }
+
+  /// Returns the parameters that occur free in `n`.
+  public mutating func parameters(freeIn n: AnyTypeIdentity) -> SortedSet<GenericParameter.ID> {
+    // Trivial if `n` contains no generic type paramerer.
+    if !n[.hasGenericParameter] { return [] }
+
+    var result: SortedSet<GenericParameter.ID> = []
+    _ = self.map(n) { (s, t) in
+      if let u = s.cast(t, to: UniversalType.self) {
+        result.formUnion(s.parameters(freeIn: s[u].head).subtracting(s[u].parameters))
+        return .stepOver(t)
+      } else if let p = s.cast(t, to: GenericParameter.self) {
+        result.insert(p)
+        return .stepOver(t)
+      } else if t[.hasGenericParameter] {
+        return .stepInto(t)
+      } else {
+        return .stepOver(t)
+      }
+    }
+
+    return result
   }
 
   /// Returns the canonical representation of a tuple containing the given elements.
@@ -842,6 +871,8 @@ public struct TypeStore: Sendable {
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as Bundle, let u as Bundle):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
+    case (_ as Enum, _ as Enum):
+      result = false
     case (let t as EqualityWitness, let u as EqualityWitness):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (_ as ErrorType, _ as ErrorType):
@@ -874,6 +905,8 @@ public struct TypeStore: Sendable {
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as TypeApplication, let u as TypeApplication):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
+    case (_ as TypeWitness, _ as TypeWitness):
+      result = false
     case (let t as UniversalType, let u as UniversalType):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     default:

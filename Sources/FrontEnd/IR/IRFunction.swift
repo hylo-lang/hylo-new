@@ -19,6 +19,9 @@ public struct IRFunction: Sendable {
     /// The identity of a synthesized function.
     case synthesized(DeclarationIdentity, TypeArguments)
 
+    /// The identity of the existentialiezd form of a polymorphic function.
+    indirect case existentialized(IRFunction.Name)
+
   }
 
   /// The way in which an IR function returns its result.
@@ -68,6 +71,17 @@ public struct IRFunction: Sendable {
 
   }
 
+  /// The types of an IR function's parameters and return value.
+  public struct Signature: Sendable {
+
+    /// The generic type parameters that the function accepts.
+    public let context: [GenericParameter.ID]
+
+    /// The types of the term parameters and return value.
+    public let head: Arrow
+
+  }
+
   /// The name of the function.
   public let name: Name
 
@@ -106,6 +120,11 @@ public struct IRFunction: Sendable {
   /// `true` iff the function has an entry.
   public var isDefined: Bool {
     !blocks.isEmpty
+  }
+
+  /// `true` iff the function has no generic type parameters.
+  public var isMonomorphic: Bool {
+    typeParameters.isEmpty
   }
 
    /// `true` iff the function returns a unit value (i.e., an isntance of `Hylo.Void`).
@@ -172,8 +191,15 @@ public struct IRFunction: Sendable {
   /// Returns the value defining the root of the place on which `i` forms an access.
   public func source(_ i: IRAccess.ID) -> IRValue {
     var s = at(i).source
-    while let r = s.register, let q = cast(r, to: IRSubfield.self) {
-      s = at(q).base
+    while let r = s.register {
+      switch tag(of: r) {
+      case IRPlaceCast.self:
+        s = (at(r) as! IRPlaceCast).source
+      case IRSubfield.self:
+        s = (at(r) as! IRSubfield).base
+      default:
+        return s
+      }
     }
     return s
   }
@@ -189,7 +215,7 @@ public struct IRFunction: Sendable {
   }
 
   /// Returns the type of `self`, computing it using `p`.
-  public func type(uniquedIn p: inout Program) -> AnyTypeIdentity {
+  public func signature() -> Signature {
     let ps = termParameters.map { (p) in
       Parameter(access: p.access, type: resolved(p.type)!.type)
     }
@@ -202,8 +228,7 @@ public struct IRFunction: Sendable {
       a = Arrow(style: .bracketed, inputs: ps, output: o.erased)
     }
 
-    let t = p.types.demand(a).erased
-    return p.types.introduce(parameters: typeParameters, into: t)
+    return .init(context: typeParameters, head: a)
   }
 
   /// Returns the tag of `i`.
@@ -318,11 +343,11 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `true` iff `v` is an alloca or a `sink` parameter.
+  /// Returns `true` iff `v` is an `alloca`, an `allocx`, or a `sink` parameter.
   public func owns(_ v: IRValue) -> Bool {
     switch v {
     case .register(let i):
-      return tag(of: i) == IRAlloca.self
+      return (tag(of: i) == IRAlloca.self) || (tag(of: i) == IRAllocx.self)
     case .parameter(let i):
       return termParameters[i].access == .sink
     default:
@@ -343,6 +368,8 @@ public struct IRFunction: Sendable {
       return (t.erased, false)
     case .function(_, let t):
       return (t, true)
+    case .type(_, let t):
+      return (t.erased, true)
     case .poison(let t):
       return resolved(t)
     }
@@ -710,10 +737,12 @@ extension IRFunction.Name: Showable {
     case .lowered(let d):
       return printer.program.debugName(of: d)
     case .initializer(let d):
-      return "\(printer.program.debugName(of: .init(d))).init"
+      return "\(printer.program.debugName(of: .init(d)))$init"
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
       return "\(printer.program.debugName(of: d))<\(list: xs)>"
+    case .existentialized(let n):
+      return "\(printer.show(n))$existentialized"
     }
   }
 

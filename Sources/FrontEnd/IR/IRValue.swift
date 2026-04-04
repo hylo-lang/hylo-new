@@ -15,13 +15,16 @@ public enum IRValue: Hashable, Sendable {
   /// A reference to a lowered function.
   indirect case function(IRFunction.Name, AnyTypeIdentity)
 
+  /// A type witness.
+  indirect case type(AnyTypeIdentity, TypeWitness.ID)
+
   /// A "poison value", representing the result of an erroneous operation.
   indirect case poison(IRType)
 
   /// `true` iff `self` is a constant.
   public var isConstant: Bool {
     switch self {
-    case .integer, .function:
+    case .integer, .function, .type:
       return true
     default:
       return false
@@ -61,6 +64,8 @@ extension IRValue: Showable {
       return "\(printer.show(t)) \(n)"
     case .function(let n, _):
       return printer.show(n)
+    case .type(let t, _):
+      return printer.show(t)
     case .poison:
       return "#!poison"
     }
