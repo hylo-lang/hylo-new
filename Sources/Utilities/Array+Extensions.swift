@@ -29,10 +29,17 @@ extension Array {
     }
   }
 
-  /// Returns a copy of `self` suffixed by `back`.
-  public func appending(_ back: Element) -> Self {
+  /// Returns the contents of `self` suffixed by `back`.
+  public consuming func appending(_ back: Element) -> Self {
     var xs = self
     xs.append(back)
+    return xs
+  }
+
+  /// Returns the contents of `self` concatenated with the contents in `suffix`.
+  public consuming func appending<S: Sequence<Element>>(contentsOf suffix: S) -> Self {
+    var xs = self
+    xs.append(contentsOf: suffix)
     return xs
   }
 
