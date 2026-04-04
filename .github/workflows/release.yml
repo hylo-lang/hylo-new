@@ -1,0 +1,118 @@
+name: Publish release
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-draft-release:
+    name: Prepare draft release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+          gh release create "$TAG" --repo "$REPOSITORY" --draft --generate-notes --latest=false --title "$TAG"
+        shell: bash
+
+  build-distributable:
+    name: Build distributable for ${{ matrix.target }}
+    needs: prepare-draft-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Swift
+        uses: SwiftyLab/setup-swift@latest
+        with:
+          swift-version: "6.2.4"
+
+      - name: Download Recent Visual Studio and Windows SDK
+        uses: compnerd/gha-setup-vsdevenv@main
+        with:
+          winsdk: "10.0.26100.0"
+          # Note: The GitHub windows-2025 runner has only a very old version of the Windows SDK available by default.
+          #       Swift is said to require version 10.0.22621.0: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
+          #       That no longer works, so we had to upgrade to 10.0.26100.0.
+          #       See also: https://github.com/swiftlang/swift/issues/88237
+
+      - name: Build distributable
+        run: swift build -c release --verbose --product hc --static-swift-stdlib
+        shell: pwsh
+
+      - name: Locate distributable
+        id: locate-distributable
+        env:
+          TAG: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $binPath = (swift build -c release --product hc --static-swift-stdlib --show-bin-path).Trim()
+          $binaryName = if ($env:RUNNER_OS -eq 'Windows') { 'hc.exe' } else { 'hc' }
+          $binaryPath = Join-Path $binPath $binaryName
+          $assetBaseName = "hylo-$env:TAG-$env:TARGET"
+          $archivePath = Join-Path $env:RUNNER_TEMP "$assetBaseName.tar.zst"
+          "bin_path=$binPath" >> $env:GITHUB_OUTPUT
+          "binary_path=$binaryPath" >> $env:GITHUB_OUTPUT
+          "archive_path=$archivePath" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Verify distributable
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & "${{ steps.locate-distributable.outputs.binary_path }}" --help | Out-Null
+        shell: pwsh
+
+      - name: Archive distributable
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archivePath = "${{ steps.locate-distributable.outputs.archive_path }}"
+          $binPath = "${{ steps.locate-distributable.outputs.bin_path }}"
+          if (Test-Path $archivePath) {
+            Remove-Item -Force $archivePath
+          }
+          tar --zstd -cf $archivePath -C $binPath .
+        shell: pwsh
+
+      - name: Upload distributable to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release upload $env:TAG "${{ steps.locate-distributable.outputs.archive_path }}" --repo $env:REPOSITORY --clobber
+        shell: pwsh
+
+
