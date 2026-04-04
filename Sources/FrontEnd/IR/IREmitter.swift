@@ -1024,6 +1024,8 @@ internal struct IREmitter {
     switch target {
     case program.standardLibraryType(.int):
       return .integer(value, program.types.demand(MachineType.word))
+    case program.standardLibraryType(.int32):
+      return .integer(value, program.types.demand(MachineType.i(32)))
     case program.standardLibraryType(.int64):
       return .integer(value, program.types.demand(MachineType.i(64)))
     default:
