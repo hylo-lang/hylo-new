@@ -8,6 +8,12 @@ fun loop<T, U>() {
   if !exit<T>() { loop<{T, T}, U>() }
 }
 
+let four: Int = 4
+
 public fun main() {
+  // Call to polymorphic function gets existentialized.
   loop<Void, Void>()
+
+  // Call to monomorphic function gets copied.
+  _ = four == 4
 }
