@@ -167,8 +167,7 @@ public struct StableDictionary<Key: Hashable, Value> {
 
   /// Creates an instance with the key/value pairs in `keysAndValues`.
   public init<S: Sequence<(Key, Value)>>(uniqueKeysAndValues keysAndValues: S) {
-    self.init()
-    reserveCapacity(keysAndValues.underestimatedCount)
+    self.init(minimumCapacity: keysAndValues.underestimatedCount)
     for (k, v) in keysAndValues {
       let inserted = assignValue(v, forKey: k).inserted
       precondition(inserted)
@@ -224,6 +223,18 @@ public struct StableDictionary<Key: Hashable, Value> {
       return i
     } else {
       return nil
+    }
+  }
+
+  /// Returns the result of applying `action` on a mutable projection of the value at `p`.
+  public mutating func modify<T>(at p: Index, _ action: (inout Value) throws -> T) rethrows -> T {
+    guard let c = contents else { preconditionFailure("Index out of range") }
+    return try c.withUnsafeMutablePointers { (head, body) in
+      precondition((p >= 0) && (p < head.pointee.end), "Index out of range")
+      let o = head.pointee.offsets
+      let s = body.advanced(by: p)
+      precondition(Bucket.isActive(s, offsets: o), "Index out of range")
+      return try action(&s.pointee.value)
     }
   }
 
