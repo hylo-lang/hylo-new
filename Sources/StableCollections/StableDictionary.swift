@@ -49,11 +49,11 @@ public struct StableDictionary<Key: Hashable, Value> {
       self.offsets = .init()
     }
 
-    /// Updates the hash-to-bucket table to assign `position` to `hash`.
-    mutating func assign(position: Int, forHash hash: Int) {
+    /// Updates the hash-to-bucket table to assign `position`, which is in `body`, to `hash`.
+    mutating func assign(position: Int, in body: UnsafeMutablePointer<Bucket>, forHash hash: Int) {
       let h0 = abs(hash) % hashToBucket.count
       var h1 = h0
-      while hashToBucket[h1] != -1 {
+      while (hashToBucket[h1] != -1) && (body[hashToBucket[h1]].truncatedHash != 0x7f) {
         h1 = (h1 + 1) % hashToBucket.count
         assert(h1 != h0)
       }
@@ -335,7 +335,7 @@ public struct StableDictionary<Key: Hashable, Value> {
 
           // Update the hash-to-bucket relation if the bucket is occupied.
           if let key = k {
-            head.pointee.assign(position: i, forHash: key.hashValue)
+            head.pointee.assign(position: i, in: target, forHash: key.hashValue)
           } else {
             Bucket.withMaybeUninitializedHash(of: t, offsets: o, { (g) in g.initialize(to: 0) })
           }
@@ -367,12 +367,13 @@ public struct StableDictionary<Key: Hashable, Value> {
       var emptyBucket = -1
       repeat {
         let position = head.pointee.hashToBucket[h1]
-        let h2 = body[position].truncatedHash
-
         if position == -1 {
           // Hash is not stored.
           break
-        } else if (h2 == truncatedHash) && body[position].key == key {
+        }
+
+        let h2 = body[position].truncatedHash
+        if (h2 == truncatedHash) && body[position].key == key {
           // Bucket found.
           return .found(position)
         } else if h2 == 0 {
@@ -396,10 +397,10 @@ public struct StableDictionary<Key: Hashable, Value> {
     ensureUnique()
     contents!.withUnsafeMutablePointers { (head, body) in
       let hash = key.hashValue
+      head.pointee.assign(position: p, in: body, forHash: hash)
+      head.pointee.count += 1
       body.advanced(by: p).initialize(
         to: .init(key: key, value: value, truncatedHash: UInt8(hash & 0xff) | 0x80))
-      head.pointee.assign(position: p, forHash: hash)
-      head.pointee.count += 1
       if p == head.pointee.end { head.pointee.end = p + 1 }
     }
   }
