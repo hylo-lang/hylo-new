@@ -94,6 +94,9 @@ public struct IRFunction: Sendable {
   /// The parameters of the function.
   public let termParameters: [IRParameter]
 
+  /// A mapping from a source declaration to their its lowered definition.
+  private var bindings: BidirectionalDictionary<DeclarationIdentity, IRValue>
+
   /// The instructions in the function.
   private var slots: List<Slot>
 
@@ -115,6 +118,7 @@ public struct IRFunction: Sendable {
     self.slots = []
     self.blocks = []
     self.uses = [:]
+    self.bindings = [:]
   }
 
   /// `true` iff the function has an entry.
@@ -612,6 +616,7 @@ public struct IRFunction: Sendable {
     while let i = a {
       assert(uses[IRValue.register(i), default: []].allSatisfy({ block(defining: $0.user) == b }))
       removeUses(by: i)
+      bindings.remove(value: .register(i))
       let n = (i != blocks[b].last) ? slots.address(after: i.address) : nil
       a = n.map(AnyInstructionIdentity.init(address:))
     }
@@ -625,6 +630,7 @@ public struct IRFunction: Sendable {
   public mutating func remove(_ i: AnyInstructionIdentity) -> AnyInstructionIdentity? {
     assert(uses[.register(i), default: []].isEmpty)
     removeUses(by: i)
+    bindings.remove(value: .register(i))
 
     let p = block(defining: i)
     if i == blocks[p].first {
@@ -660,6 +666,21 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Updates the bindings in `self` to associate the entity declared by `d` to the value `v`.
+  public mutating func associate(_ d: DeclarationIdentity, with v: IRValue) {
+    bindings.assignValue(v, forKey: d)
+  }
+
+  /// Returns the value representing the entity declared by `d`, if any.
+  public func binding(_ d: DeclarationIdentity) -> IRValue? {
+    bindings[key: d]
+  }
+
+  /// Returns the declaration represented by `v`, if any.
+  public func declaration(_ v: IRValue) -> DeclarationIdentity? {
+    bindings[value: v]
+  }
+
   /// Returns an instance consuming the definition of `self` but leaving other properties intact.
   ///
   /// This method is similar to a "non-destructive" move extracting the definition of `self` (i.e.,
@@ -671,6 +692,7 @@ public struct IRFunction: Sendable {
       typeParameters: typeParameters,
       termParameters: termParameters)
 
+    swap(&self.bindings, &other.bindings)
     swap(&self.slots, &other.slots)
     swap(&self.blocks, &other.blocks)
     swap(&self.uses, &other.uses)
@@ -684,6 +706,7 @@ public struct IRFunction: Sendable {
   public mutating func take(definition other: consuming IRFunction) {
     assert((self.name == other.name) && !isDefined)
 
+    swap(&self.bindings, &other.bindings)
     swap(&self.slots, &other.slots)
     swap(&self.blocks, &other.blocks)
     swap(&self.uses, &other.uses)
