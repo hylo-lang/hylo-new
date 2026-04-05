@@ -16,6 +16,6 @@ final class StandardLibraryLoadingTests: XCTestCase {
 
   func testStandardLibraryLoadingLocal() async throws {
     var driver = Driver()
-    try await driver.load(Module.standardLibraryName, withSourcesAt: standardLibrarySources)
+    try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
   }
 }

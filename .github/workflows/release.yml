@@ -68,7 +68,7 @@ jobs:
           #       See also: https://github.com/swiftlang/swift/issues/88237
 
       - name: Build distributable
-        run: swift build -c release --verbose --product hc --static-swift-stdlib
+        run: swift build -c release --verbose --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY
         shell: pwsh
 
       - name: Locate distributable
@@ -78,7 +78,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $binPath = (swift build -c release --product hc --static-swift-stdlib --show-bin-path).Trim()
+          $binPath = (swift build -c release --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY --show-bin-path).Trim()
           $binaryName = if ($env:RUNNER_OS -eq 'Windows') { 'hc.exe' } else { 'hc' }
           $binaryPath = Join-Path $binPath $binaryName
           $assetBaseName = "hylo-$env:TAG-$env:TARGET"

@@ -154,8 +154,17 @@ public struct Driver {
   }
 
   /// Loads the standard library with `load(_:withSourcesAt:)`.
+  /// 
+  /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the 
+  /// bundled or local standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    try await load(Module.standardLibraryName, withSourcesAt: bundledStandardLibrarySources)
+    let sourceRoot: URL
+    #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
+    sourceRoot = bundledStandardLibrarySources
+    #else
+    sourceRoot = localStandardLibrarySources
+    #endif
+    try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.

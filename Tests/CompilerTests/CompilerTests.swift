@@ -80,7 +80,7 @@ final class CompilerTests: XCTestCase {
     var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
 
     if input.manifest.requiresStandardLibrary {
-      try await driver.load(Module.standardLibraryName, withSourcesAt: standardLibrarySources)
+      try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
     }
 
     let m = driver.program.demandModule(.init("Test"))
