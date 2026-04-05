@@ -36,17 +36,17 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
+            target: linux-x64
           - os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
+            target: linux-arm64
           - os: macos-15
-            target: aarch64-apple-darwin
+            target: macos-arm64
           - os: macos-15-intel
-            target: x86_64-apple-darwin
+            target: macos-x64
           - os: windows-2025
-            target: x86_64-pc-windows-msvc
+            target: windows-x64
           - os: windows-11-arm
-            target: aarch64-pc-windows-msvc
+            target: windows-arm64
 
     runs-on: ${{ matrix.os }}
 
