@@ -98,6 +98,25 @@ final class StableDictionaryTests: XCTestCase {
     XCTAssertEqual(s[p2.position].value, 2)
   }
 
+  func testUpdateValueForKey() {
+    var s = StableDictionary<String, Int>()
+
+    let p0 = s.updateValue(1, forKey: "a")
+    XCTAssertNil(p0.former)
+    XCTAssertEqual(p0.position, 0)
+    XCTAssertEqual(s[p0.position].value, 1)
+
+    let p1 = s.updateValue(2, forKey: "a")
+    XCTAssertEqual(p1.former, 1)
+    XCTAssertEqual(p1.position, 0)
+    XCTAssertEqual(s[p0.position].value, 2)
+
+    let p2 = s.updateValue(2, forKey: "b")
+    XCTAssertNil(p2.former)
+    XCTAssertEqual(p2.position, 1)
+    XCTAssertEqual(s[p2.position].value, 2)
+  }
+
   func testReinsertPair() {
     var s: StableDictionary = ["a": 1, "b": 2, "c": 3]
     s["b"] = nil

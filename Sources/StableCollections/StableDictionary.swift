@@ -258,6 +258,25 @@ public struct StableDictionary<Key: Hashable, Value> {
     }
   }
 
+  /// Assigns `value` to `key` and returns `(former: v, position: p)` where `v` is the value
+  /// previously assigned to `key`, if any, and `p` is the position of `key` in `self`.
+  public mutating func updateValue(
+    _ value: consuming Value, forKey key: Key
+  ) -> (former: Value?, position: Int) {
+    switch lookup(key) {
+    case .found(let i):
+      ensureUnique()
+      contents!.withUnsafeMutablePointerToElements { (body) in
+        swap(&body.advanced(by: i).pointee.value, &value)
+      }
+      return (former: .some(value), position: i)
+
+    case .notFound(let i):
+      insert(key: key, value: value, at: i)
+      return (former: nil, position: i)
+    }
+  }
+
   /// Removes the key/value pair stored at `p`.
   ///
   /// - Requires: `p` is a valid position in `self`.
