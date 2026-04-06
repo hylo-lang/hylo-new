@@ -12,7 +12,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
   public let modifiers: [Parsed<DeclarationModifier>]
 
   /// The introducer of this declaration.
-  public let introducer: Parsed<Token>
+  public let introducer: Parsed<FunctionDeclaration.Introducer>
 
   /// The name of the declared function.
   public let identifier: Parsed<String>
@@ -42,7 +42,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
   public init(
     annotations: [Annotation],
     modifiers: [Parsed<DeclarationModifier>],
-    introducer: Parsed<Token>,
+    introducer: Parsed<FunctionDeclaration.Introducer>,
     identifier: Parsed<String>,
     contextParameters: ContextParameters,
     captures: CaptureList,
@@ -52,6 +52,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
     variants: [VariantDeclaration.ID],
     site: SourceSpan
   ) {
+    assert(introducer.value == anyOf(.fun, .subscript))
     self.annotations = annotations
     self.modifiers = modifiers
     self.introducer = introducer
@@ -74,7 +75,14 @@ extension FunctionBundleDeclaration: Showable {
     var result = ""
     for m in modifiers { result.append("\(m) ") }
 
-    result.append("fun \(identifier.value)")
+    switch introducer.value {
+    case .fun:
+      result.append("fun \(identifier.value)")
+    case .subscript:
+      result.append("subscript \(identifier.value)")
+    default:
+      unreachable()
+    }
 
     if !contextParameters.isEmpty {
       result.append(printer.show(contextParameters))
