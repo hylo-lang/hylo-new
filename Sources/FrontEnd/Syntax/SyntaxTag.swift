@@ -80,6 +80,7 @@ public struct SyntaxTag: Sendable {
     Block.self,
     Discard.self,
     Return.self,
+    Yield.self,
   ]
 
   static let indices = Dictionary(
