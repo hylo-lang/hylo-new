@@ -71,6 +71,14 @@ final class StableDictionaryTests: XCTestCase {
     XCTAssertEqual(s.index(forKey: "c"), 2)
   }
 
+  func testModifyAt() throws {
+    var s: StableDictionary<String, Int> = ["a": 1, "b": 2, "c": 3]
+    let i = try XCTUnwrap(s.index(forKey: "b"))
+    s.modify(at: i, { (v) in v += 3 })
+    XCTAssertEqual(s["a"], 1)
+    XCTAssertEqual(s["b"], 5)
+  }
+
   func testAssignValueForKey() {
     var s = StableDictionary<String, Int>()
 
@@ -86,6 +94,25 @@ final class StableDictionaryTests: XCTestCase {
 
     let p2 = s.assignValue(2, forKey: "b")
     XCTAssert(p2.inserted)
+    XCTAssertEqual(p2.position, 1)
+    XCTAssertEqual(s[p2.position].value, 2)
+  }
+
+  func testUpdateValueForKey() {
+    var s = StableDictionary<String, Int>()
+
+    let p0 = s.updateValue(1, forKey: "a")
+    XCTAssertNil(p0.former)
+    XCTAssertEqual(p0.position, 0)
+    XCTAssertEqual(s[p0.position].value, 1)
+
+    let p1 = s.updateValue(2, forKey: "a")
+    XCTAssertEqual(p1.former, 1)
+    XCTAssertEqual(p1.position, 0)
+    XCTAssertEqual(s[p0.position].value, 2)
+
+    let p2 = s.updateValue(2, forKey: "b")
+    XCTAssertNil(p2.former)
     XCTAssertEqual(p2.position, 1)
     XCTAssertEqual(s[p2.position].value, 2)
   }

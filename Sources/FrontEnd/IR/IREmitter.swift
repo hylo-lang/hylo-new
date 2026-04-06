@@ -116,7 +116,7 @@ internal struct IREmitter {
       report(program.missingBindingInitializer(d))
       program.forEachVariable(introducedBy: d) { (v, _) in
         let t = program.type(assignedTo: v)
-        insertionContext.frames.top[.init(v)] = .poison(.lowered(t, isAddress: true))
+        associate(.init(v), with: .poison(.lowered(t, isAddress: true)))
       }
     }
   }
@@ -132,7 +132,6 @@ internal struct IREmitter {
       // Emit the definition of the global's initializer.
       let lhs = program[program[d].pattern].pattern
       initializer = withClearContext { (me) in
-        me.insertionContext.frames.push(.init())
         me.insertionContext.function = initializer
         me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
         me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
@@ -172,7 +171,7 @@ internal struct IREmitter {
     switch program.tag(of: p) {
     case VariableDeclaration.self:
       let d = program.castUnchecked(p, to: VariableDeclaration.self)
-      insertionContext.frames.top[.init(d)] = s
+      associate(.init(d), with: s)
 
     case TuplePattern.self:
       let t = program.castUnchecked(p, to: TuplePattern.self)
@@ -290,13 +289,12 @@ internal struct IREmitter {
     // Lower the function's definition.
     insertionContext.function = program[module].ir[f]
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
-    var frame = Frame()
     for (i, p) in insertionContext.function!.termParameters.enumerated() {
       let v = IRValue.parameter(i)
 
       // Configure the base frame with the function's parameters.
       if let local = p.declaration {
-        frame[local] = v
+        insertionContext.function!.associate(local, with: v)
       }
 
       // Assume `p` is initialized if it's a `set` parameter other than the return register
@@ -311,7 +309,7 @@ internal struct IREmitter {
       }
     }
 
-    switch within(frame, { $0.lower(body: body) }) {
+    switch lower(body: body) {
     case .return(let r):
       lowering(r, { $0._return() })
 
@@ -446,7 +444,7 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Block.ID) -> ControlFlow {
-    within(.init(), { $0.lower(body: $0.program[s].statements) })
+    lower(body: program[s].statements)
   }
 
   /// Generates the IR of `s`.
@@ -463,14 +461,12 @@ internal struct IREmitter {
     let tail = insertionContext.function!.addBlock()
 
     // Lower the conditions and the success branch.
-    within(.init()) { (me) in
-      for c in me.program[s].conditions {
-        me.insertionContext.point = .end(of: me.lowerCondition(c, onFailure: onFailure))
-      }
+    for c in program[s].conditions {
+      insertionContext.point = .end(of: lowerCondition(c, onFailure: onFailure))
+    }
 
-      if me.lower(me.program[s].success) == .next {
-        me.lowering(after: me.program[s].success, { $0._br(tail) })
-      }
+    if lower(program[s].success) == .next {
+      lowering(after: program[s].success, { $0._br(tail) })
     }
 
     // Lower the failure branch.
@@ -627,14 +623,11 @@ internal struct IREmitter {
 
     // Typer should have guaranteed that the expression is single-expresion bodied.
     let (e0, e1) = program.branches(of: e)!
-
-    within(.init()) { (me) in
-      for c in me.program[e].conditions {
-        me.insertionContext.point = .end(of: me.lowerCondition(c, onFailure: onFailure))
-      }
-      me.lower(store: e0, to: target)
-      me.lowering(after: e0, { $0._br(tail) })
+    for c in program[e].conditions {
+      insertionContext.point = .end(of: lowerCondition(c, onFailure: onFailure))
     }
+    lower(store: e0, to: target)
+    lowering(after: e0, { $0._br(tail) })
 
     insertionContext.point = .end(of: onFailure)
     lower(store: e1, to: target)
@@ -1249,9 +1242,6 @@ internal struct IREmitter {
   /// The context in which instructions are inserted.
   private struct InsertionContext {
 
-    /// A stack of frames keeping track of local symbols in traversed lexical scope.
-    var frames = Stack()
-
     /// The function in which new instructions are inserted.
     var function: IRFunction? = nil
 
@@ -1260,53 +1250,6 @@ internal struct IREmitter {
 
     /// The region in the source code to which inserted instructions are associated.
     var anchor: Anchor? = nil
-
-  }
-
-  /// The local variables of a lexical scope.
-  private typealias Frame = [DeclarationIdentity: IRValue]
-
-  /// A stack of frames.
-  private struct Stack {
-
-    /// The frames in the stack, ordered from bottom to top.
-    private(set) var elements: [Frame] = []
-
-    /// Accesses the top frame.
-    ///
-    /// - Requires: The stack is not empty.
-    var top: Frame {
-      get { elements[elements.count - 1] }
-      _modify { yield &elements[elements.count - 1] }
-    }
-
-    /// Accesses the IR corresponding to `d`.
-    ///
-    /// - Requires: For a write access, the stack is not empty.
-    /// - Complexity: O(*n*) for read access where *n* is the number of frames in the stack. O(1)
-    ///   for write access.
-    subscript(d: DeclarationIdentity) -> IRValue? {
-      get {
-        for frame in elements.reversed() {
-          if let operand = frame[d] { return operand }
-        }
-        return nil
-      }
-      set { top[d] = newValue }
-    }
-
-    /// Pushes `newFrame` on the stack.
-    mutating func push(_ newFrame: Frame = .init()) {
-      elements.append(newFrame)
-    }
-
-    /// Pops the top frame.
-    ///
-    /// - Requires: The stack is not empty.
-    @discardableResult
-    mutating func pop() -> Frame {
-      return elements.removeLast()
-    }
 
   }
 
@@ -1331,6 +1274,11 @@ internal struct IREmitter {
     insertionContext.anchor!
   }
 
+  /// Associates the entity declared by `d` with the value `v` in the current function.
+  public mutating func associate(_ d: DeclarationIdentity, with v: IRValue) {
+    insertionContext.function!.associate(d, with: v)
+  }
+
   /// Returns the result of calling `action` on a copy of `self` with a cleared insertion context.
   ///
   /// Use this method to wrap the lowering of a function or subscript to save the current insertion
@@ -1340,17 +1288,6 @@ internal struct IREmitter {
     swap(&c, &insertionContext)
     let r = action(&self)
     swap(&c, &insertionContext)
-    return r
-  }
-
-  /// Returns the result of calling `action` on `self` within `f`.
-  ///
-  /// `f` is pushed on `self.frames` before `action` is called. When `action` returns. References
-  /// to locals set by `action` are invalidated when this method returns.
-  private mutating func within<T>(_ f: Frame, _ action: (inout Self) -> T) -> T {
-    insertionContext.frames.push(f)
-    let r = action(&self)
-    insertionContext.frames.pop()
     return r
   }
 
@@ -1774,7 +1711,7 @@ internal struct IREmitter {
     referenceTo d: DeclarationIdentity, applyingNullary applyNullary: Bool = true
   ) -> IRValue {
     // Is `d` already inserted into the local symbol table?
-    if let s = insertionContext.frames[d] {
+    if let s = currentFunction.binding(d) {
       return s
     }
 
@@ -1782,7 +1719,7 @@ internal struct IREmitter {
     else if program.isLocal(d) {
       // Is `d` referring to a local variable that is not yet in scope?
       if let v = program.cast(d, to: VariableDeclaration.self) {
-        // The only way to get here is if either `v` has not been defined yet.
+        // The only way to get here is if `v` has not been defined yet.
         let s = insertionContext.anchor!.site
         let t = program.type(assignedTo: v)
         report(.init(.error, "use of '\(program[v].identifier)' before its declaration", at: s))

@@ -49,11 +49,11 @@ public struct StableDictionary<Key: Hashable, Value> {
       self.offsets = .init()
     }
 
-    /// Updates the hash-to-bucket table to assign `position` to `hash`.
-    mutating func assign(position: Int, forHash hash: Int) {
+    /// Updates the hash-to-bucket table to assign `position`, which is in `body`, to `hash`.
+    mutating func assign(position: Int, in body: UnsafeMutablePointer<Bucket>, forHash hash: Int) {
       let h0 = abs(hash) % hashToBucket.count
       var h1 = h0
-      while hashToBucket[h1] != -1 {
+      while (hashToBucket[h1] != -1) && (body[hashToBucket[h1]].truncatedHash != 0x7f) {
         h1 = (h1 + 1) % hashToBucket.count
         assert(h1 != h0)
       }
@@ -167,8 +167,7 @@ public struct StableDictionary<Key: Hashable, Value> {
 
   /// Creates an instance with the key/value pairs in `keysAndValues`.
   public init<S: Sequence<(Key, Value)>>(uniqueKeysAndValues keysAndValues: S) {
-    self.init()
-    reserveCapacity(keysAndValues.underestimatedCount)
+    self.init(minimumCapacity: keysAndValues.underestimatedCount)
     for (k, v) in keysAndValues {
       let inserted = assignValue(v, forKey: k).inserted
       precondition(inserted)
@@ -227,6 +226,18 @@ public struct StableDictionary<Key: Hashable, Value> {
     }
   }
 
+  /// Returns the result of applying `action` on a mutable projection of the value at `p`.
+  public mutating func modify<T>(at p: Index, _ action: (inout Value) throws -> T) rethrows -> T {
+    guard let c = contents else { preconditionFailure("Index out of range") }
+    return try c.withUnsafeMutablePointers { (head, body) in
+      precondition((p >= 0) && (p < head.pointee.end), "Index out of range")
+      let o = head.pointee.offsets
+      let s = body.advanced(by: p)
+      precondition(Bucket.isActive(s, offsets: o), "Index out of range")
+      return try action(&s.pointee.value)
+    }
+  }
+
   /// Assigns `value` to `key` and returns `(inserted: i, position: p)` where `i` is `true` iff no
   /// value was assigned to `key` and `p` is the position of `key` in `self`.
   @discardableResult
@@ -244,6 +255,25 @@ public struct StableDictionary<Key: Hashable, Value> {
     case .notFound(let i):
       insert(key: key, value: value, at: i)
       return (inserted: true, position: i)
+    }
+  }
+
+  /// Assigns `value` to `key` and returns `(former: v, position: p)` where `v` is the value
+  /// previously assigned to `key`, if any, and `p` is the position of `key` in `self`.
+  public mutating func updateValue(
+    _ value: consuming Value, forKey key: Key
+  ) -> (former: Value?, position: Int) {
+    switch lookup(key) {
+    case .found(let i):
+      ensureUnique()
+      contents!.withUnsafeMutablePointerToElements { (body) in
+        swap(&body.advanced(by: i).pointee.value, &value)
+      }
+      return (former: .some(value), position: i)
+
+    case .notFound(let i):
+      insert(key: key, value: value, at: i)
+      return (former: nil, position: i)
     }
   }
 
@@ -335,7 +365,7 @@ public struct StableDictionary<Key: Hashable, Value> {
 
           // Update the hash-to-bucket relation if the bucket is occupied.
           if let key = k {
-            head.pointee.assign(position: i, forHash: key.hashValue)
+            head.pointee.assign(position: i, in: target, forHash: key.hashValue)
           } else {
             Bucket.withMaybeUninitializedHash(of: t, offsets: o, { (g) in g.initialize(to: 0) })
           }
@@ -367,12 +397,13 @@ public struct StableDictionary<Key: Hashable, Value> {
       var emptyBucket = -1
       repeat {
         let position = head.pointee.hashToBucket[h1]
-        let h2 = body[position].truncatedHash
-
         if position == -1 {
           // Hash is not stored.
           break
-        } else if (h2 == truncatedHash) && body[position].key == key {
+        }
+
+        let h2 = body[position].truncatedHash
+        if (h2 == truncatedHash) && body[position].key == key {
           // Bucket found.
           return .found(position)
         } else if h2 == 0 {
@@ -396,10 +427,10 @@ public struct StableDictionary<Key: Hashable, Value> {
     ensureUnique()
     contents!.withUnsafeMutablePointers { (head, body) in
       let hash = key.hashValue
+      head.pointee.assign(position: p, in: body, forHash: hash)
+      head.pointee.count += 1
       body.advanced(by: p).initialize(
         to: .init(key: key, value: value, truncatedHash: UInt8(hash & 0xff) | 0x80))
-      head.pointee.assign(position: p, forHash: hash)
-      head.pointee.count += 1
       if p == head.pointee.end { head.pointee.end = p + 1 }
     }
   }
