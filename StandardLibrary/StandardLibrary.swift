@@ -2,7 +2,8 @@ import Foundation
 
 /// The root folder of the standard library's sources. 
 /// 
-/// Use this for development time. Driver's default, unless USE_BUNDLED_STANDARD_LIBRARY option is set.
+/// This folder should be preferred during development. It is the Driver's default unless the
+/// flag `USE_BUNDLED_STANDARD_LIBRARY` is set.
 public let localStandardLibrarySources = URL(fileURLWithPath: #filePath)
   .deletingLastPathComponent()
   .appendingPathComponent("Sources")
