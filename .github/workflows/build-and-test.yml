@@ -48,13 +48,13 @@ jobs:
         shell: bash
 
       - name: Build Swift project
-        run: swift build --build-tests -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+        run: swift build --disable-sandbox --build-tests -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Verify StandardLibrary generator output is up-to-date
         run: git diff --exit-code -- StandardLibrary/Sources/Core/Numbers/Generated
 
       - name: Run tests
-        run: swift test --skip-build -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+        run: swift test --disable-sandbox  --skip-build -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}
