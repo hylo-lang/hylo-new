@@ -52,7 +52,7 @@ public struct FunctionBundleDeclaration: RoutineDeclaration, Annotatable, Scope 
     variants: [VariantDeclaration.ID],
     site: SourceSpan
   ) {
-    assert(introducer.value == anyOf(.fun, .subscript))
+    assert(!introducer.value.isInitializer)
     self.annotations = annotations
     self.modifiers = modifiers
     self.introducer = introducer

@@ -21,6 +21,16 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
     /// The memberwise initializer introducer, `memberwise init`
     case memberwiseinit
 
+    /// `true` iff `self` introduces an initializer.
+    public var isInitializer: Bool {
+      switch self {
+      case .fun, .subscript:
+        return false
+      case .`init`, .memberwiseinit:
+        return true
+      }
+    }
+
   }
 
   /// The annotations on this declaration.
@@ -118,7 +128,7 @@ extension FunctionDeclaration: Showable {
     result.append(printer.show(parameters))
     result.append(")")
 
-    if introducer.value == .fun {
+    if !introducer.value.isInitializer {
       result.append(" \(effect.value) -> " + (output.map({ (o) in printer.show(o) }) ?? "Void"))
     }
 

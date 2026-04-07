@@ -522,7 +522,8 @@ public struct Parser {
       p = parameters
     }
 
-    let output = try parseOptionalReturnTypeAscription(in: &file)
+    // Parse the return type ascription, which must be present if we're constructing a subscript.
+    let output = try parseReturnTypeAscription(introducedBy: introducer.value, in: &file)
 
     // Are we parsing a bundle declaration?
     if effect.value == .auto {
@@ -1714,7 +1715,7 @@ public struct Parser {
     let captures = try parseOptionalCaptureList(in: &file) ?? .inferred(at: position)
     let parameters = try parseParenthesizedParameterList(in: &file)
     let effect = parseOptionalAccessEffect() ?? .init(.let, at: .empty(at: position))
-    let output = try parseOptionalReturnTypeAscription(in: &file)
+    let output = try parseReturnTypeAscription(introducedBy: .fun, in: &file)
     let body = try parseCallableBody(introducedBy: .fun, in: &file)
 
     let f = file.insert(
@@ -1919,19 +1920,25 @@ public struct Parser {
     }
   }
 
-  /// Parses a return type ascription iff the next token is an arrow.
+  /// Parses the return type ascription of an abstraction introduced by `head` iff the next token
+  /// is an arrow.
   ///
   ///     return-type-ascription ::=
   ///       '->' expression
   ///
-  private mutating func parseOptionalReturnTypeAscription(
+  private mutating func parseReturnTypeAscription(
+    introducedBy head: FunctionDeclaration.Introducer,
     in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity? {
     if take(.arrow) != nil {
       return try parseExpression(in: &file)
-    } else {
-      return nil
     }
+
+    // Subscript declarations require a return type ascription.
+    if head == .subscript {
+      report(.init("missing return type ascription", at: .empty(at: position)))
+    }
+    return nil
   }
 
   /// Parses the type ascription of a parameter iff the next token is a colon.

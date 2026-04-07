@@ -97,7 +97,12 @@ extension Arrow: Showable {
     let e = printer.show(environment)
     let i = printer.show(inputs)
     let o = printer.show(output)
-    return "[\(e)](\(i)) \(effect) -> \(o)"
+    switch style {
+    case .parenthesized:
+      return "[\(e)](\(i)) \(effect) -> \(o)"
+    case .bracketed:
+      return "[\(e)](\(i)) \(effect) -> yield \(o)"
+    }
   }
 
 }

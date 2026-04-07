@@ -1079,6 +1079,8 @@ public struct Typer {
       checkAsStatement(program.castUnchecked(s, to: If.self))
     case Return.self:
       check(program.castUnchecked(s, to: Return.self))
+    case Yield.self:
+      check(program.castUnchecked(s, to: Yield.self))
     case _ where program.isExpression(s):
       checkAsStatement(ExpressionIdentity(uncheckedFrom: s.erased))
     case _ where program.isDeclaration(s):
@@ -1122,6 +1124,12 @@ public struct Typer {
     }
 
     program[s.module].setType(.void, for: s)
+  }
+
+  /// Type checks `s`.
+  private mutating func check(_ s: Yield.ID) {
+    let u = expectedOutputType(in: program.parent(containing: s)) ?? .void
+    check(program[s].value, requiring: u)
   }
 
   /// Returns the declared type of `d` without type checking its contents.
@@ -1495,10 +1503,11 @@ public struct Typer {
   private mutating func declaredArrowType<T: RoutineDeclaration>(
     of d: T.ID, taking inputs: [Parameter]
   ) -> AnyTypeIdentity {
+    let s = Call.Style(program[d].introducer.value)
+    let k = program[d].effect.value
     let e = declaredEnvironmentType(of: d)
     let o = program[d].output.map({ (a) in evaluateTypeAscription(a) }) ?? .void
-    let k = program[d].effect.value
-    let a = demand(Arrow(effect: k, environment: e, inputs: inputs, output: o))
+    let a = demand(Arrow(style: s, effect: k, environment: e, inputs: inputs, output: o))
     return introduce(program[d].contextParameters, into: a.erased)
   }
 
