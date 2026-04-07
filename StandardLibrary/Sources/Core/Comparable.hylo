@@ -5,8 +5,8 @@
 /// relation that satisfies the following for all instances `a`, `b`, and `c`:
 ///
 /// - `a < a` is always `false` (irreflexivity)
-/// - if `a < b` then `b < a` is `false` (antisymmetry)
-/// - if `a < b` and `b < b` then `a < c` (transitivity)
+/// - if `a < b` then `b < a` is `false` (asymmetry)
+/// - if `a < b` and `b < c` then `a < c` (transitivity)
 /// - if `a == b` is `false` then either `a < b` or `b < a` (totality)
 ///
 /// Making `T` conform to `Comparable` automatically equips `T` with members `infix>`, `infix>=`,
