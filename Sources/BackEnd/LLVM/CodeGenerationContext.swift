@@ -336,7 +336,7 @@ private struct CodeGenerationContext: ~Copyable {
     /// Inserts the transpilation of `i` at `insertionPoint`.
     func insert(alloca i: AnyInstructionIdentity) {
       let s = f.at(i) as! IRAlloca
-      let t = program.llvmType(from: s.storageType, in: &llvm)
+      let t = program.llvmType(from: s.storage, in: &llvm)
       if llvm.layout.storageSize(of: t) == 0 {
         register[.register(i)] = llvm.ptr.unsafe[].null.erased
       } else {
@@ -1135,9 +1135,15 @@ private struct CodeGenerationContext: ~Copyable {
         return llvmType.unsafe[].constant(v).erased
       case .function(let name, let t):
         return llvmFunction(named: name, type: t).erased
+      case .type(let t, let w):
+        return lowerWitness(type: t, witness: w)
       case .poison(let t):
         return llvm.poisonValue(of: program.llvmType(from: f.resolved(t)!.type, in: &llvm)).erased
       }
+    }
+
+    func lowerWitness(type: AnyTypeIdentity, witness: TypeWitness.ID) -> AnyValue.UnsafeReference {
+      unimplemented("type operand lowering")
     }
 
     /// Returns the LLVM function corresponding to `name` and `type`.

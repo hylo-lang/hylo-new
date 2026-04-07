@@ -156,7 +156,7 @@ final class CompilerTests: XCTestCase {
       standardLibrary: input.manifest.standardLibrary)
 
     if input.manifest.requiresStandardLibrary {
-      try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
+      try await driver.loadStandardLibrary()
     }
 
     let m = driver.program.demandModule(.init("Test"))
@@ -230,10 +230,19 @@ final class CompilerTests: XCTestCase {
     var printer = TreePrinter(program: program)
 
     for f in program[m].functions {
+      // FIXME: use mangled name instead of this incomplete hack.
+      // This doesn't 
       let d = switch(f.name) {
         case .lowered(let d): d
         case .synthesized(let d, _): d
         case .initializer(let d): DeclarationIdentity(d)
+        case .existentialized(let n): 
+          switch n {
+          case .lowered(let d): d
+          case .synthesized(let d, _): d
+          case .initializer(let d): DeclarationIdentity(d)
+          case .existentialized(_): fatalError("nested existentialized function")
+          }
       }
 
       guard case .local(let url) = program[d].site.source.name else { continue }

@@ -32,7 +32,7 @@ struct Manifest {
   private(set) var requiresStandardLibrary: Bool = true
 
   /// The standard library variant to use.
-  private(set) var standardLibrary: StandardLibraryDefinition = .full()
+  private(set) var standardLibrary: StandardLibraryRoot = .localFull()
 
   /// The stage up to which the input should be compiled.
   private(set) var stage: Stage = .llvmLowering
@@ -92,8 +92,8 @@ struct Manifest {
       requiresStandardLibrary = false
     case "stdlib":
       switch v {
-      case "minimal": standardLibrary = .minimal()
-      case "full": standardLibrary = .full()
+      case "minimal": standardLibrary = .localMinimal()
+      case "full": standardLibrary = .localFull()
       default: throw ManifestError.unknownOption
       }
     case "stage":

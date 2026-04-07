@@ -1,6 +1,6 @@
 /// A 32-bit signed integer value.
 @_symbol("Int32")
-public struct Int32 {
+public struct Int32 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i32

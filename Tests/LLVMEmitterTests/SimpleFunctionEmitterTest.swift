@@ -5,7 +5,7 @@ import XCTest
 
 final class SimpleFunctionEmitterTest: XCTestCase {
   func testInt32Addition() async throws {
-    var d = Driver(moduleCachePath: nil, targetConfiguration: .init(), standardLibrary: .minimal())
+    var d = Driver(moduleCachePath: nil, targetConfiguration: .init(), standardLibrary: .localMinimal())
     try await d.loadStandardLibrary()
 
     let m0 = d.program.demandModule(.init("M0"))
@@ -87,7 +87,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
 
   }
   func testInt32Creation() async throws {
-    var d = Driver(moduleCachePath: nil, targetConfiguration: .init(), standardLibrary: .minimal())
+    var d = Driver(moduleCachePath: nil, targetConfiguration: .init(), standardLibrary: .localMinimal())
     try await d.loadStandardLibrary()
 
     let m0 = d.program.demandModule(.init("M0"))
@@ -114,7 +114,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
       """
       fun create(set %p0: Int32&) {
       %b0:
-        %r0 = alloca Void, #align(of: Void)
+        %r0 = alloca Void, #preferred
         %r1 = access [set] %p0
         %r2 = access [set] %r0
         %r3 = apply Int32.init(%r1) => %r2
@@ -137,7 +137,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
       """
       fun create(set %p0: Int32&) {
       %b0:
-        %r0 = alloca Void, #align(of: Void)
+        %r0 = alloca Void, #preferred
         %r1 = access [set] %p0
         %r2 = access [set] %r0
         %r3 = apply Int32.init(%r1) => %r2
