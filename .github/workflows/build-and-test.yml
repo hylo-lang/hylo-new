@@ -47,19 +47,14 @@ jobs:
         run: swift --version && swift --version | grep -q ${{ matrix.swift }}
         shell: bash
 
-      # We disabled the separate build step, as it consumes extra CI time - building for testing apparently doesn't
-      # reuse the build cache from here, doubling the CI time.
+      - name: Build Swift project
+        run: swift build --build-tests -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Verify StandardLibrary generator output is up-to-date
-        if: ${{ runner.os != 'Windows' }} # Swift JIT doesn't work on Windows. https://github.com/swiftlang/swift/issues/88310
-        run: |
-          swift generator.swift
-          git diff --exit-code -- Sources/
-        working-directory: StandardLibrary
-        shell: bash
+        run: git diff --exit-code -- StandardLibrary/Sources/Core/Numbers/Generated
 
-      - name: Build and test for ${{ matrix.swift }} on ${{ matrix.os }} in ${{ matrix.config }} mode
-        run: swift test -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+      - name: Run tests
+        run: swift test --skip-build -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}

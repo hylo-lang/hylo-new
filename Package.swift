@@ -55,6 +55,13 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings),
 
+    .executableTarget(
+      name: "hc-generate-stdlib",
+      dependencies: [
+        .product(name: "ArgumentParser", package: "swift-argument-parser")
+      ],
+      swiftSettings: commonSwiftSettings),
+
     .target(
       name: "Driver",
       dependencies: [
@@ -89,7 +96,8 @@ let package = Package(
       path: "StandardLibrary",
       exclude: ["generator.swift"],
       resources: [.copy("Sources")],
-      swiftSettings: commonSwiftSettings),
+      swiftSettings: commonSwiftSettings,
+      plugins: ["GenerateHyloStdLibPlugin"]),
 
     .target(
       name: "Utilities",
@@ -136,5 +144,13 @@ let package = Package(
       capability: .buildTool(),
       dependencies: [
         .target(name: "hc-tests")
+      ],
+      packageAccess: true),
+
+    .plugin(
+      name: "GenerateHyloStdLibPlugin",
+      capability: .buildTool(),
+      dependencies: [
+        .target(name: "hc-generate-stdlib")
       ]),
   ])
