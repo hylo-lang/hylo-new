@@ -88,6 +88,23 @@ extension Program {
 
   /// Returns an error diagnosing an illegal function application.
   internal func cannotCall(
+    _ e: ExpressionIdentity, typed f: AnyTypeIdentity, _ s: Call.Style
+  ) -> Diagnostic {
+    guard
+      let n = cast(e, to: NameExpression.self),
+      types.seenAsTermAbstraction(types.head(f)) != nil
+    else { return cannotCall(f, s, at: self[e].site) }
+
+    switch s {
+    case .parenthesized:
+      return .init(.error, "cannot call '\(show(n))' as a function", at: self[e].site)
+    case .bracketed:
+      return .init(.error, "cannot call '\(show(n))' as a subscript", at: self[e].site)
+    }
+  }
+
+  /// Returns an error diagnosing an illegal function application.
+  internal func cannotCall(
     _ f: AnyTypeIdentity, _ s: Call.Style, at site: SourceSpan
   ) -> Diagnostic {
     switch s {

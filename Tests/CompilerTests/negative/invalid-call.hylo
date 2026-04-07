@@ -1,0 +1,16 @@
+//! no-std
+
+subscript foo() -> Void { () }
+fun bar() -> Void { () }
+
+public fun main() {
+  // Void is not a function.
+  _ = ()()
+  _ = ()[]
+
+  // `foo` is a subscript.
+  let _ = foo()
+
+  // `var` is a function.
+  let _ = bar[]
+}

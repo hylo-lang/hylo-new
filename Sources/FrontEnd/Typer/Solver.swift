@@ -408,7 +408,8 @@ internal struct Solver {
   private func invalidCallee(_ k: CallConstraint) -> GoalOutcome {
     .failure { (ss, _, tp, ds) in
       let t = tp.program.types.reify(k.callee, applying: ss)
-      let e = tp.program.cannotCall(t, tp.program[k.origin].style, at: tp.program[k.origin].site)
+      let e = tp.program.cannotCall(
+        tp.program[k.origin].callee, typed: t, tp.program[k.origin].style)
       ds.insert(e)
     }
   }
