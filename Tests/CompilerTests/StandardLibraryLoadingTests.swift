@@ -4,6 +4,7 @@ import Driver
 import StandardLibrary
 
 final class StandardLibraryLoadingTests: XCTestCase {
+
   func testStandardLibraryLoading() async throws {
     var driver = Driver()
     try await driver.loadStandardLibrary()
