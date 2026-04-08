@@ -1034,7 +1034,8 @@ public struct Typer {
   /// Type checks `e` and returns its type, reporting an error if it isn't coercible to `r`.
   @discardableResult
   private mutating func check(
-    _ e: ExpressionIdentity, requiring r: AnyTypeIdentity
+    _ e: ExpressionIdentity, requiring r: AnyTypeIdentity,
+    reason: CoercionConstraint.Reason = .unspecified
   ) -> AnyTypeIdentity {
     var c = InferenceContext(expectedType: r)
     let t = program[e.module].type(assignedTo: e) ?? inferredType(of: e, in: &c)
@@ -1042,20 +1043,13 @@ public struct Typer {
     // Make sure `e` can be coerced to the required type unless it is trivially equal or type
     // inference already failed.
     if !equal(t, r) && !c.obligations.isUnsatisfiable {
-      c.obligations.assume(CoercionConstraint(on: e, from: t, to: r, at: program[e].site))
+      let k = CoercionConstraint(
+        on: e, from: t, to: r, reason: reason, at: program.spanForDiagnostic(about: e))
+      c.obligations.assume(k)
     }
 
     discharge(c.obligations, relatedTo: e)
     return r
-  }
-
-  /// Type checks `e`, which occurs as a statement.
-  private mutating func checkAsStatement(_ e: ExpressionIdentity) {
-    let u = check(e, inContextExpecting: .void)
-    if !equal(u, .void) && !u[.hasError] {
-      let m = program.format("unused value of type %T", [u])
-      report(.init(.error, m, at: program[e].site))
-    }
   }
 
   /// Type checks `e`, which occurs as a statement.
@@ -1079,8 +1073,10 @@ public struct Typer {
       checkAsStatement(program.castUnchecked(s, to: If.self))
     case Return.self:
       check(program.castUnchecked(s, to: Return.self))
+    case Yield.self:
+      check(program.castUnchecked(s, to: Yield.self))
     case _ where program.isExpression(s):
-      checkAsStatement(ExpressionIdentity(uncheckedFrom: s.erased))
+      check(ExpressionIdentity(uncheckedFrom: s.erased), requiring: .void, reason: .statement)
     case _ where program.isDeclaration(s):
       check(DeclarationIdentity(uncheckedFrom: s.erased))
     default:
@@ -1122,6 +1118,12 @@ public struct Typer {
     }
 
     program[s.module].setType(.void, for: s)
+  }
+
+  /// Type checks `s`.
+  private mutating func check(_ s: Yield.ID) {
+    let u = expectedOutputType(in: program.parent(containing: s)) ?? .void
+    check(program[s].value, requiring: u)
   }
 
   /// Returns the declared type of `d` without type checking its contents.
@@ -1495,10 +1497,11 @@ public struct Typer {
   private mutating func declaredArrowType<T: RoutineDeclaration>(
     of d: T.ID, taking inputs: [Parameter]
   ) -> AnyTypeIdentity {
+    let s = Call.Style(program[d].introducer.value)
+    let k = program[d].effect.value
     let e = declaredEnvironmentType(of: d)
     let o = program[d].output.map({ (a) in evaluateTypeAscription(a) }) ?? .void
-    let k = program[d].effect.value
-    let a = demand(Arrow(effect: k, environment: e, inputs: inputs, output: o))
+    let a = demand(Arrow(style: s, effect: k, environment: e, inputs: inputs, output: o))
     return introduce(program[d].contextParameters, into: a.erased)
   }
 
@@ -2182,7 +2185,7 @@ public struct Typer {
     // Is the expression occurring as a statement?
     if isStatement {
       context.withSubcontext { (ctx) in
-        _ = inferredType(of: program[e].success, in: &ctx)
+        _ = inferredType(of: program[e].success, occurringAsStatement: true, in: &ctx)
         _ = inferredType(of: program[e].failure, occurringAsStatement: true, in: &ctx)
       }
       return context.obligations.assume(e, hasType: .void, at: program[e].site)
@@ -2190,7 +2193,7 @@ public struct Typer {
 
     // Are both branches single-bodied?
     else if let (e0, e1) = program.branches(of: e) {
-      let t0 = inferredType(of: program[e].success, in: &context)
+      let t0 = inferredType(of: program[e].success, occurringAsStatement: false, in: &context)
       context.obligations.assume(program[e].success, hasType: t0, at: program[e0].site)
       let t1 = inferredType(of: program[e].failure, occurringAsStatement: false, in: &context)
       context.obligations.assume(program[e].failure, hasType: t1, at: program[e1].site)
@@ -2551,11 +2554,6 @@ public struct Typer {
   private mutating func inferredType(
     of e: TupleLiteral.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    /// Returns the inferred type of `e`, possibly expected to have type `h`.
-    func type(of e: ExpressionIdentity, expecting h: AnyTypeIdentity?) -> AnyTypeIdentity {
-      context.withSubcontext(expectedType: h, { (ctx) in inferredType(of: e, in: &ctx) })
-    }
-
     let es = program[e].elements
     var ts: [AnyTypeIdentity] = []
 
@@ -2566,7 +2564,7 @@ public struct Typer {
 
     // If the expected type is a tuple compatible with the shape of the expression, propagate that
     // information down the expression tree.
-    else if let elements = expectedTupleElements() {
+    else if let elements = expectedTupleElements(), elements.count == es.count {
       for (e, t) in zip(es, elements) { ts.append(type(of: e, expecting: t)) }
     }
 
@@ -2578,6 +2576,11 @@ public struct Typer {
 
     let r = program.types.tuple(of: ts)
     return context.obligations.assume(e, hasType: r, at: program[e].site)
+
+    /// Returns the inferred type of `e`, possibly expected to have type `h`.
+    func type(of e: ExpressionIdentity, expecting h: AnyTypeIdentity?) -> AnyTypeIdentity {
+      context.withSubcontext(expectedType: h, { (ctx) in inferredType(of: e, in: &ctx) })
+    }
 
     /// Returns the elements of `context.expectedType` if it is a fixed-sized tuple.
     func expectedTupleElements() -> [AnyTypeIdentity]? {
@@ -2760,9 +2763,10 @@ public struct Typer {
 
   /// Returns the inferred type of `b`, which occurs in `context`.
   private mutating func inferredType(
-    of b: Block.ID, in context: inout InferenceContext
+    of b: Block.ID, occurringAsStatement isStatement: Bool,
+    in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    if let e = program.singleExpression(of: b) {
+    if !isStatement, let e = program.singleExpression(of: b) {
       let t = inferredType(of: e, in: &context)
       return context.obligations.assume(b, hasType: t, at: program[b].site)
     } else {
@@ -2779,7 +2783,7 @@ public struct Typer {
     if let e = program.cast(b, to: If.self) {
       return inferredType(of: e, occurringAsStatement: isStatement, in: &context)
     } else if let s = program.cast(b, to: Block.self) {
-      return inferredType(of: s, in: &context)
+      return inferredType(of: s, occurringAsStatement: isStatement, in: &context)
     } else {
       program.unexpected(b)
     }

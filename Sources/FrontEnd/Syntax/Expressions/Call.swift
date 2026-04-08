@@ -14,6 +14,11 @@ public struct Call: Expression {
     /// Entity called with brackets.
     case bracketed
 
+    /// Creates the style with which an entity introduced by `i` should be applied.
+    public init(_ i: FunctionDeclaration.Introducer) {
+      self = (i == .subscript) ? .bracketed : .parenthesized
+    }
+
   }
 
   /// The function or method being applied.

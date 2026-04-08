@@ -1,6 +1,9 @@
 /// The declaration of a callable entity.
 public protocol RoutineDeclaration: ModifiableDeclaration {
 
+  /// The introducer of this declaration.
+  var introducer: Parsed<FunctionDeclaration.Introducer> { get }
+
   /// The type parameters and usings of the entity.
   var contextParameters: ContextParameters { get }
 

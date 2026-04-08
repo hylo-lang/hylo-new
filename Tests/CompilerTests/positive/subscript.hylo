@@ -1,0 +1,12 @@
+//! stage:typing no-std
+
+subscript foo(x: inout Void) inout -> Void {
+  yield &x
+}
+
+fun modify<T>(x: inout T) {}
+
+public fun main() {
+  var x = ()
+  modify<Void>(&foo[&x])
+}

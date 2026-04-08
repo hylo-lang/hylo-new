@@ -1,0 +1,3 @@
+//! no-std
+
+subscript foo() { () }

@@ -1,0 +1,12 @@
+negative/invalid-call.hylo:8.7-9: error: cannot call value of type 'Void' as a function
+  _ = ()()
+      ~~
+negative/invalid-call.hylo:9.7-9: error: cannot call value of type 'Void' as a subscript
+  _ = ()[]
+      ~~
+negative/invalid-call.hylo:12.11-14: error: cannot call 'foo' as a function
+  let _ = foo()
+          ~~~
+negative/invalid-call.hylo:15.11-14: error: cannot call 'bar' as a subscript
+  let _ = bar[]
+          ~~~

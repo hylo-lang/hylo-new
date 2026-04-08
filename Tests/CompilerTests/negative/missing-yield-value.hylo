@@ -1,0 +1,5 @@
+//! no-std
+
+subscript foo() -> Void {
+  yield
+}
