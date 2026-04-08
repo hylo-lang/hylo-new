@@ -388,6 +388,8 @@ internal struct IREmitter {
       return lowerAsStatement(program.castUnchecked(s, to: If.self))
     case Return.self:
       return lower(program.castUnchecked(s, to: Return.self))
+    case Yield.self:
+      return lower(program.castUnchecked(s, to: Yield.self))
 
     default:
       // If the statement is an expression, make sure it produces `Void` or `Never`.
@@ -494,6 +496,13 @@ internal struct IREmitter {
 
     // The return instruction is emitted by the caller handling this control-flow effect.
     return .return(s)
+  }
+
+  /// Generates the IR of `s`.
+  private mutating func lower(_ s: Yield.ID) -> ControlFlow {
+    let v = lowered(lvalue: program[s].value)
+    lowering(s, { $0._yield(v) })
+    return .next
   }
 
   /// Generates the IR for storing the value of `e` to `target`.
@@ -1086,18 +1095,16 @@ internal struct IREmitter {
         IRParameter(type: .lowered(u, isAddress: true), access: .let, declaration: nil)
       }
 
-      let output = program.types.demand(RemoteType(projectee: witness.head, access: .let))
       return program[module].ir.addFunction(
         IRFunction(
-          name: name, output: .remote(output), typeParameters: ts, termParameters: ps))
+          name: name, output: .remote(.let, witness.head), typeParameters: ts, termParameters: ps))
     }
 
     // Otherwise, assume `d` identifies the declaration of a function, subscript, or bundle.
     else {
-      let ps = termParameters(of: .init(d))
+      let (ps, o) = prototype(of: .init(d))
       return program[module].ir.addFunction(
-        IRFunction(
-          name: name, output: .indirect, typeParameters: ts, termParameters: ps))
+        IRFunction(name: name, output: o, typeParameters: ts, termParameters: ps))
     }
   }
 
@@ -1110,9 +1117,9 @@ internal struct IREmitter {
       return i
     }
 
-    let ps = termParameters(of: d)
+    let (ps, o) = prototype(of: d)
     return program[module].ir.addFunction(
-      IRFunction(name: name, output: .indirect, typeParameters: [], termParameters: ps))
+      IRFunction(name: name, output: o, typeParameters: [], termParameters: ps))
   }
 
   /// Returns the identity of the constructor lowering `d`, declaring it if necessary.
@@ -1172,11 +1179,14 @@ internal struct IREmitter {
     return g
   }
 
-  /// Returns the term parameters of `d`'s lowered representation.
+  /// Returns the term parameters and return type of `d`'s lowered representation.
   ///
   /// `d` declares a function or bundle. The result includes `d`' explicit parameters, usings, and
-  /// captures. Type parameters are only lowered to term parameters in existentialized functions.
-  private mutating func termParameters(of d: DeclarationIdentity) -> [IRParameter] {
+  /// captures, in that order. Type parameters are not included. Those are only lowered to term
+  /// parameters in existentialized functions.
+  private mutating func prototype(
+    of d: DeclarationIdentity
+  ) -> ([IRParameter], IRFunction.Output) {
     let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
     var result: [IRParameter] = []
 
@@ -1193,7 +1203,7 @@ internal struct IREmitter {
     // Other declarations have capture and parameter lists.
     else {
       let parameters = program.parametersAndCaptures(of: d)
-      assert(parameters.captures.isEmpty) // TODO
+      precondition(parameters.captures.isEmpty, "TODO")
 
       // Using parameters come first.
       for p in parameters.usings {
@@ -1223,13 +1233,16 @@ internal struct IREmitter {
       }
     }
 
-    // Return register comes last.
     if program.types[abstraction].style == .parenthesized {
+      // Return register comes last.
       let o = loweredType(addressOf: program.types[abstraction].output)
       result.append(IRParameter(type: o, access: .set, declaration: nil))
+      return (result, .indirect)
+    } else {
+      let o = IRFunction.Output.remote(
+        program.types[abstraction].effect, program.types[abstraction].output)
+      return (result, o)
     }
-
-    return result
   }
 
   /// Returns the IR type of an address of an instance of `t`.
@@ -1592,14 +1605,13 @@ internal struct IREmitter {
   internal mutating func _project(with callee: IRValue, _ arguments: [IRValue]) -> IRValue {
     guard
       let t = currentFunction.result(of: callee),
-      let a = program.types.cast(t.type, to: Arrow.self),
-      let o = program.types.cast(program.types[a].output, to: RemoteType.self)
+      let a = program.types.cast(t.type, to: Arrow.self)
     else { badOperand() }
 
     let s = IRProject(
       callee: callee, arguments: arguments,
-      projectee: program.types[o].projectee,
-      access: program.types[o].access,
+      projectee: program.types[a].output,
+      access: program.types[a].effect,
       anchor: currentAnchor)
     return insert(s)!
   }

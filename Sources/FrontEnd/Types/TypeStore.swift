@@ -429,7 +429,6 @@ public struct TypeStore: Sendable {
   /// bundle), the result is `[E]() auto -> T`.
   public func seenAsTermAbstraction<T: TypeIdentity>(_ n: T) -> Arrow.ID? {
     let h = head(n)
-
     switch tag(of: h) {
     case Arrow.self:
       return .init(uncheckedFrom: h)
