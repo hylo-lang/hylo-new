@@ -390,29 +390,25 @@ internal struct IREmitter {
       return lower(program.castUnchecked(s, to: Return.self))
     case Yield.self:
       return lower(program.castUnchecked(s, to: Yield.self))
-
     default:
-      // If the statement is an expression, make sure it produces `Void` or `Never`.
-      if let e = program.castToExpression(s) {
-        let v = lowered(lvalue: e)
-        lowering(s, { _ = $0._emitDeinitialize(v) })
-
-        let t = currentFunction.result(of: v)!
-        if t.type != .void {
-          report(program.unusedValue(of: t.type, at: program.spanForDiagnostic(about: s)))
-        }
-
-        return .next
-      }
-
-      // Otherwise the statement should be a declaration.
-      if let d = program.castToDeclaration(s) {
-        lower(d)
-        return .next
-      } else {
-        program.unexpected(s)
-      }
+      break
     }
+
+    // Is `s` also an expression?
+    if let e = program.castToExpression(s) {
+      let v = lowered(lvalue: e)
+      lowering(s, { _ = $0._emitDeinitialize(v) })
+      return .next
+    }
+
+    // Is `s` also a declaration?
+    else if let d = program.castToDeclaration(s) {
+      lower(d)
+      return .next
+    }
+
+    // Ill-formed AST.
+    else { program.unexpected(s) }
   }
 
   /// Generates the IR of `s`.

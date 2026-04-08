@@ -215,6 +215,9 @@ internal struct Solver {
       case .ascription:
         ds.insert(tp.program.doesNotDenoteType(k.origin))
 
+      case .statement where tp.program.types.dealiased(u) == .void:
+        ds.insert(tp.program.unusedValue(k.origin, instanceOf: t, level: .error))
+
       default:
         let scopeOfUse = tp.program.parent(containing: k.origin)
         let (usings, lhs) = tp.program.types.open(t)

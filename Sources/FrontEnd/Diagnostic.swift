@@ -263,9 +263,18 @@ extension Program {
     undefinedSymbol(n.value, memberOf: t, at: n.site)
   }
 
-  /// Returns a warning diagnosing an unused value.
-  internal func unusedValue(of t: AnyTypeIdentity, at site: SourceSpan) -> Diagnostic {
-    .init(.warning, format("unused value of type '%T'", [t]), at: site)
+  /// Returns an error diagnostic about an unused value.
+  internal func unusedValue<T: SyntaxIdentity>(
+    _ n: T, instanceOf t: AnyTypeIdentity, level: Diagnostic.Level
+  ) -> Diagnostic {
+    unusedValue(of: t, level: level, at: spanForDiagnostic(about: n))
+  }
+
+  /// Returns a diagnostic about an unused value.
+  internal func unusedValue(
+    of t: AnyTypeIdentity, level: Diagnostic.Level, at site: SourceSpan
+  ) -> Diagnostic {
+    .init(level, format("unused value of type '%T'", [t]), at: site)
   }
 
 }

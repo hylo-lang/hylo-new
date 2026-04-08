@@ -1083,7 +1083,7 @@ public struct Program: Sendable {
   }
 
   /// If `b`, which is the body of a routine, contains exactly one return statement, return that
-  /// statemenr. Otherwise, returns `nil`.
+  /// statement. Otherwise, returns `nil`.
   public func singleReturn(of b: [StatementIdentity]) -> Return.ID? {
     b.uniqueElement.flatMap({ (s) in cast(s, to: Return.self) })
   }
@@ -1091,7 +1091,11 @@ public struct Program: Sendable {
   /// If `b` contains exactly one statement that is an expression, returns that expression.
   /// Otherwise, returns `nil`.
   public func singleExpression(of b: [StatementIdentity]) -> ExpressionIdentity? {
-    b.uniqueElement.flatMap(castToExpression(_:))
+    if let s = b.uniqueElement, self[s.file].isSingleExpressionBodied(s.erased) {
+      return castToExpression(s)
+    } else {
+      return nil
+    }
   }
 
   /// If `b` contains exactly one statement that is an expression, returns that expression.

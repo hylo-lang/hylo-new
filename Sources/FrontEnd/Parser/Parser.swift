@@ -1636,8 +1636,8 @@ public struct Parser {
     }
   }
 
-  /// Parses the else-branch of a conditional expression iff the next token if `else` or returns
-  /// an empty block otherwise.
+  /// Parses the else-branch of a conditional expression iff the next token if `else` or returns an
+  /// empty block otherwise.
   private mutating func parseElseBranch(
     in file: inout Module.SourceContainer
   ) throws -> If.ElseIdentity {
@@ -1650,7 +1650,7 @@ public struct Parser {
       }
     }
 
-    // Create an empty block at the currentposition.
+    // Create an empty block at the current position.
     else {
       return .init(file.insert(Block(introducer: nil, statements: [], site: .empty(at: position))))
     }

@@ -93,6 +93,9 @@ internal struct CoercionConstraint: Constraint {
     /// A return value.
     case `return`
 
+    /// A statement.
+    case statement
+
     /// An unspecified reason.
     case unspecified
 
