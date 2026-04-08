@@ -24,7 +24,8 @@ extension IRFunction {
     var transfer = Transfer(emittingInto: m)
     transfer.fixedPoint(interpreting: &self, startingFrom: initial, using: &typer)
 
-    return !typer.program[m].containsError
+    assert(!transfer.didFoundError || typer.program[m].containsError, "undiagnosed error")
+    return !transfer.didFoundError
   }
 
   /// Configures `context` with the initial state of `p`, which is the `i`-th parameter of `self`.
@@ -57,6 +58,9 @@ private struct Transfer: AbstractTransferFunction {
 
   /// The context being updated.
   private var context: Context = .init()
+
+  /// `true` iff an application of this function raised an error.
+  fileprivate private(set) var didFoundError: Bool = false
 
   /// Creates an instance for interpreting the contents of `m`.
   fileprivate init(emittingInto m: Module.ID) {
@@ -701,8 +705,11 @@ private struct Transfer: AbstractTransferFunction {
     let a = context.locals[place]!.place!
     let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
     let initialized = parts.filter(initializedParts(o.value).contains(_:))
+
     if !initialized.isEmpty {
-      return deinitialize(initialized, at: place, before: i, in: &f)
+      let success = deinitialize(initialized, at: place, before: i, in: &f)
+      if !success { didFoundError = true }
+      return success
     } else {
       return false
     }
@@ -780,6 +787,7 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Reports the diagnostic `d`.
   private mutating func report(_ d: Diagnostic) {
+    if d.level == .error { didFoundError = true }
     program[module].addDiagnostic(d)
   }
 

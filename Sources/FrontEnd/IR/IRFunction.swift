@@ -131,6 +131,11 @@ public struct IRFunction: Sendable {
     typeParameters.isEmpty
   }
 
+  /// `true` iff the function describes a subscript.
+  public var isSubscript: Bool {
+    output != .indirect
+  }
+
    /// `true` iff the function returns a unit value (i.e., an isntance of `Hylo.Void`).
   public var isProcedure: Bool {
     returnRegister.flatMap(result(of:))?.type == .void

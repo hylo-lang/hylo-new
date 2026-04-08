@@ -117,10 +117,16 @@ public struct Program: Sendable {
         // reifyAccesses
         work[i].function.closeOpenEndedRegions()
 
-        // The following two passes may fail
+        // The following passes may fail.
+        var ds = DiagnosticSet()
+        work[i].function.checkYieldCoherence(reportingDiagnosticsTo: &ds)
+        typer.program[m].addDiagnostics(ds)
+        if ds.containsError { continue }
+
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
 
+        // This pass cannot fail.
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
       }
 

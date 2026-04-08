@@ -15,6 +15,16 @@ public struct IRBlockSet: Hashable, Sendable {
     self.elements = .init()
   }
 
+  /// Inserts all the contents `other` into `self`.
+  public mutating func formUnion<S: Sequence<IRBlock.ID>>(_ other: S) {
+    for b in other { elements.insert(b.rawValue) }
+  }
+
+  /// Removes all elements in `self`.
+  public mutating func removeAll() {
+    self.elements = .init()
+  }
+
 }
 
 extension IRBlockSet: SetAlgebra {
@@ -44,11 +54,6 @@ extension IRBlockSet: SetAlgebra {
 
   public mutating func formUnion(_ other: Self) {
     elements.formUnion(other.elements)
-  }
-
-  /// Inserts all the contents `other` into `self`.
-  public mutating func formUnion<S: Sequence<IRBlock.ID>>(_ other: S) {
-    for b in other { elements.insert(b.rawValue) }
   }
 
   public func union(_ other: IRBlockSet) -> IRBlockSet {

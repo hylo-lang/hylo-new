@@ -254,6 +254,13 @@ public struct Module: Sendable {
     sources[d.site.source.name]!.addDiagnostic(d)
   }
 
+  /// Adds the given diagnostics to this module.
+  ///
+  /// - requires: Each diagnostic relates to some source in `self`.
+  public mutating func addDiagnostics(_ ds: DiagnosticSet) {
+    for d in ds.elements { addDiagnostic(d) }
+  }
+
   /// Adds a dependency to this module.
   public mutating func addDependency(_ d: Module.Name) {
     if !dependencies.contains(d) {
