@@ -61,7 +61,6 @@ public struct Token: Hashable, Sendable {
     case equal
     case star
     case `operator`
-    case oplus
 
     // Punctuation
     case comma

@@ -1995,9 +1995,7 @@ public struct Typer {
       return context.obligations.assume(e, hasType: .error, at: program[e].site)
     }
 
-    if let d = declaration(referredToBy: program[e].callee, in: context), d.targetIsTypeOperator {
-      return inferredType(typeOperatorApplication: e, applying: f, in: &context)
-    } else if (program[e].style == .bracketed), let t = cast(type: f, to: Metatype.self) {
+    if (program[e].style == .bracketed), let t = cast(type: f, to: Metatype.self) {
       return inferredType(bufferTypeExpression: e, element: t, in: &context)
     }
 
@@ -2014,33 +2012,6 @@ public struct Typer {
 
     context.obligations.assume(k)
     return context.obligations.assume(e, hasType: o, at: program[e].site)
-  }
-
-  /// Returns the inferred type of `e`, which is the application of a built-in type operator.
-  private mutating func inferredType(
-    typeOperatorApplication e: Call.ID, applying callee: AnyTypeIdentity,
-    in context: inout InferenceContext
-  ) -> AnyTypeIdentity {
-    assert(program[e].style == .parenthesized)
-
-    // There must be exactly one unlabeled argument.
-    guard let a = program[e].arguments.uniqueElement, a.label == nil else {
-      report(program.cannotCall(callee, .parenthesized, at: program[e].site))
-      return context.obligations.assume(e, hasType: .error, at: program[e].site)
-    }
-
-    // The right-hand side must be a metatype.
-    let rhs = evaluatePartialTypeAscription(a.value, in: &context).result
-
-    // The callee must be a polymorphic function taking two metatypes and returning one.
-    let u = program.types.castUnchecked(callee, to: UniversalType.self)
-    let f = program.types.castUnchecked(program.types[u].head, to: Arrow.self)
-    let t = program.types.substitute(
-      TypeArguments.init(mapping: program.types[u].parameters, to: [rhs]),
-      in: program.types[f].output)
-
-    assert(program.types.tag(of: t) == Metatype.self)
-    return context.obligations.assume(e, hasType: t, at: program[e].site)
   }
 
   /// Returns the inferred type of `e`, which is the expression of a buffer of `t`.
