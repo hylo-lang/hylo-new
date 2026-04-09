@@ -2052,15 +2052,14 @@ public struct Typer {
     calleeOf e: Call.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
     let callee = program[e].callee
+    let site = program.spanForDiagnostic(about: callee)
 
     // Set the type of the left-most symbol's qualification if it is implicit using the call's
     // expected type so that `f` in a call of the form `.f(x)` can be resolved as a member of the
     // call's expected type. The callee itself has no expected type; only its qualification.
-    if
-      let q = program.rootQualification(of: callee),
-      let t = context.expectedType,
-      program.tag(of: q) == ImplicitQualification.self
-    {
+    if let q = program.implicitQualification(of: callee) {
+      let t =
+        context.expectedType ?? context.obligations.assume(e, hasType: fresh().erased, at: site)
       _ = context.withSubcontext(expectedType: t) { (ctx) in inferredType(of: q, in: &ctx) }
     }
 
@@ -2071,7 +2070,6 @@ public struct Typer {
 
     // Is the callee referring to a sugared constructor?
     if (program[e].style == .parenthesized) && isTypeDeclarationReference(callee, in: context) {
-      let site = program[callee].site
       let n = program[e.module].insert(
         NameExpression(qualification: callee, name: .init("new", at: site), site: site),
         in: program.parent(containing: e))

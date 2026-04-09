@@ -1061,7 +1061,6 @@ public struct Program: Sendable {
   }
 
   /// Returns the left-most tree in the qualification of `e` iff `e` is a name or new expression.
-  /// Otherwise, returns `nil`.
   public func rootQualification(of e: ExpressionIdentity) -> ExpressionIdentity? {
     var root: ExpressionIdentity
 
@@ -1082,6 +1081,15 @@ public struct Program: Sendable {
       } else {
         return root
       }
+    }
+  }
+
+  /// Returns the left-most tree in the qualification of `e` iff it is implicit.
+  public func implicitQualification(of e: ExpressionIdentity) -> ImplicitQualification.ID? {
+    if let q = rootQualification(of: e) {
+      return cast(q, to: ImplicitQualification.self)
+    } else {
+      return nil
     }
   }
 

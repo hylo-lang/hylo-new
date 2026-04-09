@@ -41,6 +41,10 @@ internal struct Solver {
   /// to derive a complete name binding map w.r.t. its unresolved name expressions.
   private var bindings: BindingTable
 
+  /// A mapping from an expression to its elaboration.
+  ///
+  /// This map is monotonically extended when inference determines that an exression should be
+  /// coerced or desugared.
   private var elaborations: [(ExpressionIdentity, WitnessExpression)] = []
 
   /// A table from call expression to its arguments after elaboration.
