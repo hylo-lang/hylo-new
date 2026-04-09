@@ -94,7 +94,7 @@ let package = Package(
     .target(
       name: "StandardLibrary",
       path: "StandardLibrary",
-      exclude: ["generator.swift"],
+      exclude: ["Sources/Core/Generated/README.md"],
       resources: [.copy("Sources")],
       swiftSettings: commonSwiftSettings,
       plugins: [

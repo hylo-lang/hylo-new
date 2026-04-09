@@ -15,7 +15,7 @@ public struct Int8 is Deinitializable {
 
   /// Returns the absolute value of `self`.
   ///
-  /// - Precondition: `self` must not be the Int8's minimum value.
+  /// - Precondition: `self` must not be `Int8`'s minimum value.
   public fun abs() -> Self {
     if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
   }
@@ -28,12 +28,12 @@ public given Int8 is Movable {}
 
 public given Int8 is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_i8(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_i8(self.value, other.value))
   }
@@ -42,22 +42,22 @@ public given Int8 is Equatable {
 
 public given Int8 is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_slt_i8(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_sle_i8(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_sgt_i8(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_sge_i8(self.value, other.value))
   }
@@ -131,12 +131,12 @@ public given UInt8 is Movable {}
 
 public given UInt8 is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_i8(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_i8(self.value, other.value))
   }
@@ -145,22 +145,22 @@ public given UInt8 is Equatable {
 
 public given UInt8 is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_ult_i8(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ule_i8(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_ugt_i8(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_uge_i8(self.value, other.value))
   }
@@ -228,7 +228,7 @@ public struct Int16 is Deinitializable {
 
   /// Returns the absolute value of `self`.
   ///
-  /// - Precondition: `self` must not be the Int16's minimum value.
+  /// - Precondition: `self` must not be `Int16`'s minimum value.
   public fun abs() -> Self {
     if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
   }
@@ -241,12 +241,12 @@ public given Int16 is Movable {}
 
 public given Int16 is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_i16(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_i16(self.value, other.value))
   }
@@ -255,22 +255,22 @@ public given Int16 is Equatable {
 
 public given Int16 is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_slt_i16(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_sle_i16(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_sgt_i16(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_sge_i16(self.value, other.value))
   }
@@ -344,12 +344,12 @@ public given UInt16 is Movable {}
 
 public given UInt16 is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_i16(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_i16(self.value, other.value))
   }
@@ -358,22 +358,22 @@ public given UInt16 is Equatable {
 
 public given UInt16 is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_ult_i16(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ule_i16(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_ugt_i16(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_uge_i16(self.value, other.value))
   }
@@ -441,7 +441,7 @@ public struct Int32 is Deinitializable {
 
   /// Returns the absolute value of `self`.
   ///
-  /// - Precondition: `self` must not be the Int32's minimum value.
+  /// - Precondition: `self` must not be `Int32`'s minimum value.
   public fun abs() -> Self {
     if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
   }
@@ -454,12 +454,12 @@ public given Int32 is Movable {}
 
 public given Int32 is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_i32(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_i32(self.value, other.value))
   }
@@ -468,22 +468,22 @@ public given Int32 is Equatable {
 
 public given Int32 is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_slt_i32(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_sle_i32(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_sgt_i32(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_sge_i32(self.value, other.value))
   }
@@ -557,12 +557,12 @@ public given UInt32 is Movable {}
 
 public given UInt32 is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_i32(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_i32(self.value, other.value))
   }
@@ -571,22 +571,22 @@ public given UInt32 is Equatable {
 
 public given UInt32 is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_ult_i32(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ule_i32(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_ugt_i32(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_uge_i32(self.value, other.value))
   }
@@ -654,7 +654,7 @@ public struct Int64 is Deinitializable {
 
   /// Returns the absolute value of `self`.
   ///
-  /// - Precondition: `self` must not be the Int64's minimum value.
+  /// - Precondition: `self` must not be `Int64`'s minimum value.
   public fun abs() -> Self {
     if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
   }
@@ -667,12 +667,12 @@ public given Int64 is Movable {}
 
 public given Int64 is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_i64(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_i64(self.value, other.value))
   }
@@ -681,22 +681,22 @@ public given Int64 is Equatable {
 
 public given Int64 is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_slt_i64(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_sle_i64(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_sgt_i64(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_sge_i64(self.value, other.value))
   }
@@ -770,12 +770,12 @@ public given UInt64 is Movable {}
 
 public given UInt64 is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_i64(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_i64(self.value, other.value))
   }
@@ -784,22 +784,22 @@ public given UInt64 is Equatable {
 
 public given UInt64 is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_ult_i64(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ule_i64(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_ugt_i64(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_uge_i64(self.value, other.value))
   }
@@ -867,7 +867,7 @@ public struct Int is Deinitializable {
 
   /// Returns the absolute value of `self`.
   ///
-  /// - Precondition: `self` must not be the Int's minimum value.
+  /// - Precondition: `self` must not be `Int`'s minimum value.
   public fun abs() -> Self {
     if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
   }
@@ -880,12 +880,12 @@ public given Int is Movable {}
 
 public given Int is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_word(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_word(self.value, other.value))
   }
@@ -894,22 +894,22 @@ public given Int is Equatable {
 
 public given Int is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_slt_word(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_sle_word(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_sgt_word(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_sge_word(self.value, other.value))
   }
@@ -983,12 +983,12 @@ public given UInt is Movable {}
 
 public given UInt is Equatable {
 
-  /// Returns `true` if `self` is equal to `other`.
+  /// Returns `true` iff `self` is equal to `other`.
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_word(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_word(self.value, other.value))
   }
@@ -997,22 +997,22 @@ public given UInt is Equatable {
 
 public given UInt is Comparable {
 
-  /// Returns `true` if `self` is less than `other`.
+  /// Returns `true` iff `self` is less than `other`.
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_ult_word(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is less than or equal to `other`.
+  /// Returns `true` iff `self` is less than or equal to `other`.
   public fun infix<= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ule_word(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than `other`.
+  /// Returns `true` iff `self` is greater than `other`.
   public fun infix> (other: Self) -> Bool {
     .new(value: Builtin.icmp_ugt_word(self.value, other.value))
   }
 
-  /// Returns `true` if `self` is greater than or equal to `other`.
+  /// Returns `true` iff `self` is greater than or equal to `other`.
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_uge_word(self.value, other.value))
   }

@@ -105,7 +105,7 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
         /// Returns the absolute value of `self`.
         ///
-        /// - Precondition: `self` must not be the \(declarationName)'s minimum value.
+        /// - Precondition: `self` must not be `\(declarationName)`'s minimum value.
         public fun abs() -> Self {
           if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
         }
@@ -138,12 +138,12 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
     public given \(declarationName) is Equatable {
 
-      /// Returns `true` if `self` is equal to `other`.
+      /// Returns `true` iff `self` is equal to `other`.
       public fun infix== (other: Self) -> Bool {
         .new(value: Builtin.icmp_eq_\(builtinType)(self.value, other.value))
       }
 
-      /// Returns `true` if `self` is not equal to `other`.
+      /// Returns `true` iff `self` is not equal to `other`.
       public fun infix!= (other: Self) -> Bool {
         .new(value: Builtin.icmp_ne_\(builtinType)(self.value, other.value))
       }
@@ -152,22 +152,22 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
     public given \(declarationName) is Comparable {
 
-      /// Returns `true` if `self` is less than `other`.
+      /// Returns `true` iff `self` is less than `other`.
       public fun infix< (other: Self) -> Bool {
         .new(value: Builtin.icmp_\(signedness.abbreviated)lt_\(builtinType)(self.value, other.value))
       }
 
-      /// Returns `true` if `self` is less than or equal to `other`.
+      /// Returns `true` iff `self` is less than or equal to `other`.
       public fun infix<= (other: Self) -> Bool {
         .new(value: Builtin.icmp_\(signedness.abbreviated)le_\(builtinType)(self.value, other.value))
       }
 
-      /// Returns `true` if `self` is greater than `other`.
+      /// Returns `true` iff `self` is greater than `other`.
       public fun infix> (other: Self) -> Bool {
         .new(value: Builtin.icmp_\(signedness.abbreviated)gt_\(builtinType)(self.value, other.value))
       }
 
-      /// Returns `true` if `self` is greater than or equal to `other`.
+      /// Returns `true` iff `self` is greater than or equal to `other`.
       public fun infix>= (_ other: Self) -> Bool {
         .new(value: Builtin.icmp_\(signedness.abbreviated)ge_\(builtinType)(self.value, other.value))
       }
