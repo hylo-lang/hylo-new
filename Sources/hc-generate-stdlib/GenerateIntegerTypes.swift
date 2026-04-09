@@ -102,6 +102,7 @@ struct IntegerTypeDefinition: CustomStringConvertible {
       ? nil
       : """
 
+
         /// Returns the absolute value of `self`.
         ///
         /// - Precondition: `self` must not be the \(declarationName)'s minimum value.
@@ -127,8 +128,7 @@ struct IntegerTypeDefinition: CustomStringConvertible {
       /// Creates an instance equal to `false`.
       public init() {
         &self.value = Builtin.zeroinitializer_\(builtinType)()
-      }
-    \(absMethod ?? "")
+      }\(absMethod ?? "")
 
     }
 

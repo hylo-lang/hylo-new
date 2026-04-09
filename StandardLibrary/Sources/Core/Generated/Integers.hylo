@@ -123,7 +123,6 @@ public struct UInt8 is Deinitializable {
     &self.value = Builtin.zeroinitializer_i8()
   }
 
-
 }
 
 public given UInt8 is ExpressibleByIntegerLiteral { /* built-in */ }
@@ -336,7 +335,6 @@ public struct UInt16 is Deinitializable {
   public init() {
     &self.value = Builtin.zeroinitializer_i16()
   }
-
 
 }
 
@@ -551,7 +549,6 @@ public struct UInt32 is Deinitializable {
     &self.value = Builtin.zeroinitializer_i32()
   }
 
-
 }
 
 public given UInt32 is ExpressibleByIntegerLiteral { /* built-in */ }
@@ -765,7 +762,6 @@ public struct UInt64 is Deinitializable {
     &self.value = Builtin.zeroinitializer_i64()
   }
 
-
 }
 
 public given UInt64 is ExpressibleByIntegerLiteral { /* built-in */ }
@@ -978,7 +974,6 @@ public struct UInt is Deinitializable {
   public init() {
     &self.value = Builtin.zeroinitializer_word()
   }
-
 
 }
 
