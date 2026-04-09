@@ -53,11 +53,12 @@ public struct Driver {
   /// Assigns the trees in `module` to their types.
   @discardableResult
   public mutating func assignTypes(
-    of module: Module.ID
+    of module: Module.ID,
+    loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)? = nil
   ) async -> (elapsed: Duration, containsError: Bool) {
     let clock = ContinuousClock()
     let elapsed = clock.measure {
-      program.assignTypes(module)
+      program.assignTypes(module, loggingInferenceWhere: isLoggingEnabled)
     }
     return (elapsed, program[module].containsError)
   }

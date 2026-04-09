@@ -46,6 +46,12 @@ import Utilities
       valueName: "output-type"))
   private var outputType: OutputType = .ir
 
+  /// The line at which type inference should be traced.
+  @Option(
+    name: [.customLong("trace-inference")],
+    help: "Trace type inference")
+  private var lineTracingInference: LineLocator?
+
   @Option(
     name: [.customShort("o")],
     help: ArgumentHelp(
@@ -104,7 +110,9 @@ import Utilities
       return
     }
 
-    await perform("typing", { await driver.assignTypes(of: module) })
+    await perform("typing") {
+      await driver.assignTypes(of: module, loggingInferenceWhere: inferenceLoggerFilter())
+    }
     if outputType == .typedAST {
       try emitAst(module, in: driver.program, name: product)
       return
@@ -278,31 +286,6 @@ import Utilities
     return "Main"
   }
 
-  /// The type of the output files to generate.
-  private enum OutputType: String, ExpressibleByArgument, CaseIterable {
-
-    /// Abstract syntax tree before typing.
-    case ast = "ast"
-
-    /// Abstract syntax tree after typing.
-    case typedAST = "typed-ast"
-
-    /// Hylo IR before mandatory transformations.
-    case rawIR = "raw-ir"
-
-    /// Hylo IR.
-    case ir = "ir"
-
-    /// LLVM IR.
-    case llvm = "llvm"
-
-    /// Assembly.
-    case asm = "asm"
-
-    /// Executable binary.
-    case binary = "binary"
-  }
-
   /// Given the desired name of the compiler's product, returns the file to write when "raw-ast" is
   /// selected as the output type.
   private func astFile(_ productName: Module.Name) -> URL {
@@ -331,6 +314,47 @@ import Utilities
   /// selected as the output type.
   private func binaryFile(_ productName: Module.Name) -> URL {
     outputURL ?? URL(fileURLWithPath: productName.description)
+  }
+
+  private func inferenceLoggerFilter() -> ((AnySyntaxIdentity, Program) -> Bool)? {
+    lineTracingInference.map { (l) in
+      { (n: AnySyntaxIdentity, p: Program) -> Bool in
+        let s = p[n].site
+        guard case .local(let u) = s.source.name else { return false }
+        if u.absoluteURL.pathComponents.starts(with: l.path.pathComponents) {
+          let (a, _) = s.start.lineAndColumn
+          let (b, _) = s.start.lineAndColumn
+          return (a <= l.line) && (l.line <= b)
+        } else {
+          return false
+        }
+      }
+    }
+  }
+
+  /// The type of the output files to generate.
+  private enum OutputType: String, ExpressibleByArgument, CaseIterable {
+
+    /// Abstract syntax tree before typing.
+    case ast = "ast"
+
+    /// Abstract syntax tree after typing.
+    case typedAST = "typed-ast"
+
+    /// Hylo IR before mandatory transformations.
+    case rawIR = "raw-ir"
+
+    /// Hylo IR.
+    case ir = "ir"
+
+    /// LLVM IR.
+    case llvm = "llvm"
+
+    /// Assembly.
+    case asm = "asm"
+
+    /// Executable binary.
+    case binary = "binary"
   }
 
   /// Tree printing flags.

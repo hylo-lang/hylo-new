@@ -26,7 +26,7 @@ public struct Typer {
   /// Creates an instance assigning types to syntax trees in `m`, which is a module in `p`.
   public init(
     typing m: Module.ID, of p: consuming Program,
-    loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)? = nil
+    loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)?
   ) {
     self.module = m
     self.program = p
@@ -2900,7 +2900,13 @@ public struct Typer {
       commit(s, to: o)
       return s
     } else {
-      var solver = Solver(o, withLoggingEnabled: isLoggingEnabled?(n.erased, program) ?? false)
+      let loggingIsEnabled = isLoggingEnabled?(n.erased, program) ?? false
+      if loggingIsEnabled {
+        print("constraints:")
+        for c in o.constraints { print("- \(program.show(c))") }
+      }
+
+      var solver = Solver(o, withLoggingEnabled: loggingIsEnabled)
       let s = solver.solution(using: &self)
       commit(s, to: o)
       return s

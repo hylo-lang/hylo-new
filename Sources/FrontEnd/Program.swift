@@ -78,8 +78,11 @@ public struct Program: Sendable {
   }
 
   /// Assigns types to the syntax trees of `m`.
-  public mutating func assignTypes(_ m: Module.ID) {
-    var typer = Typer(typing: m, of: consume self)
+  public mutating func assignTypes(
+    _ m: Module.ID,
+    loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)?
+  ) {
+    var typer = Typer(typing: m, of: consume self, loggingInferenceWhere: isLoggingEnabled)
     typer.apply()
     self = typer.release()
   }
@@ -168,7 +171,7 @@ public struct Program: Sendable {
   public mutating func withTyper<T>(
     typing m: Module.ID, _ action: (inout Typer) -> T
   ) -> T {
-    var typer = Typer(typing: m, of: consume self)
+    var typer = Typer(typing: m, of: consume self, loggingInferenceWhere: nil)
     defer { self = typer.release() }
     return action(&typer)
   }
