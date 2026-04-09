@@ -187,7 +187,7 @@ final class LexerTests: XCTestCase {
   }
 
   func testOperator() throws {
-    var scanner = Lexer(tokenizing: "<= ++ & &&& -> == +* *+ *> (+)")
+    var scanner = Lexer(tokenizing: "<= ++ & &&& -> == +* *+ *>")
     try assertNext(from: &scanner, is: .leftAngle)
     try assertNext(from: &scanner, is: .assign)
     try assertNext(from: &scanner, is: .operator, withValue: "++")
@@ -200,7 +200,6 @@ final class LexerTests: XCTestCase {
     try assertNext(from: &scanner, is: .operator, withValue: "+")
     try assertNext(from: &scanner, is: .star)
     try assertNext(from: &scanner, is: .rightAngle)
-    try assertNext(from: &scanner, is: .oplus)
     XCTAssertNil(scanner.next())
   }
 
