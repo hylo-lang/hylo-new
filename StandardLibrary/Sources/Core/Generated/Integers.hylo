@@ -1,11 +1,11 @@
-/// A signed 8-bit integer value.
+/// A signed 8-bit integer.
 @_symbol("Int8")
 public struct Int8 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i8
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -108,14 +108,14 @@ public given Int8 is Numeric {
 }
 
 
-/// An unsigned 8-bit integer value.
+/// An unsigned 8-bit integer.
 @_symbol("UInt8")
 public struct UInt8 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i8
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -212,14 +212,14 @@ public given UInt8 is Numeric {
 }
 
 
-/// A signed 16-bit integer value.
+/// A signed 16-bit integer.
 @_symbol("Int16")
 public struct Int16 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i16
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -322,14 +322,14 @@ public given Int16 is Numeric {
 }
 
 
-/// An unsigned 16-bit integer value.
+/// An unsigned 16-bit integer.
 @_symbol("UInt16")
 public struct UInt16 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i16
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -426,14 +426,14 @@ public given UInt16 is Numeric {
 }
 
 
-/// A signed 32-bit integer value.
+/// A signed 32-bit integer.
 @_symbol("Int32")
 public struct Int32 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i32
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -536,14 +536,14 @@ public given Int32 is Numeric {
 }
 
 
-/// An unsigned 32-bit integer value.
+/// An unsigned 32-bit integer.
 @_symbol("UInt32")
 public struct UInt32 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i32
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -640,14 +640,14 @@ public given UInt32 is Numeric {
 }
 
 
-/// A signed 64-bit integer value.
+/// A signed 64-bit integer.
 @_symbol("Int64")
 public struct Int64 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i64
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -750,14 +750,14 @@ public given Int64 is Numeric {
 }
 
 
-/// An unsigned 64-bit integer value.
+/// An unsigned 64-bit integer.
 @_symbol("UInt64")
 public struct UInt64 is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.i64
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -854,14 +854,14 @@ public given UInt64 is Numeric {
 }
 
 
-/// A signed size-representing integer value.
+/// A signed integer type that can represent any object size on the target platform.
 @_symbol("Int")
 public struct Int is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.word
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.
@@ -964,14 +964,14 @@ public given Int is Numeric {
 }
 
 
-/// An unsigned size-representing integer value.
+/// An unsigned integer type that can represent any object size on the target platform.
 @_symbol("UInt")
 public struct UInt is Deinitializable {
 
   /// The raw value of this instance.
   internal var value: Builtin.word
 
-  /// Creates an instance with its raw value.
+  /// Cre ates an instance with its raw value.
   internal memberwise init
 
   /// Creates an instance equal to `false`.

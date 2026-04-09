@@ -1432,6 +1432,14 @@ extension Program {
     /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
     case expressibleByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
 
+    /// All standard library integer types.
+    static let allIntegerTypes: [StandardLibraryEntity] = [
+      .int, .uint,
+      .int8, .uint8,
+      .int16, .uint16,
+      .int32, .uint32,
+      .int64, .uint64,
+    ]
   }
 
   /// Returns the type of a term witnessing that `t` conforms to the core trait `p`.

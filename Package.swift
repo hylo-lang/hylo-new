@@ -97,7 +97,12 @@ let package = Package(
       exclude: ["generator.swift"],
       resources: [.copy("Sources")],
       swiftSettings: commonSwiftSettings,
-      plugins: ["GenerateHyloStdLibPlugin"]),
+      plugins: [
+        // Note: Only supported on Linux and Windows. 
+        // On MacOS, invoke `swift run hc-generate-stdlib` manually after changing
+        // the generator script.
+        "GenerateHyloStdLibPlugin"
+      ]),
 
     .target(
       name: "Utilities",

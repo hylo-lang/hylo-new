@@ -8,22 +8,27 @@ struct GenerateHyloIntegersPlugin: BuildToolPlugin {
   func createBuildCommands(
     context: PackagePlugin.PluginContext, target: any PackagePlugin.Target
   ) async throws -> [PackagePlugin.Command] {
-    let pluginOutputPath = context.pluginWorkDirectoryURL.appending(component: "Generated")
-    let stdlibGeneratedPath = context.package.directoryURL
-      .appending(components: "StandardLibrary", "Sources", "Core", "Numbers", "Generated")
-    
-    let integersOutput = pluginOutputPath.appending(component: "Integers.hylo")
+    #if os(macOS)
+      print("Skipping unsupported GenerateHyloStdLibPlugin on macOS. Run `swift run hc-generate-stdlib` manually when changing the generator script.")
+      return []
+    #else
+      let pluginOutputPath = context.pluginWorkDirectoryURL.appending(component: "Generated")
+      let stdlibGeneratedPath = context.package.directoryURL
+        .appending(components: "StandardLibrary", "Sources", "Core", "Generated")
 
-    try ensureSymbolicLink(at: pluginOutputPath, pointingTo: stdlibGeneratedPath)
+      let integersOutput = pluginOutputPath.appending(component: "Integers.hylo")
 
-    let c = PackagePlugin.Command.buildCommand(
-      displayName: "Generating Hylo integer type declarations into \(integersOutput.lastPathComponent)",
-      executable: try context.tool(named: "hc-generate-stdlib").url,
-      arguments: ["--output=\(integersOutput.path(percentEncoded: true))"],
-      environment: [:],
-      inputFiles: [],
-      outputFiles: [integersOutput])
-    return [c]
+      try ensureSymbolicLink(at: pluginOutputPath, pointingTo: stdlibGeneratedPath)
+
+      let c = PackagePlugin.Command.buildCommand(
+        displayName: "Generating Hylo standard library declarations into \(pluginOutputPath)",
+        executable: try context.tool(named: "hc-generate-stdlib").url,
+        arguments: ["--output=\(pluginOutputPath.path(percentEncoded: true))"],
+        environment: [:],
+        inputFiles: [],
+        outputFiles: [integersOutput])
+      return [c]
+    #endif
   }
 
   private func ensureSymbolicLink(at link: URL, pointingTo destination: URL) throws {
