@@ -39,7 +39,7 @@ public struct IRProperty: Instruction {
 
   /// The type of the value loaded by this instruction.
   public var type: IRType {
-    .lowered(propertyType, isAddress: true)
+    .place(propertyType)
   }
 
   /// `true`.

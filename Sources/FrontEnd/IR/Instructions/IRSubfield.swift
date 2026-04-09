@@ -38,7 +38,7 @@ public struct IRSubfield: Instruction {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(typeOfSubfield, isAddress: true)
+    .place(typeOfSubfield)
   }
 
   /// `true`.

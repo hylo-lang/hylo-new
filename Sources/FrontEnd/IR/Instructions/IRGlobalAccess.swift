@@ -23,7 +23,7 @@ public struct IRGlobalAccess: Instruction {
 
   /// The type of the value loaded by this instruction.
   public var type: IRType {
-    .lowered(source.storageType, isAddress: true)
+    .place(source.storageType)
   }
 
 }

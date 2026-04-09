@@ -34,7 +34,7 @@ public struct IRTypeWitness: Instruction {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(typeOfApplication.erased, isAddress: true)
+    .place(typeOfApplication.erased)
   }
 
 }

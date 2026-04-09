@@ -35,7 +35,7 @@ public struct IRAlloca: Instruction {
 
   /// The type of the value loaded by this instruction.
   public var type: IRType {
-    .addressOf(storage)
+    .place(storage)
   }
 
 }

@@ -28,7 +28,7 @@ public struct IRWitnessTable: Instruction {
 
   /// The type of the value loaded by this instruction.
   public var type: IRType {
-    .addressOf(witnessType)
+    .place(witnessType)
   }
 
 }

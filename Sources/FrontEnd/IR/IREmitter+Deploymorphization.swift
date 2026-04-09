@@ -172,9 +172,8 @@ extension IREmitter {
       minimumCapacity: poly.typeParameters.count + poly.termParameters.count)
     for p in poly.typeParameters {
       let t = program.types.demand(TypeWitness()).erased
-      let u = IRType.lowered(t, isAddress: true)
       let d = program.types[p].declaration.map(DeclarationIdentity.init(_:))
-      ps.append(.init(type: u, access: .let, declaration: d))
+      ps.append(.init(type: .place(t), access: .let, declaration: d))
     }
 
     ps.append(contentsOf: poly.termParameters)

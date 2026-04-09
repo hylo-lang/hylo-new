@@ -116,7 +116,7 @@ internal struct IREmitter {
       report(program.missingBindingInitializer(d))
       program.forEachVariable(introducedBy: d) { (v, _) in
         let t = program.type(assignedTo: v)
-        associate(.init(v), with: .poison(.lowered(t, isAddress: true)))
+        associate(.init(v), with: .poison(program.types.ir(place: t)))
       }
     }
   }
@@ -503,9 +503,9 @@ internal struct IREmitter {
 
   /// Generates the IR for storing the value of `e` to `target`.
   ///
-  /// `target` is the address of some uninitialized storage capable of holding an instance of `e`
-  /// without any conversion (e.g., the result of an `alloca`). A `set` access is formed on that
-  /// storage before the value is stored.
+  /// `target` is an uninitialized place capable of holding the value denoted by `e` without any
+  /// conversion (e.g., the result of an `alloca`). A `set` access is formed on that place before
+  /// the value is stored.
   private mutating func lower(store e: ExpressionIdentity, to target: IRValue) {
     switch program.tag(of: e) {
     case BooleanLiteral.self:
@@ -533,7 +533,7 @@ internal struct IREmitter {
     }
   }
 
-  /// Implements `lower(store:to:)` for Booleanliterals.
+  /// Implements `lower(store:to:)` for Boolean literals.
   private mutating func lower(store e: BooleanLiteral.ID, to target: IRValue) {
     let v = IRValue.integer(
       program[e].value ? 1 : 0,
@@ -953,10 +953,10 @@ internal struct IREmitter {
     return _apply_builtin(function, to: xs)
   }
 
-  /// Generates the IR for computing the address of the value denoted by `e`.
+  /// Generates the IR for computing the place of the value denoted by `e`.
   ///
-  /// The return value is the (possibly raw) address of some storage holding the value of `e`. If
-  /// `e` computes a rvalue, this value is moved into a new stack allocation.
+  /// The return value a place holding the value of `e`. If `e` computes a rvalue, this value is
+  /// moved into a new stack allocation.
   private mutating func lowered(lvalue e: ExpressionIdentity) -> IRValue {
     switch program.tag(of: e) {
     case Conversion.self:
@@ -1135,13 +1135,13 @@ internal struct IREmitter {
     var ps: [IRParameter] = .init(minimumCapacity: program[d].parameters.count + 1)
     for p in program[d].parameters {
       let t = program.type(assignedTo: p, assuming: RemoteType.self)
-      let u = loweredType(addressOf: program.types[t].projectee)
+      let u = program.types.ir(place: program.types[t].projectee)
       ps.append(IRParameter(type: u, access: program.types[t].access, declaration: .init(p)))
     }
 
     // The constructor returns an instance of the containing enum.
     let e = program.type(assignedTo: program.parent(containing: d).node!, assuming: Metatype.self)
-    let o = loweredType(addressOf: program.types[e].inhabitant)
+    let o = program.types.ir(place: program.types[e].inhabitant)
     ps.append(.init(type: o, access: .set, declaration: nil))
 
     return program[module].ir.addFunction(
@@ -1164,7 +1164,7 @@ internal struct IREmitter {
 
     // Declare the global's initializer.
     let t = program.types.dealiased(program.type(assignedTo: d))
-    let o = IRParameter(type: .lowered(t, isAddress: true), access: .set, declaration: nil)
+    let o = IRParameter(type: .place(t), access: .set, declaration: nil)
     let i = IRFunction(
       name: .initializer(d), output: .indirect, typeParameters: [], termParameters: [o])
     let f = program[module].ir.addFunction(i)
@@ -1191,7 +1191,7 @@ internal struct IREmitter {
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {
       for p in program.types[abstraction].inputs {
-        let u = loweredType(addressOf: p.type)
+        let u = program.types.ir(place: p.type)
         result.append(IRParameter(type: u, access: p.access, declaration: nil))
       }
     }
@@ -1204,7 +1204,7 @@ internal struct IREmitter {
       // Using parameters come first.
       for p in parameters.usings {
         let t = program.type(assignedTo: p)
-        let u = loweredType(addressOf: t)
+        let u = program.types.ir(place: t)
 
         if let b = program.cast(p, to: BindingDeclaration.self) {
           let (k, v) = program.implicit(introducedBy: b)
@@ -1217,21 +1217,21 @@ internal struct IREmitter {
       // If `d` is a trait requirement, the trait receiver comes next.
       if let c = program.traitRequiring(d) {
         let t = program.withTyper(typing: c.module, { (tp) in tp.typeOfTraitSelf(in: c) })
-        let u = loweredType(addressOf: t)
+        let u = program.types.ir(place: t)
         result.append(IRParameter(type: u, access: .let, declaration: nil))
       }
 
       // Explicit parameters come next.
       for p in parameters.explicit {
         let t = program.type(assignedTo: p, assuming: RemoteType.self)
-        let u = loweredType(addressOf: program.types[t].projectee)
+        let u = program.types.ir(place: program.types[t].projectee)
         result.append(IRParameter(type: u, access: program.types[t].access, declaration: .init(p)))
       }
     }
 
     if program.types[abstraction].style == .parenthesized {
       // Return register comes last.
-      let o = loweredType(addressOf: program.types[abstraction].output)
+      let o = program.types.ir(place: program.types[abstraction].output)
       result.append(IRParameter(type: o, access: .set, declaration: nil))
       return (result, .indirect)
     } else {
@@ -1239,11 +1239,6 @@ internal struct IREmitter {
         program.types[abstraction].effect, program.types[abstraction].output)
       return (result, o)
     }
-  }
-
-  /// Returns the IR type of an address of an instance of `t`.
-  private mutating func loweredType(addressOf t: AnyTypeIdentity) -> IRType {
-    .addressOf(program.types.dealiased(t))
   }
 
   // MARK: Context
@@ -1475,7 +1470,7 @@ internal struct IREmitter {
 
   /// Inserts an `access` instruction.
   internal mutating func _access(_ k: AccessEffectSet, from source: IRValue) -> IRValue {
-    assert(currentFunction.isAddress(source))
+    assert(currentFunction.isPlace(source))
     return insert(IRAccess(capabilities: k, source: source, anchor: currentAnchor))!
   }
 
@@ -1572,21 +1567,21 @@ internal struct IREmitter {
 
   /// Inserts a `load` instruction.
   internal mutating func _load(_ source: IRValue) -> IRValue {
-    assert(currentFunction.isAddress(source))
+    assert(currentFunction.isPlace(source))
     return insert(IRLoad(source: source, anchor: currentAnchor))!
   }
 
   /// Inserts a `memcpy` instruction.
   internal mutating func _memory_copy(_ source: IRValue, to target: IRValue) {
-    assert(currentFunction.isAddress(source))
-    assert(currentFunction.isAddress(target))
+    assert(currentFunction.isPlace(source))
+    assert(currentFunction.isPlace(target))
     insert(IRMemoryCopy(source: source, target: target, anchor: currentAnchor))
   }
 
   /// Inserts a `move` instruction.
   internal mutating func _move(_ source: IRValue, to target: IRValue) {
-    assert(currentFunction.isAddress(source))
-    assert(currentFunction.isAddress(target))
+    assert(currentFunction.isPlace(source))
+    assert(currentFunction.isPlace(target))
     insert(IRMove(source: source, target: target, anchor: currentAnchor))
   }
 
@@ -1731,7 +1726,7 @@ internal struct IREmitter {
         let s = insertionContext.anchor!.site
         let t = program.type(assignedTo: v)
         report(.init(.error, "use of '\(program[v].identifier)' before its declaration", at: s))
-        return .poison(.lowered(t, isAddress: true))
+        return .poison(program.types.ir(place: t))
       }
 
       fatalError()
@@ -1945,8 +1940,8 @@ internal struct IREmitter {
     _ k: AccessEffect, _ source: IRValue, of typeOfSource: AnyTypeIdentity, to target: IRValue
   ) {
     assert((k == .set) || (k == .inout))
-    assert(currentFunction.isAddress(source))
-    assert(currentFunction.isAddress(target))
+    assert(currentFunction.isPlace(source))
+    assert(currentFunction.isPlace(target))
 
     // Machine types are always copied.
     if program.types.tag(of: typeOfSource) == MachineType.self {

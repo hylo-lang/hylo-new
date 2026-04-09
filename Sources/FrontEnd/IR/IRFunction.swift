@@ -337,9 +337,9 @@ public struct IRFunction: Sendable {
     ((v.register >>= at(_:)) as? IRAccess).satisfies({ (s) in s.capabilities.contains(k) })
   }
 
-  /// Returns `true` iff `v` denotes an address.
-  public func isAddress(_ v: IRValue) -> Bool {
-    result(of: v).map(\.isAddress) ?? false
+  /// Returns `true` iff `v` denotes a place.
+  public func isPlace(_ v: IRValue) -> Bool {
+    result(of: v).map(\.isPlace) ?? false
   }
 
   /// Returns `true` iff `v` is a parameter with access `k`.
@@ -367,7 +367,7 @@ public struct IRFunction: Sendable {
   /// Returns the type of the value computed by `v` or `nil` if `v` doesn't compute any.
   ///
   /// - Requires: `v` is either a constant or an instruction in this function.
-  public func result(of v: IRValue) -> (type: AnyTypeIdentity, isAddress: Bool)? {
+  public func result(of v: IRValue) -> (type: AnyTypeIdentity, isPlace: Bool)? {
     switch v {
     case .parameter(let i):
       return resolved(termParameters[i].type)
@@ -387,16 +387,19 @@ public struct IRFunction: Sendable {
   /// Returns `t` without any relative definition.
   ///
   /// - Requires: `v` is either a constant or an isntruction in this function.
-  public func resolved(_ t: IRType) -> (type: AnyTypeIdentity, isAddress: Bool)? {
+  public func resolved(_ t: IRType) -> (type: AnyTypeIdentity, isPlace: Bool)? {
     switch t {
-    case .lowered(let u, let isAddress):
-      return (u, isAddress)
+    case .place(let u):
+      return (u, true)
+
+    case .value(let u):
+      return (u, false)
 
     case .same(let i):
       return result(of: i)
 
     case .dereferenced(let i):
-      if let (u, isAddress) = result(of: i), isAddress {
+      if let (u, isPlace) = result(of: i), isPlace {
         return (u, false)
       } else {
         fatalError("ill-formed IR type")

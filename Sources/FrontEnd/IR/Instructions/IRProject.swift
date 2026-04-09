@@ -50,7 +50,7 @@ public struct IRProject: IRRegionEntry {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(projectee, isAddress: true)
+    .place(projectee)
   }
 
   /// `true`.
@@ -71,7 +71,7 @@ public struct IRProject: IRRegionEntry {
     guard
       let t = parent.result(of: callee),
       let f = program.types.seenAsTermAbstraction(t.type),
-      t.isAddress
+      t.isPlace
     else { preconditionFailure() }
 
     // The callee supports the effect of the projection being applied.

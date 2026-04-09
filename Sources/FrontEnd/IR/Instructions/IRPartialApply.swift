@@ -43,7 +43,7 @@ public struct IRPartialApply: Instruction {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(closureType, isAddress: true)
+    .place(closureType)
   }
 
   /// `true`.
