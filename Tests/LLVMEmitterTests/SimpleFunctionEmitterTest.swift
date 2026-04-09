@@ -275,6 +275,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
   }
 }
 
+/// Asserts that `program` has no diagnostics.
 func assertNoDiagnostics(in program: Program, file: StaticString = #filePath, line: UInt = #line)
   throws
 {

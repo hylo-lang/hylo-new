@@ -39,13 +39,12 @@ final class CompilerTests: XCTestCase {
 
   }
 
+  /// The result of executing a program.
   private struct ExecutionResult {
 
     let standardOutput: String
-
     let standardError: String
-
-    let terminationStatus: Int32
+    let exitCode: Int32
 
   }
 
@@ -110,8 +109,10 @@ final class CompilerTests: XCTestCase {
     moduleCachePath.delete()
   }
 
-  /// Compiles `input` expecting no compilation error.
-  func positive(_ input: TestDescription) async throws {
+  /// Compiles `input` expecting no compilation error, potentially executing the program.
+  ///
+  /// Run-stage tests execute the program, verifying the exit code and optionally the standard output.
+  func testCaseRoot(_ input: TestDescription) async throws {
     _ = CompilerTests.initialObservationCleanup
     
     do {
@@ -126,12 +127,16 @@ final class CompilerTests: XCTestCase {
 
       guard input.manifest.stage == .run else { return }
 
-      let execution: CompilerTests.ExecutionResult = try execute(result)
+      guard let executable = result.driver.executableURL(of: result.module) else {
+        XCTFail("missing executable output")
+        throw TestFailure.missingExecutableOutput
+      }
+      let execution: CompilerTests.ExecutionResult = try execute(executable)
       try execution.standardOutput.write(to: input.root.deletingPathExtension().appendingPathExtension("stdout.observed"), atomically: true, encoding: .utf8)
 
-      assertExitCode(input.manifest.assertedExitCode ?? 0, in: execution, contextRoot: input.root)
+      assertExitCode(input.manifest.assertedExitCode ?? 0, in: execution, testCaseRoot: input.root)
       if let expected = input.expectedStandardOutput {
-        assertStandardOutput(expected, in: execution, contextRoot: input.root)
+        assertStandardOutput(expected, in: execution, testCaseRoot: input.root)
       }
     } catch let error as TestFailure {
       XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
@@ -223,6 +228,10 @@ final class CompilerTests: XCTestCase {
     return done()
   }
 
+  /// Saves the IR of module `m` for each of its source files separately.
+  ///
+  /// The outputs are written in the same directory as the source files, with the same name but
+  /// with the extension changed to `extension`.
   private func saveObservedIR(of m: Module.ID, in program: Program, extension: String) throws {
     /// The IR functions corresponding to a given source file at url.
     var sourceToIr: [URL : String] = [:]
@@ -230,8 +239,7 @@ final class CompilerTests: XCTestCase {
     var printer = TreePrinter(program: program)
 
     for f in program[m].functions {
-      // FIXME: use mangled name instead of this incomplete hack.
-      // This doesn't 
+      // FIXME: use mangled name instead of this possibly incomplete hack.
       let d = switch(f.name) {
         case .lowered(let d): d
         case .synthesized(let d, _): d
@@ -262,27 +270,20 @@ final class CompilerTests: XCTestCase {
     try llCode.write(to: o, atomically: false, encoding: .utf8)
   }
 
-  private func execute(_ result: CompilationResult) throws -> ExecutionResult {
-    guard let executable = result.driver.executableURL(of: result.module) else {
-      XCTFail("missing executable output")
-      throw TestFailure.missingExecutableOutput
-    }
-
-    return try execute(executable)
-  }
-
-  private func assertExitCode(_ expected: Int32, in observed: ExecutionResult, contextRoot: URL) {
+  /// Asserts that the exit code of `observed` matches `expected`.
+  private func assertExitCode(_ expected: Int32, in observed: ExecutionResult, testCaseRoot: URL) {
     XCTAssertEqual(
-      observed.terminationStatus,
+      observed.exitCode,
       expected,
-      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)\nSource: \(contextRoot.path)\n")
+      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)\nSource: \(testCaseRoot.path)\n")
   }
 
-  private func assertStandardOutput(_ expected: String, in observed: ExecutionResult, contextRoot: URL) {
+  /// Asserts that the standard output of `observed` matches `expected`.
+  private func assertStandardOutput(_ expected: String, in observed: ExecutionResult, testCaseRoot: URL) {
     XCTAssertEqual(
       observed.standardOutput,
       expected,
-      "mismatched stdout.\nSource: \(contextRoot.path)\n")
+      "mismatched stdout.\nSource: \(testCaseRoot.path)\n")
   }
 
   private func execute(_ executable: URL) throws -> ExecutionResult {
@@ -301,9 +302,10 @@ final class CompilerTests: XCTestCase {
     return .init(
       standardOutput: stdout,
       standardError: stderr,
-      terminationStatus: process.terminationStatus)
+      exitCode: process.terminationStatus)
   }
 
+  /// An error thrown to signal test failure with given reason.
   private enum TestFailure: Error {
     case missingExecutableOutput
     case compilationError(String)

@@ -1,5 +1,6 @@
 //! stage:run stdlib:minimal
 
+/// Returns `x * 2`.
 fun double(x: Int) -> Int {
   return x + x
 }

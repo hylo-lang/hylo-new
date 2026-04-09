@@ -1,8 +1,15 @@
 //! stage:run stdlib:minimal
 
+/// Allocates `bytes` number of bytes on heap.
+///
+/// - Returns the memory address as an integer or `null` if allocation failed.
+/// - Precondition: `bytes` must be non-negative.
 @extern("malloc_shim")
 fun malloc(bytes: Int) -> Int
 
+/// Frees the memory at the given address.
+///
+/// Precondition: `ptr` must point to a valid memory address allocated by `malloc`.
 @extern("free_shim")
 fun free(ptr: Int) -> Void
 

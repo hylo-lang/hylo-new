@@ -5,6 +5,7 @@ struct Triple is Deinitializable {
   let b: Int
   let c: Int
 
+  /// Initializes the instance from its parts.
   init(_ a: sink Int, _ b: sink Int, _ c: sink Int) {
     &self.a = a
     &self.b = b

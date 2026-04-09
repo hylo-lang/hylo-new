@@ -64,13 +64,23 @@ extension SwiftyLLVM.FloatingPointPredicate {
 ///
 /// The LLVM lowering happens upon construction, after which you can extract the resulting module via `extractModule()`.
 private struct CodeGenerationContext: ~Copyable {
+
+  /// The program containing the module being lowered.
   private let program: Program
+
+  /// The LLVM module being built.
   private var llvm: SwiftyLLVM.Module
+
+  /// The module's identity that's being transpiled.
   private let moduleID: FrontEnd.Module.ID
 
+  /// The functions from the current module to transpile.
   private let functions: [FrontEnd.IRFunction]
+
+  /// `isFunctionTranspiled[i]` is `true` iff the `i`th function's transpilation has begun.
   private var isFunctionTranspiled: [Bool]
 
+  /// Initialized a new instance from its parts, without lowering anything.
   private init(
     transpiling module: FrontEnd.Module.ID, in program: Program,
     compilingFor targetMachine: consuming SwiftyLLVM.TargetMachine
@@ -1222,6 +1232,7 @@ private struct CodeGenerationContext: ~Copyable {
         from: Array(repeating: llvm.ptr.erased, count: parameters), to: llvm.void)
     }
   }
+
 }
 
 extension Program {
