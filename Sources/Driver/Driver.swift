@@ -4,8 +4,11 @@ import FrontEnd
 import LLVMEmitter
 import StandardLibrary
 import SwiftyLLVM
+import Utilities
 
 public typealias LLVMModule = SwiftyLLVM.Module
+
+/// A FrontEnd module.
 public typealias Module = FrontEnd.Module // Shadowing the name ambiguity
 
 import Utilities
@@ -84,8 +87,6 @@ public struct Driver {
   ///
   /// It's set after LLVM lowering.
   private var llvmModules: [Module.ID: LLVMModuleBox] = [:]
-
-  private var executableOutputs: [Module.ID: URL] = [:]
 
   /// Creates an instance with the given properties.
   public init(
@@ -194,7 +195,8 @@ public struct Driver {
     let elapsed = try ContinuousClock().measure {
       let modulesToLink = [module]
       if !isFreestanding {
-        // modulesToLink.append(program.modules[.standardLibrary]!.identity) // todo enable this after we can lower the standard library
+        // todo enable this after we can lower the standard library
+        // modulesToLink.append(program.modules[.standardLibrary]!.identity)
       }
 
       try FileManager.default.withUniqueTemporaryDirectory{ objectDirectory in
@@ -205,8 +207,6 @@ public struct Driver {
         try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
 
         try linkExecutable(from: objectFiles, writingTo: executable)
-
-        executableOutputs[module] = executable
       }
     }
     return (elapsed, program[module].containsError)
@@ -223,11 +223,6 @@ public struct Driver {
   public mutating func assembly(of module: Module.ID) throws -> String {
     let buffer = try llvmModules[module]!.module.compile(.assembly)
     return Self.decode(buffer)
-  }
-
-  /// Returns the executable produced for `module`, or `nil` if no executable has been generated.
-  public func executableURL(of module: Module.ID) -> URL? {
-    executableOutputs[module]
   }
 
   /// Writes object files for `modules` into `directory` and returns their paths.
@@ -361,53 +356,17 @@ public struct Driver {
     _ = try runCommand(try findExecutable("clang"), arguments: arguments)
   }
 
-  /// Returns where to write the final executable, applying a fallback based on module name.
-  private func resolvedExecutableURL(for module: Module.ID, writingTo output: URL?) -> URL {
-    let base = output ?? URL(fileURLWithPath: moduleName(module))
-    if base.pathExtension == hostExecutableExtension { return base }
-    return base.appendingPathExtension(hostExecutableExtension)
-  }
-
-  /// The executable path extension on the host platform.
-  private var hostExecutableExtension: String {
-    #if os(Windows)
-      "exe"
-    #else
-      ""
-    #endif
-  }
-
-  private func findExecutable(_ invocationName: String) throws -> URL {
-    let executableName = hostExecutableExtension.isEmpty
-      ? invocationName
-      : invocationName + ".\(hostExecutableExtension)"
-    let environment = ProcessInfo.processInfo.environment
-    let path = environment[hostPathEnvironmentVariable] ?? ""
-
-    for root in path.split(separator: hostPathSeparator) {
-      let candidate = URL(fileURLWithPath: String(root)).appendingPathComponent(executableName)
+  /// Looks up the full path of an executable named `name` from PATH.
+  private func findExecutable(_ name: String) throws -> URL {
+    for root in Host.pathEntries() {
+      let candidate = URL(fileURLWithPath: String(root))
+        .appendingPathComponent(name).withHostExecutableSuffix()
       if FileManager.default.isExecutableFile(atPath: candidate.path) {
         return candidate
       }
     }
 
-    throw DriverFailure.missingExecutable(invocationName)
-  }
-
-  private var hostPathEnvironmentVariable: String {
-    #if os(Windows)
-      "Path"
-    #else
-      "PATH"
-    #endif
-  }
-
-  private var hostPathSeparator: Character {
-    #if os(Windows)
-      ";"
-    #else
-      ":"
-    #endif
+    throw DriverFailure.missingExecutable(name)
   }
 
   private func runCommand(_ executable: URL, arguments: [String]) throws -> ExecutionResult {
@@ -503,16 +462,5 @@ extension FileManager {
     try createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? removeItem(at: directory) }
     return try await observer(directory)
-  }
-}
-
-extension URL {
-  /// Ensures that the URL has an executable extension corresponding to the host platform.
-  public func withHostExecutableSuffix() -> URL {
-    #if os(Windows)
-    return pathExtension == "exe" ? self : appendingPathExtension("exe")
-    #else
-    return self
-    #endif
   }
 }

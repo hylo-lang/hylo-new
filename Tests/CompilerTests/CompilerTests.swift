@@ -112,7 +112,7 @@ final class CompilerTests: XCTestCase {
   /// Compiles `input` expecting no compilation error, potentially executing the program.
   ///
   /// Run-stage tests execute the program, verifying the exit code and optionally the standard output.
-  func testCaseRoot(_ input: TestDescription) async throws {
+  func positive(_ input: TestDescription) async throws {
     _ = CompilerTests.initialObservationCleanup
     
     do {
@@ -127,7 +127,7 @@ final class CompilerTests: XCTestCase {
 
       guard input.manifest.stage == .run else { return }
 
-      guard let executable = result.driver.executableURL(of: result.module) else {
+      guard let executable = result.executable else {
         XCTFail("missing executable output")
         throw TestFailure.missingExecutableOutput
       }

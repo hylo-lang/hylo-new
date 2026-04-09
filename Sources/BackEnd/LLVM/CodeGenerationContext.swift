@@ -116,6 +116,7 @@ private struct CodeGenerationContext: ~Copyable {
     get { program.modules.elements[moduleID].value }
   }
 
+  /// Transpiles function with index `i` if not already transpiled.
   mutating func incorporate(functionWithIndex i: Int) throws {
     /// Don't re-transpile functions. TODO see if this is actually necessary.
     if isFunctionTranspiled[i] { return }
@@ -1251,13 +1252,13 @@ extension Program {
   }
 }
 
-/// The contents of an arrow.
+/// The callee and the environment of a closure.
 private struct ArrowContents {
 
   /// A pointer to the underlying thin function.
   let function: SwiftyLLVM.AnyValue.UnsafeReference  // todo make AnyCallable.UnsafeReference
 
-  /// The type `function`.
+  /// The type of `function`.
   let type: SwiftyLLVM.AnyType.UnsafeReference
 
   /// The arrow's environment.

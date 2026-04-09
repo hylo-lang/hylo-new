@@ -2,7 +2,9 @@ import FrontEnd
 import Utilities
 
 extension Program {
+  /// Returns the mangled name of the type `type`.
   func llvmName(of type: AnyTypeIdentity) -> String {
+    // FIXME: use actual mangling.
     switch types.tag(of: type) {
     case Struct.self:
       let s = types[types.castUnchecked(type, to: Struct.self)]
@@ -12,11 +14,15 @@ extension Program {
     }
   }
 
+  /// Returns the mangled name of function `f`.
   func llvmName(of f: IRFunction) -> String {
+    // FIXME: use actual mangling.
     return llvmName(of: f.name)
   }
 
+  /// Returns the mangled name of function `f`.
   func llvmName(of f: IRFunction.Name) -> String {
+    // FIXME: use actual mangling.
     if case .lowered(let d) = f,
       let decl = cast(d, to: FunctionDeclaration.self)
     {
