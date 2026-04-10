@@ -232,10 +232,13 @@ internal struct IREmitter {
       TypeApplication(abstraction: table.concept.erased, arguments: table.arguments))
 
     lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
-      let x0 = me._witnesstable(type: w.erased, members: members)
-      let x1 = me._access([.let], from: x0)
-      me._yield(x1)
-      me._end(IRAccess.self, openedBy: x1)
+      let x0 = me._alloca(w.erased)
+      let x1 = me._witnesstable(type: w.erased, members: members)
+      me._emitInitialize(x0, to: x1)
+      let x2 = me._access([.let], from: x0)
+      me._yield(x2)
+      me._end(IRAccess.self, openedBy: x2)
+      me._emitDeinitialize(x0)
       me._return()
     }
 
@@ -1859,6 +1862,12 @@ internal struct IREmitter {
 
     // Nothing to do for machine types.
     if program.types.tag(of: typeOfSource) == MachineType.self {
+      _assume_state(source, initialized: false)
+      return true
+    }
+
+    // Nothing to do for conformance witnesses.
+    else if program.types.seenAsTraitApplication(typeOfSource) != nil {
       _assume_state(source, initialized: false)
       return true
     }
