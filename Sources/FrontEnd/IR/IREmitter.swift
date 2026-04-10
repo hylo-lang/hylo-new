@@ -890,21 +890,6 @@ internal struct IREmitter {
     }
   }
 
-  /// Returns the type of `e` used as a callee, assuming it is the receiver of a member method if
-  /// `isBoundMember` is `true`.
-  private mutating func loweredCalleeType(
-    of e: ExpressionIdentity, denotingReceiver isBoundMember: Bool
-  ) -> AnyTypeIdentity {
-    let t = program.type(assignedTo: e)
-    if isBoundMember {
-      // If there's a receiver, then then `e` should be a bound member function.
-      assert(program.types.isLikeBoundMember(t))
-      return program.types.lifted(t)
-    } else {
-      return t
-    }
-  }
-
   /// Generates the IR for lowering the given function or subscript call.
   ///
   /// The callee of `e` is the expression of a function or subscript other than a built-in function
