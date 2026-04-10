@@ -618,7 +618,7 @@ private struct Transfer: AbstractTransferFunction {
     place: IRValue, with consumer: AnyInstructionIdentity, in f: IRFunction
   ) {
     let t = f.result(of: place)!
-    assert(t.isAddress)
+    assert(t.isPlace)
 
     // Built-in values are implictly copied.
     if program.types.isBuiltin(t.type) {
@@ -643,7 +643,7 @@ private struct Transfer: AbstractTransferFunction {
     object: IRValue, with consumer: AnyInstructionIdentity, in f: IRFunction
   ) {
     let t = f.result(of: object)!
-    assert(!t.isAddress)
+    assert(!t.isPlace)
 
     // Constant values are synthesized on demand and built-in values are implicitly copied.
     if object.isConstant || program.types.isBuiltin(t.type) {

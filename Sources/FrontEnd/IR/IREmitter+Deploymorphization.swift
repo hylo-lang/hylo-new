@@ -119,7 +119,7 @@ extension IREmitter {
       return e._emitCast(old.result, to: parameters.last!)
     }
 
-    let referenceToMono = functionReference(referringTo: mono)
+    let referenceToMono = functionReference(to: mono)
     let s = IRApply(callee: referenceToMono, arguments: xs, result: result, anchor: old.anchor)
     f.replace(user, with: s)
   }
@@ -140,7 +140,7 @@ extension IREmitter {
       for (a, p) in zip(old.arguments, parameters) { xs.append(e._emitCast(a, to: p)) }
     }
 
-    let referenceToMono = functionReference(referringTo: mono)
+    let referenceToMono = functionReference(to: mono)
     let s = IRProject(
       callee: referenceToMono, arguments: xs, projectee: old.projectee, access: old.access,
       anchor: old.anchor)
@@ -172,9 +172,8 @@ extension IREmitter {
       minimumCapacity: poly.typeParameters.count + poly.termParameters.count)
     for p in poly.typeParameters {
       let t = program.types.demand(TypeWitness()).erased
-      let u = IRType.lowered(t, isAddress: true)
       let d = program.types[p].declaration.map(DeclarationIdentity.init(_:))
-      ps.append(.init(type: u, access: .let, declaration: d))
+      ps.append(.init(type: .place(t), access: .let, declaration: d))
     }
 
     ps.append(contentsOf: poly.termParameters)

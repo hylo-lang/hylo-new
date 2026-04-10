@@ -35,7 +35,7 @@ public struct IRPlaceCast: Instruction {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(target, isAddress: true)
+    .place(target)
   }
 
 }

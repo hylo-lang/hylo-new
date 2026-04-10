@@ -23,7 +23,7 @@ public struct IRApplyBuiltin: Instruction {
     self.operands = arguments
     self.anchor = anchor
     self.callee = callee
-    self.type = .lowered(returnTypeOfCallee, isAddress: false)
+    self.type = .value(returnTypeOfCallee)
   }
 
   /// Creates a copy of `other`, substituting its properities with `ss`.

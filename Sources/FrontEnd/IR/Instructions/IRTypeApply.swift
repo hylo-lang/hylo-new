@@ -43,7 +43,7 @@ public struct IRTypeApply: Instruction {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(typeOfApplication, isAddress: true)
+    .place(typeOfApplication)
   }
 
   /// `true`.
@@ -60,7 +60,7 @@ public struct IRTypeApply: Instruction {
     else { preconditionFailure("monomorphic callee") }
 
     // The callee must have an address type.
-    precondition(t.isAddress, "callee must have an address type")
+    precondition(t.isPlace, "callee must have an address type")
 
     // The type arguments must match the callee's parameters.
     precondition(
