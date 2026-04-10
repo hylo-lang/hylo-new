@@ -119,7 +119,7 @@ extension IREmitter {
       return e._emitCast(old.result, to: parameters.last!)
     }
 
-    let referenceToMono = functionReference(referringTo: mono)
+    let referenceToMono = functionReference(to: mono)
     let s = IRApply(callee: referenceToMono, arguments: xs, result: result, anchor: old.anchor)
     f.replace(user, with: s)
   }
@@ -140,7 +140,7 @@ extension IREmitter {
       for (a, p) in zip(old.arguments, parameters) { xs.append(e._emitCast(a, to: p)) }
     }
 
-    let referenceToMono = functionReference(referringTo: mono)
+    let referenceToMono = functionReference(to: mono)
     let s = IRProject(
       callee: referenceToMono, arguments: xs, projectee: old.projectee, access: old.access,
       anchor: old.anchor)

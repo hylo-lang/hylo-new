@@ -218,7 +218,7 @@ internal struct IREmitter {
       switch table.member(implementing: r)! {
       case .synthetic(let m, _):
         let f = demandLoweredDeclaration(syntheticImplementationOf: m, for: table.arguments)
-        let v = functionReference(referringTo: f)
+        let v = functionReference(to: f)
         members.append(v)
 
       default:
@@ -594,7 +594,7 @@ internal struct IREmitter {
       let r = me._access([.set], from: f.result)
 
       // Do the call.
-      me._apply(f.value, to: operands, savingResultTo: r)
+      me._apply(f.value, operands, into: r)
 
       // End accesses on the parameters.
       me._end(IRAccess.self, openedBy: r)
@@ -847,7 +847,7 @@ internal struct IREmitter {
   ) -> LoweredCallee {
     // TODO: Deal with the type of the receiver
     // Partial application tout ça tout ça
-    let v = functionReference(referringTo: function)
+    let v = functionReference(to: function)
     return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
   }
 
@@ -1085,15 +1085,15 @@ internal struct IREmitter {
     // Are we declaring a conformance?
     if program.tag(of: d) == ConformanceDeclaration.self {
       let witness = program.types.contextAndHead(program.type(assignedTo: d))
-
       assert(witness.context.parameters.allSatisfy(ts.contains(_:)))
+
+      let output = IRFunction.Output.remote(.let, witness.head)
       let ps = witness.context.usings.map { (u) in
-        IRParameter(type: .lowered(u, isAddress: true), access: .let, declaration: nil)
+        IRParameter(type: program.types.ir(place: u), access: .let, declaration: nil)
       }
 
       return program[module].ir.addFunction(
-        IRFunction(
-          name: name, output: .remote(.let, witness.head), typeParameters: ts, termParameters: ps))
+        IRFunction(name: name, output: output, typeParameters: ts, termParameters: ps))
     }
 
     // Otherwise, assume `d` identifies the declaration of a function, subscript, or bundle.
@@ -1509,9 +1509,7 @@ internal struct IREmitter {
 
   /// Inserts a `apply` instruction.
   internal mutating func _apply(
-    _ callee: IRValue,
-    to arguments: [IRValue],
-    savingResultTo result: IRValue
+    _ callee: IRValue, _ arguments: [IRValue], into result: IRValue
   ) {
     let s = IRApply(
       callee: callee, arguments: arguments, result: result,
@@ -1593,7 +1591,7 @@ internal struct IREmitter {
   }
 
   /// Inserts a `project` instruction.
-  internal mutating func _project(with callee: IRValue, _ arguments: [IRValue]) -> IRValue {
+  internal mutating func _project(_ callee: IRValue, _ arguments: [IRValue]) -> IRValue {
     guard
       let t = currentFunction.result(of: callee),
       let a = program.types.cast(t.type, to: Arrow.self)
@@ -1766,10 +1764,10 @@ internal struct IREmitter {
     referenceTo d: ConformanceDeclaration.ID, applyingNullary applyNullary: Bool
   ) -> IRValue {
     let f = demandLoweredDeclaration(function: d)
-    let v = functionReference(referringTo: f)
+    let v = functionReference(to: f)
 
     if program[module].ir[f].termParameters.isEmpty && applyNullary {
-      return _project(with: v, [])
+      return _project(v, [])
     } else {
       return v
     }
@@ -1823,7 +1821,7 @@ internal struct IREmitter {
       }
 
       let (callee, arguments) = stack.reversed().headAndTail!
-      return _project(with: callee, Array(arguments))
+      return _project(callee, Array(arguments))
 
     case .typeApplication(let f, let a):
       let x = _emit(witness: f, applyingNullary: applyNullary)
@@ -1855,6 +1853,7 @@ internal struct IREmitter {
 
   /// Generates the IR for deinitializing `source` and returns `true` iff `source` can be
   /// deinitialized. Otherwise, inserts a trap and returns `false`.
+  @discardableResult
   internal mutating func _emitDeinitialize(_ source: IRValue) -> Bool {
     let (typeOfSource, _) = currentFunction.result(of: source) ?? badOperand()
 
@@ -1887,7 +1886,7 @@ internal struct IREmitter {
     let x3 = _property(member, of: deinitializable, withType: t0.erased)
     let x4 = _access([.let], from: x3)
 
-    _apply(x4, to: [x1], savingResultTo: x2)
+    _apply(x4, [x1], into: x2)
 
     _end(IRAccess.self, openedBy: x4)
     _end(IRAccess.self, openedBy: x2)
@@ -1978,7 +1977,7 @@ internal struct IREmitter {
     let x3 = _access([.set], from: x0)
     let x4 = _property(.init(member), of: movable, withType: t0.erased)
 
-    _apply(x4, to: [x2, x1], savingResultTo: x3)
+    _apply(x4, [x2, x1], into: x3)
 
     _end(IRAccess.self, openedBy: x3)
     _end(IRAccess.self, openedBy: x2)
@@ -2058,7 +2057,7 @@ internal struct IREmitter {
   }
 
   /// Returns a reference to the given lowered function.
-  internal mutating func functionReference(referringTo f: IRFunction.ID) -> IRValue {
+  internal mutating func functionReference(to f: IRFunction.ID) -> IRValue {
     let n = program[module].ir[f].name
     let s = program[module].ir[f].signature()
     let t = program.types.demand(s)
