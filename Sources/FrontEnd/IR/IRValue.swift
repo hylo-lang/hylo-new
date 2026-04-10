@@ -31,6 +31,15 @@ public enum IRValue: Hashable, Sendable {
     }
   }
 
+  /// `true` iff `self` is a poison value.
+  public var isPoison: Bool {
+    if case .poison = self {
+      return true
+    } else {
+      return false
+    }
+  }
+
   /// The payload of `self` iff it denotes a parameter.
   public var parameter: Int? {
     if case .parameter(let i) = self {
