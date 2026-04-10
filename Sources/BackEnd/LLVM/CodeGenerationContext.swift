@@ -339,8 +339,10 @@ private struct CodeGenerationContext: ~Copyable {
         unimplemented("LLVM lowering for IRWitnessTable")
       case IRYield.self:
         fatalError("Unexpected IRYield instruction.")
+      case IRGlobalAccess.self:
+        insert(globalAccess: i)
       default:
-        unimplemented()
+        unimplemented("Lowering for instruction \(f.tag(of: i))")
       }
     }
 
@@ -1133,6 +1135,10 @@ private struct CodeGenerationContext: ~Copyable {
       llvm.insertUnreachable(at: insertionPoint)
     }
 
+    func insert(globalAccess i: AnyInstructionIdentity) {
+      let s = f.at(i) as! IRGlobalAccess
+      register[.register(i)] = globalVariable(s.decl)
+    }
     /// Returns the LLVM IR value corresponding to the Hylo IR operand `o`.
     func llvmOperand(_ o: FrontEnd.IRValue) -> AnyValue.UnsafeReference {
       switch o {

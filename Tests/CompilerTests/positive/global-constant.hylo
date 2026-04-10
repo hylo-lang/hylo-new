@@ -1,0 +1,7 @@
+//! stage:run stdlib:minimal
+
+let x = Int.one() + Int.one()
+
+public fun main() {
+  print(x)
+}
