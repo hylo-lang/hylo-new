@@ -71,7 +71,7 @@ void malloc_shim(intptr_t const* size, void** result) {
 }
 
 /// Frees the heap allocation referenced by `*ptr`.
-void free_shim(void** ptr) {
+void free_shim(void** ptr, void* voidResult) {
     free(*ptr);
 }
 

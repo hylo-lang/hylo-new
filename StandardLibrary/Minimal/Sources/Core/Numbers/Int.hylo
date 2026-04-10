@@ -54,9 +54,6 @@ public struct Int is Deinitializable {
   @extern("hylo_int_ge")
   public fun infix>= (other: Self) -> Bool
 
-  @extern("hylo_int_sge")
-  public fun infix>= (_ other: Self) -> Bool
-
   @extern("hylo_int_infix_add")
   fun infix+ (other: Self) -> Self
 

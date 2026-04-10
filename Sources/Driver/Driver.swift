@@ -11,8 +11,6 @@ public typealias LLVMModule = SwiftyLLVM.Module
 /// A FrontEnd module.
 public typealias Module = FrontEnd.Module // Shadowing the name ambiguity
 
-import Utilities
-
 /// A helper to drive the compilation of Hylo source files.
 public struct Driver {
 

@@ -21,9 +21,10 @@ public struct StandardLibraryRoot {
   /// The root directory of this standard library variant.
   ///
   /// The root is expected to contain a `Sources/` subdirectory with Hylo sources and a
-  /// `shim.c` file with platform-specific C shims.
+  /// `Shims/shim.c` that can expose functionality from the C standard library.
   public let root: URL
 
+  /// Creates an instance representing the standard library at `root`.
   private init(root: URL) {
     self.root = root
   }
