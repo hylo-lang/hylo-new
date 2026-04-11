@@ -1133,7 +1133,7 @@ internal struct IREmitter {
       return i
     }
 
-    let (ps, o) = prototype(of: d)
+    let (ps, o) = prototype(of: d, applying: a)
     return program[module].ir.addFunction(
       IRFunction(name: name, output: o, typeParameters: [], termParameters: ps))
   }
@@ -1201,7 +1201,7 @@ internal struct IREmitter {
   /// captures, in that order. Type parameters are not included. Those are only lowered to term
   /// parameters in existentialized functions.
   private mutating func prototype(
-    of d: DeclarationIdentity
+    of d: DeclarationIdentity, applying substitutions: TypeArguments = .init()
   ) -> ([IRParameter], IRFunction.Output) {
     let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
     var result: [IRParameter] = []
@@ -1211,7 +1211,8 @@ internal struct IREmitter {
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {
       for p in program.types[abstraction].inputs {
-        let u = program.types.dealiased(p.type)
+        let t = program.types.dealiased(p.type)
+        let u = program.types.substitute(substitutions, in: t)
         result.append(IRParameter(type: u, access: p.access, declaration: nil))
       }
     }
@@ -1223,14 +1224,15 @@ internal struct IREmitter {
 
       // Using parameters come first.
       for p in parameters.usings {
-        let t = program.type(assignedTo: p)
-        let u = program.types.dealiased(t)
+        var t = program.type(assignedTo: p)
+        t = program.types.dealiased(t)
+        t = program.types.substitute(substitutions, in: t)
 
         if let b = program.cast(p, to: BindingDeclaration.self) {
           let (k, v) = program.implicit(introducedBy: b)
-          result.append(IRParameter(type: u, access: .init(k), declaration: .init(v)))
+          result.append(IRParameter(type: t, access: .init(k), declaration: .init(v)))
         } else {
-          result.append(IRParameter(type: u, access: .let, declaration: .init(p)))
+          result.append(IRParameter(type: t, access: .let, declaration: .init(p)))
         }
       }
 
@@ -1238,26 +1240,27 @@ internal struct IREmitter {
       if let c = program.traitRequiring(d) {
         let t = program.withTyper(typing: c.module, { (tp) in tp.typeOfTraitSelf(in: c) })
         let u = program.types.dealiased(t)
-        result.append(IRParameter(type: u, access: .let, declaration: nil))
+        let v = program.types.substitute(substitutions, in: u)
+        result.append(IRParameter(type: v, access: .let, declaration: nil))
       }
 
       // Explicit parameters come next.
       for p in parameters.explicit {
         let t = program.type(assignedTo: p, assuming: RemoteType.self)
         let u = program.types.dealiased(program.types[t].projectee)
-        result.append(IRParameter(type: u, access: program.types[t].access, declaration: .init(p)))
+        let v = program.types.substitute(substitutions, in: u)
+        result.append(IRParameter(type: v, access: program.types[t].access, declaration: .init(p)))
       }
     }
 
+    // Return register comes last.
+    let r = program.types.dealiased(program.types[abstraction].output)
+    let s = program.types.substitute(substitutions, in: r)
     if program.types[abstraction].style == .parenthesized {
-      // Return register comes last.
-      let o = program.types.dealiased(program.types[abstraction].output)
-      result.append(IRParameter(type: o, access: .set, declaration: nil))
+      result.append(IRParameter(type: s, access: .set, declaration: nil))
       return (result, .indirect)
     } else {
-      let o = IRFunction.Output.remote(
-        program.types[abstraction].effect, program.types[abstraction].output)
-      return (result, o)
+      return (result, .remote(program.types[abstraction].effect, s))
     }
   }
 
