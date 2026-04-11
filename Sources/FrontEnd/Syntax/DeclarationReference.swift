@@ -74,15 +74,6 @@ public enum DeclarationReference: Hashable, Sendable {
     }
   }
 
-  /// Returns a copy of `self` in which occurrences of `m` have been substituted for `n`.
-  internal func substituting(_ m: ExpressionIdentity, for n: ExpressionIdentity) -> Self {
-    if case .inherited(let w, let d, let s) = self {
-      return .inherited(w.substituting(m, with: n), d, statically: s)
-    } else {
-      return self
-    }
-  }
-
 }
 
 extension DeclarationReference: Showable {
