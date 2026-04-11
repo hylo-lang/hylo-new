@@ -19,6 +19,9 @@ public struct IRFunction: Sendable {
     /// The identity of a synthesized function.
     case synthesized(DeclarationIdentity, TypeArguments)
 
+    /// The identity of a function implementing a trait requirement.
+    case implementation(DeclarationIdentity, ConformanceDeclaration.ID, TypeArguments)
+
     /// The identity of the existentialiezd form of a polymorphic function.
     indirect case existentialized(IRFunction.Name)
 
@@ -765,11 +768,18 @@ extension IRFunction.Name: Showable {
     switch self {
     case .lowered(let d):
       return printer.program.debugName(of: d)
+
     case .initializer(let d):
       return "\(printer.program.debugName(of: .init(d)))$init"
+
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
       return "\(printer.program.debugName(of: d))<\(list: xs)>"
+
+    case .implementation(let d, _, let a):
+      let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
+      return "\(printer.program.debugName(of: d))<\(list: xs)>"
+
     case .existentialized(let n):
       return "\(printer.show(n))$existentialized"
     }

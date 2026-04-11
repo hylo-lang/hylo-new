@@ -1,0 +1,7 @@
+//! stage:lowering
+
+trait P {
+  fun f() {}
+}
+
+struct S is P {}

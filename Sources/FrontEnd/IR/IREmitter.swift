@@ -124,19 +124,12 @@ internal struct IREmitter {
   /// Generates the IR of `d`, which declares remote local bindings.
   private mutating func lower(globalBinding d: BindingDeclaration.ID) {
     if let rhs = program[d].initializer {
-      // Retrieve the declaration of the global's initializer.
-      let g = demandLoweredDeclaration(variable: d)
-      var initializer = program[d.module].ir[g.initializer].move()
-      defer { program[d.module].ir[g.initializer].take(definition: initializer) }
-
       // Emit the definition of the global's initializer.
+      let global = demandLoweredDeclaration(variable: d)
       let lhs = program[program[d].pattern].pattern
-      initializer = withClearContext { (me) in
-        me.insertionContext.function = initializer
-        me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
+      defining(global.initializer) { (me) in
         me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
         me.lowering(rhs, { $0._return() })
-        return me.insertionContext.function.sink()
       }
     } else {
       report(program.missingBindingInitializer(d))
@@ -201,11 +194,12 @@ internal struct IREmitter {
 
   /// Generates the IR of the subscript that projects the witness declared by `d`.
   private mutating func lowerDefinitionInClearContext(_ d: ConformanceDeclaration.ID) {
-    let f = demandLoweredDeclaration(function: d)
-    assert(!program[module].ir[f].isDefined, "conformance already lowered")
+    let conformance = demandLoweredDeclaration(function: .init(d))
+    assert(!program[module].ir[conformance].isDefined, "conformance already lowered")
 
-    insertionContext.function = program[module].ir[f]
+    insertionContext.function = program[module].ir[conformance]
     insertionContext.point = .end(of: insertionContext.function!.addBlock())
+    defer { program[module].ir[conformance] = insertionContext.function.sink() }
 
     // TODO: Construct a witness table
     // The idea is to iterate over the implementation to figure out the shape of the concrete
@@ -217,12 +211,43 @@ internal struct IREmitter {
     for r in requirements {
       switch table.member(implementing: r)! {
       case .synthetic(let m, _):
-        let f = demandLoweredDeclaration(syntheticImplementationOf: m, for: table.arguments)
-        let v = functionReference(to: f)
-        members.append(v)
+        let f = demandLoweredDeclaration(
+          implementationOf: m, synthesized: true, for: d, table.arguments)
+        members.append(functionReference(to: f))
+
+      case .inherited(let w, let m, statically: _):
+        // Is the implementation defined in the trait itself?
+        if program.traitRequiring(m) == program.types[table.concept].declaration {
+          let interface = demandLoweredDeclaration(
+            implementationOf: m, synthesized: false, for: d, table.arguments)
+          members.append(functionReference(to: interface))
+
+          let implementation = demandLoweredDeclaration(function: m)
+          precondition(!program[module].ir[implementation].isSubscript, "todo")
+
+          defining(interface) { (me) in
+            me.insertionContext.anchor = .init(site: me.program[d].site, scope: .init(node: d))
+
+            // Get a reference to the implementation.
+            let x0 = me.functionReference(to: implementation)
+            let x1 = me._type_apply(x0, to: table.arguments)
+
+            // Forward the term parameters to the implementation.
+            let xs = me.currentFunction.termParameters.enumerated().map { (i, p) in
+              me._access([p.access], from: .parameter(i))
+            }
+            me._apply(x1, xs.dropLast(), into: xs.last!)
+          }
+        }
+
+        // TODO
+        else {
+          _ = w
+          unimplemented("custom requirement implementation")
+        }
 
       default:
-        unimplemented("custom implementation")
+        unimplemented("custom requirement implementation")
       }
     }
 
@@ -241,8 +266,6 @@ internal struct IREmitter {
       me._emitDeinitialize(x0)
       me._return()
     }
-
-    program[module].ir[f] = insertionContext.function.sink()
   }
 
   /// Generates the IR of `d`.
@@ -279,7 +302,7 @@ internal struct IREmitter {
 
   /// Generates the IR of `d` assuming the insertion context is clear.
   private mutating func lowerInClearContext(_ d: FunctionDeclaration.ID) {
-    let f = demandLoweredDeclaration(function: d)
+    let f = demandLoweredDeclaration(function: .init(d))
     assert(!program[module].ir[f].isDefined, "function already lowered")
 
     // Is there a body to lower?
@@ -797,8 +820,7 @@ internal struct IREmitter {
   ) -> LoweredCallee {
     switch program.tag(of: d) {
     case FunctionDeclaration.self:
-      let f = demandLoweredDeclaration(
-        function: program.castUnchecked(d, to: FunctionDeclaration.self))
+      let f = demandLoweredDeclaration(function: d)
       return loweredCallee(referringTo: f, boundTo: receiver, output: result)
 
     case EnumCaseDeclaration.self:
@@ -1089,17 +1111,18 @@ internal struct IREmitter {
 
   /// Returns the identity of the function lowering `d`, declaring it if necessary.
   ///
-  /// `d` identifies the declaration of a function, subscript, bundle, or conformance.
-  private mutating func demandLoweredDeclaration<T: Declaration & Scope>(
-    function d: T.ID
+  /// `d` identifies the declaration of a function, subscript, or conformance.
+  private mutating func demandLoweredDeclaration(
+    function d: DeclarationIdentity
   ) -> IRFunction.ID {
-    let name = IRFunction.Name.lowered(.init(d))
+    let name = IRFunction.Name.lowered(d)
     if let i = program[module].ir.functions.index(forKey: name) {
       return i
     }
 
+    let scopeOfDeclaration = program.castToScope(d)!
     let ts = program.withTyper(typing: d.module) { (tp) in
-      tp.accumulatedGenericParameters(visibleFrom: .init(node: d))
+      tp.accumulatedGenericParameters(visibleFrom: scopeOfDeclaration)
     }
 
     // Are we declaring a conformance?
@@ -1116,26 +1139,32 @@ internal struct IREmitter {
         IRFunction(name: name, output: output, typeParameters: ts, termParameters: ps))
     }
 
-    // Otherwise, assume `d` identifies the declaration of a function, subscript, or bundle.
+    // Otherwise, assume `d` identifies the declaration of a function or subscript.
     else {
-      let (ps, o) = prototype(of: .init(d))
+      let (ps, o) = prototype(of: d)
       return program[module].ir.addFunction(
         IRFunction(name: name, output: o, typeParameters: ts, termParameters: ps))
     }
   }
 
-  /// Returns the identity of the function lowering `d`, declaring it if necessary.
+  /// Returns the identity of the function lowering the implementation of `requirement` for the
+  /// `conformance` with the given `arguments`, declaring it if necessary.
   private mutating func demandLoweredDeclaration(
-    syntheticImplementationOf d: DeclarationIdentity, for a: TypeArguments
+    implementationOf requirement: DeclarationIdentity, synthesized isSynthesized: Bool,
+    for conformance: ConformanceDeclaration.ID, _ arguments: TypeArguments
   ) -> IRFunction.ID {
-    let name = IRFunction.Name.synthesized(d, a)
+    let name: IRFunction.Name =
+      isSynthesized
+      ? .synthesized(requirement, arguments)
+      : .implementation(requirement, conformance, arguments)
+
     if let i = program[module].ir.functions.index(forKey: name) {
       return i
+    } else {
+      let (ps, o) = prototype(of: requirement, applying: arguments)
+      return program[module].ir.addFunction(
+        IRFunction(name: name, output: o, typeParameters: [], termParameters: ps))
     }
-
-    let (ps, o) = prototype(of: d, applying: a)
-    return program[module].ir.addFunction(
-      IRFunction(name: name, output: o, typeParameters: [], termParameters: ps))
   }
 
   /// Returns the identity of the constructor lowering `d`, declaring it if necessary.
@@ -1197,8 +1226,8 @@ internal struct IREmitter {
 
   /// Returns the term parameters and return type of `d`'s lowered representation.
   ///
-  /// `d` declares a function or bundle. The result includes `d`' explicit parameters, usings, and
-  /// captures, in that order. Type parameters are not included. Those are only lowered to term
+  /// `d` declares a function or subscript. The result includes `d`' explicit parameters, usings,
+  /// and captures, in that order. Type parameters are not included. Those are only lowered to term
   /// parameters in existentialized functions.
   private mutating func prototype(
     of d: DeclarationIdentity, applying substitutions: TypeArguments = .init()
@@ -1343,7 +1372,6 @@ internal struct IREmitter {
     return r
   }
 
-
   /// Returns the result of calling `action` on `self` with the insertion context configured to
   /// emit new instructions at `p` in `f`, anchoring them to `a`.
   internal mutating func lowering<R>(
@@ -1377,6 +1405,29 @@ internal struct IREmitter {
       return lowering(.before(j), anchoredTo: a, in: &f, action)
     } else {
       return lowering(.end(of: f.block(defining: i)), anchoredTo: a, in: &f, action)
+    }
+  }
+
+  /// Returns the result of calling `action` on `self` with the insertion context configured to
+  /// emit new instructions in the entry of `f`, which is not yet defined.
+  private mutating func defining<R>(
+    _ f: IRFunction.ID, _ action: (inout Self) -> R
+  ) -> R {
+    let function = program[module].ir[f].move()
+    assert(!function.isDefined, "function is already defined")
+
+    return withClearContext { (me) in
+      me.insertionContext.function = consume function
+      me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
+
+      defer {
+        // Once `action` returns, the insertion context contains the function that was originally
+        // moved out of the program. We have to put it back.
+        let defined = me.insertionContext.function.sink()
+        me.program[me.module].ir[f].take(definition: defined)
+      }
+
+      return action(&me)
     }
   }
 
@@ -1786,7 +1837,7 @@ internal struct IREmitter {
   private mutating func _emit(
     referenceTo d: ConformanceDeclaration.ID, applyingNullary applyNullary: Bool
   ) -> IRValue {
-    let f = demandLoweredDeclaration(function: d)
+    let f = demandLoweredDeclaration(function: .init(d))
     let v = functionReference(to: f)
 
     if program[module].ir[f].termParameters.isEmpty && applyNullary {
