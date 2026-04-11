@@ -225,9 +225,7 @@ public struct IRFunction: Sendable {
 
   /// Returns the type of `self`, computing it using `p`.
   public func signature() -> Signature {
-    let ps = termParameters.map { (p) in
-      Parameter(access: p.access, type: resolved(p.type)!.type)
-    }
+    let ps = termParameters.map({ (p) in Parameter(access: p.access, type: p.type) })
 
     var a: Arrow
     switch output {
@@ -370,7 +368,7 @@ public struct IRFunction: Sendable {
   public func result(of v: IRValue) -> (type: AnyTypeIdentity, isPlace: Bool)? {
     switch v {
     case .parameter(let i):
-      return resolved(termParameters[i].type)
+      return resolved(.place(termParameters[i].type))
     case .register(let i):
       return resolved(at(i).type)
     case .integer(_, let t):

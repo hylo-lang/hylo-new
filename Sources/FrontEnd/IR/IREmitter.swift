@@ -303,8 +303,7 @@ internal struct IREmitter {
       // Assume `p` is initialized if it's a `set` parameter other than the return register
       // accessing the storage of a trivially initializable object (e.g., an empty struct).
       if (p.access == .set) && (v != insertionContext.function!.returnRegister) {
-        let t = insertionContext.function!.resolved(p.type)!.type
-        if program.isTriviallyInitializable(t, in: .init(node: d)) {
+        if program.isTriviallyInitializable(p.type, in: .init(node: d)) {
           lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
             me._assume_state(v, initialized: true)
           }
@@ -1110,7 +1109,7 @@ internal struct IREmitter {
 
       let output = IRFunction.Output.remote(.let, witness.head)
       let ps = witness.context.usings.map { (u) in
-        IRParameter(type: program.types.ir(place: u), access: .let, declaration: nil)
+        IRParameter(type: program.types.dealiased(u), access: .let, declaration: nil)
       }
 
       return program[module].ir.addFunction(
@@ -1156,13 +1155,13 @@ internal struct IREmitter {
     var ps: [IRParameter] = .init(minimumCapacity: program[d].parameters.count + 1)
     for p in program[d].parameters {
       let t = program.type(assignedTo: p, assuming: RemoteType.self)
-      let u = program.types.ir(place: program.types[t].projectee)
+      let u = program.types.dealiased(program.types[t].projectee)
       ps.append(IRParameter(type: u, access: program.types[t].access, declaration: .init(p)))
     }
 
     // The constructor returns an instance of the containing enum.
     let e = program.type(assignedTo: program.parent(containing: d).node!, assuming: Metatype.self)
-    let o = program.types.ir(place: program.types[e].inhabitant)
+    let o = program.types.dealiased(program.types[e].inhabitant)
     ps.append(.init(type: o, access: .set, declaration: nil))
 
     return program[module].ir.addFunction(
@@ -1185,7 +1184,7 @@ internal struct IREmitter {
 
     // Declare the global's initializer.
     let t = program.types.dealiased(program.type(assignedTo: d))
-    let o = IRParameter(type: .place(t), access: .set, declaration: nil)
+    let o = IRParameter(type: t, access: .set, declaration: nil)
     let i = IRFunction(
       name: .initializer(d), output: .indirect, typeParameters: [], termParameters: [o])
     let f = program[module].ir.addFunction(i)
@@ -1212,7 +1211,7 @@ internal struct IREmitter {
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {
       for p in program.types[abstraction].inputs {
-        let u = program.types.ir(place: p.type)
+        let u = program.types.dealiased(p.type)
         result.append(IRParameter(type: u, access: p.access, declaration: nil))
       }
     }
@@ -1225,7 +1224,7 @@ internal struct IREmitter {
       // Using parameters come first.
       for p in parameters.usings {
         let t = program.type(assignedTo: p)
-        let u = program.types.ir(place: t)
+        let u = program.types.dealiased(t)
 
         if let b = program.cast(p, to: BindingDeclaration.self) {
           let (k, v) = program.implicit(introducedBy: b)
@@ -1238,21 +1237,21 @@ internal struct IREmitter {
       // If `d` is a trait requirement, the trait receiver comes next.
       if let c = program.traitRequiring(d) {
         let t = program.withTyper(typing: c.module, { (tp) in tp.typeOfTraitSelf(in: c) })
-        let u = program.types.ir(place: t)
+        let u = program.types.dealiased(t)
         result.append(IRParameter(type: u, access: .let, declaration: nil))
       }
 
       // Explicit parameters come next.
       for p in parameters.explicit {
         let t = program.type(assignedTo: p, assuming: RemoteType.self)
-        let u = program.types.ir(place: program.types[t].projectee)
+        let u = program.types.dealiased(program.types[t].projectee)
         result.append(IRParameter(type: u, access: program.types[t].access, declaration: .init(p)))
       }
     }
 
     if program.types[abstraction].style == .parenthesized {
       // Return register comes last.
-      let o = program.types.ir(place: program.types[abstraction].output)
+      let o = program.types.dealiased(program.types[abstraction].output)
       result.append(IRParameter(type: o, access: .set, declaration: nil))
       return (result, .indirect)
     } else {
