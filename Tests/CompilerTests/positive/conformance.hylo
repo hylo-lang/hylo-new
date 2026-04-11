@@ -4,4 +4,8 @@ trait P {
   fun f() {}
 }
 
-struct S is P {}
+struct S0 is P {}
+
+struct S1 is P {
+  fun f() {}
+}

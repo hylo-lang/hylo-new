@@ -453,28 +453,32 @@ public struct Typer {
     func namedImplementation(of requirement: DeclarationIdentity) -> DeclarationReference? {
       let requiredName = program.name(of: requirement)!
       let requiredType = expectedImplementationType(of: requirement)
-
       var viable: [DeclarationReference] = []
 
-      // Is there a unique implementation in the conformance declaration?
+      // Is there an implementation in the conformance declaration?
       for c in lookup(requiredName, lexicallyIn: .init(node: d)) {
         let candidateType = declaredType(of: c)
         if unifiable(candidateType, requiredType) { viable.append(.direct(c)) }
       }
 
+      // Is there an implementation that is already member of the conforming type?
       if viable.isEmpty {
-        // Is there an implementation that is already member of the conforming type?
+        var defaultCandidate: DeclarationReference? = nil
+
         for c in resolve(requiredName, memberOf: qualification, visibleFrom: .init(node: d)) {
           if !unifiable(c.type, requiredType) { continue }
 
           // If we resolved the requirement, make sure it has a default implementation.
           switch c.reference {
-          case .inherited(_, requirement, _) where !hasDefinition(requirement):
-            continue
+          case .inherited(_, requirement, _):
+            if hasDefinition(requirement) { defaultCandidate = c.reference }
           default:
             viable.append(c.reference)
           }
         }
+
+        // The default implementation is used iff there is no other candidate.
+        if viable.isEmpty, let c = defaultCandidate { viable.append(c) }
       }
 
       if let pick = viable.uniqueElement {

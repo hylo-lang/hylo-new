@@ -209,26 +209,48 @@ internal struct IREmitter {
 
     let (associatedTypes, requirements) = program.requirements(of: table.concept)
     for r in requirements {
+      if let d = program.cast(r, to: FunctionDeclaration.self) {
+        precondition(program[d].introducer.value != .subscript, "todo")
+      }
+
       switch table.member(implementing: r)! {
       case .synthetic(let m, _):
+        assert(m == r)
         let f = demandLoweredDeclaration(
-          implementationOf: m, synthesized: true, for: d, table.arguments)
+          implementationOf: r, synthesized: true, for: d, table.arguments)
         members.append(functionReference(to: f))
+
+      case .direct(let m):
+        let interface = demandLoweredDeclaration(
+          implementationOf: r, synthesized: false, for: d, table.arguments)
+        members.append(functionReference(to: interface))
+
+        defining(interface) { (me) in
+          me.insertionContext.anchor = .init(site: me.program[d].site, scope: .init(node: d))
+
+          // Get a reference to the implementation.
+          let implementation = me.demandLoweredDeclaration(function: m)
+          let x0 = me.functionReference(to: implementation)
+
+          // Forward the term parameters to the implementation.
+          let xs = me.currentFunction.termParameters.enumerated().dropFirst().map { (i, p) in
+            me._access([p.access], from: .parameter(i))
+          }
+          me._apply(x0, xs.dropLast(), into: xs.last!)
+        }
 
       case .inherited(let w, let m, statically: _):
         // Is the implementation defined in the trait itself?
         if program.traitRequiring(m) == program.types[table.concept].declaration {
           let interface = demandLoweredDeclaration(
-            implementationOf: m, synthesized: false, for: d, table.arguments)
+            implementationOf: r, synthesized: false, for: d, table.arguments)
           members.append(functionReference(to: interface))
-
-          let implementation = demandLoweredDeclaration(function: m)
-          precondition(!program[module].ir[implementation].isSubscript, "todo")
 
           defining(interface) { (me) in
             me.insertionContext.anchor = .init(site: me.program[d].site, scope: .init(node: d))
 
             // Get a reference to the implementation.
+            let implementation = me.demandLoweredDeclaration(function: m)
             let x0 = me.functionReference(to: implementation)
             let x1 = me._type_apply(x0, to: table.arguments)
 
@@ -1585,6 +1607,7 @@ internal struct IREmitter {
   internal mutating func _apply(
     _ callee: IRValue, _ arguments: [IRValue], into result: IRValue
   ) {
+    assert(isCallable(callee, with: arguments))
     let s = IRApply(
       callee: callee, arguments: arguments, result: result,
       anchor: currentAnchor)
@@ -2153,6 +2176,14 @@ internal struct IREmitter {
     let s = program[module].ir[f].signature()
     let t = program.types.demand(s)
     return .function(n, t)
+  }
+
+  /// Returns `true` iff `callee` denotes a function that can be called with `arguments` in the
+  /// current function.
+  private mutating func isCallable(_ callee: IRValue, with arguments: [IRValue]) -> Bool {
+    let t = currentFunction.result(of: callee)!.type
+    let u = program.types.seenAsTermAbstraction(t)!
+    return program.types[u].inputs.count == arguments.count
   }
 
 }

@@ -30,8 +30,8 @@ public enum DeclarationReference: Hashable, Sendable {
 
   /// A reference to a synthetic implementation of a trait requirement.
   ///
-  /// The payload is `true` iff the implementation is transitively synthetic, meaning that it does
-  /// not involve any user code. This property is set during typing.
+  /// The second element of the payload is `true` iff the implementation is transitively synthetic,
+  /// meaning that it does not involve any user code. This property is set during typing.
   case synthetic(DeclarationIdentity, transitively: Bool)
 
   /// `true` iff this referennce mentions open variable.
