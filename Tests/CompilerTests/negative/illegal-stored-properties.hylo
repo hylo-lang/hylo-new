@@ -8,3 +8,8 @@ enum E<T> {
   let foo: Void
   static let bar: Void = ()
 }
+
+extension <T> S<T> {
+  let foo: Void
+  static let bar: Void = ()
+}
