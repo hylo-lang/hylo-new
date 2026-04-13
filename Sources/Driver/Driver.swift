@@ -124,15 +124,24 @@ public struct Driver {
     }
 
     // Attempt to load the module from disk.
-    if cachingIsEnabled, let data = archive(of: module) {
-      let h = SourceFile.fingerprint(contentsOf: sources)
-      var a = ReadableArchive(data)
-      let (_, fingerprint) = try Module.header(&a)
-      if h == fingerprint {
-        a = ReadableArchive(data)
-        try program.load(module: module, from: &a)
-        return
+    do {
+      if cachingIsEnabled, let data = archive(of: module) {
+        let h = SourceFile.fingerprint(contentsOf: sources)
+        var a = ReadableArchive(data)
+        let (_, fingerprint) = try Module.header(&a)
+        if h == fingerprint {
+          a = ReadableArchive(data)
+          try program.load(module: module, from: &a)
+          return
+        }
       }
+    } catch ArchiveError.invalidInput {
+      let m = """
+        Failed to parse module archive of '\(module)' at '\(moduleCachePath, default: "nil")'.
+
+        Maybe the archive is compiled using a different version of the compiler. Try erasing the module cache.
+        """
+      fatalError(m)
     }
 
     // Compile the module from sources.
