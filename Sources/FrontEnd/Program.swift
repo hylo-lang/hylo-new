@@ -610,6 +610,11 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `n` if it identifies a node of type `U`; otherwise, returns `nil`.
+  public func flatCast<T: SyntaxIdentity, U: Syntax>(_ n: T?, to: U.Type) -> U.ID? {
+    n.flatMap({ (m) in cast(m, to: U.self) })
+  }
+
   /// Returns `w` if it is the desugared form of a conformance type. Otherwise, returns `nil`.
   public func seenAsConformanceTypeExpression(_ w: StaticCall.ID) -> ConformanceTypeSugar? {
     Utilities.read(self[w], { (tree) in tree.arguments.isEmpty ? nil : .init(tree) })

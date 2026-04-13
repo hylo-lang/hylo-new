@@ -3146,7 +3146,7 @@ public struct Typer {
     }
 
     // The witness refers to a given declaration?
-    else if let d = witness.declaration, let c = program.cast(d, to: ConformanceDeclaration.self) {
+    else if let c = program.flatCast(witness.declaration, to: ConformanceDeclaration.self) {
       // Read the associated type definition.
       if let i = implementation(of: requirement, in: c) {
         return declaredType(of: i)
@@ -3691,7 +3691,7 @@ public struct Typer {
     var gs: [Given] = []
     appendGivens(in: program.declarations(lexicallyIn: s), to: &gs)
 
-    if let d = s.node, let c = program.cast(d, to: TraitDeclaration.self) {
+    if let c = program.flatCast(s.node, to: TraitDeclaration.self) {
       gs.append(.recursive(typeOfTraitSelf(in: c)))
     }
 

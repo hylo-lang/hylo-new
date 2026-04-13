@@ -697,9 +697,7 @@ public struct IRFunction: Sendable {
   /// moved back into `self` using `take(definition:)`.
   public mutating func move() -> IRFunction {
     var other = IRFunction(
-      name: name, output: output,
-      typeParameters: typeParameters,
-      termParameters: termParameters)
+      name: name, output: output, typeParameters: typeParameters, termParameters: termParameters)
 
     swap(&self.bindings, &other.bindings)
     swap(&self.slots, &other.slots)

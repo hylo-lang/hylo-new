@@ -47,6 +47,8 @@ internal struct IREmitter {
       lower(program.castUnchecked(d, to: EnumCaseDeclaration.self))
     case EnumDeclaration.self:
       lower(program.castUnchecked(d, to: EnumDeclaration.self))
+    case ExtensionDeclaration.self:
+      lower(program.castUnchecked(d, to: ExtensionDeclaration.self))
     case FunctionDeclaration.self:
       lower(program.castUnchecked(d, to: FunctionDeclaration.self))
     case ImportDeclaration.self:
@@ -314,6 +316,13 @@ internal struct IREmitter {
       } else {
         lower(m)
       }
+    }
+  }
+
+  /// Generates the IR of `d`.
+  private mutating func lower(_ d: ExtensionDeclaration.ID) {
+    for m in program[d].members {
+      lower(m)
     }
   }
 
@@ -821,13 +830,26 @@ internal struct IREmitter {
     case .inherited(let w, let m, let statically):
       // The callee refers to a member declared in extension.
       let s = statically ? nil : program[e].qualification.map({ (s) in lowered(lvalue: s) })
-      let t = program.type(assignedTo: e)
-      let u = program.types.lifted(t)
 
-      return lowering(e) { (me) in
-        let x0 = me._emit(witness: w)
-        let x1 = me._property(m, of: x0, withType: u)
-        return LoweredCallee(value: x1, arguments: Array(contentsOf: s), result: result)
+      // Is the member declared in an extension?
+      if program.isExtensionMember(m) {
+        let target = loweredCallee(e, referringTo: m, boundTo: s, output: result)
+        return lowering(e) { (me) in
+          let (ts, xs) = me._emitArguments(of: w)
+          let f = ts.isEmpty ? target.value : me._type_apply(target.value, to: ts)
+          return LoweredCallee(value: f, arguments: xs + target.arguments, result: target.result)
+        }
+      }
+
+      // The member is inherited by conformance.
+      else {
+        let t = program.type(assignedTo: e)
+        let u = program.types.lifted(t)
+        return lowering(e) { (me) in
+          let x0 = me._emit(witness: w)
+          let x1 = me._property(m, of: x0, withType: u)
+          return LoweredCallee(value: x1, arguments: Array(contentsOf: s), result: result)
+        }
       }
 
     default:
@@ -860,8 +882,6 @@ internal struct IREmitter {
   private mutating func loweredCallee(
     referringTo function: IRFunction.ID, boundTo receiver: IRValue?, output result: IRValue
   ) -> LoweredCallee {
-    // TODO: Deal with the type of the receiver
-    // Partial application tout ça tout ça
     let v = functionReference(to: function)
     return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
   }
@@ -1917,19 +1937,9 @@ internal struct IREmitter {
       return _emit(referenceTo: d, applyingNullary: applyNullary)
 
     case .termApplication(let f, let a):
-      var stack = [_emit(witness: a)]
-      var abstraction: WitnessExpression? = f
-      while let w = abstraction.take() {
-        if case .termApplication(let g, let b) = w.value {
-          stack.append(_emit(witness: b))
-          abstraction = g
-        } else {
-          stack.append(_emit(witness: w, applyingNullary: false))
-        }
-      }
-
-      let (callee, arguments) = stack.reversed().headAndTail!
-      return _project(callee, Array(arguments))
+      let (abstraction, arguments) = _emit(curriedApplicationOf: f, to: a)
+      let callee = _emit(witness: abstraction, applyingNullary: false)
+      return _project(callee, arguments)
 
     case .typeApplication(let f, let a):
       let x = _emit(witness: f, applyingNullary: applyNullary)
@@ -1937,6 +1947,55 @@ internal struct IREmitter {
 
     default:
       fatalError()
+    }
+  }
+
+  /// Generates the IR for computing the arguments of the term application represented by `f(a)`.
+  ///
+  /// Term applications are represented in curried form. A call to a function `f` accepting two
+  /// parameters is encoded as `(f(a0))(a1)`. This method "unrolls" such an encoding and returns
+  /// the underlying abstraction `f` together with the values of each argument.
+  private mutating func _emit(
+    curriedApplicationOf f: WitnessExpression, to a: WitnessExpression
+  ) -> (WitnessExpression, [IRValue]) {
+    var stack = [_emit(witness: a, applyingNullary: true)]
+    var abstraction = f
+    while true {
+      if case .termApplication(let g, let b) = abstraction.value {
+        stack.append(_emit(witness: b, applyingNullary: true))
+        abstraction = g
+      } else {
+        return (abstraction, stack.reversed())
+      }
+    }
+  }
+
+  /// Returns the type and term arguments of `w`, which is a reference to an extension.
+  ///
+  /// Declaration references to declarations declared in type extensions are expressed using a
+  /// witness representing the type and term arguments passed to parameters declared on the
+  /// extension itself. This method computes the values of these arguments.
+  private mutating func _emitArguments(
+    of w: WitnessExpression
+  ) -> (types: TypeArguments, terms: [IRValue]) {
+    var value = w.value
+    var types: TypeArguments.Contents = [:]
+    var terms: [IRValue] = []
+
+    while true {
+      switch value {
+      case .termApplication(let f, let a):
+        let (x, xs) = _emit(curriedApplicationOf: f, to: a)
+        value = x.value
+        terms.append(contentsOf: xs)
+
+      case .typeApplication(let f, let a):
+        value = f.value
+        types.merge(a.elements, uniquingKeysWith: { (_, _) in fatalError() })
+
+      default:
+        return (TypeArguments(types), terms)
+      }
     }
   }
 

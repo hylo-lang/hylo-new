@@ -16,7 +16,7 @@ public enum DeclarationReference: Hashable, Sendable {
   /// type. The whole expression denotes a function or subscript partially applied to `x`
   case member(DeclarationIdentity)
 
-  /// A reference to a non-static member inherited by conformance or extension.
+  /// A reference to a member inherited by conformance or extension.
   ///
   /// The reference was formed from an expression `x.member` where `member` refers to a symbol
   /// declared in an extension of `x`'s type, or defined as a requirement of a trait to which the
