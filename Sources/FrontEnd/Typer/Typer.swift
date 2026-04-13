@@ -1504,7 +1504,16 @@ public struct Typer {
     let e = declaredEnvironmentType(of: d)
     let o = program[d].output.map({ (a) in evaluateTypeAscription(a) }) ?? .void
     let a = demand(Arrow(style: s, effect: k, environment: e, inputs: inputs, output: o))
-    return introduce(program[d].contextParameters, into: a.erased)
+
+    // Extensions can define context parameters as well.
+    if let x = program.extensionContaining(d) {
+      return introduce(
+        types: program[d].contextParameters.types,
+        usings: chain(program[x].contextParameters.usings, program[d].contextParameters.usings),
+        into: a.erased)
+    } else {
+      return introduce(program[d].contextParameters, into: a.erased)
+    }
   }
 
   /// Returns the type of the environment of `d`.
@@ -1686,14 +1695,22 @@ public struct Typer {
     }
   }
 
-  /// Returns `t` as the head of a universal type and/or implication introducing `parameters`.
+  /// Returns `t` as the head of a universal type and/or implication introducing `clause`.
   private mutating func introduce(
-    _ parameters: ContextParameters, into t: AnyTypeIdentity
+    _ clause: ContextParameters, into t: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    if parameters.isEmpty { return t }
+    introduce(types: clause.types, usings: clause.usings, into: t)
+  }
 
-    let ps = declaredTypes(of: parameters.types)
-    let us = parameters.usings.map({ (p) in declaredType(of: p) })
+  /// Returns `t` as the head of a universal type and/or implication introducing the given
+  /// contextual parameters.
+  private mutating func introduce<U: Collection<DeclarationIdentity>>(
+    types: [GenericParameterDeclaration.ID], usings: U, into t: AnyTypeIdentity
+  ) -> AnyTypeIdentity {
+    if types.isEmpty && usings.isEmpty { return t }
+
+    let ps = declaredTypes(of: types)
+    let us = usings.map({ (p) in declaredType(of: p) })
     return program.types.introduce(.init(parameters: ps, usings: us), into: t)
   }
 

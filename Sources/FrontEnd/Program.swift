@@ -328,16 +328,11 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns `true` iff `n` declares a member in an type extension.
+  /// Returns `true` iff `n` declares a member entity in an type extension.
   ///
   /// - Rquires: The module containing `n` is scoped.
   public func isExtensionMember<T: SyntaxIdentity>(_ n: T) -> Bool {
-    switch tag(of: n) {
-    case FunctionDeclaration.self:
-      return parent(containing: n, as: ExtensionDeclaration.self) != nil
-    default:
-      return false
-    }
+    extensionContaining(n) != nil
   }
 
   /// Returns `true` iff `n` declares a non-static member entity.
@@ -759,6 +754,19 @@ public struct Program: Sendable {
       return parent(containing: parent(containing: n).node!, as: TraitDeclaration.self)
     default:
       return nil
+    }
+  }
+
+  /// If `n` declares a member entity in an extension, returns the that declaration. Otherwise,
+  /// returns `nil`.
+  ///
+  /// - Rquires: The module containing `n` is scoped.
+  public func extensionContaining<T: SyntaxIdentity>(_ n: T) -> ExtensionDeclaration.ID? {
+    switch tag(of: n) {
+    case VariantDeclaration.self:
+      return parent(containing: parent(containing: n).node!, as: ExtensionDeclaration.self)
+    default:
+      return parent(containing: n, as: ExtensionDeclaration.self)
     }
   }
 
