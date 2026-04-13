@@ -4071,6 +4071,12 @@ public struct Typer {
         return []
       }
 
+    case "Metatype":
+      let p = demand(GenericParameter.nth(0, .proper))
+      let t = demand(Metatype(inhabitant: p.erased))
+      let u = metatype(of: UniversalType(parameters: [p], head: t.erased))
+      return [.init(reference: .builtin(.alias), type: u.erased)]
+
     case "Never":
       let t = program.types.never()
       let u = demand(Metatype(inhabitant: t.erased))

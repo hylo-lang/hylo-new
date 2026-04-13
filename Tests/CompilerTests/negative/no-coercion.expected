@@ -1,0 +1,3 @@
+negative/no-coercion.hylo:14.29-35: error: no coercion from 'P<Void> ==> [Void](self: let Void) let -> Void' to '[Void](let Void) let -> Void'
+  let x: [](Void) -> Void = Void.f
+                            ~~~~~~
