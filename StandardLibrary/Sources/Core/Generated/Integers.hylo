@@ -1,0 +1,1064 @@
+/// A signed 8-bit integer.
+@_symbol("Int8")
+public struct Int8 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i8
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i8()
+  }
+
+  /// Returns the absolute value of `self`.
+  ///
+  /// - Precondition: `self` must not be `Int8`'s minimum value.
+  public fun abs() -> Self {
+    if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
+  }
+
+}
+
+public given Int8 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given Int8 is Movable {}
+
+public given Int8 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i8(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i8(self.value, other.value))
+  }
+
+}
+
+public given Int8 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_slt_i8(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sle_i8(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sgt_i8(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_sge_i8(self.value, other.value))
+  }
+
+}
+
+public given Int8 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.sadd_with_overflow_i8(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.ssub_with_overflow_i8(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given Int8 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.smul_with_overflow_i8(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// An unsigned 8-bit integer.
+@_symbol("UInt8")
+public struct UInt8 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i8
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i8()
+  }
+
+}
+
+public given UInt8 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given UInt8 is Movable {}
+
+public given UInt8 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i8(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i8(self.value, other.value))
+  }
+
+}
+
+public given UInt8 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ult_i8(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ule_i8(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ugt_i8(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_uge_i8(self.value, other.value))
+  }
+
+}
+
+public given UInt8 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.uadd_with_overflow_i8(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.usub_with_overflow_i8(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given UInt8 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.umul_with_overflow_i8(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// A signed 16-bit integer.
+@_symbol("Int16")
+public struct Int16 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i16
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i16()
+  }
+
+  /// Returns the absolute value of `self`.
+  ///
+  /// - Precondition: `self` must not be `Int16`'s minimum value.
+  public fun abs() -> Self {
+    if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
+  }
+
+}
+
+public given Int16 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given Int16 is Movable {}
+
+public given Int16 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i16(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i16(self.value, other.value))
+  }
+
+}
+
+public given Int16 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_slt_i16(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sle_i16(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sgt_i16(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_sge_i16(self.value, other.value))
+  }
+
+}
+
+public given Int16 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.sadd_with_overflow_i16(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.ssub_with_overflow_i16(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given Int16 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.smul_with_overflow_i16(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// An unsigned 16-bit integer.
+@_symbol("UInt16")
+public struct UInt16 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i16
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i16()
+  }
+
+}
+
+public given UInt16 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given UInt16 is Movable {}
+
+public given UInt16 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i16(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i16(self.value, other.value))
+  }
+
+}
+
+public given UInt16 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ult_i16(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ule_i16(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ugt_i16(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_uge_i16(self.value, other.value))
+  }
+
+}
+
+public given UInt16 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.uadd_with_overflow_i16(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.usub_with_overflow_i16(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given UInt16 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.umul_with_overflow_i16(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// A signed 32-bit integer.
+@_symbol("Int32")
+public struct Int32 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i32
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i32()
+  }
+
+  /// Returns the absolute value of `self`.
+  ///
+  /// - Precondition: `self` must not be `Int32`'s minimum value.
+  public fun abs() -> Self {
+    if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
+  }
+
+}
+
+public given Int32 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given Int32 is Movable {}
+
+public given Int32 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i32(self.value, other.value))
+  }
+
+}
+
+public given Int32 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_slt_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sle_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sgt_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_sge_i32(self.value, other.value))
+  }
+
+}
+
+public given Int32 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.sadd_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.ssub_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given Int32 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.smul_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// An unsigned 32-bit integer.
+@_symbol("UInt32")
+public struct UInt32 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i32
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i32()
+  }
+
+}
+
+public given UInt32 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given UInt32 is Movable {}
+
+public given UInt32 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i32(self.value, other.value))
+  }
+
+}
+
+public given UInt32 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ult_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ule_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ugt_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_uge_i32(self.value, other.value))
+  }
+
+}
+
+public given UInt32 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.uadd_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.usub_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given UInt32 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.umul_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// A signed 64-bit integer.
+@_symbol("Int64")
+public struct Int64 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i64
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i64()
+  }
+
+  /// Returns the absolute value of `self`.
+  ///
+  /// - Precondition: `self` must not be `Int64`'s minimum value.
+  public fun abs() -> Self {
+    if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
+  }
+
+}
+
+public given Int64 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given Int64 is Movable {}
+
+public given Int64 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i64(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i64(self.value, other.value))
+  }
+
+}
+
+public given Int64 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_slt_i64(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sle_i64(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sgt_i64(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_sge_i64(self.value, other.value))
+  }
+
+}
+
+public given Int64 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.sadd_with_overflow_i64(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.ssub_with_overflow_i64(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given Int64 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.smul_with_overflow_i64(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// An unsigned 64-bit integer.
+@_symbol("UInt64")
+public struct UInt64 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i64
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i64()
+  }
+
+}
+
+public given UInt64 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given UInt64 is Movable {}
+
+public given UInt64 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i64(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i64(self.value, other.value))
+  }
+
+}
+
+public given UInt64 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ult_i64(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ule_i64(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ugt_i64(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_uge_i64(self.value, other.value))
+  }
+
+}
+
+public given UInt64 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.uadd_with_overflow_i64(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.usub_with_overflow_i64(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given UInt64 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.umul_with_overflow_i64(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// A signed integer type that can represent any object size on the target platform.
+@_symbol("Int")
+public struct Int is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.word
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_word()
+  }
+
+  /// Returns the absolute value of `self`.
+  ///
+  /// - Precondition: `self` must not be `Int`'s minimum value.
+  public fun abs() -> Self {
+    if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
+  }
+
+}
+
+public given Int is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given Int is Movable {}
+
+public given Int is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_word(self.value, other.value))
+  }
+
+}
+
+public given Int is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_slt_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sle_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sgt_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_sge_word(self.value, other.value))
+  }
+
+}
+
+public given Int is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.sadd_with_overflow_word(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.ssub_with_overflow_word(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given Int is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.smul_with_overflow_word(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+
+
+/// An unsigned integer type that can represent any object size on the target platform.
+@_symbol("UInt")
+public struct UInt is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.word
+
+  /// Cre ates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_word()
+  }
+
+}
+
+public given UInt is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given UInt is Movable {}
+
+public given UInt is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_word(self.value, other.value))
+  }
+
+}
+
+public given UInt is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ult_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ule_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ugt_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_uge_word(self.value, other.value))
+  }
+
+}
+
+public given UInt is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.uadd_with_overflow_word(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.usub_with_overflow_word(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given UInt is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.umul_with_overflow_word(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+}
+

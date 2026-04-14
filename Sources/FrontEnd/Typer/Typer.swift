@@ -4570,14 +4570,9 @@ public struct Typer {
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
     guard program.containsStandardLibrary else { return false }
-    switch program.types.dealiased(t) {
-    case standardLibraryType(.int),
-        standardLibraryType(.int32),
-        standardLibraryType(.int64):
-      return true
-    default:
-      return false
-    }
+
+    let d = program.types.dealiased(t)
+    return Program.StandardLibraryEntity.allIntegerTypes.contains { standardLibraryType($0) == d }
   }
 
   /// Returns the type of the given standard library entity.

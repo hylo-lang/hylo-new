@@ -1,0 +1,18 @@
+//! stage:lowering
+
+fun expressible_by_integer_literal() {
+  let a1: Int8 = Int8.zero() + Int8.zero()
+  let a2: UInt8 = UInt8.zero() + UInt8.zero()
+
+  let a3: Int16 = Int16.zero() + Int16.zero()
+  let a4: UInt16 = UInt16.zero() + UInt16.zero()
+
+  let a5: Int32 = Int32.zero() + Int32.zero()
+  let a6: UInt32 = UInt32.zero() + UInt32.zero()
+
+  let a7: Int64 = Int64.zero() + Int64.zero()
+  let a8: UInt64 = UInt64.zero() + UInt64.zero()
+
+  let a9: Int = Int.zero() + Int.zero()
+  let a10: UInt = UInt.zero() + UInt.zero()
+}
