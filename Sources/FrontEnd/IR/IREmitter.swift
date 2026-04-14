@@ -2263,28 +2263,28 @@ extension Program {
 
   }
 
-  /// Returns the term parameters of `d`, which identifies a callable abstraction.
-  fileprivate func parametersAndCaptures(of d: DeclarationIdentity) -> ParametersAndCaptures {
+  /// Returns the term parameters of `d`, which declares a function or variant.
+  fileprivate func parametersAndCaptures(
+    of d: DeclarationIdentity
+  ) -> ParametersAndCaptures {
     switch tag(of: d) {
     case FunctionDeclaration.self:
       return parametersAndCaptures(of: castUnchecked(d, to: FunctionDeclaration.self))
     case VariantDeclaration.self:
-      return parametersAndCaptures(of: castUnchecked(d, to: VariantDeclaration.self))
+      return parametersAndCaptures(of: parent(containing: d, as: FunctionBundleDeclaration.self)!)
     default:
       unexpected(d)
     }
   }
 
   /// Returns the term parameters of `d`.
-  fileprivate func parametersAndCaptures(of d: FunctionDeclaration.ID) -> ParametersAndCaptures {
-    .init(explicit: self[d].parameters, usings: self[d].contextParameters.usings, captures: [])
-  }
-
-  /// Returns the term parameters of `d`.
-  fileprivate func parametersAndCaptures(of d: VariantDeclaration.ID) -> ParametersAndCaptures {
-    let p = parent(containing: d, as: FunctionBundleDeclaration.self)!
-    return .init(
-      explicit: self[p].parameters, usings: self[p].contextParameters.usings, captures: [])
+  fileprivate func parametersAndCaptures<T: RoutineDeclaration>(
+    of d: T.ID
+  ) -> ParametersAndCaptures {
+    // If `d` is declared in an extension, then it accepts the using parameters of that extension.
+    var usings = extensionContaining(d).map({ (x) in self[x].contextParameters.usings }) ?? []
+    usings.append(contentsOf: self[d].contextParameters.usings)
+    return .init(explicit: self[d].parameters, usings: usings, captures: [])
   }
 
 }

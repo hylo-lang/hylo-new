@@ -1504,16 +1504,7 @@ public struct Typer {
     let e = declaredEnvironmentType(of: d)
     let o = program[d].output.map({ (a) in evaluateTypeAscription(a) }) ?? .void
     let a = demand(Arrow(style: s, effect: k, environment: e, inputs: inputs, output: o))
-
-    // Extensions can define context parameters as well.
-    if let x = program.extensionContaining(d) {
-      return introduce(
-        types: program[d].contextParameters.types,
-        usings: chain(program[x].contextParameters.usings, program[d].contextParameters.usings),
-        into: a.erased)
-    } else {
-      return introduce(program[d].contextParameters, into: a.erased)
-    }
+    return introduce(program[d].contextParameters, into: a.erased)
   }
 
   /// Returns the type of the environment of `d`.
