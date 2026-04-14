@@ -47,15 +47,7 @@ final class CompilerTests: XCTestCase {
   ///
   /// An new directory is generated every time this property is initialized and removed once all
   /// tests have run.
-  private static let moduleCachePath: (url: URL, delete: @Sendable () -> Void) = {
-    let m = FileManager.default
-    let u = try! m.url(
-      for: .itemReplacementDirectory,
-      in: .userDomainMask,
-      appropriateFor: m.currentDirectoryURL,
-      create: true)
-    return (u, { try? FileManager.default.removeItem(at: u) })
-  }()
+  private static let moduleCachePath = Driver.temporaryModuleCachePath()
 
   /// Deletes cached compilation artifacts.
   override class func tearDown() {

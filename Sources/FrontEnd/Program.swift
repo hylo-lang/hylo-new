@@ -9,7 +9,7 @@ public struct Program: Sendable {
   public private(set) var modules = OrderedDictionary<Module.Name, Module>()
 
   /// The types in the program.
-  public internal(set) var types = TypeStore()
+  public var types = TypeStore()
 
   /// The memoization caches of type inference and name resolution.
   ///
@@ -21,6 +21,9 @@ public struct Program: Sendable {
   /// This table is initialized either by `Typer.apply` before the standard library is type checked
   /// or by `self.load(module:from:)` after the standard library has been deserialized.
   private var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
+
+  /// `true` iff the program is allowed to have an only partially loaded standard library.
+  public var allowPartialStandardLibrary: Bool = false
 
   /// Creates an empty program.
   public init() {}
@@ -1385,12 +1388,14 @@ extension Program {
   /// This method must be called before type checking the standard library.
   internal mutating func initializeStandardLibraryCaches() {
     for n in Program.StandardLibraryEntity.allCases {
-      guard
-        let a = identity(module: .standardLibrary),
+      if let a = identity(module: .standardLibrary),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
-      else { fatalError("missing or corrupt standard library") }
-      standardLibraryDeclarations[n] = d
+      {
+        standardLibraryDeclarations[n] = d
+      } else if !allowPartialStandardLibrary {
+        fatalError("missing or corrupt standard library")
+      }
     }
   }
 
