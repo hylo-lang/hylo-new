@@ -8,7 +8,7 @@ public struct Int is Deinitializable {
   /// Creates an instance with its raw value.
   internal memberwise init
 
-  /// Creates an instance equal to `false`.
+  /// Creates an instance with value `0`.
   public init() {
     &self.value = Builtin.zeroinitializer_word()
   }
