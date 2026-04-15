@@ -66,7 +66,7 @@ extension Base64Digit: LosslessStringConvertible {
 
   /// Creates an instance from its Unicode scalar representation.
   public init?(scalar: Unicode.Scalar) {
-    guard scalar.value < 128 else {
+    guard scalar.value < UInt8.max else {
       return nil
     }
     self.init(ascii: UInt8(scalar.value))

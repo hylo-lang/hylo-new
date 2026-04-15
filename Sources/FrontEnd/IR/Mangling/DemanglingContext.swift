@@ -47,12 +47,12 @@ struct DemanglingContext {
   /// Assuming `stream` starts with a mangled string, consumes and returns it. Returns `nil` iff
   /// the data is corrupted.
   mutating func takeString() -> String? {
-    switch takeInteger()?.rawValue {
-    case .some(0):
+guard let length = takeInteger(0) else { return nil }
+switch length {
       return String(stream[stream.startIndex..<stream.startIndex])
     case .some(1):
       guard let n = takeInteger() else { return nil }
-      guard n.rawValue < symbols.count else {
+      guard n.rawValue < strings.count else {
         debug.print("ERROR: out of bounds when reading string \(n)")
         return nil
       }

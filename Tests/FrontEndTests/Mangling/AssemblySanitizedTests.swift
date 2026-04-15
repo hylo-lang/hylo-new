@@ -27,8 +27,7 @@ final class AssemblySanitizedTests: XCTestCase {
     XCTAssertEqual("abc123".assemblySanitized, "abc123")
     XCTAssertEqual("_foo".assemblySanitized, "_foo")
   }
-
-  /// A few examples of names to test with.
+  /// A few examples of well-formed names to test with.
   private let examples = [
     "infix+++",
     "日本語",

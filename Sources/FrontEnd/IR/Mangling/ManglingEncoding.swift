@@ -332,7 +332,7 @@ struct ManglingEncoding: Sendable {
       case EnumDeclaration.self:
         append(unqualified: EnumDeclaration.ID(uncheckedFrom: n.erased), to: &output)
       case EnumCaseDeclaration.self:
-        append(unqualified: EnumDeclaration.ID(uncheckedFrom: n.erased), to: &output)
+        append(unqualified: EnumCaseDeclaration.ID(uncheckedFrom: n.erased), to: &output)
       case ExtensionDeclaration.self:
         append(extension: ExtensionDeclaration.ID(uncheckedFrom: n.erased), to: &output)
       case FunctionDeclaration.self:

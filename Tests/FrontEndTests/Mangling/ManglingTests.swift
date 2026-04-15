@@ -191,7 +191,7 @@ final class ManglingTests: XCTestCase {
     // }
   }
 
-  /// Tests that the demanging for a selection of declarations don't contain errors.
+  /// Tests that the demangling for a selection of declarations don't contain errors.
   func testDeclarationsSelection() async {
     var p = await TestProgram()
 
