@@ -8,7 +8,7 @@ public struct Kind: Sendable {
   public typealias RawValue = UInt32
 
   /// Creates an instance with the given raw value.
-  init(rawValue: RawValue) {
+  internal init(rawValue: RawValue) {
     self.rawValue = rawValue
   }
 

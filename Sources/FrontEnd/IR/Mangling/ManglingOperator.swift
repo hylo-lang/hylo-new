@@ -2,6 +2,7 @@ import Utilities
 
 /// Short identifier specifying how to interpret the next fragment of mangled data.
 public enum ManglingOperator: String, CaseIterable, Sendable {
+
   // Convention: operator strings are matching regex "[a-z]*[A-Z]"
 
   /// Starts a lookup of a previously mangled symbol.
@@ -186,7 +187,7 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
     }
   }
 
-  /// `true` iff `self` is an operator that starts an entity declaration.
+  /// `true` iff `self` starts an entity declaration.
   var isEntityOperator: Bool {
     switch self {
     case .lookup, .lookupRelative, .reserved, .associatedTypeDeclaration, .enumCaseDeclaration,

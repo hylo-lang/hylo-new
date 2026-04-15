@@ -1,6 +1,6 @@
 /// A utility for printing debug information with indentation to reflect the structure of the data
 /// being printed.
-struct DebugPrinter {
+internal struct DebugPrinter {
 
   /// Whether to print debug information at all.
   public let enabled: Bool
@@ -44,7 +44,7 @@ struct DebugPrinter {
   }
 
   /// Prints `x` to the standard output, prefixed by indentation reflecting the current nesting
-  /// level. Does nothing if `enabled` is `false`.
+  /// level iff `enabled` is `true`. Does nothing otherwise.
   func print<T>(_ x: @autoclosure () -> T) {
     if enabled {
       printIndentation()

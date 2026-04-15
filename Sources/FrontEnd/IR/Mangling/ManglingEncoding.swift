@@ -53,7 +53,7 @@ struct ManglingEncoding: Sendable {
 
   /// Returns the demangled symbol from `source`.
   ///
-  /// If `source` is not fully consumed, indicates an error.
+  /// An error is returned if `source` is not fully consumed when this function returns.
   static func demangle(from source: inout DemanglingContext) -> DemangledSymbol {
     guard let o = source.peekOperator() else { return .error(nil, remaining: source.remaining) }
     let r: DemangledSymbol
@@ -194,8 +194,7 @@ struct ManglingEncoding: Sendable {
         }
 
         // Stop if we cannot continue, or if we need to continue with something that cannot be a
-        // scope or a declaration.
-        // Also consider the case that we start another declaration.
+        // scope or a declaration. Also consider the case that we start another declaration.
         guard let n = source.peekOperator() else { break }
         if n == .reserved || n == .module || n == .lookupRelative || !n.isEntityOperator {
           break
@@ -383,9 +382,9 @@ struct ManglingEncoding: Sendable {
   }
 
   /// Demangles a conformance declaration from `source`.
-  private static func takeConformanceDeclaration(from source: inout DemanglingContext)
-    -> DemangledEntity
-  {
+  private static func takeConformanceDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
     let t = takeType(from: &source)
     let usings =
       source.takeItems(takingEachWith: { (s) -> DemangledEntity in
@@ -406,9 +405,9 @@ struct ManglingEncoding: Sendable {
   }
 
   /// Demangles an extension declaration from `source`.
-  private static func takeExtensionDeclaration(from source: inout DemanglingContext)
-    -> DemangledEntity
-  {
+  private static func takeExtensionDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
     let t = takeType(from: &source)
     let usings =
       source.takeItems(takingEachWith: { (s) -> DemangledEntity in
@@ -448,9 +447,9 @@ struct ManglingEncoding: Sendable {
   }
 
   /// Demangles a static function declaration from `source`.
-  private static func takeStaticFunctionDeclaration(from source: inout DemanglingContext)
-    -> DemangledEntity
-  {
+  private static func takeStaticFunctionDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
     guard let n = takeName(from: &source) else { return .error }
     let t = takeType(from: &source)
     return .functionDeclaration(name: n, type: t, isStatic: true)
@@ -571,6 +570,7 @@ struct ManglingEncoding: Sendable {
   private mutating func append<T: SyntaxIdentity>(typeOf d: T, to output: inout ManglingContext) {
     append(type: program.type(assignedTo: d), to: &output)
   }
+
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(type s: AnyTypeIdentity, to output: inout ManglingContext) {
     output.writing(type: s, program: program) { (output) in

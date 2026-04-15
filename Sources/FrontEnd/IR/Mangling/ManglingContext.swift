@@ -1,4 +1,5 @@
 /// The context for mangling a symbol, type, or scope.
+///
 /// It maintains the state of the mangling process, including the output being built, as well as
 /// the lookup tables and current qualification.
 struct ManglingContext {
@@ -19,10 +20,11 @@ struct ManglingContext {
   private var reserved: [ManglingSymbol: ReservedSymbol] = [:]
 
   /// Object used for printing debugging information during mangling.
+  ///
   /// Set `enabled` to `true` to enable debug printing.
   private var debug = DebugPrinter(enabled: false)
 
-  /// An instance for mangling symbols in `program`.
+  /// Creates an instance for mangling symbols in `program`.
   init(_ program: Program) {
     output = ""
     initializeReservedSymbols(program: program)
@@ -50,7 +52,7 @@ struct ManglingContext {
     reserved[.node(AnySyntaxIdentity(program.standardLibraryDeclaration(d)))] = s
   }
 
-  /// Writes `x` to `output`.
+  /// Writes `x` to `self.output`.
   private mutating func add<T: TextOutputStreamable>(_ x: T) {
     x.write(to: &output)
   }
@@ -102,8 +104,8 @@ struct ManglingContext {
     debug.print("- op: \(o)")
   }
 
-  /// Writes the mangled representation of `items`, calling `addItem` to mangle each individual
-  /// element to `output`.
+  /// Writes the mangled representation of `items` to `output`, calling `addItem` to mangle each
+  /// individual element.
   mutating func add<T: Collection>(
     items: T,
     appendingEachWith addItem: (T.Element, inout Self) -> Void

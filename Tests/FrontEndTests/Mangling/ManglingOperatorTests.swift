@@ -19,8 +19,7 @@ final class ManglingOperatorTests: XCTestCase {
     }
   }
 
-  /// Checks that we can write all the mangling operators in a string,
-  /// and then parse them back correctly.
+  /// Tests that we can write all the mangling operators in a string and parse them back.
   func testRoundTrip() {
     // Write all operators into a single string.
     var mangled = ""

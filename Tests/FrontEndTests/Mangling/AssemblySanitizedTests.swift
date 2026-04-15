@@ -49,7 +49,7 @@ final class AssemblySanitizedTests: XCTestCase {
     }
   }
 
-  /// Tests that the desanitization is a reverse operation of sanitization, for a few examples.
+  /// Tests that the desanitization is a reverse operation of sanitization.
   func testDesanitization() {
     for example in examples {
       XCTAssertEqual(String(assemblySanitized: example.assemblySanitized), example)

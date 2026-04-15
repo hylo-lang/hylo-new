@@ -22,8 +22,7 @@ final class Base64VarUIntTests: XCTestCase {
     XCTAssertEqual(Base64VarUInt(4211).description, "R2")
   }
 
-  /// Test that decoding an encoded `Base64VarUInt` yields the original value,
-  /// for various input ranges.
+  /// Test that decoding an encoded `Base64VarUInt` yields the original value.
   func testRoundTrip() {
     for i: UInt64 in 0 ..< 5000 {
       let s = Base64VarUInt(i).description
@@ -44,6 +43,7 @@ final class Base64VarUIntTests: XCTestCase {
       0x7fff_ffff, 0x8000_0000, 0xffff_ffff,
       0x7fff_ffff_ffff_ffff, 0x8000_0000_0000_0000, 0xffff_ffff_ffff_ffff,
     ]
+
     for i in specialValues {
       let s = Base64VarUInt(i).description
       XCTAssertEqual(Base64VarUInt(s)?.rawValue, i)

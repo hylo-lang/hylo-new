@@ -1,5 +1,5 @@
 /// The identity of a symbol that can be mangled.
-enum ManglingSymbol: Hashable {
+enum MangledSymbol: Hashable {
 
   /// A declaration or a scope.
   case node(AnySyntaxIdentity)

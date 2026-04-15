@@ -6,8 +6,7 @@ import XCTest
 /// A collection of tests that checks mangling/demangling for the standard library.
 final class StandardLibraryManglingTests: XCTestCase {
 
-  /// Checks that we can mangle and demangle without errors
-  /// all the declarations in the standard library.
+  /// Tests the mangling and demangling of all the declarations in the standard library.
   func testStandardLibraryMangling() async throws {
     var driver = Driver(moduleCachePath: Self.moduleCachePath.url)
     try await driver.loadStandardLibrary()

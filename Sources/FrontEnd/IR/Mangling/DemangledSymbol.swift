@@ -1,9 +1,9 @@
-/// The demangled description of a or entity.
+/// The demangled description of an entity.
 public indirect enum DemangledSymbol: Hashable, Sendable {
 
   /// An instance decoding the symbol mangled in `s`.
   ///
-  /// May yield an error if the mangled string is malformed.
+  /// May produce an error if the mangled string is malformed.
   public init(_ s: String) {
     if let x = String(assemblySanitized: s) {
       var source = DemanglingContext(stream: x[...])
@@ -23,7 +23,8 @@ public indirect enum DemangledSymbol: Hashable, Sendable {
   case witnessTable(DemangledType)
 
   /// An error encountered during demangling.
-  /// Captures what we could demangle until we encountered the error, if any, and the characters
+  ///
+  /// The payload captures what we could demangle until we encountered the error, if any, and the characters
   /// still remaining to be parsed.
   case error(DemangledSymbol?, remaining: String)
 

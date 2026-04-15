@@ -53,7 +53,7 @@ final class ManglingTests: XCTestCase {
     testTypeAliasMangling(module: m0, program: &p.base)
   }
 
-  /// Tests the mangling and demangling of specific declarations, covering various cases.
+  /// Tests the mangling and demangling of specific declarations.
   func testSpecificDeclarations() async {
     var p = await TestProgram()
 
@@ -185,13 +185,6 @@ final class ManglingTests: XCTestCase {
       assertManglingOf(declaration: d, in: p.base, is: r)
     }
 
-    // print("---")
-    // for s in p.base[m0].syntax {
-    //   if p.base.isDeclaration(s) {
-    //     let d = DeclarationIdentity(uncheckedFrom: s)
-    //     print(p.base.debugName(of: d), ": ", p.base.tag(of: s))
-    //   }
-    // }
   }
 
   /// Tests that the demangling for a selection of declarations don't contain errors.
@@ -310,7 +303,7 @@ final class ManglingTests: XCTestCase {
     }
   }
 
-  /// Tests that mangling and demangling works in cases where entity lookup is used internally.
+  /// Tests mangling and demangling in cases where entity lookup is used internally.
   func testReuseScopes() async {
     var p = await TestProgram()
 
@@ -634,7 +627,7 @@ final class ManglingTests: XCTestCase {
     XCTAssertFalse(demangled.contains("?"), "demangling of \(m) contains errors: \(demangled)")
   }
 
-  /// Find the first top-level declaration of `m` named `n`, returning its identity, or `nil` if
+  /// Finds the first top-level declaration of `m` named `n`, returning its identity, or `nil` if
   /// no such declaration exists.
   private func findTopLevelDeclaration(
     named n: String, in m: Module.ID, of program: Program

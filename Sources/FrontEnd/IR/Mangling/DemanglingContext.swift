@@ -12,6 +12,7 @@ struct DemanglingContext {
   private var symbols: [DemangledSymbol] = []
 
   /// Object used for printing debugging information during demangling.
+  ///
   /// Set `enabled` to `true` to enable debug printing.
   private var debug = DebugPrinter(enabled: false)
 
