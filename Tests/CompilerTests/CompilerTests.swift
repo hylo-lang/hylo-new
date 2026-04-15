@@ -150,7 +150,7 @@ final class CompilerTests: XCTestCase {
         report.write(Self.explain(difference: delta, relativeTo: lhs, named: n))
 
         guard case .local(let u) = n else { continue }
-        let v = u.deletingPathExtension().appendingPathExtension("observed")
+        let v = u.deletingPathExtension().appendingPathExtension("diagnostics.observed")
         try? o.write(to: v, atomically: true, encoding: .utf8)
       }
     }
