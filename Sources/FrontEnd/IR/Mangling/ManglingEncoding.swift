@@ -532,7 +532,7 @@ struct ManglingEncoding: Sendable {
   private mutating func append(
     function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
   ) {
-    switch program[m][ir: s].name {
+    switch program[m].ir[s].name {
     case .lowered(let d):
       // Note: no symbol needed; we assume it's a lowered function.
       append(decl: d, to: &output)
@@ -540,6 +540,9 @@ struct ManglingEncoding: Sendable {
       output.add(operator: .synthesizedFunctionDeclaration)
       append(decl: d, to: &output)
       append(typeArguments: a, to: &output)
+    case .initializer, .existentialized:
+      // TODO (LucTeo): Implement these
+      break
     }
   }
 

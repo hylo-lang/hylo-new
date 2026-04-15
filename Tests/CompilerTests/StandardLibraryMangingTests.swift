@@ -12,7 +12,7 @@ final class StandardLibraryManglingTests: XCTestCase {
     var driver = Driver(moduleCachePath: Self.moduleCachePath.url)
     try await driver.loadStandardLibrary()
 
-    let m = driver.program.modules[.standardLibrary]!
+    let m = driver.program.modules[Module.standardLibraryName]!
     for s in m.syntax {
       if driver.program.isDeclaration(s) {
         let d = DeclarationIdentity(uncheckedFrom: s)
