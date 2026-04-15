@@ -14,7 +14,10 @@
 
 # Generated tests
 Tests/CompilerTests/CompilerTests+GeneratedTests.swift
+
+# Observations during testing
 Tests/CompilerTests/**/*.observed
+StandardLibrary/**/*.observed
 
 # Local development
 /Playground

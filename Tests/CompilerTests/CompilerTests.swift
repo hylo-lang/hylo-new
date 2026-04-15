@@ -88,18 +88,18 @@ final class CompilerTests: XCTestCase {
       driver.program[m].addDependency(Module.standardLibraryName)
     }
 
-    var expectations: [FileName: String] = [:]
+    var expectedDiagnostics: [FileName: String] = [:]
     try input.forEachSourceURL { (u) in
       let source = try SourceFile(contentsOf: u)
       driver.program[m].addSource(source)
 
-      let v = u.deletingPathExtension().appendingPathExtension("expected")
+      let v = u.deletingPathExtension().appendingPathExtension("diagnostics.expected")
       let expected = try? String(contentsOf: v, encoding: .utf8)
-      expectations[source.name] = expected
+      expectedDiagnostics[source.name] = expected
     }
 
     func done() -> (Program, [FileName: String]) {
-      (driver.program, expectations)
+      (driver.program, expectedDiagnostics)
     }
 
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -174,7 +174,7 @@ final class CompilerTests: XCTestCase {
       for d in e.sorted() {
         d.render(into: &o, showingPaths: .relative(to: root), style: .unstyled)
         if case .local(let u) = n {
-          let v = u.deletingPathExtension().appendingPathExtension("observed")
+          let v = u.deletingPathExtension().appendingPathExtension("diagnostics.observed")
           try? o.write(to: v, atomically: true, encoding: .utf8)
         }
       }
