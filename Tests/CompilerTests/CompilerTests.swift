@@ -12,6 +12,9 @@ import XCTest
 /// manually invoking `hc-tests`.
 final class CompilerTests: XCTestCase {
 
+  /// Iff true, intermediate compilation artifacts are saved even if test cases pass.
+  let alwaysSaveArtifacts = false
+
   /// The input of a compiler test.
   struct TestDescription {
 
@@ -41,6 +44,28 @@ final class CompilerTests: XCTestCase {
       }
     }
 
+    /// Returns where to save test-case level observations with `tag`.
+    ///
+    /// Package-based tests save observations at "<package-root>/<tag>.observed" while
+    /// single-file tests save observations at "<source-file>.<tag>.observed".
+    ///
+    /// - Requires: `tag` is a valid file name on all supported operating systems.
+    func testCaseLevelObservationDestination(tag: String) throws -> URL {
+      if isPackage {
+        root.appending(component: ".\(tag).observed")
+      } else {
+        root.deletingPathExtension().appendingPathExtension("\(tag).observed")
+      }
+    }
+
+    /// Saves `contents` into a file at its test-case level observation destination
+    /// as specified by `testCaseLevelObservationDestination(tag:)`.
+    ///
+    /// - Requires: `tag` is a valid file name on all supported operating systems.
+    func saveTestCaseLevelObservation(_ contents: String, tag: String) throws {
+      try contents.write(to: testCaseLevelObservationDestination(tag: tag), atomically: true, encoding: .utf8)
+    }
+
   }
 
   /// A temporary folder for caching compilation artifacts during testing.
@@ -62,6 +87,51 @@ final class CompilerTests: XCTestCase {
     moduleCachePath.delete()
   }
 
+  /// The intermediate artifacts of a module's compilation.
+  ///
+  /// Members shall be set after the corresponding stage is completed.
+  private struct Artifacts {
+
+    /// The lowered IR of the compiled module, if any.
+    var rawIR: String?
+
+    /// The transformed IR of the compiled module, if any.
+    var transformedIR: String?
+
+    /// The compiled IR artifact of the tested module, if any.
+    var llvmIR: String?
+
+    /// Saves the artifacts into test-case-level observation files of `test`.
+    func save(into test: TestDescription) throws {
+      if let rawIR {
+        try test.saveTestCaseLevelObservation(rawIR, tag: "raw-ir")
+      }
+      if let transformedIR {
+        try test.saveTestCaseLevelObservation(transformedIR, tag: "transformed-ir")
+      }
+      if let llvmIR {
+        try test.saveTestCaseLevelObservation(llvmIR, tag: "ll")
+      }
+    }
+
+  }
+
+  /// The test case currently being run.
+  private var testCase: TestDescription? = nil
+
+  /// The intermediate compilation artifacts.
+  private var artifacts: Artifacts = .init()
+
+  /// Saves any available compilation artifacts on test failure
+  /// or if `alwaysSaveArtifacts` is true to facilitate diagnosis.
+  ///
+  /// Run by XCTest after each test case.
+  override func tearDownWithError() throws {
+    if let testRun, testRun.failureCount > 0 || alwaysSaveArtifacts, let testCase {
+      try artifacts.save(into: testCase)
+    }
+  }
+
   /// Compiles `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
     let (program, _) = try await compile(input)
@@ -76,7 +146,11 @@ final class CompilerTests: XCTestCase {
   }
 
   /// Compiles `input` into `p` and returns expected diagnostics for each compiled source file.
+  ///
+  /// Sets up the `testCase` context and populates `artifacts` as soon as compilation stages succeed.
   private func compile(_ input: TestDescription) async throws -> (Program, [FileName: String]) {
+    self.testCase = input
+
     var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
 
     if input.manifest.requiresStandardLibrary {
@@ -111,8 +185,15 @@ final class CompilerTests: XCTestCase {
     if input.manifest.stage == .typing { return done() }
 
     // IR Lowering.
-    if await driver.lower(m).containsError { return done() }
-    if await driver.applyTransformationPasses(m).containsError { return done() }
+    let l = await driver.lower(m)
+    if l.containsError { return done() }
+    artifacts.rawIR = driver.program.show(driver.program[m].ir)
+
+    // IR Transformation passes.
+    let t = await driver.applyTransformationPasses(m)
+    if t.containsError { return done() }
+    artifacts.transformedIR = driver.program.show(driver.program[m].ir)
+
     if input.manifest.stage == .lowering { return done() }
 
     // Code generation.
