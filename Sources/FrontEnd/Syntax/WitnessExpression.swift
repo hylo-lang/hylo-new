@@ -36,8 +36,8 @@ public struct WitnessExpression: Hashable, Sendable {
     case nested(WitnessExpression)
 
     /// Returns a copy of `self` in which occurrences of assumed given identified by `i` have been
-    /// substituted for `new`.
-    public func substituting(assumed i: Int, for new: Value) -> Self {
+    /// substituted with `new`.
+    public func substituting(assumed i: Int, with new: Value) -> Self {
       switch self {
       case .identity, .abstract, .synthetic, .builtin, .reference:
         return self
@@ -45,29 +45,29 @@ public struct WitnessExpression: Hashable, Sendable {
         return i == j ? new : self
       case .termApplication(let w, let a):
         return .termApplication(
-          w.substituting(assumed: i, for: new), a.substituting(assumed: i, for: new))
+          w.substituting(assumed: i, with: new), a.substituting(assumed: i, with: new))
       case .typeApplication(let w, let ts):
         return .typeApplication(
-          w.substituting(assumed: i, for: new), ts)
+          w.substituting(assumed: i, with: new), ts)
       case .nested(let w):
         return .nested(
-          w.substituting(assumed: i, for: new))
+          w.substituting(assumed: i, with: new))
       }
     }
 
     /// Returns a copy of `self` in which occurrences of `m` have been substituted for `n`.
-    internal func substituting(_ m: ExpressionIdentity, for n: ExpressionIdentity) -> Self {
+    internal func substituting(_ m: ExpressionIdentity, with n: ExpressionIdentity) -> Self {
       switch self {
       case .identity(let x):
         return .identity(x == m ? n : m)
       case .abstract, .assumed, .synthetic, .builtin, .reference:
         return self
       case .termApplication(let w, let a):
-        return .termApplication(w.substituting(m, for: n), a.substituting(m, for: n))
+        return .termApplication(w.substituting(m, with: n), a.substituting(m, with: n))
       case .typeApplication(let w, let a):
-        return .typeApplication(w.substituting(m, for: n), a)
+        return .typeApplication(w.substituting(m, with: n), a)
       case .nested(let w):
-        return .nested(w.substituting(m, for: n))
+        return .nested(w.substituting(m, with: n))
       }
     }
 
@@ -133,15 +133,15 @@ public struct WitnessExpression: Hashable, Sendable {
     }
   }
 
-  /// Returns a copy of `self` in which occurrences of `m` have been substituted for `n`.
-  internal func substituting(_ m: ExpressionIdentity, for n: ExpressionIdentity) -> Self {
-    .init(value: value.substituting(m, for: n), type: type)
+  /// Returns a copy of `self` in which occurrences of `m` have been substituted with `n`.
+  internal func substituting(_ m: ExpressionIdentity, with n: ExpressionIdentity) -> Self {
+    .init(value: value.substituting(m, with: n), type: type)
   }
 
   /// Returns a copy of `self` in which occurrences of assumed given identified by `i` have been
-  /// substituted for `new`.
-  internal func substituting(assumed i: Int, for new: Value) -> Self {
-    .init(value: value.substituting(assumed: i, for: new), type: type)
+  /// substituted with `new`.
+  internal func substituting(assumed i: Int, with new: Value) -> Self {
+    .init(value: value.substituting(assumed: i, with: new), type: type)
   }
 
   /// If `self` is a type application of `e`, returns the its type arguments.

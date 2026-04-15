@@ -17,10 +17,7 @@ public struct IRProject: IRRegionEntry {
 
   /// Creates an instance with the given properties.
   public init(
-    callee: IRValue,
-    arguments: [IRValue],
-    projectee: AnyTypeIdentity,
-    access: AccessEffect,
+    callee: IRValue, arguments: [IRValue], projectee: AnyTypeIdentity, access: AccessEffect,
     anchor: Anchor
   ) {
     var operands = Array<IRValue>(minimumCapacity: arguments.count + 1)
@@ -31,6 +28,14 @@ public struct IRProject: IRRegionEntry {
     self.anchor = anchor
     self.projectee = projectee
     self.access = access
+  }
+
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in ss[o] })
+    self.anchor = other.anchor
+    self.projectee = other.projectee
+    self.access = other.access
   }
 
   /// The subscript being applied.
@@ -45,7 +50,7 @@ public struct IRProject: IRRegionEntry {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(projectee, isAddress: true)
+    .place(projectee)
   }
 
   /// `true`.
@@ -66,7 +71,7 @@ public struct IRProject: IRRegionEntry {
     guard
       let t = parent.result(of: callee),
       let f = program.types.seenAsTermAbstraction(t.type),
-      t.isAddress
+      t.isPlace
     else { preconditionFailure() }
 
     // The callee supports the effect of the projection being applied.

@@ -141,7 +141,7 @@ final class LexerTests: XCTestCase {
     let input: SourceFile = """
       auto case else enum extension false fun given if import infix init inout internal let match
       postfix prefix private public return set sink static struct subscript trait true type var
-      where
+      where yield
       """
     var scanner = Lexer(tokenizing: input)
     try assertNext(from: &scanner, is: .auto)
@@ -175,6 +175,7 @@ final class LexerTests: XCTestCase {
     try assertNext(from: &scanner, is: .type)
     try assertNext(from: &scanner, is: .var)
     try assertNext(from: &scanner, is: .where)
+    try assertNext(from: &scanner, is: .yield)
     XCTAssertNil(scanner.next())
   }
 
@@ -186,7 +187,7 @@ final class LexerTests: XCTestCase {
   }
 
   func testOperator() throws {
-    var scanner = Lexer(tokenizing: "<= ++ & &&& -> == +* *+ *> (+)")
+    var scanner = Lexer(tokenizing: "<= ++ & &&& -> == +* *+ *>")
     try assertNext(from: &scanner, is: .leftAngle)
     try assertNext(from: &scanner, is: .assign)
     try assertNext(from: &scanner, is: .operator, withValue: "++")
@@ -199,7 +200,6 @@ final class LexerTests: XCTestCase {
     try assertNext(from: &scanner, is: .operator, withValue: "+")
     try assertNext(from: &scanner, is: .star)
     try assertNext(from: &scanner, is: .rightAngle)
-    try assertNext(from: &scanner, is: .oplus)
     XCTAssertNil(scanner.next())
   }
 

@@ -13,8 +13,14 @@ public struct IRFunction: Sendable {
     /// The identity of a function lowered from sources.
     case lowered(DeclarationIdentity)
 
+    /// The identity of a global initializer.
+    case initializer(BindingDeclaration.ID)
+
     /// The identity of a synthesized function.
     case synthesized(DeclarationIdentity, TypeArguments)
+
+    /// The identity of the existentialiezd form of a polymorphic function.
+    indirect case existentialized(IRFunction.Name)
 
   }
 
@@ -25,12 +31,12 @@ public struct IRFunction: Sendable {
     case indirect
 
     /// The result is projected.
-    case remote(RemoteType.ID)
+    case remote(AccessEffect, AnyTypeIdentity)
 
     /// The payload of `self` iff it denotes a projection.
-    public var remote: RemoteType.ID? {
-      if case .remote(let t) = self {
-        return t
+    public var remote: (AccessEffect, AnyTypeIdentity)? {
+      if case .remote(let k, let t) = self {
+        return (k, t)
       } else {
         return nil
       }
@@ -65,6 +71,17 @@ public struct IRFunction: Sendable {
 
   }
 
+  /// The types of an IR function's parameters and return value.
+  public struct Signature: Sendable {
+
+    /// The generic type parameters that the function accepts.
+    public let context: [GenericParameter.ID]
+
+    /// The types of the term parameters and return value.
+    public let head: Arrow
+
+  }
+
   /// The name of the function.
   public let name: Name
 
@@ -77,14 +94,17 @@ public struct IRFunction: Sendable {
   /// The parameters of the function.
   public let termParameters: [IRParameter]
 
+  /// A mapping from a source declaration to their its lowered definition.
+  private var bindings: BidirectionalDictionary<DeclarationIdentity, IRValue>
+
   /// The instructions in the function.
-  private var slots: List<Slot> = []
+  private var slots: List<Slot>
 
   /// The basic blocks in the function, the first of which being the function's entry.
-  public private(set) var blocks: List<IRBlock> = []
+  public private(set) var blocks: List<IRBlock>
 
   /// The use chains of the values in this function.
-  public private(set) var uses: [IRValue: [Use]] = [:]
+  public private(set) var uses: [IRValue: [Use]]
 
   /// Creates an instance with the given properties.
   public init(
@@ -97,11 +117,23 @@ public struct IRFunction: Sendable {
     self.termParameters = termParameters
     self.slots = []
     self.blocks = []
+    self.uses = [:]
+    self.bindings = [:]
   }
 
   /// `true` iff the function has an entry.
   public var isDefined: Bool {
     !blocks.isEmpty
+  }
+
+  /// `true` iff the function has no generic type parameters.
+  public var isMonomorphic: Bool {
+    typeParameters.isEmpty
+  }
+
+  /// `true` iff the function describes a subscript.
+  public var isSubscript: Bool {
+    output != .indirect
   }
 
    /// `true` iff the function returns a unit value (i.e., an isntance of `Hylo.Void`).
@@ -142,18 +174,43 @@ public struct IRFunction: Sendable {
 
   /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
   public func isBoundImmutably(_ i: AnyInstructionIdentity) -> Bool {
-    switch at(i) {
-    case is IRAlloca:
+    switch tag(of: i) {
+    case IRAlloca.self:
       return false
-    case let s as IRAccess:
-      return isBoundImmutably(s.source)
-    case let s as IRProject:
-      return s.access == .let
-    case let s as IRSubfield:
-      return isBoundImmutably(s.base)
+    case IRAccess.self:
+      return (at(i) as! IRAccess).capabilities == [.let]
+    case IRProject.self:
+      return (at(i) as! IRProject).access == .let
+    case IRSubfield.self:
+      return isBoundImmutably((at(i) as! IRSubfield).base)
     default:
       return true
     }
+  }
+
+  /// Returns `true` iff `v` is a built-in value, using `program` to examine types.
+  public func isBuiltinValue(_ v: IRValue, using program: Program) -> Bool {
+    if let t = result(of: v) {
+      return program.types.isBuiltin(t.type)
+    } else {
+      return false
+    }
+  }
+
+  /// Returns the value defining the root of the place on which `i` forms an access.
+  public func source(_ i: IRAccess.ID) -> IRValue {
+    var s = at(i).source
+    while let r = s.register {
+      switch tag(of: r) {
+      case IRPlaceCast.self:
+        s = (at(r) as! IRPlaceCast).source
+      case IRSubfield.self:
+        s = (at(r) as! IRSubfield).base
+      default:
+        return s
+      }
+    }
+    return s
   }
 
   /// Returns the last use of `v` in `b`, if any.
@@ -167,7 +224,7 @@ public struct IRFunction: Sendable {
   }
 
   /// Returns the type of `self`, computing it using `p`.
-  public func type(uniquedIn p: inout Program) -> AnyTypeIdentity {
+  public func signature() -> Signature {
     let ps = termParameters.map { (p) in
       Parameter(access: p.access, type: resolved(p.type)!.type)
     }
@@ -176,12 +233,11 @@ public struct IRFunction: Sendable {
     switch output {
     case .indirect:
       a = Arrow(style: .parenthesized, inputs: Array(ps.dropLast()), output: ps.last!.type)
-    case .remote(let o):
-      a = Arrow(style: .bracketed, inputs: ps, output: o.erased)
+    case .remote(let k, let o):
+      a = Arrow(style: .bracketed, effect: k, inputs: ps, output: o.erased)
     }
 
-    let t = p.types.demand(a).erased
-    return p.types.introduce(parameters: typeParameters, into: t)
+    return .init(context: typeParameters, head: a)
   }
 
   /// Returns the tag of `i`.
@@ -281,9 +337,9 @@ public struct IRFunction: Sendable {
     ((v.register >>= at(_:)) as? IRAccess).satisfies({ (s) in s.capabilities.contains(k) })
   }
 
-  /// Returns `true` iff `v` denotes an address.
-  public func isAddress(_ v: IRValue) -> Bool {
-    result(of: v).map(\.isAddress) ?? false
+  /// Returns `true` iff `v` denotes a place.
+  public func isPlace(_ v: IRValue) -> Bool {
+    result(of: v).map(\.isPlace) ?? false
   }
 
   /// Returns `true` iff `v` is a parameter with access `k`.
@@ -296,11 +352,11 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `true` iff `v` is an alloca or a `sink` parameter.
+  /// Returns `true` iff `v` is an `alloca`, an `allocx`, or a `sink` parameter.
   public func owns(_ v: IRValue) -> Bool {
     switch v {
     case .register(let i):
-      return tag(of: i) == IRAlloca.self
+      return (tag(of: i) == IRAlloca.self) || (tag(of: i) == IRAllocx.self)
     case .parameter(let i):
       return termParameters[i].access == .sink
     default:
@@ -311,7 +367,7 @@ public struct IRFunction: Sendable {
   /// Returns the type of the value computed by `v` or `nil` if `v` doesn't compute any.
   ///
   /// - Requires: `v` is either a constant or an instruction in this function.
-  public func result(of v: IRValue) -> (type: AnyTypeIdentity, isAddress: Bool)? {
+  public func result(of v: IRValue) -> (type: AnyTypeIdentity, isPlace: Bool)? {
     switch v {
     case .parameter(let i):
       return resolved(termParameters[i].type)
@@ -320,6 +376,8 @@ public struct IRFunction: Sendable {
     case .integer(_, let t):
       return (t.erased, false)
     case .function(_, let t):
+      return (t, true)
+    case .type(_, let t):
       return (t.erased, true)
     case .poison(let t):
       return resolved(t)
@@ -329,16 +387,19 @@ public struct IRFunction: Sendable {
   /// Returns `t` without any relative definition.
   ///
   /// - Requires: `v` is either a constant or an isntruction in this function.
-  public func resolved(_ t: IRType) -> (type: AnyTypeIdentity, isAddress: Bool)? {
+  public func resolved(_ t: IRType) -> (type: AnyTypeIdentity, isPlace: Bool)? {
     switch t {
-    case .lowered(let u, let isAddress):
-      return (u, isAddress)
+    case .place(let u):
+      return (u, true)
+
+    case .value(let u):
+      return (u, false)
 
     case .same(let i):
       return result(of: i)
 
     case .dereferenced(let i):
-      if let (u, isAddress) = result(of: i), isAddress {
+      if let (u, isPlace) = result(of: i), isPlace {
         return (u, false)
       } else {
         fatalError("ill-formed IR type")
@@ -524,14 +585,14 @@ public struct IRFunction: Sendable {
     return user
   }
 
-  /// Substitutes `old` for `new`.
+  /// Substitutes `old` with `new`.
   ///
   /// The use chains are updated so that the uses made by `old` are replaced by the uses made by
   /// `new` and all uses of `old` refer to `new`. After the call, `instruction(old) == new`.
   ///
   /// - Requires: The result of `new` has the same type as the result of old.
   internal mutating func replace<T: Instruction>(
-    _ old: AnyInstructionIdentity, for new: T
+    _ old: AnyInstructionIdentity, with new: T
   ) {
     assert(areEqual(at(old).type, new.type))
     removeUses(by: old)
@@ -541,10 +602,10 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Substitutes occurrences of `old` for `new` in the successors of `source`, returning `true`
+  /// Substitutes occurrences of `old` with `new` in the successors of `source`, returning `true`
   /// iff `old` was a successor of `source`.
   internal mutating func replaceSuccessor(
-    _ old: IRBlock.ID, of source: IRBlock.ID, for new: IRBlock.ID
+    _ old: IRBlock.ID, of source: IRBlock.ID, with new: IRBlock.ID
   ) -> Bool  {
     let l = blocks[source].last!
     if var s = at(l) as? any Terminator, s.replaceSuccessor(old, with: new) {
@@ -563,6 +624,7 @@ public struct IRFunction: Sendable {
     while let i = a {
       assert(uses[IRValue.register(i), default: []].allSatisfy({ block(defining: $0.user) == b }))
       removeUses(by: i)
+      bindings.remove(value: .register(i))
       let n = (i != blocks[b].last) ? slots.address(after: i.address) : nil
       a = n.map(AnyInstructionIdentity.init(address:))
     }
@@ -576,6 +638,7 @@ public struct IRFunction: Sendable {
   public mutating func remove(_ i: AnyInstructionIdentity) -> AnyInstructionIdentity? {
     assert(uses[.register(i), default: []].isEmpty)
     removeUses(by: i)
+    bindings.remove(value: .register(i))
 
     let p = block(defining: i)
     if i == blocks[p].first {
@@ -611,6 +674,52 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Updates the bindings in `self` to associate the entity declared by `d` to the value `v`.
+  public mutating func associate(_ d: DeclarationIdentity, with v: IRValue) {
+    bindings.assignValue(v, forKey: d)
+  }
+
+  /// Returns the value representing the entity declared by `d`, if any.
+  public func binding(_ d: DeclarationIdentity) -> IRValue? {
+    bindings[key: d]
+  }
+
+  /// Returns the declaration represented by `v`, if any.
+  public func declaration(_ v: IRValue) -> DeclarationIdentity? {
+    bindings[value: v]
+  }
+
+  /// Returns an instance consuming the definition of `self` but leaving other properties intact.
+  ///
+  /// This method is similar to a "non-destructive" move extracting the definition of `self` (i.e.,
+  /// its instructions) but leaving a valid function declaration behind. The moved definition can
+  /// moved back into `self` using `take(definition:)`.
+  public mutating func move() -> IRFunction {
+    var other = IRFunction(
+      name: name, output: output,
+      typeParameters: typeParameters,
+      termParameters: termParameters)
+
+    swap(&self.bindings, &other.bindings)
+    swap(&self.slots, &other.slots)
+    swap(&self.blocks, &other.blocks)
+    swap(&self.uses, &other.uses)
+    return other
+  }
+
+  /// Assigns the definition of `self` to that of `other`, which has the same signature.
+  ///
+  /// `other` is the (possibly modofied) result of `self.move()` and `self` has not have been
+  /// modified in the meantime.
+  public mutating func take(definition other: consuming IRFunction) {
+    assert((self.name == other.name) && !isDefined)
+
+    swap(&self.bindings, &other.bindings)
+    swap(&self.slots, &other.slots)
+    swap(&self.blocks, &other.blocks)
+    swap(&self.uses, &other.uses)
+  }
+
 }
 
 extension IRFunction: Showable {
@@ -630,8 +739,8 @@ extension IRFunction: Showable {
     }
     result.append(")")
 
-    if case .remote(let t) = self.output {
-      result.append(" -> \(printer.show(t))")
+    if case .remote(let k, let t) = self.output {
+      result.append(" -> \(k) \(printer.show(t))")
     }
 
     if !slots.isEmpty {
@@ -658,9 +767,13 @@ extension IRFunction.Name: Showable {
     switch self {
     case .lowered(let d):
       return printer.program.debugName(of: d)
+    case .initializer(let d):
+      return "\(printer.program.debugName(of: .init(d)))$init"
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
       return "\(printer.program.debugName(of: d))<\(list: xs)>"
+    case .existentialized(let n):
+      return "\(printer.show(n))$existentialized"
     }
   }
 

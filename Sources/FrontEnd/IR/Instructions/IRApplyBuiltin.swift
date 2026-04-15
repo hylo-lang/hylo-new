@@ -17,15 +17,21 @@ public struct IRApplyBuiltin: Instruction {
 
   /// Creates an instance with the given properties.
   public init(
-    callee: BuiltinFunction,
-    returnTypeOfCallee: AnyTypeIdentity,
-    arguments: [IRValue],
+    callee: BuiltinFunction, returnTypeOfCallee: AnyTypeIdentity, arguments: [IRValue],
     anchor: Anchor
   ) {
     self.operands = arguments
     self.anchor = anchor
     self.callee = callee
-    self.type = .lowered(returnTypeOfCallee, isAddress: false)
+    self.type = .value(returnTypeOfCallee)
+  }
+
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in ss[o] })
+    self.anchor = other.anchor
+    self.callee = other.callee
+    self.type = other.type
   }
 
   /// The arguments of the call.

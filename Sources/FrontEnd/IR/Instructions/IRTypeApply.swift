@@ -19,15 +19,21 @@ public struct IRTypeApply: Instruction {
 
   /// Creates an instance with the given properties.
   public init(
-    callee: IRValue,
-    arguments: TypeArguments,
-    typeOfApplication: AnyTypeIdentity,
+    callee: IRValue, arguments: TypeArguments, typeOfApplication: AnyTypeIdentity,
     anchor: Anchor
   ) {
     self.operands = [callee]
     self.anchor = anchor
     self.arguments = arguments
     self.typeOfApplication = typeOfApplication
+  }
+
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = [ss[other.callee]]
+    self.anchor = other.anchor
+    self.arguments = other.arguments
+    self.typeOfApplication = other.typeOfApplication
   }
 
   /// The type abstraction being applied.
@@ -37,7 +43,7 @@ public struct IRTypeApply: Instruction {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(typeOfApplication, isAddress: true)
+    .place(typeOfApplication)
   }
 
   /// `true`.
@@ -54,7 +60,7 @@ public struct IRTypeApply: Instruction {
     else { preconditionFailure("monomorphic callee") }
 
     // The callee must have an address type.
-    precondition(t.isAddress, "callee must have an address type")
+    precondition(t.isPlace, "callee must have an address type")
 
     // The type arguments must match the callee's parameters.
     precondition(

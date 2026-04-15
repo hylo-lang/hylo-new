@@ -6,11 +6,18 @@ extension Array {
     self.reserveCapacity(n)
   }
 
-  /// Creates an array with the value of `head` followed by the contents of `tail`.
-  public init<S: Sequence<Element>>(_ head: Element, prependedTo tail: S) {
-    self.init(minimumCapacity: tail.underestimatedCount + 1)
+  /// Creates an array with the value of `head` followed by the contents of `suffix`.
+  public init<S: Sequence<Element>>(_ head: Element, prependedTo suffix: S) {
+    self.init(minimumCapacity: suffix.underestimatedCount + 1)
     self.append(head)
-    self.append(contentsOf: tail)
+    self.append(contentsOf: suffix)
+  }
+
+  /// Creates an array with the contents of `prefix` followed by `back`.
+  public init<S: Sequence<Element>>(_ prefix: S, terminatedBy back: Element) {
+    self.init(minimumCapacity: prefix.underestimatedCount + 1)
+    self.append(contentsOf: prefix)
+    self.append(back)
   }
 
   /// Creates an array with the contents of `e`, if any.
@@ -20,6 +27,13 @@ extension Array {
     } else {
       self = []
     }
+  }
+
+  /// Returns the contents of `self` suffixed by `back`.
+  public consuming func appending(_ back: Element) -> Self {
+    var xs = self
+    xs.append(back)
+    return xs
   }
 
 }

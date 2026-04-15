@@ -1,0 +1,23 @@
+// A missing yield.
+subscript f0(x: Bool) -> Bool {
+  if x { yield true }
+  if x { yield false }
+}
+
+// Two consecutive yields in the same basic block.
+subscript f1(x: Bool) -> Bool {
+  yield true
+  yield false
+}
+
+// Two consecutive yields in different basic blocks.
+subscript f2(x: Bool) -> Bool {
+  if x { yield true }
+  yield false
+}
+
+// Two consecutive yields in different basic blocks.
+subscript f3(x: Bool) -> Bool {
+  yield false
+  if x { yield true }
+}

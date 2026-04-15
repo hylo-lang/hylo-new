@@ -1,6 +1,4 @@
-/// Allocates and initializes a witness table. 
-///
-/// The witness table is allocated on the stack.
+/// Creates a witness table.
 public struct IRWitnessTable: Instruction {
 
   /// The operands of the instruction.
@@ -19,9 +17,16 @@ public struct IRWitnessTable: Instruction {
     self.witnessType = witnessType
   }
 
-  /// The type of the value loaded by this instruction.
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in ss[o] })
+    self.anchor = other.anchor
+    self.witnessType = other.witnessType
+  }
+
+  /// The type of the instruction's result.
   public var type: IRType {
-    .addressOf(witnessType)
+    .value(witnessType)
   }
 
 }

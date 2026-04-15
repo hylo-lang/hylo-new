@@ -1,6 +1,6 @@
 import Archivist
 
-/// The application of an abstraction to compile-time arguments.
+/// The application of an abstraction to context arguments.
 @Archivable
 public struct StaticCall: Expression {
 

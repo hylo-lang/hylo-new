@@ -53,11 +53,12 @@ public struct Driver {
   /// Assigns the trees in `module` to their types.
   @discardableResult
   public mutating func assignTypes(
-    of module: Module.ID
+    of module: Module.ID,
+    loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)? = nil
   ) async -> (elapsed: Duration, containsError: Bool) {
     let clock = ContinuousClock()
     let elapsed = clock.measure {
-      program.assignTypes(module)
+      program.assignTypes(module, loggingInferenceWhere: isLoggingEnabled)
     }
     return (elapsed, program[module].containsError)
   }
@@ -123,15 +124,24 @@ public struct Driver {
     }
 
     // Attempt to load the module from disk.
-    if cachingIsEnabled, let data = archive(of: module) {
-      let h = SourceFile.fingerprint(contentsOf: sources)
-      var a = ReadableArchive(data)
-      let (_, fingerprint) = try Module.header(&a)
-      if h == fingerprint {
-        a = ReadableArchive(data)
-        try program.load(module: module, from: &a)
-        return
+    do {
+      if cachingIsEnabled, let data = archive(of: module) {
+        let h = SourceFile.fingerprint(contentsOf: sources)
+        var a = ReadableArchive(data)
+        let (_, fingerprint) = try Module.header(&a)
+        if h == fingerprint {
+          a = ReadableArchive(data)
+          try program.load(module: module, from: &a)
+          return
+        }
       }
+    } catch ArchiveError.invalidInput {
+      let m = """
+        Failed to parse module archive of '\(module)' at '\(moduleCachePath, default: "nil")'.
+
+        Maybe the archive is compiled using a different version of the compiler. Try erasing the module cache.
+        """
+      fatalError(m)
     }
 
     // Compile the module from sources.
@@ -148,20 +158,29 @@ public struct Driver {
 
     if cachingIsEnabled {
       let a = try program.archive(module: m)
-      let f = moduleCachePath!.appending(component: module.rawValue + ".hylomodule")
+      let f = moduleCachePath!.appending(component: module + ".hylomodule")
       try a.write(into: f)
     }
   }
 
   /// Loads the standard library with `load(_:withSourcesAt:)`.
+  /// 
+  /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the 
+  /// bundled or local standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    try await load(.standardLibrary, withSourcesAt: standardLibrarySources)
+    let sourceRoot: URL
+    #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
+    sourceRoot = bundledStandardLibrarySources
+    #else
+    sourceRoot = localStandardLibrarySources
+    #endif
+    try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
   public func archive(of module: Module.Name) -> Data? {
     if let prefix = moduleCachePath {
-      let path = prefix.appending(path: module.rawValue + ".hylomodule")
+      let path = prefix.appending(path: module + ".hylomodule")
       return try? Data(contentsOf: path)
     } else {
       return nil

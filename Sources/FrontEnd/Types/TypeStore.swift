@@ -80,6 +80,12 @@ public struct TypeStore: Sendable {
     }
   }
 
+  /// Returns the unique type corresponding to the given signature, creating it if necessary.
+  internal mutating func demand(_ s: IRFunction.Signature) -> AnyTypeIdentity {
+    let t = demand(s.head).erased
+    return introduce(parameters: s.context, into: t)
+  }
+
   /// Returns the tag of `n`.
   public func tag<T: TypeIdentity>(of n: T) -> TypeTag {
     .init(type(of: self[n]))
@@ -259,6 +265,29 @@ public struct TypeStore: Sendable {
     return p
   }
 
+  /// Returns the parameters that occur free in `n`.
+  public mutating func parameters(freeIn n: AnyTypeIdentity) -> SortedSet<GenericParameter.ID> {
+    // Trivial if `n` contains no generic type paramerer.
+    if !n[.hasGenericParameter] { return [] }
+
+    var result: SortedSet<GenericParameter.ID> = []
+    _ = self.map(n) { (s, t) in
+      if let u = s.cast(t, to: UniversalType.self) {
+        result.formUnion(s.parameters(freeIn: s[u].head).subtracting(s[u].parameters))
+        return .stepOver(t)
+      } else if let p = s.cast(t, to: GenericParameter.self) {
+        result.insert(p)
+        return .stepOver(t)
+      } else if t[.hasGenericParameter] {
+        return .stepInto(t)
+      } else {
+        return .stepOver(t)
+      }
+    }
+
+    return result
+  }
+
   /// Returns the canonical representation of a tuple containing the given elements.
   ///
   /// The result is `.void` if `elements` is empty. Otherwise, it is an instance of `Tuple`.
@@ -290,12 +319,28 @@ public struct TypeStore: Sendable {
       if let u = cast(b, to: Tuple.self) {
         s = u
       } else {
-        return (result + [b], isOpenEnded: true)
+        return (result.appending(b), isOpenEnded: true)
       }
     }
 
     assert(self[s] == .empty)
     return (result, isOpenEnded: false)
+  }
+
+  /// Returns the `i`-th member of `t`, if any.
+  public func member(_ i: consuming Int, of t: Tuple.ID) -> AnyTypeIdentity? {
+    var s = t
+    while case .cons(let a, let b) = self[s] {
+      if i == 0 {
+        return a
+      } else if let u = cast(b, to: Tuple.self) {
+        i -= 1
+        s = u
+      } else {
+        return nil
+      }
+    }
+    return nil
   }
 
   /// Assuming `a` identifies the (possibly polymorphic) type of a callable abstraction with an
@@ -384,7 +429,6 @@ public struct TypeStore: Sendable {
   /// bundle), the result is `[E]() auto -> T`.
   public func seenAsTermAbstraction<T: TypeIdentity>(_ n: T) -> Arrow.ID? {
     let h = head(n)
-
     switch tag(of: h) {
     case Arrow.self:
       return .init(uncheckedFrom: h)
@@ -545,7 +589,7 @@ public struct TypeStore: Sendable {
     let output = if k.isMutating {
       self[n].output
     } else {
-      tuple(of: updates + [self[n].output]).erased
+      tuple(of: updates.appending(self[n].output)).erased
     }
 
     return demand(Arrow(effect: k, environment: environment, inputs: inputs, output: output))
@@ -826,6 +870,8 @@ public struct TypeStore: Sendable {
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as Bundle, let u as Bundle):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
+    case (_ as Enum, _ as Enum):
+      result = false
     case (let t as EqualityWitness, let u as EqualityWitness):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (_ as ErrorType, _ as ErrorType):
@@ -858,6 +904,8 @@ public struct TypeStore: Sendable {
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as TypeApplication, let u as TypeApplication):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
+    case (_ as TypeWitness, _ as TypeWitness):
+      result = false
     case (let t as UniversalType, let u as UniversalType):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     default:

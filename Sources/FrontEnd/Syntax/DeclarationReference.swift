@@ -54,16 +54,6 @@ public enum DeclarationReference: Hashable, Sendable {
     }
   }
 
-  /// Returns `true` iff `self` refers to a built-in type operator.
-  public var targetIsTypeOperator: Bool {
-    switch self {
-    case .builtin(.product), .builtin(.sum):
-      return true
-    default:
-      return false
-    }
-  }
-
   /// The referred declaration, unless it is built-in.
   public var target: DeclarationIdentity? {
     switch self {
@@ -87,7 +77,7 @@ public enum DeclarationReference: Hashable, Sendable {
   /// Returns a copy of `self` in which occurrences of `m` have been substituted for `n`.
   internal func substituting(_ m: ExpressionIdentity, for n: ExpressionIdentity) -> Self {
     if case .inherited(let w, let d, let s) = self {
-      return .inherited(w.substituting(m, for: n), d, statically: s)
+      return .inherited(w.substituting(m, with: n), d, statically: s)
     } else {
       return self
     }

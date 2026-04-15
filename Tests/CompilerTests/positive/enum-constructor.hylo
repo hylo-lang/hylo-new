@@ -1,0 +1,13 @@
+//! stage:lowering
+
+enum E is Deinitializable {
+  case a(x: Int)
+  case b(x: Bool)
+}
+
+fun use<T>(x: T) {}
+
+public fun main() {
+  let e = E.a(1)
+  use(e)
+}

@@ -16,14 +16,19 @@ public struct IRSubfield: Instruction {
   public let typeOfSubfield: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
-  public init(
-    base: IRValue, path: IndexPath, typeOfSubfield: AnyTypeIdentity,
-    anchor: Anchor
-  ) {
+  public init(base: IRValue, path: IndexPath, typeOfSubfield: AnyTypeIdentity, anchor: Anchor) {
     self.operands = [base]
     self.anchor = anchor
     self.path = path
     self.typeOfSubfield = typeOfSubfield
+  }
+
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = [ss[other.base]]
+    self.anchor = other.anchor
+    self.path = other.path
+    self.typeOfSubfield = other.typeOfSubfield
   }
 
   /// The address of the record containing the subfield whose address is computed.
@@ -33,14 +38,13 @@ public struct IRSubfield: Instruction {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .lowered(typeOfSubfield, isAddress: true)
+    .place(typeOfSubfield)
   }
 
   /// `true`.
   public var isExtendingOperandLifetimes: Bool {
     true
   }
-
 }
 
 extension IRSubfield: Showable {

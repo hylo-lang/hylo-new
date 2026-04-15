@@ -43,6 +43,7 @@ public struct Token: Hashable, Sendable {
     case type
     case `var`
     case `where`
+    case yield
 
     // Scalar literals
     case integerLiteral
@@ -60,7 +61,6 @@ public struct Token: Hashable, Sendable {
     case equal
     case star
     case `operator`
-    case oplus
 
     // Punctuation
     case comma

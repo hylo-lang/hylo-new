@@ -23,6 +23,12 @@ public struct IRStore: Instruction {
     self.anchor = anchor
   }
 
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = [ss[other.value], ss[other.target]]
+    self.anchor = other.anchor
+  }
+
   /// The value to write.
   public var value: IRValue {
     operands[0]

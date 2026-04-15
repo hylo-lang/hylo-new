@@ -181,6 +181,7 @@ public struct Lexer: IteratorProtocol, Sequence {
     case "type": tag = .type
     case "var": tag = .var
     case "where": tag = .where
+    case "yield": tag = .yield
     default: tag = .name
     }
 
@@ -240,7 +241,7 @@ public struct Lexer: IteratorProtocol, Sequence {
     case "}": tag = .rightBrace
     case "[": tag = .leftBracket
     case "]": tag = .rightBracket
-    case "(": tag = take("+)") == nil ? .leftParenthesis : .oplus
+    case "(": tag = .leftParenthesis
     case ")": tag = .rightParenthesis
     case "@": tag = .at
     case ",": tag = .comma

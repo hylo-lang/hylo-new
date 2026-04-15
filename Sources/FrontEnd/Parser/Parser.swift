@@ -4,7 +4,7 @@ import Utilities
 public struct Parser {
 
   /// The context in which a parser is being used.
-  private enum Context {
+  private enum Context: Equatable {
 
     /// The default context.
     case `default`
@@ -13,7 +13,7 @@ public struct Parser {
     case functionBody
 
     /// The parsing of member declarations.
-    case typeBody
+    case typeBody(SyntaxTag)
 
     /// The parsing of the subpattern of a binding pattern.
     case bindingSubpattern
@@ -21,6 +21,11 @@ public struct Parser {
     /// `true` iff `self` denotes a local scope.
     var isLocal: Bool {
       (self == .functionBody) || (self == .bindingSubpattern)
+    }
+
+    /// Returns `true` iff `self` denotes the body of at type declaration.
+    var isTypeBody: Bool {
+      if case .typeBody = self { return true } else { return false }
     }
 
   }
@@ -90,12 +95,14 @@ public struct Parser {
       return try .init(parseEnumCaseDeclaration(after: prologue, in: &file))
     case .enum:
       return try .init(parseEnumDeclaration(after: prologue, in: &file))
-    case .fun:
+    case .extension:
+      return try .init(parseExtensionDeclaration(after: prologue, in: &file))
+    case .fun, .subscript:
       return try parseFunctionOrBundleDeclaration(after: prologue, in: &file)
     case .given:
       return try parseGivenDeclaration(after: prologue, in: &file)
-    case .extension:
-      return try .init(parseExtensionDeclaration(after: prologue, in: &file))
+    case .import:
+      return try .init(parseImportDeclaration(after: prologue, in: &file))
     case .`init`:
       return try .init(parseInitializerDeclaration(after: prologue, in: &file))
     case .struct:
@@ -220,7 +227,7 @@ public struct Parser {
     // Contextual keywords.
     else if let t = peek(), t.tag == .name {
       switch t.text {
-      case "indirect" where context == .typeBody:
+      case "indirect" where context.isTypeBody:
         _ = take()
         return .init(.indirect, at: t.site)
 
@@ -263,6 +270,7 @@ public struct Parser {
   /// Parses the declaration of an enum case.
   ///
   ///     enum-case-declaration ::=
+  ///       'case' identifier
   ///       'case' identifier '(' parameter-list? ')' ('=' expression)?
   ///
   private mutating func parseEnumCaseDeclaration(
@@ -270,7 +278,7 @@ public struct Parser {
   ) throws -> EnumCaseDeclaration.ID {
     let introducer = try take(.case) ?? expected("'case'")
     let identifier = parseSimpleIdentifier()
-    let parameters = try parseParenthesizedParameterList(in: &file)
+    let parameters = try parseOptionalEnumCasePayload(in: &file)
     let body: ExpressionIdentity?
     if let assign = take(.assign) {
       body = try parseExpression(in: &file)
@@ -295,6 +303,17 @@ public struct Parser {
         site: span(from: introducer)))
   }
 
+  /// Parses declarations of case associated values iff the next token is a left parenthesis.
+  private mutating func parseOptionalEnumCasePayload(
+    in file: inout Module.SourceContainer
+  ) throws -> [ParameterDeclaration.ID] {
+    if next(is: .leftParenthesis) {
+      return try parseParenthesizedParameterList(in: &file)
+    } else {
+      return []
+    }
+  }
+
   /// Parses an enum declaration.
   private mutating func parseEnumDeclaration(
     after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
@@ -304,7 +323,8 @@ public struct Parser {
     let parameters = try parseOptionalTypeParameterClause(in: &file)
     let representation = try next(is: .leftParenthesis) ? parseExpression(in: &file) : nil
     let conformances = try parseOptionalAdjunctConformanceList(until: .leftBrace, in: &file)
-    let members = try parseTypeBody(in: &file, accepting: \.isValidEnumMember)
+    let members = try parseTypeBody(
+      of: EnumDeclaration.self, in: &file, accepting: \.isValidEnumMember)
 
     return file.insert(
       EnumDeclaration(
@@ -356,7 +376,8 @@ public struct Parser {
       }
     }
 
-    let members = try parseTypeBody(in: &file, accepting: \.isValidStructMember)
+    let members = try parseTypeBody(
+      of: ExtensionDeclaration.self, in: &file, accepting: \.isValidStructMember)
 
     // No modifiers or annotations allowed on extensions.
     _ = sanitize(prologue.annotations, accepting: { _ in false })
@@ -368,6 +389,21 @@ public struct Parser {
         contextParameters: contextParameters,
         extendee: extendee,
         members: members,
+        site: span(from: introducer)))
+  }
+
+  /// Parses an import declaration.
+  private mutating func parseImportDeclaration(
+    after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
+  ) throws -> ImportDeclaration.ID {
+    let introducer = try take(.import) ?? expected("'import'")
+    let identifier = parseSimpleIdentifier()
+
+    return file.insert(
+      ImportDeclaration(
+        modifiers: sanitize(prologue.modifiers, accepting: \.isApplicableToImport),
+        introducer: introducer,
+        identifier: identifier,
         site: span(from: introducer)))
   }
 
@@ -423,9 +459,7 @@ public struct Parser {
       _ = try take(contextual: "is") ?? expected("'is'")
       let concept = try parseExpression(in: &file)
       let witness = file.desugaredConformance(of: lhs, to: concept)
-      let members = self.next(is: .leftBrace)
-        ? try parseTypeBody(in: &file, accepting: \.isValidStructMember)
-        : nil
+      let members = try parseOptionalConformanceBody(in: &file)
 
       // No annotations allowed on given declarations.
       _ = sanitize(prologue.annotations, accepting: { _ in false })
@@ -443,6 +477,18 @@ public struct Parser {
     }
   }
 
+  /// Parses the body of a type declaration iff the next token is a left brace.
+  private mutating func parseOptionalConformanceBody(
+    in file: inout Module.SourceContainer
+  ) throws -> [DeclarationIdentity]? {
+    if next(is: .leftBrace) {
+      return try parseTypeBody(
+        of: ConformanceDeclaration.self, in: &file, accepting: \.isValidStructMember)
+    } else {
+      return nil
+    }
+  }
+
   /// Parses a function bundle declaration.
   ///
   ///     function-declaration ::=
@@ -457,32 +503,37 @@ public struct Parser {
   private mutating func parseFunctionOrBundleDeclaration(
     after prologue: DeclarationPrologue, in file: inout Module.SourceContainer
   ) throws -> DeclarationIdentity {
-    let introducer = try take(.fun) ?? expected("'fun'")
+    // Parse the introducer, which is 'fun' or 'subscript'.
+    let introducer = try parseFunctionIntroducer()
     let identifier = try parseFunctionIdentifier()
+
+    // Parse the captures and parameters, e.g., `[...]<T is P>(x: T)`
     let captures = try parseOptionalCaptureList(in: &file) ?? .empty(at: position)
     let (contextParameters, parameters) = try parseParameterClauses(in: &file)
+
+    // Parse the effect on the environment/receiver.
     let effect = parseOptionalAccessEffect() ?? .init(.let, at: .empty(at: position))
 
     // Insert the self-parameter of non-static member declarations.
     var p: [ParameterDeclaration.ID] = []
-    if (context == .typeBody) && !prologue.contains(.static) {
+    if context.isTypeBody && !prologue.contains(.static) {
       p = Array(file.synthesizeSelfParameter(effect: effect), prependedTo: parameters)
     } else {
       p = parameters
     }
 
-    let output = try parseOptionalReturnTypeAscription(in: &file)
+    // Parse the return type ascription, which must be present if we're constructing a subscript.
+    let output = try parseReturnTypeAscription(introducedBy: introducer.value, in: &file)
 
     // Are we parsing a bundle declaration?
     if effect.value == .auto {
-      let b = try parseBundleBody(in: &file)
-      let i = asBundleIdentifier(identifier)
+      let b = try parseBundleBody(introducedBy: introducer.value, in: &file)
       let n = file.insert(
         FunctionBundleDeclaration(
           annotations: prologue.annotations,
           modifiers: prologue.modifiers,
-          introducer: .init(introducer, at: introducer.site),
-          identifier: i,
+          introducer: introducer,
+          identifier: asBundleIdentifier(identifier),
           contextParameters: contextParameters,
           captures: captures,
           parameters: p,
@@ -495,13 +546,12 @@ public struct Parser {
 
     // We're parsing a regular function declaration.
     else {
-      let f = Parsed(FunctionDeclaration.Introducer.fun, at: introducer.site)
-      let b = try parseOptionalCallableBody(in: &file)
+      let b = try parseOptionalCallableBody(introducedBy: introducer.value, in: &file)
       let n = file.insert(
         FunctionDeclaration(
           annotations: prologue.annotations,
           modifiers: prologue.modifiers,
-          introducer: f,
+          introducer: introducer,
           identifier: identifier,
           contextParameters: contextParameters,
           captures: captures,
@@ -529,7 +579,7 @@ public struct Parser {
     // Are we parsing a custom initializer?
     if introducer.value == .`init` {
       let (contextParameters, parameters) = try parseParameterClauses(in: &file)
-      let b = try parseOptionalCallableBody(in: &file)
+      let b = try parseOptionalCallableBody(introducedBy: introducer.value, in: &file)
 
       return file.insert(
         FunctionDeclaration(
@@ -548,6 +598,11 @@ public struct Parser {
 
     // Are we parsing a memberwise initializer?
     else if introducer.value == .memberwiseinit {
+      if context != .typeBody(.init(StructDeclaration.self)) {
+        let m = "memberwise initializer can only occur in the declaration of a struct"
+        throw ParseError(m, at: introducer.site)
+      }
+
       return file.insert(
         FunctionDeclaration(
           annotations: prologue.annotations,
@@ -566,13 +621,26 @@ public struct Parser {
     else { unreachable("invalid introducer") }
   }
 
+  /// Parses the introducer of a function or subscript declaration that is not an initializer.
+  private mutating func parseFunctionIntroducer()
+    throws -> Parsed<FunctionDeclaration.Introducer>
+  {
+    if let t = take(.fun) {
+      return .init(.fun, at: t.site)
+    } else if let t = take(.subscript) {
+      return .init(.subscript, at: t.site)
+    } else {
+      throw expected("'fun' or 'subscript'")
+    }
+  }
+
   /// Parses the introducer of an initializer declaration.
   ///
   ///     initializer-introducer ::=
   ///       'memberwise'? 'init'
   ///
-  private mutating func parseInitializerIntroducer() throws
-    -> Parsed<FunctionDeclaration.Introducer>
+  private mutating func parseInitializerIntroducer()
+    throws -> Parsed<FunctionDeclaration.Introducer>
   {
     if let t = take(.`init`) {
       return .init(.`init`, at: t.site)
@@ -784,7 +852,7 @@ public struct Parser {
       case let n as NameExpression:
         return file.insert(StaticCall(callee: b, arguments: conformer(), site: n.site))
       case let n as StaticCall:
-        return file.replace(b, for: n.replacing(arguments: conformer() + n.arguments))
+        return file.replace(b, with: n.replacing(arguments: conformer() + n.arguments))
       case let n:
         throw ParseError("invalid context bound", at: n.site)
       }
@@ -900,48 +968,59 @@ public struct Parser {
         site: span(from: start)))
   }
 
-  /// Parses the body of a callable abstraction iff the next token is a left brace.
+  /// Parses the body of an abstraction introduced by `head` iff the next token is a left brace.
   private mutating func parseOptionalCallableBody(
-    in file: inout Module.SourceContainer
+    introducedBy head: FunctionDeclaration.Introducer, in file: inout Module.SourceContainer
   ) throws -> [StatementIdentity]? {
     if next(is: .leftBrace) {
-      return try parseCallableBody(in: &file)
+      return try parseCallableBody(introducedBy: head, in: &file)
     } else {
       return nil
     }
   }
 
-  /// Parses the body of a callable abstraction.
+  /// Parses the body of an abstraction introduced by `head`.
   ///
   /// The body is parsed as a sequence of statements enclosed in braces. If the sequence is empty,
   /// the result is a list containing one return statement having no return value. If the sequence
   /// contains a single expression, the result is a list containing one return statement having
   /// that expression as a return value. Otherwise, the result contains the parsed statements.
   private mutating func parseCallableBody(
-    in file: inout Module.SourceContainer
+    introducedBy head: FunctionDeclaration.Introducer, in file: inout Module.SourceContainer
   ) throws -> [StatementIdentity] {
     var ss = try entering(.functionBody, { (me) in try me.parseBracedStatementList(in: &file) })
 
-    if ss.isEmpty {
+    // If we parsed an empty body and we're in the body of a function or initializer, then insert
+    // a return statement.
+    if ss.isEmpty && (head != .subscript) {
       let r = file.insert(Return(introducer: nil, value: nil, site: .empty(at: position)))
       ss.append(.init(r))
-    } else if let s = ss.uniqueElement, file.tag(of: s).value is any Expression.Type {
+    }
+
+    // If we parsed a single expression, introduce a return or yield statement.
+    else if let s = ss.uniqueElement, file.isSingleExpressionBodied(s.erased) {
       let e = ExpressionIdentity(uncheckedFrom: s.erased)
-      let r = file.insert(Return(introducer: nil, value: e, site: file[s].site))
-      ss[0] = .init(r)
+      if head == .subscript {
+        let r = file.insert(Yield(introducer: nil, value: e, site: file[s].site))
+        ss[0] = .init(r)
+      } else {
+        let r = file.insert(Return(introducer: nil, value: e, site: file[s].site))
+        ss[0] = .init(r)
+      }
     }
 
     return ss
   }
 
+  /// Parses the body a bundle declaration introduced by `head`.
   private mutating func parseBundleBody(
-    in file: inout Module.SourceContainer
+    introducedBy head: FunctionDeclaration.Introducer, in file: inout Module.SourceContainer
   ) throws -> [VariantDeclaration.ID] {
     let start = nextTokenStart()
 
     let vs = try inBraces { (m0) in
       try m0.semicolonSeparated(until: .rightBrace) { (m1) in
-        try m1.parseVariant(in: &file)
+        try m1.parseVariant(introducedBy: head, in: &file)
       }
     }
 
@@ -951,12 +1030,12 @@ public struct Parser {
     return vs
   }
 
-  /// Parses the body of a variant in a function or subscript bundle.
+  /// Parses the body of a variant in a function or subscript bundle introduced by `head`.
   private mutating func parseVariant(
-    in file: inout Module.SourceContainer
+    introducedBy head: FunctionDeclaration.Introducer, in file: inout Module.SourceContainer
   ) throws -> VariantDeclaration.ID {
     let k = try parseOptionalAccessEffect() ?? expected("access effect")
-    let b = try parseOptionalCallableBody(in: &file)
+    let b = try parseOptionalCallableBody(introducedBy: head, in: &file)
     return file.insert(VariantDeclaration(effect: k, body: b, site: span(from: k.site.start)))
   }
 
@@ -974,7 +1053,8 @@ public struct Parser {
     let identifier = parseSimpleIdentifier()
     let parameters = try parseOptionalTypeParameterClause(in: &file)
     let conformances = try parseOptionalAdjunctConformanceList(until: .leftBrace, in: &file)
-    let members = try parseTypeBody(in: &file, accepting: \.isValidStructMember)
+    let members = try parseTypeBody(
+      of: StructDeclaration.self, in: &file, accepting: \.isValidStructMember)
 
     return file.insert(
       StructDeclaration(
@@ -1002,7 +1082,9 @@ public struct Parser {
 
     // Base traits are desugared as given requirements before other members.
     var members = try parseOptionalRefinementList(of: identifier.value,  in: &file)
-    try members.append(contentsOf: parseTypeBody(in: &file, accepting: \.isValidTraitMember))
+    try members.append(
+      contentsOf: parseTypeBody(
+        of: TraitDeclaration.self, in: &file, accepting: \.isValidTraitMember))
 
     if let p = parameters.usings.first {
       report(.init("constraints on trait parameters are not supported yet", at: file[p].site))
@@ -1048,17 +1130,18 @@ public struct Parser {
     }
   }
 
-  /// Parses a the body of a type declaration.
+  /// Parses the body of a type declaration.
   ///
   ///     type-body ::=
   ///       '{' ';'* type-members? '}'
   ///     type-members ::=
   ///       type-members? ';'* declaration ';'*
   ///
-  private mutating func parseTypeBody(
+  private mutating func parseTypeBody<T: Scope>(
+    of: T.Type,
     in file: inout Module.SourceContainer, accepting isValid: (SyntaxTag) -> Bool
   ) throws -> [DeclarationIdentity] {
-    try entering(.typeBody) { (m0) in
+    try entering(.typeBody(.init(T.self))) { (m0) in
       try m0.inBraces { (m1) in
         try m1.semicolonSeparated(until: .rightBrace) { (m2) in
           let d = try m2.parseDeclaration(in: &file)
@@ -1113,7 +1196,7 @@ public struct Parser {
       _ = sanitize(prologue.modifiers, accepting: { _ in false })
 
       // An error has already been reported if the identifier is `$!`.
-      if (context != .typeBody) && (identifier.value != "$!") {
+      if !context.isTypeBody && (identifier.value != "$!") {
         report(.init("declaration is not allowed here", at: introducer.site))
       }
 
@@ -1278,7 +1361,7 @@ public struct Parser {
     var h = head
     while true {
       // Qualifications and bracketed calls bind more tightly than mutation markers.
-      if let n = try appendNominalComponent(to: h, in: &file) {
+      if let n = try appendMemberSelection(to: h, in: &file) {
         h = n
       } else if let n = try appendBracketedArguments(to: h, in: &file) {
         h = n
@@ -1295,16 +1378,24 @@ public struct Parser {
     return h
   }
 
-  /// If the next token is a dot, parses a nominal component and returns a name expression
-  /// qualified by `head`. Otherwise, returns `nil`.
-  private mutating func appendNominalComponent(
+  /// If the next token is a dot, parses a nominal component or a tuple member index and returns a
+  /// name expression or a tuple member qualified by `head`. Otherwise, returns `nil`.
+  private mutating func appendMemberSelection(
     to head: ExpressionIdentity, in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity? {
     if take(.dot) == nil { return nil }
-    let n = try parseName()
-    let s = span(from: file[head].site.start)
-    let m = file.insert(NameExpression(qualification: head, name: n, site: s))
-    return .init(m)
+
+    if let i = take(.integerLiteral) {
+      let n = try Int(i.text) ?? illegalTupleMemberIndex(i)
+      let s = span(from: file[head].site.start)
+      let m = file.insert(TupleMember(parent: head, member: .init(n, at: i.site), site: s))
+      return .init(m)
+    } else {
+      let n = try parseName()
+      let s = span(from: file[head].site.start)
+      let m = file.insert(NameExpression(qualification: head, name: n, site: s))
+      return .init(m)
+    }
   }
 
   /// If the next token is a left angle, parses an argument list and returns a static call applying
@@ -1545,8 +1636,8 @@ public struct Parser {
     }
   }
 
-  /// Parses the else-branch of a conditional expression iff the next token if `else` or returns
-  /// an empty block otherwise.
+  /// Parses the else-branch of a conditional expression iff the next token if `else` or returns an
+  /// empty block otherwise.
   private mutating func parseElseBranch(
     in file: inout Module.SourceContainer
   ) throws -> If.ElseIdentity {
@@ -1559,7 +1650,7 @@ public struct Parser {
       }
     }
 
-    // Create an empty block at the currentposition.
+    // Create an empty block at the current position.
     else {
       return .init(file.insert(Block(introducer: nil, statements: [], site: .empty(at: position))))
     }
@@ -1624,8 +1715,8 @@ public struct Parser {
     let captures = try parseOptionalCaptureList(in: &file) ?? .inferred(at: position)
     let parameters = try parseParenthesizedParameterList(in: &file)
     let effect = parseOptionalAccessEffect() ?? .init(.let, at: .empty(at: position))
-    let output = try parseOptionalReturnTypeAscription(in: &file)
-    let body = try parseCallableBody(in: &file)
+    let output = try parseReturnTypeAscription(introducedBy: .fun, in: &file)
+    let body = try parseCallableBody(introducedBy: .fun, in: &file)
 
     let f = file.insert(
       FunctionDeclaration(
@@ -1758,7 +1849,7 @@ public struct Parser {
     // Check for spread operators.
     if lc != nil, let ellipsis = take(.ellipsis) {
       let last = try parseExpression(in: &file)
-      return (xs + [last], ellipsis)
+      return (xs.appending(last), ellipsis)
     } else {
       return (xs, nil)
     }
@@ -1829,19 +1920,25 @@ public struct Parser {
     }
   }
 
-  /// Parses a return type ascription iff the next token is an arrow.
+  /// Parses the return type ascription of an abstraction introduced by `head` iff the next token
+  /// is an arrow.
   ///
   ///     return-type-ascription ::=
   ///       '->' expression
   ///
-  private mutating func parseOptionalReturnTypeAscription(
+  private mutating func parseReturnTypeAscription(
+    introducedBy head: FunctionDeclaration.Introducer,
     in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity? {
     if take(.arrow) != nil {
       return try parseExpression(in: &file)
-    } else {
-      return nil
     }
+
+    // Subscript declarations require a return type ascription.
+    if head == .subscript {
+      report(.init("missing return type ascription", at: .empty(at: position)))
+    }
+    return nil
   }
 
   /// Parses the type ascription of a parameter iff the next token is a colon.
@@ -2005,7 +2102,7 @@ public struct Parser {
     var head = q
 
     while true {
-      if let n = try appendNominalComponent(to: head, in: &file) {
+      if let n = try appendMemberSelection(to: head, in: &file) {
         head = n
       } else if let n = try appendAngledArguments(to: head, in: &file) {
         head = n
@@ -2093,6 +2190,8 @@ public struct Parser {
       return try .init(parseDiscardStement(in: &file))
     case .return:
       return try .init(parseReturnStatement(in: &file))
+    case .yield:
+      return try .init(parseYieldStatement(in: &file))
     case _ where head.isDeclarationHead:
       return try .init(parseDeclaration(in: &file))
     default:
@@ -2137,6 +2236,25 @@ public struct Parser {
     return file.insert(Return(introducer: i, value: v, site: span(from: i)))
   }
 
+  /// Parses a yield statement.
+  ///
+  ///     yield-statement ::=
+  ///       'yield' expression
+  ///
+  private mutating func parseYieldStatement(
+    in file: inout Module.SourceContainer
+  ) throws -> Yield.ID {
+    let i = try take(.yield) ?? expected("'yield'")
+
+    // There should not be a newline between `yield` and the expression.
+    if newlinesBeforeNextToken() {
+      throw expected("expression")
+    }
+
+    let v = try parseExpression(in: &file)
+    return file.insert(Yield(introducer: i, value: v, site: span(from: i)))
+  }
+
   /// Parses an assignment or an expression.
   ///
   ///     assignment-statement ::=
@@ -2176,21 +2294,27 @@ public struct Parser {
   ///       identifier
   ///       operator-identifier
   ///
-  private mutating func parseFunctionIdentifier(
-  ) throws -> Parsed<FunctionIdentifier> {
-    if let t = peek() {
-      if t.isOperatorNotation {
-        let i = try parseOperatorIdentifier()
-        return .init(.operator(i.value.notation, i.value.identifier), at: i.site)
-      } else if t.isOperatorHead {
-        report(.init("missing operator notation", at: .empty(at: t.site.start)))
-        let o = try parseOperator()
-        return .init(.operator(.none, String(o.text)), at: o)
-      }
+  private mutating func parseFunctionIdentifier() throws -> Parsed<FunctionIdentifier> {
+    let head = try peek() ?? expected("identifier")
+
+    // Is the head an operator?
+    if head.isOperatorNotation {
+      let i = try parseOperatorIdentifier()
+      return .init(.operator(i.value.notation, i.value.identifier), at: i.site)
     }
 
-    let identifier = parseSimpleIdentifier()
-    return .init(.simple(identifier.value), at: identifier.site)
+    // Is the operator notation missing?
+    else if head.isOperatorHead {
+      report(.init("missing operator notation", at: .empty(at: head.site.start)))
+      let o = try parseOperator()
+      return .init(.operator(.none, String(o.text)), at: o)
+    }
+
+    // Otherwise, parse a simple identifier.
+    else {
+      let i = parseSimpleIdentifier()
+      return .init(.simple(i.value), at: i.site)
+    }
   }
 
   /// Returns `i` asa bundle identifier, reporting an error if it's an operator.
@@ -2208,8 +2332,9 @@ public struct Parser {
   ///     operator-identifier ::= (token)
   ///       operator-notation operator
   ///
-  private mutating func parseOperatorIdentifier(
-  ) throws -> Parsed<(notation: OperatorNotation, identifier: String)> {
+  private mutating func parseOperatorIdentifier()
+    throws -> Parsed<(notation: OperatorNotation, identifier: String)>
+  {
     let n = try parseOperatorNotation()
     let i = try parseOperator()
 
@@ -2587,6 +2712,11 @@ public struct Parser {
     .init("unary operator '\(o.text)' cannot be separated from its operand", at: o)
   }
 
+  /// Returns a parse error reporting a failure to parse a tuple member index.
+  private func illegalTupleMemberIndex(_ i: Token) -> ParseError {
+    .init("cannot parse '\(i.text)' as a tuple member index", at: i.site)
+  }
+
   /// Reports `e` and returns `v`.
   private mutating func fix<T>(_ e: ParseError, with v: T) -> T {
     report(e)
@@ -2801,7 +2931,7 @@ extension Module.SourceContainer {
       let desugared = StaticCall(
         callee: rhs.callee, arguments: Array(conformer, prependedTo: rhs.arguments),
         site: self[concept].site)
-      return replace(concept, for: desugared)
+      return replace(concept, with: desugared)
     } else {
       return insert(StaticCall(callee: concept, arguments: [conformer], site: self[concept].site))
     }

@@ -159,6 +159,35 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
     withObject(at: place, computingLayoutWith: &typer, { (o, _) in o.value = value })
   }
 
+  /// Updates `self` to define register `i`, which is in `f`.
+  ///
+  /// `i` identifies a register in `f` that results in either an object or a place. In the first
+  /// case, an new object is assigned to `i` directly. In the second case, a new place is created
+  /// to contain the new oject and the register is assigned to that place.
+  ///
+  /// The new object is defined as a uniform value `v`.
+  internal mutating func declare<T: InstructionIdentity>(
+    _ i: T, from f: IRFunction, initially v: Domain
+  ) {
+    assert(locals[.register(i.erased)] == nil, "register is already assigned")
+
+    // Create a new object.
+    let t = f.resolved(f.at(i.erased).type)!
+    let o = AbstractObject(type: t.type, value: .uniform(v))
+
+    // If the register defines an address, create a new place and assigns it the new object.
+    if t.isPlace {
+      assert(memory[.register(i.erased)] == nil, "storage already exists")
+      memory[.register(i.erased)] = .init(type: t.type, value: .uniform(v))
+      locals[.register(i.erased)] = .place(.root(.register(i.erased)))
+    }
+
+    // Otherwise, assigns the new object to the register itself.
+    else {
+      locals[.register(i.erased)] = .object(o)
+    }
+  }
+
 }
 
 extension AbstractContext.Locals: RandomAccessCollection {

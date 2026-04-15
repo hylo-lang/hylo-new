@@ -100,6 +100,11 @@ public struct SortedSet<Element: Comparable>: Equatable {
     elements.remove(at: index)
   }
 
+  /// Returns a set containing the elements `self` that do not occur in `other`.
+  public func subtracting<S: Sequence<Element>>(_ other: S) -> Self {
+    self.subtracting(SortedSet(other))
+  }
+
 }
 
 extension SortedSet: ExpressibleByArrayLiteral {

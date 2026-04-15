@@ -85,11 +85,23 @@ final class SortedSetTests: XCTestCase {
     XCTAssert(p2.inserted)
   }
 
+  func testRemoveAt() {
+    var s: SortedSet = ["a", "b", "c"]
+    XCTAssertEqual(s.remove(at: s.startIndex), "a")
+    XCTAssert(s.elementsEqual(["b", "c"]))
+  }
+
   func testRemove() {
     var s: SortedSet = ["a", "b", "c"]
     XCTAssertNotNil(s.remove("a"))
     XCTAssertNil(s.remove("a"))
     XCTAssertNil(s.remove("z"))
+  }
+
+  func testSubtracting() {
+    let s: SortedSet = ["a", "b", "c"]
+    let t = s.subtracting(["d", "c", "a"])
+    XCTAssertEqual(t, ["b"])
   }
 
   func testReserveCapacity() {

@@ -1,0 +1,21 @@
+negative/illegal-yield.hylo:4.23: error: subscript must yield before returning
+  if x { yield false }
+                      ^
+negative/illegal-yield.hylo:10.3: error: subscript cannot project more than once
+  yield false
+  ^
+negative/illegal-yield.hylo:9.3: note: value already projected here
+  yield true
+  ^
+negative/illegal-yield.hylo:16.3: error: subscript cannot project more than once
+  yield false
+  ^
+negative/illegal-yield.hylo:15.10: note: value already projected here
+  if x { yield true }
+         ^
+negative/illegal-yield.hylo:22.10: error: subscript cannot project more than once
+  if x { yield true }
+         ^
+negative/illegal-yield.hylo:21.3: note: value already projected here
+  yield false
+  ^

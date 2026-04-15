@@ -9,31 +9,7 @@ public struct Module: Sendable {
   public typealias ID = Int
 
   /// The name of a module.
-  @Archivable
-  public struct Name: Hashable, Sendable, CustomStringConvertible {
-
-    /// The raw value of this name.
-    public let rawValue: String
-
-    /// Creates an instance with the given raw value.
-    public init(_ rawValue: String) {
-      self.rawValue = rawValue
-    }
-
-    /// A textual description of this name.
-    public var description: String {
-      rawValue
-    }
-
-    /// Returns `true` iff `self` lexicographicaly precedes `other`.
-    public func lexicographicallyPrecedes(_ other: Self) -> Bool {
-      rawValue.lexicographicallyPrecedes(other.rawValue)
-    }
-
-    /// The name of Hylo's standard library.
-    public static let standardLibrary = Name("hylo.Hylo")
-
-  }
+  public typealias Name = String
 
   /// A source file added to a module.
   internal struct SourceContainer: Sendable {
@@ -95,6 +71,37 @@ public struct Module: Sendable {
       return syntaxToTag[n.offset]
     }
 
+    /// Returns `true` iff `s` can be evaluated as an expression.
+    internal func isSingleExpressionBodied(_ s: AnySyntaxIdentity) -> Bool {
+      var work = [s]
+
+      while let w = work.popLast() {
+        switch tag(of: w) {
+        case If.self:
+          let n = self[w] as! If
+
+          if let s = (self[n.success] as! Block).statements.uniqueElement {
+            work.append(s.erased)
+          } else {
+            return false
+          }
+
+          if tag(of: n.failure) == If.self {
+            work.append(n.failure.erased)
+          } else if let s = (self[n.failure] as! Block).statements.uniqueElement {
+            work.append(s.erased)
+          } else {
+            return false
+          }
+
+        case let t:
+          return t.value is any Expression.Type
+        }
+      }
+
+      return true
+    }
+
     /// Inserts `child` into `self`.
     internal mutating func insert<T: Syntax>(_ child: T) -> T.ID {
       let d = syntax.count
@@ -108,7 +115,7 @@ public struct Module: Sendable {
     ///
     /// - Requires: If `n` identifies a scope, then `T` must conform to `Scope`.
     internal mutating func replace<T: Expression>(
-      _ n: ExpressionIdentity, for newTree: T
+      _ n: ExpressionIdentity, with newTree: T
     ) -> T.ID {
       assert(n.file == identity)
       syntax[n.offset] = .init(newTree)
@@ -151,6 +158,54 @@ public struct Module: Sendable {
 
   }
 
+  /// The lowered functions and static variables of a module.
+  internal struct IR: Sendable {
+
+    /// A mapping from a function name to its declaration (and possibly definition).
+    internal private(set) var functions: OrderedDictionary<IRFunction.Name, IRFunction>
+
+    /// The global variables allocated in the static memory of the module.
+    internal private(set) var variables: OrderedDictionary<IRGlobal.Name, IRGlobal>
+
+    /// Creates an empty instance.
+    internal init() {
+      self.functions = [:]
+      self.variables = [:]
+    }
+
+    /// Projects the function identified by `f`.
+    internal subscript(f: IRFunction.ID) -> IRFunction {
+      get { functions.values[f] }
+      _modify { yield &functions.values[f] }
+    }
+
+    /// Adds `f` to this module.
+    ///
+    /// - Requires: `self` contains no IR function having the name of `f`.
+    @discardableResult
+    internal mutating func addFunction(_ f: IRFunction) -> IRFunction.ID {
+      modify(&functions[f.name]) { (slot) in
+        assert(slot == nil, "function already declared")
+        slot = .some(f)
+      }
+      return functions.index(forKey: f.name)!
+    }
+
+    /// Assigns the global variables `g` to `d`.
+    ///
+    /// - Requires: `self` assigns no global variables to `d`.
+    internal mutating func addGlobal(_ g: IRGlobal) {
+      modify(&variables[g.name]) { (slot) in
+        assert(slot == nil, "variable already assigned")
+        slot = g
+      }
+    }
+
+  }
+
+  /// The name of Hylo's standard library.
+  public static let standardLibraryName = Name("Hylo")
+
   /// The name of the module.
   public let name: Name
 
@@ -164,7 +219,7 @@ public struct Module: Sendable {
   internal private(set) var sources: OrderedDictionary<FileName, SourceContainer> = [:]
 
   /// The IR functions in the module.
-  internal private(set) var ir: OrderedDictionary<IRFunction.Name, IRFunction?> = [:]
+  internal var ir: IR = .init()
 
   /// Creates an empty module with the given name and identity.
   public init(name: Name, identity: Module.ID) {
@@ -174,7 +229,7 @@ public struct Module: Sendable {
 
   /// `true` iff `self` is Hylo's standard library.
   public var isStandardLibrary: Bool {
-    name == .standardLibrary
+    name == Module.standardLibraryName
   }
 
   /// Returns a hash of the module that suitable for determining whether its sources have changed.
@@ -199,6 +254,13 @@ public struct Module: Sendable {
     sources[d.site.source.name]!.addDiagnostic(d)
   }
 
+  /// Adds the given diagnostics to this module.
+  ///
+  /// - requires: Each diagnostic relates to some source in `self`.
+  public mutating func addDiagnostics(_ ds: DiagnosticSet) {
+    for d in ds.elements { addDiagnostic(d) }
+  }
+
   /// Adds a dependency to this module.
   public mutating func addDependency(_ d: Module.Name) {
     if !dependencies.contains(d) {
@@ -219,18 +281,6 @@ public struct Module: Sendable {
       sources[s.name] = f
       return (inserted: true, identity: f.identity)
     }
-  }
-
-  /// Adds `f` to this module.
-  ///
-  /// - Requires: `self` contains no IR function having the name of `f`.
-  @discardableResult
-  public mutating func addFunction(_ f: IRFunction) -> IRFunction.ID {
-    modify(&ir[f.name]) { (d) in
-      assert(d == nil, "function already declared")
-      d = .some(f)
-    }
-    return ir.index(forKey: f.name)!
   }
 
   /// Inserts `child` into `self` in the bucket of `file`.
@@ -265,9 +315,9 @@ public struct Module: Sendable {
   ///
   /// - Requires: If `n` identifies a scope, then `T` must conform to `Scope`.
   @discardableResult
-  public mutating func replace<T: Expression>(_ n: ExpressionIdentity, for newTree: T) -> T.ID {
+  public mutating func replace<T: Expression>(_ n: ExpressionIdentity, with newTree: T) -> T.ID {
     assert(!(tag(of: n).value is any Scope.Type) || (T.self is any Scope))
-    return sources.values[n.file.offset].replace(n, for: newTree)
+    return sources.values[n.file.offset].replace(n, with: newTree)
   }
 
   /// The nodes in `self`'s abstract syntax tree.
@@ -281,8 +331,8 @@ public struct Module: Sendable {
   }
 
   /// The IR functions in `self`.
-  public var functions: some Collection<IRFunction> {
-    ir.values.map({ (f) in f! })
+  public var functions: OrderedDictionary<IRFunction.Name, IRFunction>.Values {
+    ir.functions.values
   }
 
   /// The identities of the source files in `self`.
@@ -317,12 +367,6 @@ public struct Module: Sendable {
   internal subscript<T: Syntax>(n: T.ID) -> T {
     assert(n.module == identity)
     return sources.values[n.file.offset].syntax[n.offset].wrapped as! T
-  }
-
-  /// Projects the function identified by `f`.
-  internal subscript(ir f: IRFunction.ID) -> IRFunction {
-    get { ir.values[f]! }
-    _modify { yield &ir.values[f]! }
   }
 
   /// Returns the tag of `n`.
@@ -376,15 +420,6 @@ public struct Module: Sendable {
   internal func implementations(definedBy d: ConformanceDeclaration.ID) -> WitnessTable? {
     assert(d.module == identity)
     return sources.values[d.file.offset].witnessTables[d.offset]
-  }
-
-  internal mutating func takeFunction(_ f: IRFunction.ID) -> IRFunction {
-    ir.values[f].sink()
-  }
-
-  internal mutating func reassignFunction(_ v: IRFunction, to f: IRFunction.ID) {
-    assert(ir.values[f] == nil)
-    ir.values[f] = v
   }
 
 }
@@ -585,6 +620,29 @@ extension Module: Archivable {
     let name = try archive.read(Name.self)
     let hash = try archive.read(UInt64.self, endianness: .little)
     return (name, hash)
+  }
+
+}
+
+extension Module.IR: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  public func show(using printer: inout TreePrinter) -> String {
+    var result = ""
+    var first = true
+
+    for g in variables.values {
+      if first { first = false } else { result.write("\n") }
+      result.write(printer.show(g))
+      result.write("\n")
+    }
+    for f in functions.values {
+      if first { first = false } else { result.write("\n") }
+      result.write(printer.show(f))
+      result.write("\n")
+    }
+
+    return result
   }
 
 }

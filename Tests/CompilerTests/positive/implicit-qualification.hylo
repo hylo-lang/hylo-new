@@ -7,8 +7,13 @@ struct A<T> {
   public fun id() sink -> Self { self }
 }
 
+public fun use<T>(x: A<T>) {}
+
 public fun main() {
   let a0: A<_> = .new(x: ())
   let a1: A<_> = .make(())
   let a2: A<_> = .make(()).id()
+
+  use(.new(x: ()))
+  use(.make(()).id())
 }

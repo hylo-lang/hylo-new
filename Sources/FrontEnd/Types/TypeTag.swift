@@ -48,6 +48,7 @@ public struct TypeTag: Sendable {
     TypeAlias.self,
     TypeApplication.self,
     TypeVariable.self,
+    TypeWitness.self,
     UniversalType.self,
   ]
 

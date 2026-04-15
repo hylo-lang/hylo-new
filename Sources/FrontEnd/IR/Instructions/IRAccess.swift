@@ -35,6 +35,13 @@ public struct IRAccess: IRRegionEntry {
     self.capabilities = capabilities
   }
 
+  /// Creates a copy of `other`, substituting its properities with `ss`.
+  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
+    self.operands = [ss[other.source]]
+    self.anchor = other.anchor
+    self.capabilities = other.capabilities
+  }
+
   /// The address of the storage on which a capability is requested.
   public var source: IRValue {
     operands[0]

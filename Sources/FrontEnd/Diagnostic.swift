@@ -88,6 +88,23 @@ extension Program {
 
   /// Returns an error diagnosing an illegal function application.
   internal func cannotCall(
+    _ e: ExpressionIdentity, typed f: AnyTypeIdentity, _ s: Call.Style
+  ) -> Diagnostic {
+    guard
+      let n = cast(e, to: NameExpression.self),
+      types.seenAsTermAbstraction(types.head(f)) != nil
+    else { return cannotCall(f, s, at: self[e].site) }
+
+    switch s {
+    case .parenthesized:
+      return .init(.error, "cannot call '\(show(n))' as a function", at: self[e].site)
+    case .bracketed:
+      return .init(.error, "cannot call '\(show(n))' as a subscript", at: self[e].site)
+    }
+  }
+
+  /// Returns an error diagnosing an illegal function application.
+  internal func cannotCall(
     _ f: AnyTypeIdentity, _ s: Call.Style, at site: SourceSpan
   ) -> Diagnostic {
     switch s {
@@ -246,9 +263,39 @@ extension Program {
     undefinedSymbol(n.value, memberOf: t, at: n.site)
   }
 
-  /// Returns a warning diagnosing an unused value.
-  internal func unusedValue(of t: AnyTypeIdentity, at site: SourceSpan) -> Diagnostic {
-    .init(.warning, format("unused value of type '%T'", [t]), at: site)
+  /// Returns an error diagnostic about an unused value.
+  internal func unusedValue<T: SyntaxIdentity>(
+    _ n: T, instanceOf t: AnyTypeIdentity, level: Diagnostic.Level
+  ) -> Diagnostic {
+    unusedValue(of: t, level: level, at: spanForDiagnostic(about: n))
+  }
+
+  /// Returns a diagnostic about an unused value.
+  internal func unusedValue(
+    of t: AnyTypeIdentity, level: Diagnostic.Level, at site: SourceSpan
+  ) -> Diagnostic {
+    .init(level, format("unused value of type '%T'", [t]), at: site)
+  }
+
+}
+
+extension IRFunction {
+
+  /// Returns an error indicating that `second` yields after `first` already did.
+  internal func extraneousYield(
+    _ second: AnyInstructionIdentity, first: AnyInstructionIdentity
+  ) -> Diagnostic {
+    let n = Diagnostic(
+      .note, "value already projected here", at: .empty(at: at(first).anchor.site.start))
+    return .init(
+      .error, "subscript cannot project more than once",
+      at: .empty(at: at(second).anchor.site.start),
+      notes: [n])
+  }
+
+  /// Returns an error indicating that a yield statement is missing.
+  internal func missingYield(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "subscript must yield before returning", at: site)
   }
 
 }
@@ -259,12 +306,12 @@ extension Diagnostic {
     .init(.error, "cannot consume '\(k)' projection", at: site)
   }
 
-  internal static func illegalMove(at site: SourceSpan) -> Diagnostic {
-    .init(.error, "illegal move", at: site)
+  internal static func illegalAccess(_ k: AccessEffect, at site: SourceSpan) -> Diagnostic {
+    .init(.error, "illegal '\(k)' access", at: site)
   }
 
-  internal static func illegalMutableAccess(at site: SourceSpan) -> Diagnostic {
-    .init(.error, "illegal mutable access", at: site)
+  internal static func illegalMove(at site: SourceSpan) -> Diagnostic {
+    .init(.error, "illegal move", at: site)
   }
 
   internal static func uninitializedObject(at site: SourceSpan) -> Diagnostic {

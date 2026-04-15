@@ -45,27 +45,27 @@ public struct Program: Sendable {
 
   /// Returns `true` iff the module containing the the standard library is present.
   public var containsStandardLibrary: Bool {
-    if let i = identity(module: .standardLibrary) {
+    if let i = identity(module: Module.standardLibraryName) {
       return !self[i].sources.isEmpty
     } else {
       return false
     }
   }
 
-  /// Returns the identity of the module named `moduleName`.
-  public mutating func demandModule(_ moduleName: Module.Name) -> Module.ID {
-    if let m = modules.index(forKey: moduleName) {
+  /// Returns the identity of the module with the given `name`.
+  public mutating func demandModule(_ name: Module.Name) -> Module.ID {
+    if let m = modules.index(forKey: name) {
       return m
     } else {
       let m = modules.count
-      modules[moduleName] = Module(name: moduleName, identity: m)
+      modules[name] = Module(name: name, identity: m)
       return m
     }
   }
 
-  /// Returns the identity of the module named `moduleName` or `nil` if no such module exists.
-  public func identity(module moduleName: Module.Name) -> Module.ID? {
-    modules.index(forKey: moduleName)
+  /// Returns the identity of the module with the given `name` or `nil` if no such module exists.
+  public func identity(module name: Module.Name) -> Module.ID? {
+    modules.index(forKey: name)
   }
 
   /// Computes the scoping relationships in `m`.
@@ -81,8 +81,11 @@ public struct Program: Sendable {
   }
 
   /// Assigns types to the syntax trees of `m`.
-  public mutating func assignTypes(_ m: Module.ID) {
-    var typer = Typer(typing: m, of: consume self)
+  public mutating func assignTypes(
+    _ m: Module.ID,
+    loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)?
+  ) {
+    var typer = Typer(typing: m, of: consume self, loggingInferenceWhere: isLoggingEnabled)
     typer.apply()
     self = typer.release()
   }
@@ -100,14 +103,17 @@ public struct Program: Sendable {
     withTyper(typing: m) { (typer) in
       // Temporarily move all functions to a local work list.
       var work: [(id: IRFunction.ID, function: IRFunction)] = []
-      modify(&typer.program[typer.module]) { (module) in
-        work = module.ir.values.indices.map({ (i) in (i, module.takeFunction(i)) })
+      let end = modify(&typer.program[m].ir) { (ir) in
+        for i in ir.functions.values.indices where ir[i].isDefined {
+          work.append((i, ir[i].move()))
+        }
+        return ir.functions.values.endIndex
       }
 
       let never = typer.program.types.never()
 
       // Mandatory intra-procedural passes.
-      for i in work.indices where work[i].function.isDefined {
+      for i in work.indices {
         work[i].function.foldRedundantInstructions()
         work[i].function.simplifyControlFlow()
         work[i].function.removeCodeAfterCallsReturning(never: never.erased)
@@ -116,17 +122,50 @@ public struct Program: Sendable {
         // reifyBundles
         // reifyAccesses
         work[i].function.closeOpenEndedRegions()
-        work[i].function.normalizeLifetimes(emittingInto: m, using: &typer)
+
+        // The following passes may fail.
+        var ds = DiagnosticSet()
+        work[i].function.checkYieldCoherence(reportingDiagnosticsTo: &ds)
+        typer.program[m].addDiagnostics(ds)
+        if ds.containsError { continue }
+
+        if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
+        if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
+
+        // This pass cannot fail.
+        work[i].function.depolymorphize(emittingInto: m, using: &typer)
       }
 
-      // It is possible new functions have been declared during lifetime normalization, e.g., for
-      // deinitializing outstanding values.
-
       // Move all functions back.
-      modify(&typer.program[typer.module]) { (module) in
+      modify(&typer.program[m].ir) { (ir) in
         while let (i, f) = work.popLast() {
-          module.reassignFunction(f, to: i)
+          ir[i].take(definition: f)
         }
+      }
+
+      // New functions may ave been introduced during the previous passes. Those that have been
+      // declared during depolymorphization must be defined in the current module unless they are
+      // behind a resilience boundary. Since this process may result in further new declarations,
+      // we must compute a fixed point on the number of functions.
+
+      var window = typer.program[m].ir.functions.values.indices[end...]
+      while !window.isEmpty {
+        // Look for functions that must be defined in the current module.
+        for i in window {
+          let module = typer.program[m]
+          guard
+            case .existentialized(let a) = module.ir[i].name,
+            case .some(let poly) = module.ir.functions.index(forKey: a),
+            module.ir[poly].isDefined
+          else { continue }
+
+          typer.program.withEmitter(insertingIn: m) { (emitter) in
+            emitter.existentialize(poly, into: i)
+          }
+        }
+
+        // New functions are those that are stored after the end of the current window.
+        window = typer.program[m].ir.functions.values.indices[window.endIndex...]
       }
     }
   }
@@ -135,7 +174,7 @@ public struct Program: Sendable {
   public mutating func withTyper<T>(
     typing m: Module.ID, _ action: (inout Typer) -> T
   ) -> T {
-    var typer = Typer(typing: m, of: consume self)
+    var typer = Typer(typing: m, of: consume self, loggingInferenceWhere: nil)
     defer { self = typer.release() }
     return action(&typer)
   }
@@ -470,6 +509,46 @@ public struct Program: Sendable {
     return x1.isTransitivelySynthetic
   }
 
+  /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
+  public mutating func isTriviallyInitializable(
+    _ t: AnyTypeIdentity, in s: ScopeIdentity
+  ) -> Bool {
+    let u = types.dealiased(t)
+    switch types.tag(of: u) {
+    case Struct.self:
+      return isTriviallyInitializable(types.castUnchecked(u, to: Struct.self), in: s)
+    case Tuple.self:
+      return isTriviallyInitializable(types.castUnchecked(u, to: Tuple.self), in: s)
+    case TypeApplication.self:
+      return isTriviallyInitializable(types.castUnchecked(u, to: TypeApplication.self), in: s)
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
+  public mutating func isTriviallyInitializable(
+    _ t: Struct.ID, in s: ScopeIdentity
+  ) -> Bool {
+    let d = types[t].declaration
+    return isInlineable(d, in: s) && storedProperties(of: d).isEmpty
+  }
+
+  /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
+  public mutating func isTriviallyInitializable(
+    _ t: Tuple.ID, in s: ScopeIdentity
+  ) -> Bool {
+    let ms = types.members(of: t)
+    return ms.types.isEmpty && !ms.isOpenEnded
+  }
+
+  /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
+  public mutating func isTriviallyInitializable(
+    _ t: TypeApplication.ID, in s: ScopeIdentity
+  ) -> Bool {
+    isTriviallyInitializable(types[t].abstraction, in: s)
+  }
+
   /// Returns `true` if the memory layout of `t` is visible from `scopeOfUse`.
   public mutating func isInlineable(_ t: AnyTypeIdentity, in scopeOfUse: ScopeIdentity) -> Bool {
     let u = types.dealiased(t)
@@ -552,7 +631,7 @@ public struct Program: Sendable {
     else { return nil }
 
     // Is the witness defined in the standard library?
-    if parent(containing: d).module != identity(module: .standardLibrary) {
+    if parent(containing: d).module != identity(module: Module.standardLibraryName) {
       return nil
     }
 
@@ -564,19 +643,13 @@ public struct Program: Sendable {
     }
   }
 
-//  /// Returns `(n, p)` where `p` denotes the struct of which `n` is a member iff `n` declares a
-//  /// stored property.
-//  ///
-//  /// - Requires: The module containing `s` is scoped.
-//  public func asStoredPropertyDeclaration(
-//    _ n: DeclarationIdentity
-//  ) -> (declaration: VariableDeclaration.ID, parent: StructDeclaration.ID)? {
-//    guard
-//      let v = cast(n, to: VariableDeclaration.self),
-//      let p = parent(containing: v, as: StructDeclaration.self)
-//    else { return nil }
-//    return (v, p)
-//  }
+  /// Returns the built-in function referred to by `n`, if any.
+  public func asBuiltinFunction(_ n: ExpressionIdentity) -> BuiltinFunction? {
+    if let e = cast(n, to: NameExpression.self) {
+      if case .builtin(.function(let f)) = declaration(referredToBy: e) { return f }
+    }
+    return nil
+  }
 
   /// Returns the innermost scope that strictly contains `n`.
   ///
@@ -834,17 +907,22 @@ public struct Program: Sendable {
 
   /// Returns a string describing the entity declared by `d`.
   public func debugName(of d: DeclarationIdentity) -> String {
-    var result = [nameOrTag(of: d)]
+    var result = [unqualifiedDebugName(of: d)]
     for s in scopes(from: self.parent(containing: d)) {
-      if let n = s.node {
-        if let d = castToDeclaration(n), let s = name(of: d)?.description {
-          result.append(s)
-        } else {
-          result.append(tag(of: n).description)
-        }
+      if let n = s.node.flatMap(castToDeclaration(_:)) {
+        result.append(unqualifiedDebugName(of: n))
       }
     }
     return result.reversed().joined(separator: ".")
+  }
+
+  /// Returns a string describing the entity declared by `d`, sans qualification.
+  public func unqualifiedDebugName(of d: DeclarationIdentity) -> String {
+    if let b = cast(d, to: BindingDeclaration.self) {
+      return names(introducedBy: b).uniqueElement?.description ?? tag(of: d).description
+    } else {
+      return nameOrTag(of: d)
+    }
   }
 
   /// Returns the name of the unique entity declared by `d` or a description of `d`'s tag if it
@@ -986,7 +1064,6 @@ public struct Program: Sendable {
   }
 
   /// Returns the left-most tree in the qualification of `e` iff `e` is a name or new expression.
-  /// Otherwise, returns `nil`.
   public func rootQualification(of e: ExpressionIdentity) -> ExpressionIdentity? {
     var root: ExpressionIdentity
 
@@ -1010,8 +1087,17 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns the left-most tree in the qualification of `e` iff it is implicit.
+  public func implicitQualification(of e: ExpressionIdentity) -> ImplicitQualification.ID? {
+    if let q = rootQualification(of: e) {
+      return cast(q, to: ImplicitQualification.self)
+    } else {
+      return nil
+    }
+  }
+
   /// If `b`, which is the body of a routine, contains exactly one return statement, return that
-  /// statemenr. Otherwise, returns `nil`.
+  /// statement. Otherwise, returns `nil`.
   public func singleReturn(of b: [StatementIdentity]) -> Return.ID? {
     b.uniqueElement.flatMap({ (s) in cast(s, to: Return.self) })
   }
@@ -1019,7 +1105,11 @@ public struct Program: Sendable {
   /// If `b` contains exactly one statement that is an expression, returns that expression.
   /// Otherwise, returns `nil`.
   public func singleExpression(of b: [StatementIdentity]) -> ExpressionIdentity? {
-    b.uniqueElement.flatMap(castToExpression(_:))
+    if let s = b.uniqueElement, self[s.file].isSingleExpressionBodied(s.erased) {
+      return castToExpression(s)
+    } else {
+      return nil
+    }
   }
 
   /// If `b` contains exactly one statement that is an expression, returns that expression.
@@ -1053,10 +1143,10 @@ public struct Program: Sendable {
   /// Returns the adjunct conformances of `d`, if any.
   public func adjuncts(of d: DeclarationIdentity) -> [ConformanceDeclaration.ID]? {
     switch tag(of: d) {
-    case StructDeclaration.self:
-      return self[castUnchecked(d, to: StructDeclaration.self)].conformances
     case EnumDeclaration.self:
       return self[castUnchecked(d, to: EnumDeclaration.self)].conformances
+    case StructDeclaration.self:
+      return self[castUnchecked(d, to: StructDeclaration.self)].conformances
     default:
       return nil
     }
@@ -1318,6 +1408,9 @@ extension Program {
     /// `Hylo.Int`.
     case int = "Int"
 
+    /// `Hylo.Int32`.
+    case int32 = "Int32"
+
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
@@ -1388,7 +1481,7 @@ extension Program {
   /// This method must be called before type checking the standard library.
   internal mutating func initializeStandardLibraryCaches() {
     for n in Program.StandardLibraryEntity.allCases {
-      if let a = identity(module: .standardLibrary),
+      if let a = identity(module: Module.standardLibraryName),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
       {
@@ -1425,20 +1518,20 @@ extension Program {
     return w.finalize()
   }
 
-  /// Loads the module named `moduleName` from `archive`.
+  /// Loads the module with the given `name` from `archive`.
   ///
   /// - Note: `self` is not modified if an exception is thrown.
-  /// - Requires: `moduleName` is the name of the module stored in `archive`.
+  /// - Requires: `name` is the name of the module stored in `archive`.
   @discardableResult
   public mutating func load<A>(
-    module moduleName: Module.Name, from archive: inout ReadableArchive<A>
+    module name: Module.Name, from archive: inout ReadableArchive<A>
   ) throws -> (loaded: Bool, identity: Module.ID) {
     // Nothing to do if the module is already loaded.
-    if let m = identity(module: moduleName) { return (false, m) }
+    if let m = identity(module: name) { return (false, m) }
 
     // Reserve an identity for the new module.
     let m = modules.count
-    var c = Module.SerializationContext(identities: [moduleName: m], types: .init())
+    var c = Module.SerializationContext(identities: [name: m], types: .init())
 
     // Configure the serialization context.
     swap(&c.types, &types)
@@ -1449,11 +1542,11 @@ extension Program {
 
     // Deserialize the module.
     let instance = try c.withWrapped({ (ctx) in try archive.read(Module.self, in: &ctx) })
-    precondition(moduleName == instance.name)
-    modules[moduleName] = instance
+    precondition(name == instance.name)
+    modules[name] = instance
 
     // Initialize the standard library cache if necessary.
-    if moduleName == .standardLibrary {
+    if name == Module.standardLibraryName {
       initializeStandardLibraryCaches()
     }
 

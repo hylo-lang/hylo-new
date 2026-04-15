@@ -66,6 +66,7 @@ public struct SyntaxTag: Sendable {
     StringLiteral.self,
     SyntheticExpression.self,
     TupleLiteral.self,
+    TupleMember.self,
     TupleTypeExpression.self,
     WildcardLiteral.self,
 
@@ -79,6 +80,7 @@ public struct SyntaxTag: Sendable {
     Block.self,
     Discard.self,
     Return.self,
+    Yield.self,
   ]
 
   static let indices = Dictionary(

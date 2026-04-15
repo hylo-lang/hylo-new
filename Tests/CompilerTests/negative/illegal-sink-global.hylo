@@ -1,0 +1,10 @@
+//! stage:lowering
+
+let foo = ()
+
+struct S { public static let foo = () }
+
+public fun main() {
+  var x = foo
+  var y = S.foo
+}

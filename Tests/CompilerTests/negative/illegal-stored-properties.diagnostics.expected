@@ -1,0 +1,9 @@
+negative/illegal-stored-properties.hylo:4.3-9: error: generic types cannot contain static stored properties
+  static let bar: Void = ()
+  ~~~~~~
+negative/illegal-stored-properties.hylo:8.3-6: error: enums cannot contained stored properties
+  let foo: Void
+  ~~~
+negative/illegal-stored-properties.hylo:9.3-9: error: generic types cannot contain static stored properties
+  static let bar: Void = ()
+  ~~~~~~

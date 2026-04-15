@@ -93,6 +93,9 @@ internal struct CoercionConstraint: Constraint {
     /// A return value.
     case `return`
 
+    /// A statement.
+    case statement
+
     /// An unspecified reason.
     case unspecified
 
@@ -388,6 +391,38 @@ extension MemberConstraint: Showable {
   /// Returns a textual representation of `self` using `printer`.
   internal func show(using printer: inout TreePrinter) -> String {
     "(\(printer.show(qualification))).\(printer.program[member].name) =:= \(printer.show(type))"
+  }
+
+}
+
+/// A constraint stating that a value of type `Q` is a tuple having a member `m` of type `R`.
+internal struct TupleMemberConstraint: Constraint {
+
+  /// The expression of the member.
+  internal let member: Parsed<Int>
+
+  /// The qualification of the member.
+  internal private(set) var parent: AnyTypeIdentity
+
+  /// The type of the member.
+  internal private(set) var type: AnyTypeIdentity
+
+  /// The site from which the constraint originates.
+  internal let site: SourceSpan
+
+  /// Applies `transform` on constituent types of `self`.
+  internal mutating func update(_ transform: (AnyTypeIdentity) -> AnyTypeIdentity) {
+    parent = transform(parent)
+    type = transform(type)
+  }
+
+}
+
+extension TupleMemberConstraint: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  internal func show(using printer: inout TreePrinter) -> String {
+    "(\(printer.show(parent))).\(member) =:= \(printer.show(type))"
   }
 
 }

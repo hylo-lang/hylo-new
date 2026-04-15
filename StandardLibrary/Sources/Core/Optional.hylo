@@ -6,7 +6,7 @@ public enum Optional<T> {
   case some(wrapped: T)
 
   /// The absence of a value.
-  case none()
+  case none
 
 }
 

@@ -1,7 +1,7 @@
 import Archivist
 import Utilities
 
-/// The declaration of a function.
+/// The declaration of a function or subscript.
 @Archivable
 public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
 
@@ -9,14 +9,27 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
   @Archivable
   public enum Introducer: UInt8, Sendable {
 
-    /// The function introducer, `fun`.
+    /// The introducer of ordinary functions, `fun`.
     case fun
+
+    /// The introducer of subscripts, `subscript`.
+    case `subscript`
 
     /// The initializer introducer, `init`.
     case `init`
 
     /// The memberwise initializer introducer, `memberwise init`
     case memberwiseinit
+
+    /// `true` iff `self` introduces an initializer.
+    public var isInitializer: Bool {
+      switch self {
+      case .fun, .subscript:
+        return false
+      case .`init`, .memberwiseinit:
+        return true
+      }
+    }
 
   }
 
@@ -96,9 +109,14 @@ extension FunctionDeclaration: Showable {
     for m in modifiers { result.append("\(m) ") }
 
     switch introducer.value {
-    case .fun: result.append("fun \(identifier.value)")
-    case .`init`: result.append("init")
-    case .memberwiseinit: result.append("memberwise init")
+    case .fun:
+      result.append("fun \(identifier.value)")
+    case .subscript:
+      result.append("subscript \(identifier.value)")
+    case .`init`:
+      result.append("init")
+    case .memberwiseinit:
+      result.append("memberwise init")
     }
 
     if !contextParameters.isEmpty {
@@ -110,7 +128,7 @@ extension FunctionDeclaration: Showable {
     result.append(printer.show(parameters))
     result.append(")")
 
-    if introducer.value == .fun {
+    if !introducer.value.isInitializer {
       result.append(" \(effect.value) -> " + (output.map({ (o) in printer.show(o) }) ?? "Void"))
     }
 
