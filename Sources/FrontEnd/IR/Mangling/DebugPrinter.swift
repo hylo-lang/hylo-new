@@ -13,20 +13,6 @@ struct DebugPrinter {
     self.enabled = enabled
   }
 
-  /// Increases the indentation level by one.
-  mutating func increaseIndentation() {
-    if enabled {
-      indentation += 1
-    }
-  }
-
-  /// Decreases the indentation level by one.
-  mutating func decreaseIndentation() {
-    if enabled {
-      indentation -= 1
-    }
-  }
-
   /// Returns the application of `action`, logging the scope described by `description` and the
   /// result if debug printing is enabled.
   mutating func withScope<T>(_ description: @autoclosure () -> String, _ action: () -> T) -> T {

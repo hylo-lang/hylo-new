@@ -38,6 +38,7 @@ final class AssemblySanitizedTests: XCTestCase {
     "$",
     "!@#$%^&*()_+",
     "foo$bar",
+    "having$$$may_not_be_the_goal",
   ]
 
   /// Tests that strings containing symbols are sanitized correctly.

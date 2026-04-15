@@ -63,13 +63,13 @@ extension String {
       return self
     }
 
-    var result = ""
+    var payload = ""
     var instructions = ""
     var previousInsertionOffset = 0
 
     for (offset, point) in unicodeScalars.enumerated() {
       if Base64Digit(scalar: point) != nil {
-        result.append(Character(point))
+        payload.append(Character(point))
         continue
       }
 
@@ -79,7 +79,7 @@ extension String {
       previousInsertionOffset = offset
     }
 
-    return result + "$" + instructions
+    return payload + "$" + instructions
   }
 
 }

@@ -272,7 +272,7 @@ final class ManglingTests: XCTestCase {
     }
   }
 
-  /// Tests that the demanging for a declarations with more generics don't contain errors.
+  /// Tests that the demangling for a declarations with more generics don't contain errors.
   func testDeclarationsWithMoreGenerics() async {
     var p = await TestProgram()
 
@@ -358,21 +358,21 @@ final class ManglingTests: XCTestCase {
     }
   }
 
-  /// Tests the mangling and demanging of reserved types in `program`.
+  /// Tests the mangling and demangling of reserved types in `program`.
   private func testReservedTypesMangling(program: inout Program) {
     let never = AnyTypeIdentity(program.types.never())
     assertManglingOf(type: never, in: program, is: "Never")
     assertManglingOf(type: .void, in: program, is: "Void")
   }
 
-  /// Tests the mangling and demanging of core types in `program`.
+  /// Tests the mangling and demangling of core types in `program`.
   private func testCoreTypesMangling(program: inout Program) {
     assertManglingOf(type: program.standardLibraryType(.bool), in: program, is: "Hylo.Bool")
     assertManglingOf(type: program.standardLibraryType(.int), in: program, is: "Hylo.Int")
     assertManglingOf(type: program.standardLibraryType(.int64), in: program, is: "Hylo.Int64")
   }
 
-  /// Tests the mangling and demanging of arrow types in `program`.
+  /// Tests the mangling and demangling of arrow types in `program`.
   private func testArrowTypeMangling(program: inout Program) {
     let int = program.standardLibraryType(.int)
     let int64 = program.standardLibraryType(.int64)
@@ -392,7 +392,7 @@ final class ManglingTests: XCTestCase {
       is: "[Hylo.Int64](x: Hylo.Int, y: Hylo.Int64) inout -> Hylo.Bool")
   }
 
-  /// Tests the mangling and demanging of associated types in `program`.
+  /// Tests the mangling and demangling of associated types in `program`.
   private func testAssociatedTypeMangling(module m: Module.ID, program: inout Program) {
     let provider = findTopLevelDeclaration(named: "Provider", in: m, of: program)!
     let traitDeclaration = TraitDeclaration.ID(uncheckedFrom: provider.erased)
@@ -418,7 +418,7 @@ final class ManglingTests: XCTestCase {
     )
   }
 
-  /// Tests the mangling and demanging of enum types in `program`.
+  /// Tests the mangling and demangling of enum types in `program`.
   private func testEnumTypeMangling(module m: Module.ID, program: inout Program) {
     let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
     assertManglingOf(
@@ -428,7 +428,7 @@ final class ManglingTests: XCTestCase {
       is: "M0.#.MyEnum")
   }
 
-  /// Tests the mangling and demanging of equality witness types in `program`.
+  /// Tests the mangling and demangling of equality witness types in `program`.
   private func testEqualityWitnessMangling(program: inout Program) {
     let int = program.standardLibraryType(.int)
     let int64 = program.standardLibraryType(.int64)
@@ -437,7 +437,7 @@ final class ManglingTests: XCTestCase {
       type: program.types.demand(t).erased, in: program, is: "Hylo.Int == Hylo.Int64")
   }
 
-  /// Tests the mangling and demanging of function pointer types in `program`.
+  /// Tests the mangling and demangling of function pointer types in `program`.
   private func testFunctionPointerMangling(program: inout Program) {
     let int = program.standardLibraryType(.int)
     let int64 = program.standardLibraryType(.int64)
@@ -456,7 +456,7 @@ final class ManglingTests: XCTestCase {
       type: t, in: program, is: "ptr (Hylo.Int64, Hylo.Int, Hylo.Int64) -> Hylo.Bool")
   }
 
-  /// Tests the mangling and demanging of generic parameter types in `program`.
+  /// Tests the mangling and demangling of generic parameter types in `program`.
   private func testGenericParameterMangling(module m: Module.ID, program: inout Program) {
     let provider = Array(program.collectTopLevel(TraitDeclaration.self, of: m)).first!
     assertManglingOf(
@@ -477,7 +477,7 @@ final class ManglingTests: XCTestCase {
       is: "GenericParameterNth<3, *>")
   }
 
-  /// Tests the mangling and demanging of implication types in `program`.
+  /// Tests the mangling and demangling of implication types in `program`.
   private func testImplicationTypeMangling(program: inout Program) {
     let bool = program.standardLibraryType(.bool)
     let int = program.standardLibraryType(.int)
@@ -487,7 +487,7 @@ final class ManglingTests: XCTestCase {
       type: program.types.demand(t).erased, in: program, is: "(Hylo.Bool, Hylo.Int) => Hylo.Int64")
   }
 
-  /// Tests the mangling and demanging of literal types in `program`.
+  /// Tests the mangling and demangling of literal types in `program`.
   private func testLiteralTypeMangling(program: inout Program) {
     assertManglingOf(
       type: program.types.demand(LiteralType.integer).erased,
@@ -499,7 +499,7 @@ final class ManglingTests: XCTestCase {
       is: "FloatLiteral")
   }
 
-  /// Tests the mangling and demanging of machine types in `program`.
+  /// Tests the mangling and demangling of machine types in `program`.
   private func testMachineTypeMangling(program: inout Program) {
     let expected: [(MachineType, String)] = [
       (MachineType.i(8), "i8"),
@@ -519,7 +519,7 @@ final class ManglingTests: XCTestCase {
     }
   }
 
-  /// Tests the mangling and demanging of metakind types in `program`.
+  /// Tests the mangling and demangling of metakind types in `program`.
   private func testMetakindTypeMangling(program: inout Program) {
     assertManglingOf(
       type: program.types.demand(Metakind(inhabitant: .proper)).erased,
@@ -527,35 +527,35 @@ final class ManglingTests: XCTestCase {
       is: "Metakind<*>")
   }
 
-  /// Tests the mangling and demanging of opaque environment types in `program`.
+  /// Tests the mangling and demangling of opaque environment types in `program`.
   private func testOpaqueEnvironmentTypeMangling(module m: Module.ID, program: inout Program) {
     let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
     let t = OpaqueType.environment(d)
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "some M0.#.MyEnum")
   }
 
-  /// Tests the mangling and demanging of remote types in `program`.
+  /// Tests the mangling and demangling of remote types in `program`.
   private func testRemoteTypeMangling(program: inout Program) {
     let int = program.standardLibraryType(.int)
     let t = RemoteType(projectee: int.erased, access: .inout)
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "inout Hylo.Int")
   }
 
-  /// Tests the mangling and demanging of struct types in `program`.
+  /// Tests the mangling and demangling of struct types in `program`.
   private func testStructTypeMangling(module m: Module.ID, program: inout Program) {
     let d = findTopLevelDeclaration(named: "A", in: m, of: program)!
     let t = Struct(declaration: .init(uncheckedFrom: d.erased))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "M0.#.A")
   }
 
-  /// Tests the mangling and demanging of trait types in `program`.
+  /// Tests the mangling and demangling of trait types in `program`.
   private func testTraitTypeMangling(module m: Module.ID, program: inout Program) {
     let d = findTopLevelDeclaration(named: "Provider", in: m, of: program)!
     let t = Trait(declaration: .init(uncheckedFrom: d.erased))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "M0.#.Provider")
   }
 
-  /// Tests the mangling and demanging of tuple types in `program`.
+  /// Tests the mangling and demangling of tuple types in `program`.
   private func testTupleTypeMangling(program: inout Program) {
     let bool = program.standardLibraryType(.bool)
     let int = program.standardLibraryType(.int)
@@ -569,7 +569,7 @@ final class ManglingTests: XCTestCase {
       type: program.types.demand(t3).erased, in: program, is: "(Hylo.Bool, Hylo.Int, Void)")
   }
 
-  /// Tests the mangling and demanging of type application types in `program`.
+  /// Tests the mangling and demangling of type application types in `program`.
   private func testTypeApplicationMangling(module m: Module.ID, program: inout Program) {
     let int = program.standardLibraryType(.int)
     let myEnum = Array(program.collectTopLevel(EnumDeclaration.self, of: m)).first!
@@ -583,7 +583,7 @@ final class ManglingTests: XCTestCase {
       is: "M0.#.MyEnum<[GenericParameterUser<M0.#.MyEnum.T, *>: Hylo.Int]>")
   }
 
-  /// Tests the mangling and demanging of universal types in `program`.
+  /// Tests the mangling and demangling of universal types in `program`.
   private func testUniversalTypeMangling(program: inout Program) {
     let parameter = program.types.demand(GenericParameter.nth(1, .proper))
     let t = UniversalType(parameters: [parameter], head: parameter.erased)
@@ -593,7 +593,7 @@ final class ManglingTests: XCTestCase {
       is: "<GenericParameterNth<1, *>> GenericParameterNth<1, *>")
   }
 
-  /// Tests the mangling and demanging of type alias types in `program`.
+  /// Tests the mangling and demangling of type alias types in `program`.
   private func testTypeAliasMangling(module m: Module.ID, program: inout Program) {
     let c = findTopLevelDeclaration(named: "C", in: m, of: program)!
     let output = (program[c] as! StructDeclaration).members[0]
