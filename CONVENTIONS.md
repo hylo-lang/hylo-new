@@ -68,7 +68,7 @@ Avoid typed `throws` unless you are confident that the immediate caller will be 
 
 - All new code should be covered by tests.
 - Tests should exercise the contract: verify postconditions under valid preconditions.
-- (Death tests are not supported in Swift XCTest, but it would be nice to write tests that exercise libraries that they uphold safety by crashing correctly on precondition violations.)
+- (Death tests are not supported in Swift XCTest, but it would be nice to write tests that exercise that libraries uphold safety by crashing correctly on precondition violations.)
 
 ## Formatting
 
