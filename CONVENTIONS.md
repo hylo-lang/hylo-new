@@ -33,7 +33,7 @@ When to use each termination mechanism:
 - **`unimplemented("feature name")`** - a stub for functionality not yet written.
 - **`fatalError("message")`** - avoid this, either `unreachable()` or `unimplemented()` should be used instead. If you don't expect it to be unreachable nor unimplemented, prefer reporting an error with throw or returning `nil`.
 
-When a contract seems too strict to use correctly without accidentally breaking preconditions, you can either relax the preconditions (e.g. `demandModule(name:)` - gets or creates module if doesn't exist yet) or report an error/return an optional (e.g. `myHashmap[key]` - returns nil if key is not found).
+When a contract seems too strict to use correctly without accidentally breaking preconditions, you can either relax the preconditions (e.g. `demandModule(name:)` - gets or creates the module if it doesn't exist yet) or report an error/return an optional (e.g. `myHashmap[key]` - returns nil if key is not found).
 
 Avoid typed `throws` unless you are confident that the immediate caller will be interested in handling the error and it doesn't just use its description but is interested in the specific error type.
 
