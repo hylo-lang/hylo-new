@@ -77,5 +77,5 @@ Avoid typed `throws` unless you are confident that the immediate caller will be 
 - Add blank lines inside type, extension, and enum declarations - leave one empty line after the opening brace and before the closing brace.
 - Separate protocol conformances into their own extensions unless it's a marker protocol.
 - Use explicit named parameters in parentheses for multi-statement closures: `{ element in ... }`. Use `$0` shorthand only in short, single-expression closures.
-- Use `MARK:` comments to organize sections in large files.
+- Use `// MARK:` comments to organize sections in large files.
 - Use `self.` in initializers when assigning to stored properties.
