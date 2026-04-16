@@ -79,3 +79,19 @@ Avoid typed `throws` unless you are confident that the immediate caller will be 
 - Use explicit named parameters in parentheses for multi-statement closures: `{ element in ... }`. Use `$0` shorthand only in short, single-expression closures.
 - Use `// MARK:` comments to organize sections in large files.
 - Use `self.` in initializers when assigning to stored properties.
+
+## File names
+
+All Swift source files end with the extension `.swift` and all Hylo source files end with the extension `.hylo`.
+
+In general, a file is named after the main entity that it defines. A file that extends an existing type with a protocol (Swift) or trait (Hylo) conformance is named with a combination of the type name and the protocol or trait name, joined with a plus (`+`) sign. For more complex situations, exercise your best judgment.
+
+For example:
+
+- A Swift file defining a type named MyType is named MyType.swift.
+- A Swift file defining how MyType conforms to Equatable is named MyType+Equatable.swift.
+- Retroactive conformances can be added in `MyType+Extensions.swift`.
+
+Avoid defining multiple types, protocols, or traits in the same file unless they are scoped by a main entity or meant to
+be used only in that file. Usually, conformances and custom error types are small and are defined in the same file as 
+the type to which they apply.
