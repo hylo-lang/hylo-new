@@ -19,6 +19,7 @@ Documentation enables local reasoning - it's a shortcut for understanding so rea
 - Create the strictest contracts possible, so long as the client can reason about the preconditions locally.
 - Preconditions and postconditions are relationships between components - think in terms of what the caller must provide and what the callee guarantees in return.
 - Contract evolution: you may safely weaken preconditions and strengthen postconditions. The reverse breaks clients, so you must inspect all call sites before introducing the change.
+- When a contract seems too strict to use correctly without accidentally breaking preconditions, you can either relax the preconditions (e.g. `demandModule(name:)` - gets or creates the module if it doesn't exist yet) or report an error/return an optional (e.g. `myHashmap[key]` - returns nil if key is not found).
 
 ## Errors
 
@@ -33,9 +34,9 @@ When to use each termination mechanism:
 - **`unimplemented("feature name")`** - a stub for functionality not yet written.
 - **`fatalError("message")`** - avoid this, either `unreachable()` or `unimplemented()` should be used instead. If you don't expect it to be unreachable nor unimplemented, prefer reporting an error with throw or returning `nil`.
 
-When a contract seems too strict to use correctly without accidentally breaking preconditions, you can either relax the preconditions (e.g. `demandModule(name:)` - gets or creates the module if it doesn't exist yet) or report an error/return an optional (e.g. `myHashmap[key]` - returns nil if key is not found).
-
-Avoid typed `throws` unless you are confident that the immediate caller will be interested in handling the error and it doesn't just use its description but is interested in the specific error type.
+Reporting errors:
+- Avoid typed `throws` unless you are confident that the immediate caller will be interested in handling the error, and it doesn't just use its description but is interested in the specific error type. Otherwise, you would expose implementation details that propagate through your program's APIs virally.
+- Avoid silently swallowing invalid input that would lead to accepting undesirable inputs; report and propagate errors instead.
 
 ## Safety
 
