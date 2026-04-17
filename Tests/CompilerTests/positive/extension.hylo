@@ -1,0 +1,12 @@
+//! stage:lowering
+
+trait P {}
+extension <T is P> T {
+  public fun f() { self.f() }
+}
+
+given Void is P {}
+
+public fun main() {
+  ().f()
+}

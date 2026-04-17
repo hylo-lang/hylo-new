@@ -69,7 +69,7 @@ public struct Typer {
     /// The cache of `Typer.extensions(visibleAtTopLevelOf:)`.
     fileprivate var sourceToExtensions: [[ExtensionDeclaration.ID]?]
 
-    /// The cache of `Typer.extensions(lexicallyIn:)`.
+    /// The cache of `Typer.extensions(visibleFrom:)`.
     fileprivate var scopeToExtensions: [ScopeIdentity: [ExtensionDeclaration.ID]]
 
     /// The cache of `Typer.declarations(lexicallyIn:)`.
@@ -4192,21 +4192,8 @@ public struct Typer {
     _ n: Name, memberInExtensionOf q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity,
     statically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
-    // Are we in the scope of a syntax tree?
-    if let p = program.parent(containing: scopeOfUse) {
-      let es = extensions(lexicallyIn: scopeOfUse)
-      let xs = resolve(n, memberInExtensionOf: q, visibleFrom: p, statically: selectionIsStatic)
-      let ys = resolve(
-        n, declaredIn: es, applyingTo: q, in: scopeOfUse, statically: selectionIsStatic)
-      return xs + ys
-    }
-
-    // We are at the top-level.
-    else {
-      let es = extensions(visibleAtTopLevelOf: scopeOfUse.file)
-      return resolve(
-        n, declaredIn: es, applyingTo: q, in: scopeOfUse, statically: selectionIsStatic)
-    }
+    let es = extensions(visibleFrom: scopeOfUse)
+    return resolve(n, declaredIn: es, applyingTo: q, in: scopeOfUse, statically: selectionIsStatic)
   }
 
   /// For each declaration in `es` that applies to `q`, adds to `result` the members of that
@@ -4417,14 +4404,26 @@ public struct Typer {
     }
   }
 
-  /// Returns the extensions that are directly contained in `s`.
-  private mutating func extensions(lexicallyIn s: ScopeIdentity) -> [ExtensionDeclaration.ID] {
-    if let ds = cache.scopeToExtensions[s] {
+  /// Returns the extensions that are visible from `scopeOfUse`.
+  private mutating func extensions(
+    visibleFrom scopeOfUse: ScopeIdentity
+  ) -> [ExtensionDeclaration.ID] {
+    if let ds = cache.scopeToExtensions[scopeOfUse] {
       return ds
-    } else {
-      let ds = Array(program.declarations(of: ExtensionDeclaration.self, lexicallyIn: s))
-      cache.scopeToExtensions[s] = ds
+    }
+
+    // Are we in the scope of a syntax tree?
+    else if let p = program.parent(containing: scopeOfUse) {
+      var ds = extensions(visibleFrom: p)
+      ds.append(
+        contentsOf: program.declarations(of: ExtensionDeclaration.self, lexicallyIn: scopeOfUse))
+      cache.scopeToExtensions[scopeOfUse] = ds
       return ds
+    }
+
+    // We are at the top level.
+    else {
+      return extensions(visibleAtTopLevelOf: scopeOfUse.file)
     }
   }
 
