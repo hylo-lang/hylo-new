@@ -56,6 +56,7 @@ public struct Driver {
     of module: Module.ID,
     loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)? = nil
   ) async -> (elapsed: Duration, containsError: Bool) {
+    try? await Task.sleep(nanoseconds: 1_000_000_000)
     let clock = ContinuousClock()
     let elapsed = clock.measure {
       program.assignTypes(module, loggingInferenceWhere: isLoggingEnabled)
