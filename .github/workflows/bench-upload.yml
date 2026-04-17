@@ -9,6 +9,10 @@ on:
     workflows: ["Build and Test"]
     types: [completed]
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   upload:
     name: Upload all testbed results to Bencher
@@ -63,38 +67,49 @@ jobs:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-          for dir in results/benchmark-results-*/; do
-            testbed=$(basename "$dir" | sed 's/^benchmark-results-//')
-            file="$dir/benchmark_results.json"
-            echo "::group::Uploading $testbed"
-            if [ "$EVENT" = "pull_request" ]; then
-              bencher run \
-                --project "$BENCHER_PROJECT" \
-                --token "$BENCHER_API_TOKEN" \
-                --branch "$PR_HEAD" \
-                --hash "$PR_HEAD_SHA" \
-                --start-point "$PR_BASE" \
-                --start-point-hash "$PR_BASE_SHA" \
-                --start-point-clone-thresholds \
-                --start-point-reset \
-                --testbed "$testbed" \
-                --error-on-alert \
-                --adapter json \
-                --github-actions "$GITHUB_API_TOKEN" \
-                --ci-number "$PR_NUMBER" \
-                --file "$file"
-            elif [ "$EVENT" = "push" ] && [ "$HEAD_BRANCH" = "main" ]; then
+          $failedTestbeds = @()
+          foreach ($resultsDirectory in Get-ChildItem -Path results -Directory -Filter 'benchmark-results-*') {
+            $testbed = $resultsDirectory.Name -replace '^benchmark-results-', ''
+            $resultsFile = Join-Path $resultsDirectory.FullName 'benchmark_results.json'
+            Write-Host "::group::Uploading $testbed"
+            $uploadAttempted = $false
+            if ($env:EVENT -eq 'pull_request') {
+              bencher run `
+                --project $env:BENCHER_PROJECT `
+                --token $env:BENCHER_API_TOKEN `
+                --branch $env:PR_HEAD `
+                --hash $env:PR_HEAD_SHA `
+                --start-point $env:PR_BASE `
+                --start-point-hash $env:PR_BASE_SHA `
+                --start-point-clone-thresholds `
+                --start-point-reset `
+                --testbed $testbed `
+                --error-on-alert `
+                --adapter json `
+                --github-actions $env:GITHUB_API_TOKEN `
+                --ci-number $env:PR_NUMBER `
+                --file $resultsFile
+              $uploadAttempted = $true
+            } elseif ($env:EVENT -eq 'push' -and $env:HEAD_BRANCH -eq 'main') {
               # Thresholds used for PR alerts are configured once in the
               # Bencher UI, so the main-branch upload is just a baseline.
-              bencher run \
-                --project "$BENCHER_PROJECT" \
-                --token "$BENCHER_API_TOKEN" \
-                --branch main \
-                --hash "$HEAD_SHA" \
-                --testbed "$testbed" \
-                --adapter json \
-                --file "$file"
-            fi
-            echo "::endgroup::"
-          done
+              bencher run `
+                --project $env:BENCHER_PROJECT `
+                --token $env:BENCHER_API_TOKEN `
+                --branch main `
+                --hash $env:HEAD_SHA `
+                --testbed $testbed `
+                --adapter json `
+                --file $resultsFile
+              $uploadAttempted = $true
+            }
+            Write-Host "::endgroup::"
+            if ($uploadAttempted -and $LASTEXITCODE -ne 0) {
+              Write-Host "::error::bencher run failed for $testbed (exit $LASTEXITCODE)"
+              $failedTestbeds += $testbed
+            }
+          }
+          if ($failedTestbeds.Count -gt 0) {
+            Write-Host "::error::bencher run failed for: $($failedTestbeds -join ', ')"
+            exit 1
+          }
