@@ -47,7 +47,7 @@ jobs:
       - uses: ./.github/actions/setup-hylo-toolchain
 
       - name: Build tests
-        run: swift build --build-tests -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+        run: swift build --build-tests -c ${{ matrix.config }} -Xswiftc -enable-testing --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       # Time just the test run. Emits Bencher Metric Format JSON with
       # nanosecond latency (SECONDS has 1s precision, good enough for
