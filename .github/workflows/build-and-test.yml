@@ -53,14 +53,15 @@ jobs:
       - name: Build tests
         run: swift build --build-tests -c ${{ matrix.config }} -Xswiftc -enable-testing --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
-      # Time just the test run. Emits Bencher Metric Format JSON.
+      # Time just the test run. Emits Bencher Metric Format JSON with
+      # elapsed seconds as a floating-point value.
       - name: Run and time test suite
         run: |
           $start = Get-Date
           swift test -c ${{ matrix.config }} --skip-build --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $nanoseconds = ((Get-Date) - $start).Ticks * 100
-          @{ 'hylo-test-suite' = @{ latency = @{ value = $nanoseconds } } } | ConvertTo-Json -Depth 5 -Compress | Tee-Object -FilePath benchmark_results.json
+          $seconds = ((Get-Date) - $start).TotalSeconds
+          @{ 'hylo-test-suite' = @{ latency = @{ value = $seconds } } } | ConvertTo-Json -Depth 5 -Compress | Tee-Object -FilePath benchmark_results.json
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
