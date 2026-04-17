@@ -20,6 +20,3 @@ runs:
         #       That no longer works, so we had to upgrade to 10.0.26100.0.
         #       See also: https://github.com/swiftlang/swift/issues/88237
 
-    - name: Verify swift version
-      run: swift --version && swift --version | grep -q 6.2.4
-      shell: bash

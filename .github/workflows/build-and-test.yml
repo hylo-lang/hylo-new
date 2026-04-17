@@ -14,6 +14,10 @@ on:
       - ".gitignore"
       - ".editorconfig"
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   test:
     name: ${{ matrix.testbed }} / ${{ matrix.config }}
@@ -49,15 +53,14 @@ jobs:
       - name: Build tests
         run: swift build --build-tests -c ${{ matrix.config }} -Xswiftc -enable-testing --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
-      # Time just the test run. Emits Bencher Metric Format JSON with
-      # nanosecond latency (SECONDS has 1s precision, good enough for
-      # multi-minute suites).
+      # Time just the test run. Emits Bencher Metric Format JSON.
       - name: Run and time test suite
-        shell: bash
         run: |
-          SECONDS=0
+          $start = Get-Date
           swift test -c ${{ matrix.config }} --skip-build --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
-          printf '{"hylo-test-suite":{"latency":{"value":%d}}}\n' "$((SECONDS * 1000000000))" | tee benchmark_results.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $nanoseconds = ((Get-Date) - $start).Ticks * 100
+          @{ 'hylo-test-suite' = @{ latency = @{ value = $nanoseconds } } } | ConvertTo-Json -Depth 5 -Compress | Tee-Object -FilePath benchmark_results.json
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
@@ -77,7 +80,9 @@ jobs:
       # ---------- Code coverage (debug ubuntu only) ----------
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}
-        run: llvm-cov export $(swift build --show-bin-path)/HyloPackageTests.xctest  --format="lcov" --instr-profile $(swift build --show-bin-path)/codecov/default.profdata > info.lcov
+        run: |
+          $binPath = (swift build --show-bin-path).Trim()
+          llvm-cov export "$binPath/HyloPackageTests.xctest" --format=lcov --instr-profile "$binPath/codecov/default.profdata" > info.lcov
 
       - name: Upload coverage report to Codecov
         if: ${{ matrix.export-coverage }}
