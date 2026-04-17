@@ -1,0 +1,25 @@
+name: Set up the Hylo compiler build toolchain
+description: >-
+  Installs the necessary environment for building the Hylo compiler.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Swift 6.2.4
+      uses: SwiftyLab/setup-swift@latest
+      with:
+        swift-version: "6.2.4"
+
+    - name: Download Recent Visual Studio and Windows SDK
+      if: runner.os == 'Windows'
+      uses: compnerd/gha-setup-vsdevenv@main
+      with:
+        winsdk: "10.0.26100.0"
+        # Note: The GitHub windows-2025 runner has only a very old version of the Windows SDK available by default.
+        #       Swift is said to require version 10.0.22621.0: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
+        #       That no longer works, so we had to upgrade to 10.0.26100.0.
+        #       See also: https://github.com/swiftlang/swift/issues/88237
+
+    - name: Verify swift version
+      run: swift --version && swift --version | grep -q 6.2.4
+      shell: bash

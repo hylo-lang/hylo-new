@@ -1,6 +1,13 @@
 name: Build and Test
 on:
   push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".editorconfig"
+  pull_request:
     paths-ignore:
       - "**.md"
       - "LICENSE"
@@ -9,50 +16,65 @@ on:
 
 jobs:
   test:
+    name: ${{ matrix.testbed }} / ${{ matrix.config }}
     strategy:
       fail-fast: false
       matrix:
-        # Note: all combinations of the following will be run independently
-        os: [macos-15, ubuntu-24.04, windows-2025]
-        swift: ["6.2.4"]
-        config: [release, debug]
-
+        # All {os} x {config} combinations run independently. Every row is
+        # benchmarked; debug is x64-only so arm OSes are excluded below.
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025, windows-11-arm]
+        config: [debug, release]
+        exclude:
+          - { os: ubuntu-24.04-arm, config: debug }
+          - { os: macos-15,         config: debug }
+          - { os: windows-11-arm,   config: debug }
         include:
-          # Disable exporting code coverage by default.
-          - export-coverage: false
+          # Map each os to a Bencher testbed label.
+          - { os: ubuntu-24.04,     testbed: linux-x64 }
+          - { os: ubuntu-24.04-arm, testbed: linux-arm64 }
+          - { os: macos-15,         testbed: macos-arm64 }
+          - { os: macos-15-intel,   testbed: macos-x64 }
+          - { os: windows-2025,     testbed: windows-x64 }
+          - { os: windows-11-arm,   testbed: windows-arm64 }
+          # Enable code coverage export in a single configuration.
+          - { os: ubuntu-24.04, config: debug, export-coverage: true }
 
-          # Enable exporting code coverage in a single configuration.
-          - os: "ubuntu-24.04"
-            config: debug
-            export-coverage: true
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }}
-        uses: SwiftyLab/setup-swift@latest
-        with:
-          swift-version: ${{ matrix.swift }}
+      - uses: ./.github/actions/setup-hylo-toolchain
 
-      - name: Download Recent Visual Studio and Windows SDK
-        uses: compnerd/gha-setup-vsdevenv@main
-        with:
-          winsdk: "10.0.26100.0"
-          # Note: The GitHub windows-2025 runner has only a very old version of the Windows SDK available by default.
-          #       Swift is said to require version 10.0.22621.0: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
-          #       That no longer works, so we had to upgrade to 10.0.26100.0.
-          #       See also: https://github.com/swiftlang/swift/issues/88237
+      - name: Build tests
+        run: swift build --build-tests -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
-      - name: Verify swift version
-        run: swift --version && swift --version | grep -q ${{ matrix.swift }}
+      # Time just the test run. Emits Bencher Metric Format JSON with
+      # nanosecond latency (SECONDS has 1s precision, good enough for
+      # multi-minute suites).
+      - name: Run and time test suite
         shell: bash
+        run: |
+          SECONDS=0
+          swift test -c ${{ matrix.config }} --skip-build --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+          printf '{"hylo-test-suite":{"latency":{"value":%d}}}\n' "$((SECONDS * 1000000000))" | tee benchmark_results.json
 
-      # We disabled the separate build step, as it consumes extra CI time - building for testing apparently doesn't
-      # reuse the build cache from here, doubling the CI time.
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ matrix.testbed }}-${{ matrix.config }}
+          path: benchmark_results.json
 
-      - name: Build and test for ${{ matrix.swift }} on ${{ matrix.os }} in ${{ matrix.config }} mode
-        run: swift test -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+      # Only one matrix row uploads the triggering event, to avoid duplicate
+      # artifact names. bench-upload.yml reads it to reconstruct PR metadata.
+      - name: Upload triggering event
+        if: matrix.testbed == 'linux-x64' && matrix.config == 'debug'
+        uses: actions/upload-artifact@v4
+        with:
+          name: triggering-event
+          path: ${{ github.event_path }}
 
+      # ---------- Code coverage (debug ubuntu only) ----------
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}
         run: llvm-cov export $(swift build --show-bin-path)/HyloPackageTests.xctest  --format="lcov" --instr-profile $(swift build --show-bin-path)/codecov/default.profdata > info.lcov
@@ -62,5 +84,3 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-
-    runs-on: ${{ matrix.os }}

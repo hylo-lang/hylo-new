@@ -1,0 +1,100 @@
+name: Upload Benchmarks to Bencher
+
+# Runs after "Build and Test" completes, in the context of the default branch
+# (so it has access to secrets even when the triggering workflow came from a
+# fork PR). See https://bencher.dev/docs/how-to/github-actions/#pull-requests-from-forks
+# for the canonical fork-safe pattern this implements.
+on:
+  workflow_run:
+    workflows: ["Build and Test"]
+    types: [completed]
+
+jobs:
+  upload:
+    name: Upload all testbed results to Bencher
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      pull-requests: write
+      checks: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all benchmark artifacts
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: ^benchmark-results-.*$
+          name_is_regexp: true
+          run_id: ${{ github.event.workflow_run.id }}
+          path: results
+
+      - name: Download triggering event payload
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: triggering-event
+          run_id: ${{ github.event.workflow_run.id }}
+
+      # For PR-triggered runs, parse event.json and export PR fields as
+      # intermediate env vars (never interpolated via ${{ }} to avoid shell
+      # injection from untrusted fork branch names).
+      - name: Extract PR event data
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const e = JSON.parse(fs.readFileSync('event.json', 'utf8'));
+            core.exportVariable('PR_HEAD',     e.pull_request.head.ref);
+            core.exportVariable('PR_HEAD_SHA', e.pull_request.head.sha);
+            core.exportVariable('PR_BASE',     e.pull_request.base.ref);
+            core.exportVariable('PR_BASE_SHA', e.pull_request.base.sha);
+            core.exportVariable('PR_NUMBER',   String(e.number));
+
+      - uses: bencherdev/bencher@main
+
+      # Loop over every benchmark-results-<testbed>-<config> artifact that
+      # build-and-test produced. The artifact name after the common prefix is
+      # the Bencher testbed name.
+      - name: Upload benchmarks to Bencher
+        env:
+          EVENT: ${{ github.event.workflow_run.event }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          BENCHER_PROJECT: ${{ vars.BENCHER_PROJECT }}
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for dir in results/benchmark-results-*/; do
+            testbed=$(basename "$dir" | sed 's/^benchmark-results-//')
+            file="$dir/benchmark_results.json"
+            echo "::group::Uploading $testbed"
+            if [ "$EVENT" = "pull_request" ]; then
+              bencher run \
+                --project "$BENCHER_PROJECT" \
+                --token "$BENCHER_API_TOKEN" \
+                --branch "$PR_HEAD" \
+                --hash "$PR_HEAD_SHA" \
+                --start-point "$PR_BASE" \
+                --start-point-hash "$PR_BASE_SHA" \
+                --start-point-clone-thresholds \
+                --start-point-reset \
+                --testbed "$testbed" \
+                --error-on-alert \
+                --adapter json \
+                --github-actions "$GITHUB_API_TOKEN" \
+                --ci-number "$PR_NUMBER" \
+                --file "$file"
+            elif [ "$EVENT" = "push" ] && [ "$HEAD_BRANCH" = "main" ]; then
+              # Thresholds used for PR alerts are configured once in the
+              # Bencher UI, so the main-branch upload is just a baseline.
+              bencher run \
+                --project "$BENCHER_PROJECT" \
+                --token "$BENCHER_API_TOKEN" \
+                --branch main \
+                --hash "$HEAD_SHA" \
+                --testbed "$testbed" \
+                --adapter json \
+                --file "$file"
+            fi
+            echo "::endgroup::"
+          done

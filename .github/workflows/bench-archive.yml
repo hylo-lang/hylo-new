@@ -1,0 +1,25 @@
+name: Archive Closed Branch in Bencher
+
+# When a PR is closed (merged or not), archive its branch in Bencher so the
+# project dashboard doesn't accumulate stale PR branches over time.
+# Uses pull_request_target so secrets are available even for fork PRs;
+# this workflow does not check out or run PR-provided code.
+on:
+  pull_request_target:
+    types: [closed]
+
+jobs:
+  archive:
+    name: Archive closed PR branch in Bencher
+    runs-on: ubuntu-latest
+    steps:
+      - uses: bencherdev/bencher@main
+      - name: Archive branch
+        env:
+          BENCHER_PROJECT: ${{ vars.BENCHER_PROJECT }}
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+        run: |
+          bencher archive \
+            --project "$BENCHER_PROJECT" \
+            --token "$BENCHER_API_TOKEN" \
+            --branch "$GITHUB_HEAD_REF"
