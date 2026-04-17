@@ -44,12 +44,21 @@ public enum DeclarationReference: Hashable, Sendable {
     }
   }
 
-  /// `true` iff `self` is a transitively synthetic implementation of some trait requirement.
+  /// `true` iff `self` is a synthetic implementation of a some trait requirement.
+  public var isSynthetic: Bool {
+    if case .synthetic = self {
+      return true
+    } else {
+      return false
+    }
+  }
+
+  /// `true` iff `self` is a synthetic implementation of some trait requirement that does not
+  /// involve any user code.
   public var isTransitivelySynthethic: Bool {
-    switch self {
-    case .synthetic(_, let t):
+    if case .synthetic(_, let t) = self {
       return t
-    default:
+    } else {
       return false
     }
   }

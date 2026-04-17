@@ -1,11 +1,16 @@
 //! stage:lowering
 
-trait P {
-  fun f() {}
-}
+trait P { fun f() {} }
+trait Q {}
 
+// Requirement is implemented by the default implementation.
 struct S0 is P {}
 
+// Requirement is implemented by a native member.
 struct S1 is P {
   fun f() {}
 }
+
+// Requirement is implemented in an extension member.
+extension <T is Q> T { fun f() {} }
+struct S2 is P & Q {}

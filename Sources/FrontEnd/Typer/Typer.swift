@@ -3132,7 +3132,7 @@ public struct Typer {
   /// - Parameters:
   ///   - requirement: The declaration of a concept requirement.
   ///   - witness: A model witnessing a conformance to the concept defining `requirement`.
-  private mutating func typeOfImplementation(
+  internal mutating func typeOfImplementation(
     satisfying requirement: DeclarationIdentity, in witness: WitnessExpression
   ) -> AnyTypeIdentity {
     if let d = program.cast(requirement, to: AssociatedTypeDeclaration.self) {
@@ -4242,6 +4242,12 @@ public struct Typer {
       let model = typeOfModel(of: q, conformingTo: concept, with: vs)
       for a in summon(model.erased, in: scopeOfUse) {
         for m in ms {
+          // Ignore the member if it is static but the qualification isn't.
+          if program.isStatic(m) && !selectionIsStatic { continue }
+
+          // Determine the type of the resolved member, adapting it to the qualification. Since
+          // we're resolving a trait requirement we know that we can refer to the unbound version
+          // of any non-static member.
           let w = program.types.reify(
             a.witness, applying: a.substitutions, withVariables: .substitutedByError)
           var member = typeOfImplementation(satisfying: m, in: w)
