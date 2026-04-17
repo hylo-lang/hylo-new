@@ -68,15 +68,6 @@ jobs:
           name: benchmark-results-${{ matrix.testbed }}-${{ matrix.config }}
           path: benchmark_results.json
 
-      # Only one matrix row uploads the triggering event, to avoid duplicate
-      # artifact names. bench-upload.yml reads it to reconstruct PR metadata.
-      - name: Upload triggering event
-        if: matrix.testbed == 'linux-x64' && matrix.config == 'debug'
-        uses: actions/upload-artifact@v4
-        with:
-          name: triggering-event
-          path: ${{ github.event_path }}
-
       # ---------- Code coverage (debug ubuntu only) ----------
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}
@@ -89,3 +80,15 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Independent job so the event artifact is produced regardless of which
+  # test matrix rows succeed or fail. bench-upload.yml reads it to reconstruct
+  # PR metadata in a fork-safe way.
+  upload-triggering-event:
+    name: Upload triggering event
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact@v4
+        with:
+          name: triggering-event
+          path: ${{ github.event_path }}
