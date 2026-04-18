@@ -385,6 +385,13 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Returns the type of the function computed by `v` if any, using `program` to examine types.
+  ///
+  /// - Requires: `v` is either a constant or an instruction in this function.
+  public func resultAsTermAbstraction(of v: IRValue, in program: Program) -> Arrow.ID? {
+    result(of: v).flatMap({ (t, _) in program.types.seenAsTermAbstraction(t) })
+  }
+
   /// Returns `t` without any relative definition.
   ///
   /// - Requires: `v` is either a constant or an instruction in this function.

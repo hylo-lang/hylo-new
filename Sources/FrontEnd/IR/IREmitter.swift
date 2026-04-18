@@ -1735,15 +1735,13 @@ internal struct IREmitter {
 
   /// Inserts a `project` instruction.
   internal mutating func _project(_ callee: IRValue, _ arguments: [IRValue]) -> IRValue {
-    guard
-      let t = currentFunction.result(of: callee),
-      let a = program.types.cast(t.type, to: Arrow.self)
-    else { badOperand() }
+    let t = currentFunction.resultAsTermAbstraction(of: callee, in: program) ?? badOperand()
+    assert(program.types[t].inputs.count == arguments.count)
 
     let s = IRProject(
       callee: callee, arguments: arguments,
-      projectee: program.types[a].output,
-      access: program.types[a].effect,
+      projectee: program.types[t].output,
+      access: program.types[t].effect,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -1870,7 +1868,7 @@ internal struct IREmitter {
         return .poison(program.types.ir(place: t))
       }
 
-      fatalError()
+      unimplemented("lowering for \(program.debugName(of: d))")
     }
 
     // Is `d` a conformance declaration?
@@ -1953,9 +1951,8 @@ internal struct IREmitter {
   /// of the current function, which is an interface function wrapping a call to `f`.
   private mutating func _emitCallToRequirementImplementation(_ f: LoweredCallee) {
     // Retrieve the signature of the implementation.
-    let t = currentFunction.result(of: f.value)!
-    let u = program.types.seenAsTermAbstraction(t.type)!
-    let parameters = program.types[u].inputs
+    let t = currentFunction.resultAsTermAbstraction(of: f.value, in: program)!
+    let parameters = program.types[t].inputs
 
     // Form accesses on all parameters.
     var operands = Array<IRValue>(minimumCapacity: parameters.count + 1)
@@ -1996,11 +1993,19 @@ internal struct IREmitter {
     case .termApplication(let f, let a):
       let (abstraction, arguments) = _emit(curriedApplicationOf: f, to: a)
       let callee = _emit(witness: abstraction, applyingNullary: false)
-      return _project(callee, arguments)
+
+      let t = currentFunction.resultAsTermAbstraction(of: callee, in: program)!
+      let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
+        _access(.init(p.access), from: a)
+      }
+      return _project(callee, xs)
 
     case .typeApplication(let f, let a):
       let x = _emit(witness: f, applyingNullary: applyNullary)
       return _type_apply(x, to: a)
+
+    case .nested(let w):
+      return _emit(witness: w, applyingNullary: applyNullary)
 
     default:
       fatalError()
@@ -2301,9 +2306,8 @@ internal struct IREmitter {
   /// Returns `true` iff `callee` denotes a function that can be called with `arguments` in the
   /// current function.
   private mutating func isCallable(_ callee: IRValue, with arguments: [IRValue]) -> Bool {
-    let t = currentFunction.result(of: callee)!.type
-    let u = program.types.seenAsTermAbstraction(t)!
-    return program.types[u].inputs.count == arguments.count
+    let t = currentFunction.resultAsTermAbstraction(of: callee, in: program)!
+    return program.types[t].inputs.count == arguments.count
   }
 
 }
