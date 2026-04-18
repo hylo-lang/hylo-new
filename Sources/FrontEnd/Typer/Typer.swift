@@ -69,7 +69,7 @@ public struct Typer {
     /// The cache of `Typer.extensions(visibleAtTopLevelOf:)`.
     fileprivate var sourceToExtensions: [[ExtensionDeclaration.ID]?]
 
-    /// The cache of `Typer.extensions(lexicallyIn:)`.
+    /// The cache of `Typer.extensions(visibleFrom:)`.
     fileprivate var scopeToExtensions: [ScopeIdentity: [ExtensionDeclaration.ID]]
 
     /// The cache of `Typer.declarations(lexicallyIn:)`.
@@ -453,28 +453,32 @@ public struct Typer {
     func namedImplementation(of requirement: DeclarationIdentity) -> DeclarationReference? {
       let requiredName = program.name(of: requirement)!
       let requiredType = expectedImplementationType(of: requirement)
-
       var viable: [DeclarationReference] = []
 
-      // Is there a unique implementation in the conformance declaration?
+      // Is there an implementation in the conformance declaration?
       for c in lookup(requiredName, lexicallyIn: .init(node: d)) {
         let candidateType = declaredType(of: c)
         if unifiable(candidateType, requiredType) { viable.append(.direct(c)) }
       }
 
+      // Is there an implementation that is already member of the conforming type?
       if viable.isEmpty {
-        // Is there an implementation that is already member of the conforming type?
+        var defaultCandidate: DeclarationReference? = nil
+
         for c in resolve(requiredName, memberOf: qualification, visibleFrom: .init(node: d)) {
           if !unifiable(c.type, requiredType) { continue }
 
           // If we resolved the requirement, make sure it has a default implementation.
           switch c.reference {
-          case .inherited(_, requirement, _) where !hasDefinition(requirement):
-            continue
+          case .inherited(_, requirement, _):
+            if hasDefinition(requirement) { defaultCandidate = c.reference }
           default:
             viable.append(c.reference)
           }
         }
+
+        // The default implementation is used iff there is no other candidate.
+        if viable.isEmpty, let c = defaultCandidate { viable.append(c) }
       }
 
       if let pick = viable.uniqueElement {
@@ -533,43 +537,15 @@ public struct Typer {
       report(.init(.error, "raw representations are not supported yet", at: s))
     }
 
-    for m in program[d].members { checkEnumMember(m) }
+    for m in program[d].members { checkMember(m) }
     for c in program[d].conformances { check(c) }
     checkUniqueDeclaration(d, of: program[d].identifier.value)
-  }
-
-  /// Type checks `d`, which is the declaration of a member in an enum.
-  private mutating func checkEnumMember(_ d: DeclarationIdentity) {
-    // Enforce syntactic restrictions.
-    switch program.tag(of: d) {
-    case BindingDeclaration.self:
-      let m = program.castUnchecked(d, to: BindingDeclaration.self)
-      if !checkValidEnumMember(m) { return }
-
-    default:
-      break
-    }
-
-    // Type check the member.
-    check(d)
-  }
-
-  /// Returns `true` iff `d` is a valid enum member; otherwise, returns `false` and reports a
-  /// diagnostic.
-  private mutating func checkValidEnumMember(_ d: BindingDeclaration.ID) -> Bool {
-    if program[d].is(.static) {
-      return checkValidStaticStoredProperty(d)
-    } else {
-      let m = "enums cannot contained stored properties"
-      report(.init(.error, m, at: program.spanForDiagnostic(about: d)))
-      return false
-    }
   }
 
   /// Type checks `d`.
   private mutating func check(_ d: ExtensionDeclaration.ID) {
     _ = extendeeType(d)
-    for m in program[d].members { check(m) }
+    for m in program[d].members { checkMember(m) }
   }
 
   /// Type checks `d`.
@@ -687,24 +663,9 @@ public struct Typer {
   /// Type checks `d`.
   private mutating func check(_ d: StructDeclaration.ID) {
     _ = declaredType(of: d)
-    for m in program[d].members { checkStructMember(m) }
+    for m in program[d].members { checkMember(m) }
     for c in program[d].conformances { check(c) }
     checkUniqueDeclaration(d, of: program[d].identifier.value)
-  }
-
-  /// Type checks `d`, which is the declaration of a member in a struct.
-  private mutating func checkStructMember(_ d: DeclarationIdentity) {
-    // Enforce syntactic restrictions.
-    switch program.tag(of: d) {
-    case BindingDeclaration.self:
-      let m = program.castUnchecked(d, to: BindingDeclaration.self)
-      if program[m].is(.static) && !checkValidStaticStoredProperty(m) { return }
-    default:
-      break
-    }
-
-    // Type check the member.
-    check(d)
   }
 
   /// Type checks `d`.
@@ -776,17 +737,58 @@ public struct Typer {
     }
   }
 
-  /// Returns `true` iff `d` is a valid static stored property; otherwise, returns `false` and
-  /// reports a diagnostic.
-  private mutating func checkValidStaticStoredProperty(_ d: BindingDeclaration.ID) -> Bool {
+  /// Type checks `d`, which is the declaration of a member in a nominal type declaration.
+  private mutating func checkMember(_ d: DeclarationIdentity) {
+    switch program.tag(of: d) {
+    case BindingDeclaration.self:
+      let m = program.castUnchecked(d, to: BindingDeclaration.self)
+      if let e = diagnoseIllegalStoredProperty(m) {
+        report(e)
+      } else {
+        check(d)
+      }
+
+    default:
+      check(d)
+    }
+  }
+
+  /// Returns a diagnostic iff `d`, which occurs as a member in a nominal type declaration, is not
+  /// a valid stored property.
+  private mutating func diagnoseIllegalStoredProperty(_ d: BindingDeclaration.ID) -> Diagnostic? {
+    let entity: String
+
+    // Only structs can declare non-static stored properties.
+    switch program.tag(of: program.parent(containing: d).node!) {
+    case StructDeclaration.self:
+      return program[d].is(.static) ? diagnoseIllegalStaticStoredProperty(d) : nil
+    case EnumDeclaration.self:
+      entity = "enums"
+    case ExtensionDeclaration.self:
+      entity = "extensions"
+    default:
+      unreachable()
+    }
+
+    if program[d].is(.static) {
+      return diagnoseIllegalStaticStoredProperty(d)
+    } else {
+      let s = program.spanForDiagnostic(about: d)
+      return .init(.error, "\(entity) cannot contain stored properties", at: s)
+    }
+  }
+
+  /// Returns a diagnostic iff `d` is not a valid static stored property.
+  private mutating func diagnoseIllegalStaticStoredProperty(
+    _ d: BindingDeclaration.ID
+  ) -> Diagnostic? {
     assert(program[d].is(.static))
     if !accumulatedGenericParameters(visibleFrom: program.parent(containing: d)).isEmpty {
       let m = "generic types cannot contain static stored properties"
       let s = program[d].spanForModifier(.static)!
-      report(.init(.error, m, at: s))
-      return false
+      return .init(.error, m, at: s)
     } else {
-      return true
+      return nil
     }
   }
 
@@ -1684,14 +1686,22 @@ public struct Typer {
     }
   }
 
-  /// Returns `t` as the head of a universal type and/or implication introducing `parameters`.
+  /// Returns `t` as the head of a universal type and/or implication introducing `clause`.
   private mutating func introduce(
-    _ parameters: ContextParameters, into t: AnyTypeIdentity
+    _ clause: ContextParameters, into t: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    if parameters.isEmpty { return t }
+    introduce(types: clause.types, usings: clause.usings, into: t)
+  }
 
-    let ps = declaredTypes(of: parameters.types)
-    let us = parameters.usings.map({ (p) in declaredType(of: p) })
+  /// Returns `t` as the head of a universal type and/or implication introducing the given
+  /// contextual parameters.
+  private mutating func introduce<U: Collection<DeclarationIdentity>>(
+    types: [GenericParameterDeclaration.ID], usings: U, into t: AnyTypeIdentity
+  ) -> AnyTypeIdentity {
+    if types.isEmpty && usings.isEmpty { return t }
+
+    let ps = declaredTypes(of: types)
+    let us = usings.map({ (p) in declaredType(of: p) })
     return program.types.introduce(.init(parameters: ps, usings: us), into: t)
   }
 
@@ -3122,7 +3132,7 @@ public struct Typer {
   /// - Parameters:
   ///   - requirement: The declaration of a concept requirement.
   ///   - witness: A model witnessing a conformance to the concept defining `requirement`.
-  private mutating func typeOfImplementation(
+  internal mutating func typeOfImplementation(
     satisfying requirement: DeclarationIdentity, in witness: WitnessExpression
   ) -> AnyTypeIdentity {
     if let d = program.cast(requirement, to: AssociatedTypeDeclaration.self) {
@@ -3144,7 +3154,7 @@ public struct Typer {
     }
 
     // The witness refers to a given declaration?
-    else if let d = witness.declaration, let c = program.cast(d, to: ConformanceDeclaration.self) {
+    else if let c = program.flatCast(witness.declaration, to: ConformanceDeclaration.self) {
       // Read the associated type definition.
       if let i = implementation(of: requirement, in: c) {
         return declaredType(of: i)
@@ -3689,7 +3699,7 @@ public struct Typer {
     var gs: [Given] = []
     appendGivens(in: program.declarations(lexicallyIn: s), to: &gs)
 
-    if let d = s.node, let c = program.cast(d, to: TraitDeclaration.self) {
+    if let c = program.flatCast(s.node, to: TraitDeclaration.self) {
       gs.append(.recursive(typeOfTraitSelf(in: c)))
     }
 
@@ -4052,6 +4062,12 @@ public struct Typer {
         return []
       }
 
+    case "Metatype":
+      let p = demand(GenericParameter.nth(0, .proper))
+      let t = demand(Metatype(inhabitant: p.erased))
+      let u = metatype(of: UniversalType(parameters: [p], head: t.erased))
+      return [.init(reference: .builtin(.alias), type: u.erased)]
+
     case "Never":
       let t = program.types.never()
       let u = demand(Metatype(inhabitant: t.erased))
@@ -4176,21 +4192,8 @@ public struct Typer {
     _ n: Name, memberInExtensionOf q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity,
     statically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
-    // Are we in the scope of a syntax tree?
-    if let p = program.parent(containing: scopeOfUse) {
-      let es = extensions(lexicallyIn: scopeOfUse)
-      let xs = resolve(n, memberInExtensionOf: q, visibleFrom: p, statically: selectionIsStatic)
-      let ys = resolve(
-        n, declaredIn: es, applyingTo: q, in: scopeOfUse, statically: selectionIsStatic)
-      return xs + ys
-    }
-
-    // We are at the top-level.
-    else {
-      let es = extensions(visibleAtTopLevelOf: scopeOfUse.file)
-      return resolve(
-        n, declaredIn: es, applyingTo: q, in: scopeOfUse, statically: selectionIsStatic)
-    }
+    let es = extensions(visibleFrom: scopeOfUse)
+    return resolve(n, declaredIn: es, applyingTo: q, in: scopeOfUse, statically: selectionIsStatic)
   }
 
   /// For each declaration in `es` that applies to `q`, adds to `result` the members of that
@@ -4239,6 +4242,12 @@ public struct Typer {
       let model = typeOfModel(of: q, conformingTo: concept, with: vs)
       for a in summon(model.erased, in: scopeOfUse) {
         for m in ms {
+          // Ignore the member if it is static but the qualification isn't.
+          if program.isStatic(m) && !selectionIsStatic { continue }
+
+          // Determine the type of the resolved member, adapting it to the qualification. Since
+          // we're resolving a trait requirement we know that we can refer to the unbound version
+          // of any non-static member.
           let w = program.types.reify(
             a.witness, applying: a.substitutions, withVariables: .substitutedByError)
           var member = typeOfImplementation(satisfying: m, in: w)
@@ -4401,14 +4410,26 @@ public struct Typer {
     }
   }
 
-  /// Returns the extensions that are directly contained in `s`.
-  private mutating func extensions(lexicallyIn s: ScopeIdentity) -> [ExtensionDeclaration.ID] {
-    if let ds = cache.scopeToExtensions[s] {
+  /// Returns the extensions that are visible from `scopeOfUse`.
+  private mutating func extensions(
+    visibleFrom scopeOfUse: ScopeIdentity
+  ) -> [ExtensionDeclaration.ID] {
+    if let ds = cache.scopeToExtensions[scopeOfUse] {
       return ds
-    } else {
-      let ds = Array(program.declarations(of: ExtensionDeclaration.self, lexicallyIn: s))
-      cache.scopeToExtensions[s] = ds
+    }
+
+    // Are we in the scope of a syntax tree?
+    else if let p = program.parent(containing: scopeOfUse) {
+      var ds = extensions(visibleFrom: p)
+      ds.append(
+        contentsOf: program.declarations(of: ExtensionDeclaration.self, lexicallyIn: scopeOfUse))
+      cache.scopeToExtensions[scopeOfUse] = ds
       return ds
+    }
+
+    // We are at the top level.
+    else {
+      return extensions(visibleAtTopLevelOf: scopeOfUse.file)
     }
   }
 

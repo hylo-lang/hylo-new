@@ -32,14 +32,12 @@ extension IRFunction {
   private mutating func addParameter(
     _ p: IRParameter, offset i: Int, to context: inout Transfer.Context
   ) {
-    let t = resolved(p.type)!.type
     context.locals[.parameter(i)] = .place(.root(.parameter(i)))
-
     switch p.access {
     case .let, .inout, .sink:
-      context.memory[.parameter(i)] = .init(type: t, value: .uniform(.initialized))
+      context.memory[.parameter(i)] = .init(type: p.type, value: .uniform(.initialized))
     case .set:
-      context.memory[.parameter(i)] = .init(type: t, value: .uniform(.uninitialized))
+      context.memory[.parameter(i)] = .init(type: p.type, value: .uniform(.uninitialized))
     case .auto:
       fatalError("invalid IR")
     }
