@@ -82,6 +82,7 @@ public struct Program: Sendable {
     _ m: Module.ID,
     loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)?
   ) {
+    types.reserveCapacity(max(types.underestimatedCount << 1, 10000))
     var typer = Typer(typing: m, of: consume self, loggingInferenceWhere: isLoggingEnabled)
     typer.apply()
     self = typer.release()
@@ -1540,6 +1541,7 @@ extension Program {
     // Reserve an identity for the new module.
     let m = modules.count
     var c = Module.SerializationContext(identities: [name: m], types: .init())
+    types.reserveCapacity(max(types.underestimatedCount << 1, 10000))
 
     // Configure the serialization context.
     swap(&c.types, &types)
