@@ -30,6 +30,16 @@ public struct TypeStore: Sendable {
     self.nextFreshIdentifier = 0
   }
 
+  /// Returns a number less than the number of types created with this store.
+  public var underestimatedCount: Int {
+    types.count
+  }
+
+  /// Reserves enough space to store `minimumCapacity` types without allocating new storage.
+  public mutating func reserveCapacity(_ minimumCapacity: Int) {
+    self.types.reserveCapacity(minimumCapacity)
+  }
+
   /// Returns the identity of a fresh type variable.
   public mutating func fresh() -> TypeVariable.ID {
     defer { nextFreshIdentifier += 1 }
