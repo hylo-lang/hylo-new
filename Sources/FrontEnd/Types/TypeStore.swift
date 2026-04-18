@@ -43,7 +43,7 @@ public struct TypeStore: Sendable {
     return t
   }
 
-  /// Returns the body of `f` with each parameter substituted for its corresponding argument.
+  /// Returns the body of `f` with each parameter substituted with its corresponding argument.
   public mutating func application(
     of f: UniversalType.ID, to arguments: TypeArguments
   ) -> AnyTypeIdentity {
@@ -52,7 +52,7 @@ public struct TypeStore: Sendable {
     return introduce(parameters: p, into: t)
   }
 
-  /// Returns the body of `f` with each parameter substituted for its corresponding argument.
+  /// Returns the body of `f` with each parameter substituted with its corresponding argument.
   public mutating func application(
     of f: UniversalType.ID, to arguments: [AnyTypeIdentity]
   ) -> AnyTypeIdentity {
@@ -208,7 +208,7 @@ public struct TypeStore: Sendable {
     }
   }
 
-  /// Returns `n` with each occurrence the parameters in `ps` substituted for a fresh variable.
+  /// Returns `n` with each occurrence the parameters in `ps` substituted with a fresh variable.
   public mutating func open(
     _ ps: [GenericParameter.ID], in n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
@@ -790,26 +790,34 @@ public struct TypeStore: Sendable {
     }
   }
 
-  /// Returns `n` with the keys in `substitutions` substituted for their corresponding values.
+  /// Returns `n` with the keys in `substitutions` substituted with their corresponding values.
   public mutating func substitute(
     _ substitutions: [AnyTypeIdentity: AnyTypeIdentity], in n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    self.map(n) { (s, t) in
-      if let u = substitutions[t] { .stepOver(u) } else { .stepInto(t) }
+    if substitutions.isEmpty {
+      return n
+    } else {
+      return self.map(n) { (s, t) in
+        if let u = substitutions[t] { .stepOver(u) } else { .stepInto(t) }
+      }
     }
   }
 
-  /// Returns `n` with the keys in `substitutions` substituted for their corresponding values.
+  /// Returns `n` with the keys in `substitutions` substituted with their corresponding values.
   public mutating func substitute(
     _ substitutions: TypeArguments, in n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    self.map(n) { (s, t) in
-      // The uncheked cast is okay because type of an identity is irrelevant to `Hashable`.
-      if let u = substitutions[.init(uncheckedFrom: t)] { .stepOver(u) } else { .stepInto(t) }
+    if substitutions.isEmpty {
+      return n
+    } else {
+      return self.map(n) { (s, t) in
+        // The uncheked cast is okay because type of an identity is irrelevant to `Hashable`.
+        if let u = substitutions[.init(uncheckedFrom: t)] { .stepOver(u) } else { .stepInto(t) }
+      }
     }
   }
 
-  /// Returns `n` with unification variables substituted for an error.
+  /// Returns `n` with unification variables substituted with an error.
   public mutating func substituteVariableForError(in n: AnyTypeIdentity) -> AnyTypeIdentity {
     self.map(n) { (s, t) in
       if t.isVariable {

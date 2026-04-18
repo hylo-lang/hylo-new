@@ -263,7 +263,7 @@ extension Program {
     undefinedSymbol(n.value, memberOf: t, at: n.site)
   }
 
-  /// Returns an error diagnostic about an unused value.
+  /// Returns an error diagnosing about an unused value.
   internal func unusedValue<T: SyntaxIdentity>(
     _ n: T, instanceOf t: AnyTypeIdentity, level: Diagnostic.Level
   ) -> Diagnostic {

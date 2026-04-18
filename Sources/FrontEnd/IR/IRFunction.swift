@@ -19,6 +19,9 @@ public struct IRFunction: Sendable {
     /// The identity of a synthesized function.
     case synthesized(DeclarationIdentity, TypeArguments)
 
+    /// The identity of a function implementing a trait requirement.
+    case implementation(DeclarationIdentity, ConformanceDeclaration.ID, TypeArguments)
+
     /// The identity of the existentialiezd form of a polymorphic function.
     indirect case existentialized(IRFunction.Name)
 
@@ -225,9 +228,7 @@ public struct IRFunction: Sendable {
 
   /// Returns the type of `self`, computing it using `p`.
   public func signature() -> Signature {
-    let ps = termParameters.map { (p) in
-      Parameter(access: p.access, type: resolved(p.type)!.type)
-    }
+    let ps = termParameters.map({ (p) in Parameter(access: p.access, type: p.type) })
 
     var a: Arrow
     switch output {
@@ -370,7 +371,7 @@ public struct IRFunction: Sendable {
   public func result(of v: IRValue) -> (type: AnyTypeIdentity, isPlace: Bool)? {
     switch v {
     case .parameter(let i):
-      return resolved(termParameters[i].type)
+      return resolved(.place(termParameters[i].type))
     case .register(let i):
       return resolved(at(i).type)
     case .integer(_, let t):
@@ -696,9 +697,7 @@ public struct IRFunction: Sendable {
   /// moved back into `self` using `take(definition:)`.
   public mutating func move() -> IRFunction {
     var other = IRFunction(
-      name: name, output: output,
-      typeParameters: typeParameters,
-      termParameters: termParameters)
+      name: name, output: output, typeParameters: typeParameters, termParameters: termParameters)
 
     swap(&self.bindings, &other.bindings)
     swap(&self.slots, &other.slots)
@@ -767,11 +766,18 @@ extension IRFunction.Name: Showable {
     switch self {
     case .lowered(let d):
       return printer.program.debugName(of: d)
+
     case .initializer(let d):
       return "\(printer.program.debugName(of: .init(d)))$init"
+
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
       return "\(printer.program.debugName(of: d))<\(list: xs)>"
+
+    case .implementation(let d, _, let a):
+      let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
+      return "\(printer.program.debugName(of: d))<\(list: xs)>"
+
     case .existentialized(let n):
       return "\(printer.show(n))$existentialized"
     }

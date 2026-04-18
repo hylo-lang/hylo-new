@@ -63,7 +63,7 @@ extension IREmitter {
     let mono = demandExistentialized(poly)
 
     // Get the types of the parameters of the original poloymorphic function.
-    let parameters = poly.termParameters.map({ (p) in f.resolved(p.type)!.type })
+    let parameters = poly.termParameters.map(\.type)
 
     // Create an array with a type witness for each of the type argument passed to `i`. These
     // witnesses will be concatenated with the term arguments of each use application of `c`
@@ -173,7 +173,7 @@ extension IREmitter {
     for p in poly.typeParameters {
       let t = program.types.demand(TypeWitness()).erased
       let d = program.types[p].declaration.map(DeclarationIdentity.init(_:))
-      ps.append(.init(type: .place(t), access: .let, declaration: d))
+      ps.append(.init(type: t, access: .let, declaration: d))
     }
 
     ps.append(contentsOf: poly.termParameters)
