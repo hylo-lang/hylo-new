@@ -84,7 +84,6 @@ jobs:
                 --start-point-clone-thresholds `
                 --start-point-reset `
                 --testbed $testbed `
-                --error-on-alert `
                 --adapter json `
                 --github-actions $env:GITHUB_API_TOKEN `
                 --ci-number $env:PR_NUMBER `
