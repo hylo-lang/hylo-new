@@ -977,23 +977,15 @@ internal struct IREmitter {
     assert(arguments.count == parameters.count)
 
     return lowering(e) { (me) in
-      // Form accesses on the parameters. Note that we won't close these accesses here because, if
-      // the callee is a subscript, then the lifetimes the parameters' accesses have to cover all
-      // uses of the projected value, which are not known yet. We'll delay the work until lifetime
-      // analysis instead.
-      for i in 0 ..< arguments.count {
-        arguments[i] = me._access(.init(parameters[i].access), from: arguments[i])
-      }
-
-      // Do the call.
+      // Form accesses on the parameters right before the call. Note that we won't close these
+      // accesses here because, if the callee is a subscript, then the lifetimes the parameters'
+      // accesses have to cover all uses of the projected value, which are not known yet. We'll
+      // delay the work until lifetime analysis instead.
       if me.program[e].style == .parenthesized {
-        let r = me._access([.set], from: f.result)
-        me._apply(f.value, arguments, into: r)
-        me._end(IRAccess.self, openedBy: r)
-        return f.result
+        return me._apply(f.value, arguments, into: f.result, afterFormingAccesses: true)
       } else {
         assert(f.result.isPoison)
-        return me._project(f.value, arguments)
+        return me._project(f.value, arguments, afterFormingAccesses: true)
       }
     }
   }
@@ -1650,14 +1642,35 @@ internal struct IREmitter {
   }
 
   /// Inserts a `apply` instruction.
+  ///
+  /// If `formAccesses` is `true`, an access is created on each argument before the projection,
+  /// with the access effects defined by the type of `callee`'s parameters. Otherwise, each given
+  /// argument is an access requesting the effect of the corresponding parameter.
+  ///
+  /// The result of the function is the value passed to the return register of the callee, which
+  /// is *not* the register assigned by the `apply` instruction.
   internal mutating func _apply(
-    _ callee: IRValue, _ arguments: [IRValue], into result: IRValue
-  ) {
-    assert(isCallable(callee, with: arguments))
+    _ callee: IRValue, _ arguments: consuming [IRValue], into result: IRValue,
+    afterFormingAccesses formAccesses: Bool
+  ) -> IRValue {
+    let t = currentFunction.resultAsTermAbstraction(of: callee, in: program) ?? badOperand()
+    assert(program.types[t].inputs.count == arguments.count)
+
+    var last = result
+    if formAccesses {
+      let parameters = program.types[t].inputs
+      for i in 0 ..< arguments.count {
+        arguments[i] = _access(.init(parameters[i].access), from: arguments[i])
+      }
+      last = _access([.set], from: result)
+    }
+
     let s = IRApply(
-      callee: callee, arguments: arguments, result: result,
+      callee: callee, arguments: arguments, result: last,
       anchor: currentAnchor)
     insert(s)
+
+    return result
   }
 
   /// Inserts a `apply_builtin` instruction.
@@ -1734,9 +1747,22 @@ internal struct IREmitter {
   }
 
   /// Inserts a `project` instruction.
-  internal mutating func _project(_ callee: IRValue, _ arguments: [IRValue]) -> IRValue {
+  ///
+  /// If `formAccesses` is `true`, an access is created on each argument before the projection,
+  /// with the access effects defined by the type of `callee`'s parameters. Otherwise, each given
+  /// argument is an access requesting the effect of the corresponding parameter.
+  internal mutating func _project(
+    _ callee: IRValue, _ arguments: consuming [IRValue], afterFormingAccesses formAccesses: Bool
+  ) -> IRValue {
     let t = currentFunction.resultAsTermAbstraction(of: callee, in: program) ?? badOperand()
     assert(program.types[t].inputs.count == arguments.count)
+
+    if formAccesses {
+      let parameters = program.types[t].inputs
+      for i in 0 ..< arguments.count {
+        arguments[i] = _access(.init(parameters[i].access), from: arguments[i])
+      }
+    }
 
     let s = IRProject(
       callee: callee, arguments: arguments,
@@ -1908,7 +1934,7 @@ internal struct IREmitter {
     let v = functionReference(to: f)
 
     if program[module].ir[f].termParameters.isEmpty && applyNullary {
-      return _project(v, [])
+      return _project(v, [], afterFormingAccesses: false)
     } else {
       return v
     }
@@ -1934,42 +1960,24 @@ internal struct IREmitter {
     return _subfield(x, at: p!)
   }
 
-  /// Generates the IR for applying `d` to `xs`, returning a raw access to the place holding the
-  /// return value.
-  private mutating func _emitCall(_ d: IRFunction.ID, _ xs: [IRValue]) -> IRValue {
-    let function = functionReference(to: d)
-    let x0 = _alloca(program[module].ir[d].signature().head.output)
-    let x1 = _access([.set], from: x0)
-    _apply(function, [], into: x1)
-    _end(IRAccess.self, openedBy: x1)
-    return x0
-  }
-
   /// Generates this IR for forwarding the arguments of the current function to `f`.
   ///
   /// This method is called during the construction of a witness table to generate the definition
   /// of the current function, which is an interface function wrapping a call to `f`.
   private mutating func _emitCallToRequirementImplementation(_ f: LoweredCallee) {
-    // Retrieve the signature of the implementation.
-    let t = currentFunction.resultAsTermAbstraction(of: f.value, in: program)!
-    let parameters = program.types[t].inputs
-
-    // Form accesses on all parameters.
-    var operands = Array<IRValue>(minimumCapacity: parameters.count + 1)
-    for (p, a) in zip(parameters, f.arguments) {
-      operands.append(_access(.init(p.access), from: a))
-    }
-    for (i, p) in currentFunction.termParameters.enumerated().dropFirst() {
-      operands.append(_access([p.access], from: .parameter(i)))
+    // Gather the parameters.
+    var operands = Array(f.arguments)
+    for i in 1 ..< currentFunction.termParameters.count {
+      operands.append(.parameter(i))
     }
 
     // Do the call.
     if currentFunction.isSubscript {
-      let x0 = _project(f.value, operands)
+      let x0 = _project(f.value, operands, afterFormingAccesses: true)
       _yield(x0)
     } else {
       let x0 = operands.removeLast()
-      _apply(f.value, operands, into: x0)
+      _ = _apply(f.value, operands, into: x0, afterFormingAccesses: true)
     }
 
     _return()
@@ -1993,12 +2001,7 @@ internal struct IREmitter {
     case .termApplication(let f, let a):
       let (abstraction, arguments) = _emit(curriedApplicationOf: f, to: a)
       let callee = _emit(witness: abstraction, applyingNullary: false)
-
-      let t = currentFunction.resultAsTermAbstraction(of: callee, in: program)!
-      let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
-        _access(.init(p.access), from: a)
-      }
-      return _project(callee, xs)
+      return _project(callee, arguments, afterFormingAccesses: true)
 
     case .typeApplication(let f, let a):
       let x = _emit(witness: f, applyingNullary: applyNullary)
@@ -2121,7 +2124,7 @@ internal struct IREmitter {
     let x3 = _property(member, of: deinitializable, withType: t0.erased)
     let x4 = _access([.let], from: x3)
 
-    _apply(x4, [x1], into: x2)
+    _ = _apply(x4, [x1], into: x2, afterFormingAccesses: false)
 
     _end(IRAccess.self, openedBy: x4)
     _end(IRAccess.self, openedBy: x2)
@@ -2212,7 +2215,7 @@ internal struct IREmitter {
     let x3 = _access([.set], from: x0)
     let x4 = _property(.init(member), of: movable, withType: t0.erased)
 
-    _apply(x4, [x2, x1], into: x3)
+    _ = _apply(x4, [x2, x1], into: x3, afterFormingAccesses: false)
 
     _end(IRAccess.self, openedBy: x3)
     _end(IRAccess.self, openedBy: x2)
@@ -2301,13 +2304,6 @@ internal struct IREmitter {
     let s = program[module].ir[f].signature()
     let t = program.types.demand(s)
     return .function(n, t)
-  }
-
-  /// Returns `true` iff `callee` denotes a function that can be called with `arguments` in the
-  /// current function.
-  private mutating func isCallable(_ callee: IRValue, with arguments: [IRValue]) -> Bool {
-    let t = currentFunction.resultAsTermAbstraction(of: callee, in: program)!
-    return program.types[t].inputs.count == arguments.count
   }
 
 }
