@@ -53,14 +53,22 @@ jobs:
       - name: Build tests
         run: swift build --build-tests -c ${{ matrix.config }} -Xswiftc -enable-testing --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
-      # Time just the test run. Emits Bencher Metric Format JSON with
-      # elapsed seconds as a floating-point value.
+      # Report XCTest's self-measured "All tests" runtime rather than wall
+      # clock, to exclude SwiftPM/test-runner startup overhead. XCTest prints
+      # a summary line like:
+      #   Executed 123 tests, with 0 failures (0 unexpected) in 1.114 (1.114) seconds
+      # The last such match in the log is the aggregate "All tests" time.
       - name: Run and time test suite
         run: |
-          $start = Get-Date
-          swift test -c ${{ matrix.config }} --skip-build --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+          swift test -c ${{ matrix.config }} --skip-build --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }} 2>&1 | Tee-Object -FilePath test.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $seconds = ((Get-Date) - $start).TotalSeconds
+          $log = Get-Content test.log -Raw
+          $timingMatches = [regex]::Matches($log, 'in (\d+(?:\.\d+)?) \(\d+(?:\.\d+)?\) seconds')
+          if ($timingMatches.Count -eq 0) {
+            Write-Error 'Could not find XCTest timing summary in test output.'
+            exit 1
+          }
+          $seconds = [double]$timingMatches[$timingMatches.Count - 1].Groups[1].Value
           @{ 'hylo-test-suite' = @{ latency = @{ value = $seconds } } } | ConvertTo-Json -Depth 5 -Compress | Tee-Object -FilePath benchmark_results.json
 
       - name: Upload benchmark results
