@@ -15,7 +15,7 @@ let commonSwiftSettings: [SwiftSetting] = [
 let package = Package(
   name: "Hylo",
   platforms: [
-    .macOS(.v13)
+    .macOS(.v15)
   ],
   products: [
     .executable(name: "hc", targets: ["hc"]),
@@ -38,6 +38,7 @@ let package = Package(
     .package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
+    .package(path: "./Swifty-LLVM"),
   ],
   targets: [
     .executableTarget(
@@ -47,6 +48,7 @@ let package = Package(
         .target(name: "FrontEnd"),
         .target(name: "Utilities"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -61,9 +63,11 @@ let package = Package(
       name: "Driver",
       dependencies: [
         .target(name: "FrontEnd"),
+        .target(name: "LLVMEmitter"),
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
         .product(name: "Archivist", package: "archivist"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -78,6 +82,17 @@ let package = Package(
         .product(name: "BigInt", package: "BigInt"),
       ],
       swiftSettings: commonSwiftSettings),
+
+    .target(
+      name: "LLVMEmitter",
+      dependencies: [
+        .target(name: "FrontEnd"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
+        .target(name: "Utilities"),
+      ],
+      path: "Sources/BackEnd/LLVM",
+      swiftSettings: commonSwiftSettings,
+    ),
 
     .target(
       name: "StableCollections",
@@ -105,6 +120,7 @@ let package = Package(
       dependencies: [
         .target(name: "Driver"),
         .target(name: "FrontEnd"),
+        .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
       ],
       exclude: ["negative", "positive", "README.md"],
@@ -115,6 +131,14 @@ let package = Package(
       name: "FrontEndTests",
       dependencies: [
         .target(name: "FrontEnd")
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
+      name: "LLVMEmitterTests",
+      dependencies: [
+        .target(name: "LLVMEmitter"),
+        .target(name: "Driver")
       ],
       swiftSettings: commonSwiftSettings),
 

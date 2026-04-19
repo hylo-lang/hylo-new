@@ -4,6 +4,7 @@ import FrontEnd
 import StandardLibrary
 import Utilities
 import XCTest
+typealias Host = Utilities.Host
 
 /// The driver for generated compiler tests.
 ///
@@ -58,6 +59,15 @@ final class CompilerTests: XCTestCase {
       }
     }
 
+    /// Returns where to save the generated executable upon failure.
+    func executableDestination() -> URL {
+      if isPackage {
+        root.appending(component: ".executable\(Host.nativeExecutableSuffix)")
+      } else {
+        root.deletingPathExtension().appendingPathExtension("executable\(Host.nativeExecutableSuffix)")
+      }
+    }
+
     /// Saves `contents` into a file at its test-case level observation destination
     /// as specified by `testCaseLevelObservationDestination(tag:)`.
     ///
@@ -101,6 +111,11 @@ final class CompilerTests: XCTestCase {
     /// The compiled IR artifact of the tested module, if any.
     var llvmIR: String?
 
+    /// The URL of the generated executable residing in a temporary directory, if any.
+    ///
+    /// Copied to the test case destination upon test case failure.
+    var executable: URL?
+
     /// Saves the artifacts into test-case-level observation files of `test`.
     func save(into test: TestDescription) throws {
       if let rawIR {
@@ -112,8 +127,16 @@ final class CompilerTests: XCTestCase {
       if let llvmIR {
         try test.saveTestCaseLevelObservation(llvmIR, tag: "ll")
       }
+      if let executable {
+        try FileManager.default.copyItem(at: executable, to: test.executableDestination())
+      }
     }
 
+  }
+
+  /// Whether the test case has recorded any failures or uncaught exceptions.
+  var testFailed: Bool {
+    if let testRun, testRun.totalFailureCount > 0 { true } else { false }
   }
 
   /// The test case currently being run.
@@ -124,37 +147,62 @@ final class CompilerTests: XCTestCase {
 
   /// Saves any available compilation artifacts on test failure
   /// or if `alwaysSaveArtifacts` is true to facilitate diagnosis.
-  ///
-  /// Run by XCTest after each test case.
-  override func tearDownWithError() throws {
-    if let testRun, testRun.failureCount > 0 || alwaysSaveArtifacts, let testCase {
+  func saveArtifactsIfNeeded() throws {
+    if testFailed || alwaysSaveArtifacts, let testCase {
       try artifacts.save(into: testCase)
     }
   }
 
+  /// Run by XCTest after each test case.
+  override func tearDownWithError() throws {
+    try saveArtifactsIfNeeded()
+  }
+
+  /// The result of a successful compilation.
+  private struct CompilationResult {
+
+    /// The driver used to compile the test program.
+    var driver: Driver
+
+    /// The main module being compiled.
+    let module: FrontEnd.Module.ID
+
+    /// The expected diagnostics for each source file.
+    let expectedDiagnostics: [FileName: String]
+
+  }
+
   /// Compiles `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    let (program, _) = try await compile(input)
-    assertSansError(program)
+    do {
+      let r = try await compile(input)
+      try assertSansError(r.driver.program)
+    } catch let error as TestFailure {
+      XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
+    }
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    let (program, expectations) = try await compile(input)
-    XCTAssert(program.containsError, "program compiled but an error was expected")
-    assertExpectations(expectations, program.diagnostics)
+    do {
+      let r = try await compile(input)
+      XCTAssert(r.driver.program.containsError, "program compiled but an error was expected.\nSource: \(input.root.path)\n")
+      assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
+    } catch let error as TestFailure {
+      XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
+    }
   }
 
-  /// Compiles `input` into `p` and returns expected diagnostics for each compiled source file.
+  /// Compiles `input` into `outputDirectory` and returns expected diagnostics for each compiled source file.
   ///
   /// Sets up the `testCase` context and populates `artifacts` as soon as compilation stages succeed.
-  private func compile(_ input: TestDescription) async throws -> (Program, [FileName: String]) {
+  private func compile(_ input: TestDescription) async throws -> CompilationResult {
     self.testCase = input
 
-    var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
+    var driver = try Driver(moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native())
 
     if input.manifest.requiresStandardLibrary {
-      try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
+      try await driver.loadStandardLibrary()
     }
 
     let m = driver.program.demandModule(.init("Test"))
@@ -172,8 +220,11 @@ final class CompilerTests: XCTestCase {
       expectedDiagnostics[source.name] = expected
     }
 
-    func done() -> (Program, [FileName: String]) {
-      (driver.program, expectedDiagnostics)
+    func done() -> CompilationResult {
+      .init(
+        driver: driver,
+        module: m,
+        expectedDiagnostics: expectedDiagnostics)
     }
 
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -196,12 +247,47 @@ final class CompilerTests: XCTestCase {
 
     if input.manifest.stage == .lowering { return done() }
 
-    // Code generation.
-    assert(input.manifest.stage == .codegen)
+    // LLVM Lowering.
+    if (try driver.lowerToLLVM(m)).containsError { return done() }
+    artifacts.llvmIR = driver.llvmIR(of: m)!
+    if input.manifest.stage == .llvmLowering { return done() }
+
+    // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
+    if input.manifest.requiresStandardLibrary {
+      // let stdlibID = driver.program.demandModule(Module.standardLibraryName)
+      // if await driver.lower(stdlibID).containsError { return done() }
+      // if await driver.applyTransformationPasses(stdlibID).containsError { return done() }
+      // if (try driver.lowerToLLVM(stdlibID)).containsError { return done() }
+    }
+
+    if input.manifest.stage == .executableLinking {
+      let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
+
+      let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
+      _ = try driver.generateExecutable(from: m, writingTo: executable)
+      artifacts.executable = executable
+    }
+
     return done()
   }
 
-  private func compile(_ m: Module.ID, driver: inout Driver) {
+  /// An error thrown to signal test failure with given reason.
+  private enum TestFailure: Error {
+
+    case missingExecutableOutput
+    case compilationError(String)
+    case invalidTestDescription(String)
+
+    var localizedDescription: String {
+      switch self {
+      case .missingExecutableOutput:
+        return "missing executable output"
+      case .compilationError(let message):
+        return "Compilation failure:\n\(message)"
+      case .invalidTestDescription(let d):
+        return "Invalid test description (\(d))"
+      }
+    }
 
   }
 
@@ -242,7 +328,7 @@ final class CompilerTests: XCTestCase {
   }
 
   /// Asserts that `program` does not contain any error.
-  private func assertSansError(_ program: Program) {
+  private func assertSansError(_ program: Program) throws {
     if !program.containsError { return }
 
     let root = URL(filePath: #filePath).deletingLastPathComponent()
@@ -261,7 +347,7 @@ final class CompilerTests: XCTestCase {
       }
       report.write(o)
     }
-    XCTFail(report)
+    throw TestFailure.compilationError(report)
   }
 
   /// Returns a message explaining `delta`, which is the result of comparing `expectation` to some

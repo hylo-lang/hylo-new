@@ -60,6 +60,16 @@ jobs:
         with:
           swift-version: "6.2.4"
 
+      - name: Set up LLVM
+        uses: hylo-lang/get-llvm@v0.3.0
+        id: get-llvm
+        with:
+          llvmVersion: "20.1.6"
+          llvmBuildRelease: "20260309-221030"
+          llvmBuildConfig: MinSizeRel
+          addToPkgConfigPath: true
+          addToPath: true
+
       - name: Download Recent Visual Studio and Windows SDK
         uses: compnerd/gha-setup-vsdevenv@main
         with:
