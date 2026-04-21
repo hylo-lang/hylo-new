@@ -599,7 +599,7 @@ final class ManglingTests: XCTestCase {
       is: "Metatype<typealias M0.#.C.Output = Hylo.Int>")
   }
 
-  /// Asserts that the mangling of `t` in `p` is `expected`.
+  /// Asserts that the mangling of `t` in `p` equals `expected`.
   private func assertManglingOf(type t: AnyTypeIdentity, in p: Program, is expected: String) {
     let m = p.mangled(t)
     let demangled = DemangledSymbol(m).description
@@ -609,7 +609,7 @@ final class ManglingTests: XCTestCase {
     )
   }
 
-  /// Asserts that the mangling of `d` in `p` is `expected`.
+  /// Asserts that the mangling of `d` in `p` equals `expected`.
   private func assertManglingOf(
     declaration d: DeclarationIdentity, in p: Program, is expected: String
   ) {
@@ -621,7 +621,7 @@ final class ManglingTests: XCTestCase {
     )
   }
 
-  /// Asserts that the mangling of `t` in `p` is `expected`.
+  /// Asserts that the mangling of `t` in `p` equals `expected`.
   private func assertDemanglingIsOk(mangled m: String) {
     let demangled = DemangledSymbol(m).description
     XCTAssertFalse(demangled.contains("?"), "demangling of \(m) contains errors: \(demangled)")

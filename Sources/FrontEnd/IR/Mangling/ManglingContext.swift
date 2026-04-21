@@ -123,7 +123,7 @@ struct ManglingContext {
     symbolPosition[s] = symbolPosition.count
   }
 
-  /// Records `q` as the innermost scope being mangled, and returns the previous one.
+  /// Records `q` as the innermost scope being mangled, and returns the previous recorded value.
   mutating func record(qualification q: ScopeIdentity?) -> ScopeIdentity? {
     let previous = qualification
     qualification = q
@@ -131,14 +131,14 @@ struct ManglingContext {
   }
 
   /// If `s` is reserved or has already been inserted in the symbol lookup table, writes a lookup
-  /// reference to it and returns `true`. Otherwise, returns `false`.
-  mutating func appendIf(reservedOrRecorded s: ManglingSymbol, in program: Program) -> Bool {
-    appendIf(reserved: s) || appendIf(recorded: s, in: program)
+  /// reference to it and returns `true`. Otherwise, returns `false` without modifying `self`.
+  mutating func addIf(reservedOrRecorded s: ManglingSymbol, in program: Program) -> Bool {
+    addIf(reserved: s) || addIf(recorded: s, in: program)
   }
 
   /// Writes a lookup reference to `s` and returns `true` iff `s` is a reserved
   /// mangling symbol. Otherwise, returns `false` without modifying `self`.
-  private mutating func appendIf(reserved s: ManglingSymbol) -> Bool {
+  private mutating func addIf(reserved s: ManglingSymbol) -> Bool {
     if let r = reserved[s] {
       if case .type = s {
         add(operator: .reservedType)
@@ -155,7 +155,7 @@ struct ManglingContext {
 
   /// Writes a lookup reference to `s` and returns `true` iff `s` in the lookup table. Otherwise,
   /// returns `false` without modifying `self`.
-  private mutating func appendIf(recorded s: ManglingSymbol, in program: Program) -> Bool {
+  private mutating func addIf(recorded s: ManglingSymbol, in program: Program) -> Bool {
     if let p = symbolPosition[s] {
       if case .type = s {
         add(operator: .lookupType)
@@ -172,7 +172,7 @@ struct ManglingContext {
 
   /// If `q` is the qualification accumulated so far, writes a lookup reference to it and returns
   /// `true`. Otherwise, returns `false`.
-  mutating func appendIf(qualification q: ScopeIdentity) -> Bool {
+  mutating func addIf(qualification q: ScopeIdentity) -> Bool {
     if q == qualification {
       add(operator: .lookupRelative)
       return true
@@ -192,7 +192,8 @@ struct ManglingContext {
     }
   }
 
-  /// Executes `action` on a mutable `self`, performing debug logging for the qualification.
+  /// Executes `action` on a mutable `self`, performing debug logging saying that we are writing a
+  /// qualification.
   mutating func writingQualification(
     _ action: (_ source: inout Self) -> Void
   ) {

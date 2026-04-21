@@ -14,7 +14,7 @@ internal struct DebugPrinter {
   }
 
   /// Returns the application of `action`, logging the scope described by `description` and the
-  /// result if debug printing is enabled.
+  /// resulting value if debug printing is enabled.
   mutating func withScope<T>(_ description: @autoclosure () -> String, _ action: () -> T) -> T {
     if enabled {
       let d = description()

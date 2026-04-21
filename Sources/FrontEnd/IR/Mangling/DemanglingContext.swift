@@ -55,12 +55,16 @@ struct DemanglingContext {
     case 1:
       guard let n = takeInteger() else { return nil }
       guard n.rawValue < strings.count else {
-        debug.print("ERROR: out of bounds when reading string \(n)")
+        debug.print("ERROR: out of bounds when referring to string \(n)")
         return nil
       }
       return String(strings[Int(n.rawValue)])
     case let n:
       let j = stream.index(stream.startIndex, offsetBy: Int(n - 2))
+      guard j <= stream.endIndex else {
+        debug.print("ERROR: out of bounds when reading string")
+        return nil
+      }
       let r = stream[..<j]
       strings.append(r)
       stream = stream[j...]

@@ -11,67 +11,67 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a lookup of a previously mangled type.
   case lookupType = "L"
 
-  /// Indicates a lookup to the current qualification.
+  /// Starts a lookup to the current qualification.
   case lookupRelative = "rK"
 
   /// Starts a reserved symbol identifier.
   case reserved = "R"
 
-  /// Starts a reserved symbol identifier.
+  /// Starts a reserved type identifier.
   case reservedType = "tR"
 
-  /// Indicates an associated type declaration symbol.
+  /// Starts an associated type declaration symbol.
   case associatedTypeDeclaration = "taD"
 
-  /// Indicates an enum case declaration symbol.
+  /// Starts an enum case declaration symbol.
   case enumCaseDeclaration = "ecD"
 
-  /// Indicates an enum declaration symbol.
+  /// Starts an enum declaration symbol.
   case enumDeclaration = "eD"
 
-  /// Indicates a binding declaration symbol.
+  /// Starts a binding declaration symbol.
   case bindingDeclaration = "bD"
 
-  /// Indicates a conformance declaration symbol.
+  /// Starts a conformance declaration symbol.
   case conformanceDeclaration = "cD"
 
-  /// Indicates an extension declaration symbol.
+  /// Starts an extension declaration symbol.
   case extensionDeclaration = "xD"
 
-  /// Indicates an import declaration symbol.
+  /// Starts an import declaration symbol.
   case importDeclaration = "iD"
 
-  /// Indicates a function declaration symbol.
+  /// Starts a function declaration symbol.
   case functionDeclaration = "F"
 
-  /// Indicates a static function declaration symbol.
+  /// Starts a static function declaration symbol.
   case staticFunctionDeclaration = "sF"
 
-  /// Indicates a function bundle declaration symbol.
+  /// Starts a function bundle declaration symbol.
   case functionBundleDeclaration = "bF"
 
-  /// Indicates a synthesized function declaration symbol.
+  /// Starts a synthesized function declaration symbol.
   case synthesizedFunctionDeclaration = "xF"
 
-  /// Indicates a generic parameter declaration symbol.
+  /// Starts a generic parameter declaration symbol.
   case genericParameterDeclaration = "G"
 
-  /// Indicates a parameter declaration symbol.
+  /// Starts a parameter declaration symbol.
   case parameterDeclaration = "P"
 
-  /// Indicates a struct declaration symbol.
+  /// Starts a struct declaration symbol.
   case structDeclaration = "S"
 
-  /// Indicates a typealias declaration symbol.
+  /// Starts a typealias declaration symbol.
   case typealiasDeclaration = "A"
 
-  /// Indicates a trait declaration symbol.
+  /// Starts a trait declaration symbol.
   case traitDeclaration = "C"
 
-  /// Indicates a variable declaration symbol.
+  /// Starts a variable declaration symbol.
   case variableDeclaration = "V"
 
-  /// Indicates a variant declaration symbol.
+  /// Starts a variant declaration symbol.
   case variantDeclaration = "vD"
 
   /// Starts an arrow type.
@@ -95,10 +95,10 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts an implication type.
   case implicationType = "iT"
 
-  /// Indicates a literal integer type.
+  /// Starts a literal integer type.
   case literalIntegerType = "liT"
 
-  /// Indicates a literal float type.
+  /// Starts a literal float type.
   case literalFloatType = "lfT"
 
   /// Starts a machine integer type of a specific width.
@@ -107,10 +107,10 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a machine float type of a specific width.
   case machineFloatType = "mfT"
 
-  /// Indicates a machine pointer type.
+  /// Starts a machine pointer type.
   case machinePointerType = "mpT"
 
-  /// Indicates a machine word type.
+  /// Starts a machine word type.
   case machineWordType = "mwT"
 
   /// Starts a generic parameter conformer type.
@@ -143,7 +143,7 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a tuple cons type.
   case tupleConsType = "tT"
 
-  /// Indicates a tuple empty type.
+  /// Starts a tuple empty type.
   case tupleEmptyType = "teT"
 
   /// Starts a type alias type.

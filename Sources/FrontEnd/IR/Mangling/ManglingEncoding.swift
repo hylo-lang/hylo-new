@@ -64,16 +64,13 @@ struct ManglingEncoding: Sendable {
     } else {
       r = takeWitnessTable(from: &source)
     }
-
-    // If we haven't consumed all the input, report an error.
-    // Otherwise return what we have.
     return source.isComplete ? r : .error(r, remaining: source.remaining)
   }
 
   /// Writes the mangled representation of `d` to `output`.
   private mutating func append(decl d: DeclarationIdentity, to output: inout ManglingContext) {
     output.writing(decl: d, program: program) { (output) in
-      if output.appendIf(reservedOrRecorded: .node(.init(d)), in: program) { return }
+      if output.addIf(reservedOrRecorded: .node(.init(d)), in: program) { return }
 
       // First add the qualification of the declaration.
       appendQualification(of: d, to: &output)
@@ -215,13 +212,13 @@ struct ManglingEncoding: Sendable {
       var earlyExit = false
       let p = program.parent(containing: n)
       for s in program.scopes(from: p) {
-        if s.node != nil, output.appendIf(reservedOrRecorded: .node(s.node!), in: program) {
+        if s.node != nil, output.addIf(reservedOrRecorded: .node(s.node!), in: program) {
           earlyExit = true
           break
-        } else if output.appendIf(reservedOrRecorded: s.asSymbol, in: program) {
+        } else if output.addIf(reservedOrRecorded: s.asSymbol, in: program) {
           earlyExit = true
           break
-        } else if output.appendIf(qualification: s) {
+        } else if output.addIf(qualification: s) {
           precondition(qs.isEmpty)
           return
         } else {
@@ -303,7 +300,7 @@ struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `m` to `output`.
   private mutating func append(module m: Module.ID, to output: inout ManglingContext) {
-    if output.appendIf(reservedOrRecorded: .module(m), in: program) { return }
+    if output.addIf(reservedOrRecorded: .module(m), in: program) { return }
     output.add(operator: .module)
     output.add(string: program[m].name.description)
   }
@@ -316,7 +313,7 @@ struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(scope s: ScopeIdentity, to output: inout ManglingContext) {
-    if output.appendIf(reservedOrRecorded: s.asSymbol, in: program) { return }
+    if output.addIf(reservedOrRecorded: s.asSymbol, in: program) { return }
 
     let q = output.record(qualification: s)
     if let n = s.node {
@@ -574,7 +571,7 @@ struct ManglingEncoding: Sendable {
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(type s: AnyTypeIdentity, to output: inout ManglingContext) {
     output.writing(type: s, program: program) { (output) in
-      if output.appendIf(reservedOrRecorded: .type(s), in: program) { return }
+      if output.addIf(reservedOrRecorded: .type(s), in: program) { return }
 
       let a = program.types[s]
       switch a {
@@ -808,7 +805,9 @@ struct ManglingEncoding: Sendable {
   private static func takeFunctionPointerType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    let inputs = source.takeItems(takingEachWith: { (s) in takeType(from: &s) }) ?? []
+    guard let inputs = source.takeItems(takingEachWith: { (s) in takeType(from: &s) }) else {
+      return .error
+    }
     let output = takeType(from: &source)
     return .functionPointer(inputs: inputs, output: output)
   }
@@ -917,7 +916,9 @@ struct ManglingEncoding: Sendable {
   private static func takeMachineIntegerType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    let width = source.takeInt().map { UInt8(truncatingIfNeeded: $0) } ?? 0
+    guard let width = source.takeInt().map({ UInt8(truncatingIfNeeded: $0) }) else {
+      return .error
+    }
     return .machine(.i(width))
   }
 
