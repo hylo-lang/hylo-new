@@ -1481,14 +1481,17 @@ extension Program {
   /// This method must be called before type checking the standard library.
   internal mutating func initializeStandardLibraryCaches() {
     for n in Program.StandardLibraryEntity.allCases {
-      if let a = identity(module: Module.standardLibraryName),
+      guard
+        let a = identity(module: Module.standardLibraryName),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
-      {
-        standardLibraryDeclarations[n] = d
-      } else if !allowPartialStandardLibrary {
-        fatalError("missing or corrupt standard library")
+      else {
+        if !allowPartialStandardLibrary {
+          fatalError("missing or corrupt standard library")
+        }
+        continue
       }
+      standardLibraryDeclarations[n] = d
     }
   }
 
