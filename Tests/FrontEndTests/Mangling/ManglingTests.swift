@@ -268,7 +268,7 @@ final class ManglingTests: XCTestCase {
     }
   }
 
-  /// Tests that the demangling for a declarations with more generics don't contain errors.
+  /// Tests demangling for declarations with more generics.
   func testDeclarationsWithMoreGenerics() async {
     var p = await TestProgram()
 
@@ -637,7 +637,7 @@ final class ManglingTests: XCTestCase {
     }
   }
 
-  /// Find the first declaration of `m` of type `t`, named `n`, returning its identity, or
+  /// Finds the first declaration of `m` of type `t`, named `n`, returning its identity, or
   /// `nil` if no such declaration exists.
   private func findDeclaration<T: Syntax>(
     _ t: T.Type, named n: String, in m: Module.ID, of program: Program
@@ -645,7 +645,7 @@ final class ManglingTests: XCTestCase {
     findDeclaration(t, in: m, of: program) { $0 == n }
   }
 
-  /// Find the first declaration of `m` of type `t`, that has a name for which `predicate` returns
+  /// Finds the first declaration of `m` of type `t`, that has a name for which `predicate` returns
   /// `true`, returning its identity, or `nil` if no such declaration exists.
   private func findDeclaration<T: Syntax>(
     _ t: T.Type, in m: Module.ID, of program: Program, nameMatching predicate: (String) -> Bool

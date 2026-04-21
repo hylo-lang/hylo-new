@@ -1173,7 +1173,7 @@ struct ManglingEncoding: Sendable {
 extension ScopeIdentity {
 
   /// The mangling symbol corresponding to `self`.
-  fileprivate var asSymbol: ManglingSymbol {
+  fileprivate var asSymbol: MangledSymbol {
     if isFile {
       return .fileScope(self)
     } else {

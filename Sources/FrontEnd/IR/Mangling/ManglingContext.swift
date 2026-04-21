@@ -11,13 +11,13 @@ struct ManglingContext {
   private var stringPosition: [String: Int] = [:]
 
   /// A table mapping mangled symbols to their position in the symbol lookup table.
-  private var symbolPosition: [ManglingSymbol: Int] = [:]
+  private var symbolPosition: [MangledSymbol: Int] = [:]
 
   /// The innermost scope being mangled, if any.
   private var qualification: ScopeIdentity?
 
   /// A table mapping known symbols to their reserved mangled identifier.
-  private var reserved: [ManglingSymbol: ReservedSymbol] = [:]
+  private var reserved: [MangledSymbol: ReservedSymbol] = [:]
 
   /// Object used for printing debugging information during mangling.
   ///
@@ -117,7 +117,7 @@ struct ManglingContext {
   }
 
   /// Records `s` in the symbol lookup table if it is not reserved or already recorded.
-  mutating func record(symbol s: ManglingSymbol, in program: Program) {
+  mutating func record(symbol s: MangledSymbol, in program: Program) {
     if symbolPosition.keys.contains(s) || reserved.keys.contains(s) { return }
     debug.print("- recording \(Self.debugName(symbol: s, in: program)): \(symbolPosition.count)")
     symbolPosition[s] = symbolPosition.count
@@ -132,13 +132,13 @@ struct ManglingContext {
 
   /// If `s` is reserved or has already been inserted in the symbol lookup table, writes a lookup
   /// reference to it and returns `true`. Otherwise, returns `false` without modifying `self`.
-  mutating func addIf(reservedOrRecorded s: ManglingSymbol, in program: Program) -> Bool {
+  mutating func addIf(reservedOrRecorded s: MangledSymbol, in program: Program) -> Bool {
     addIf(reserved: s) || addIf(recorded: s, in: program)
   }
 
   /// Writes a lookup reference to `s` and returns `true` iff `s` is a reserved
   /// mangling symbol. Otherwise, returns `false` without modifying `self`.
-  private mutating func addIf(reserved s: ManglingSymbol) -> Bool {
+  private mutating func addIf(reserved s: MangledSymbol) -> Bool {
     if let r = reserved[s] {
       if case .type = s {
         add(operator: .reservedType)
@@ -155,7 +155,7 @@ struct ManglingContext {
 
   /// Writes a lookup reference to `s` and returns `true` iff `s` in the lookup table. Otherwise,
   /// returns `false` without modifying `self`.
-  private mutating func addIf(recorded s: ManglingSymbol, in program: Program) -> Bool {
+  private mutating func addIf(recorded s: MangledSymbol, in program: Program) -> Bool {
     if let p = symbolPosition[s] {
       if case .type = s {
         add(operator: .lookupType)
@@ -222,7 +222,7 @@ struct ManglingContext {
   }
 
   /// Returns the name of `s` in `program` for debug printing purposes.
-  private static func debugName(symbol s: ManglingSymbol, in program: Program) -> String {
+  private static func debugName(symbol s: MangledSymbol, in program: Program) -> String {
     switch s {
     case .type(let x):
       return "type \(debugName(of: x, in: program))"
