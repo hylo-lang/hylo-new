@@ -22,9 +22,8 @@ extension IRFunction {
   private mutating func addParameter(
     _ p: IRParameter, offset i: Int, to context: inout Transfer.Context
   ) {
-    let t = resolved(p.type)!.type
     context.locals[.parameter(i)] = .place(.root(.parameter(i)))
-    context.memory[.parameter(i)] = .init(type: t, value: .uniform(.unique))
+    context.memory[.parameter(i)] = .init(type: p.type, value: .uniform(.unique))
   }
 
   /// Returns the access instruction from which `i` reborrows, if any.

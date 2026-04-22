@@ -159,7 +159,7 @@ public struct Module: Sendable {
   }
 
   /// The lowered functions and static variables of a module.
-  internal struct IR: Sendable {
+  public struct IR: Sendable {
 
     /// A mapping from a function name to its declaration (and possibly definition).
     internal private(set) var functions: OrderedDictionary<IRFunction.Name, IRFunction>
@@ -219,7 +219,7 @@ public struct Module: Sendable {
   internal private(set) var sources: OrderedDictionary<FileName, SourceContainer> = [:]
 
   /// The IR functions in the module.
-  internal var ir: IR = .init()
+  public internal(set) var ir: IR = .init()
 
   /// Creates an empty module with the given name and identity.
   public init(name: Name, identity: Module.ID) {

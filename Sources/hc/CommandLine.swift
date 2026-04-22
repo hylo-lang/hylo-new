@@ -171,9 +171,7 @@ import Utilities
   private func emitIR(
     _ module: Module.ID, in program: Program, name: Module.Name
   ) throws {
-    let target = irFile(name)
-    let r = program[module].functions.joinedString(separator: "\n") { f in program.show(f) }
-    try write(r, to: target)
+    try write(program.show(program[module].ir), to: irFile(name))
   }
 
   /// Emits the LLVM IR of `module` in `program` with name `name`.

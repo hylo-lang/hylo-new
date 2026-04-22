@@ -35,7 +35,7 @@ extension IRWitnessTable: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "witnesstable \(printer.show(witnessType)) {\(printer.show(operands))}"
+    "witnesstable {\(printer.show(operands))} as \(printer.show(witnessType))"
   }
 
 }

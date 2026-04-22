@@ -16,7 +16,7 @@ public enum DeclarationReference: Hashable, Sendable {
   /// type. The whole expression denotes a function or subscript partially applied to `x`
   case member(DeclarationIdentity)
 
-  /// A reference to a non-static member inherited by conformance or extension.
+  /// A reference to a member inherited by conformance or extension.
   ///
   /// The reference was formed from an expression `x.member` where `member` refers to a symbol
   /// declared in an extension of `x`'s type, or defined as a requirement of a trait to which the
@@ -30,8 +30,8 @@ public enum DeclarationReference: Hashable, Sendable {
 
   /// A reference to a synthetic implementation of a trait requirement.
   ///
-  /// The payload is `true` iff the implementation is transitively synthetic, meaning that it does
-  /// not involve any user code. This property is set during typing.
+  /// The second element of the payload is `true` iff the implementation is transitively synthetic,
+  /// meaning that it does not involve any user code. This property is set during typing.
   case synthetic(DeclarationIdentity, transitively: Bool)
 
   /// `true` iff this referennce mentions open variable.
@@ -44,12 +44,21 @@ public enum DeclarationReference: Hashable, Sendable {
     }
   }
 
-  /// `true` iff `self` is a transitively synthetic implementation of some trait requirement.
+  /// `true` iff `self` is a synthetic implementation of a some trait requirement.
+  public var isSynthetic: Bool {
+    if case .synthetic = self {
+      return true
+    } else {
+      return false
+    }
+  }
+
+  /// `true` iff `self` is a synthetic implementation of some trait requirement that does not
+  /// involve any user code.
   public var isTransitivelySynthethic: Bool {
-    switch self {
-    case .synthetic(_, let t):
+    if case .synthetic(_, let t) = self {
       return t
-    default:
+    } else {
       return false
     }
   }
@@ -71,15 +80,6 @@ public enum DeclarationReference: Hashable, Sendable {
       return 1
     case .inherited(let w, _, _):
       return 1 + w.elaborationCost
-    }
-  }
-
-  /// Returns a copy of `self` in which occurrences of `m` have been substituted for `n`.
-  internal func substituting(_ m: ExpressionIdentity, for n: ExpressionIdentity) -> Self {
-    if case .inherited(let w, let d, let s) = self {
-      return .inherited(w.substituting(m, with: n), d, statically: s)
-    } else {
-      return self
     }
   }
 

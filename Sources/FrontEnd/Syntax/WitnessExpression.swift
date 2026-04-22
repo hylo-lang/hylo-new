@@ -55,7 +55,7 @@ public struct WitnessExpression: Hashable, Sendable {
       }
     }
 
-    /// Returns a copy of `self` in which occurrences of `m` have been substituted for `n`.
+    /// Returns a copy of `self` in which occurrences of `m` have been substituted with `n`.
     internal func substituting(_ m: ExpressionIdentity, with n: ExpressionIdentity) -> Self {
       switch self {
       case .identity(let x):
