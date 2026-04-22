@@ -9,7 +9,7 @@ public struct Program: Sendable {
   public private(set) var modules = OrderedDictionary<Module.Name, Module>()
 
   /// The types in the program.
-  public var types = TypeStore()
+  public internal(set) var types = TypeStore()
 
   /// The memoization caches of type inference and name resolution.
   ///
