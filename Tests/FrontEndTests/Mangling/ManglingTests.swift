@@ -129,20 +129,11 @@ final class ManglingTests: XCTestCase {
       ),
       "B": (StructDeclaration.self, "M0.#.B"),
       "P": (StructDeclaration.self, "M0.#.P"),
-      // TODO (LucTeo): fix this
-      // "ConformanceDeclaration.X": (
-      //   TypeAliasDeclaration.self,
-      //   "M0.#.given M0.#.W<[GenericParameterConformer<M0.#.W, *>: Void]> where .X"
-      // ),
       "W": (TraitDeclaration.self, "M0.#.W"),
       "B.x": (VariableDeclaration.self, "M0.#.B.x"),
       "P.x": (VariableDeclaration.self, "M0.#.P.x"),
       "P.y": (VariableDeclaration.self, "M0.#.P.y"),
       "g.x": (VariableDeclaration.self, "M0.#.fun g: [Void]() let -> Void.x"),
-      // TODO (LucTeo): fix this
-      // "g.FunctionDeclaration.b": (
-      //   VariableDeclaration.self, "M0.#.fun g: [Void]() let -> Void.$anonymous.b"
-      // ),
       "f.f@let": (
         VariantDeclaration.self,
         "M0.#.fun bundle f: bundle<[Void](Hylo.Int64) auto -> Hylo.Int64, [let, inout]>.let"
@@ -155,8 +146,11 @@ final class ManglingTests: XCTestCase {
 
     // Substring match test cases.
     let expected2: [String: (any Syntax.Type, String)] = [
-      // TODO (LucTeo): fix this
-      // "B.$": (BindingDeclaration.self, "M0.#.B.[x]"),
+      ">.X": (
+        TypeAliasDeclaration.self,
+        "M0.#.given M0.#.W<[GenericParameterConformer<M0.#.W, *>: Void]> where .X"
+      ),
+      "B.x": (BindingDeclaration.self, "M0.#.B.[x]"),
       "$<ConformanceDeclaration at": (
         ConformanceDeclaration.self,
         "M0.#.given M0.#.W<[GenericParameterConformer<M0.#.W, *>: Void]> where "
@@ -164,6 +158,9 @@ final class ManglingTests: XCTestCase {
       "$<ExtensionDeclaration at": (
         ExtensionDeclaration.self,
         "M0.#.extension <GenericParameterUser<...T, *>> (Void, GenericParameterUser<...T, *>, Void) where "
+      ),
+      ">.b": (
+        VariableDeclaration.self, "M0.#.fun g: [Void]() let -> Void.$anonymous.b"
       ),
     ]
 
