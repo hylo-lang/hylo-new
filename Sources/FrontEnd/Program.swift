@@ -23,10 +23,12 @@ public struct Program: Sendable {
   private var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
 
   /// `true` iff the program is allowed to have an only partially loaded standard library.
-  public var allowPartialStandardLibrary: Bool = false
+  private var allowPartialStandardLibrary: Bool = false
 
   /// Creates an empty program.
-  public init() {}
+  public init(allowPartialStandardLibrary: Bool = false) {
+    self.allowPartialStandardLibrary = allowPartialStandardLibrary
+  }
 
   /// `true` if the program has errors.
   public var containsError: Bool {

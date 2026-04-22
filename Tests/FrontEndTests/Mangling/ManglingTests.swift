@@ -673,8 +673,7 @@ final class ManglingTests: XCTestCase {
 
     /// An instance with a minimal standard library, ready for testing.
     init() async {
-      self.base = .init()
-      base.allowPartialStandardLibrary = true
+      self.base = .init(allowPartialStandardLibrary: true)
       self.standardLibraryModule = base.demandModule(Module.standardLibraryName)
       _ = base[standardLibraryModule].addSource(
         """
