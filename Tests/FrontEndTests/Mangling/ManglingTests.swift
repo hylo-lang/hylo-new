@@ -8,7 +8,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of all kinds of types.
   func testTypes() async {
-    var p = await TestProgram()
+    var p = await Program.testProgramWithMinimalStandardLibrary()
 
     let m0 = p.addModule(
       named: "M0",
@@ -29,33 +29,34 @@ final class ManglingTests: XCTestCase {
           case two(x: sink T)
         }
         """)
-    await p.typeCheck(m0)
+    p = await p.typeChecked()
+    failIfContainsError(p)
 
-    testReservedTypesMangling(program: &p.base)
-    testCoreTypesMangling(program: &p.base)
-    testArrowTypeMangling(program: &p.base)
-    testAssociatedTypeMangling(module: m0, program: &p.base)
-    testEnumTypeMangling(module: m0, program: &p.base)
-    testEqualityWitnessMangling(program: &p.base)
-    testFunctionPointerMangling(program: &p.base)
-    testGenericParameterMangling(module: m0, program: &p.base)
-    testImplicationTypeMangling(program: &p.base)
-    testLiteralTypeMangling(program: &p.base)
-    testMachineTypeMangling(program: &p.base)
-    testMetakindTypeMangling(program: &p.base)
-    testOpaqueEnvironmentTypeMangling(module: m0, program: &p.base)
-    testRemoteTypeMangling(program: &p.base)
-    testStructTypeMangling(module: m0, program: &p.base)
-    testTraitTypeMangling(module: m0, program: &p.base)
-    testTupleTypeMangling(program: &p.base)
-    testTypeApplicationMangling(module: m0, program: &p.base)
-    testUniversalTypeMangling(program: &p.base)
-    testTypeAliasMangling(module: m0, program: &p.base)
+    testReservedTypesMangling(program: &p)
+    testCoreTypesMangling(program: &p)
+    testArrowTypeMangling(program: &p)
+    testAssociatedTypeMangling(module: m0, program: &p)
+    testEnumTypeMangling(module: m0, program: &p)
+    testEqualityWitnessMangling(program: &p)
+    testFunctionPointerMangling(program: &p)
+    testGenericParameterMangling(module: m0, program: &p)
+    testImplicationTypeMangling(program: &p)
+    testLiteralTypeMangling(program: &p)
+    testMachineTypeMangling(program: &p)
+    testMetakindTypeMangling(program: &p)
+    testOpaqueEnvironmentTypeMangling(module: m0, program: &p)
+    testRemoteTypeMangling(program: &p)
+    testStructTypeMangling(module: m0, program: &p)
+    testTraitTypeMangling(module: m0, program: &p)
+    testTupleTypeMangling(program: &p)
+    testTypeApplicationMangling(module: m0, program: &p)
+    testUniversalTypeMangling(program: &p)
+    testTypeAliasMangling(module: m0, program: &p)
   }
 
   /// Tests the mangling and demangling of specific declarations.
   func testSpecificDeclarations() async {
-    var p = await TestProgram()
+    var p = await Program.testProgramWithMinimalStandardLibrary()
 
     let m0 = p.addModule(
       named: "M0",
@@ -103,7 +104,8 @@ final class ManglingTests: XCTestCase {
         }
 
         """)
-    await p.typeCheck(m0)
+    p = await p.typeChecked()
+    failIfContainsError(p)
 
     // Exact match test cases.
     let expected: [String: (any Syntax.Type, String)] = [
@@ -166,30 +168,30 @@ final class ManglingTests: XCTestCase {
     ]
 
     for (n, (t, r)) in expected {
-      guard let d = findDeclaration(t, named: n, in: m0, of: p.base) else {
+      guard let d = findDeclaration(t, named: n, in: m0, of: p) else {
         XCTFail("unable to find declaration \(n)")
         continue
       }
-      assertManglingOf(declaration: d, in: p.base, is: r)
+      assertManglingOf(declaration: d, in: p, is: r)
     }
     for (n, (t, r)) in expected2 {
       guard
         let d = findDeclaration(
-          t, in: m0, of: p.base,
+          t, in: m0, of: p,
           nameMatching: { (name) in name.contains(n) }
         )
       else {
         XCTFail("unable to find declaration with name containing \(n)")
         continue
       }
-      assertManglingOf(declaration: d, in: p.base, is: r)
+      assertManglingOf(declaration: d, in: p, is: r)
     }
 
   }
 
   /// Tests that the demangling for a selection of declarations don't contain errors.
   func testDeclarationsSelection() async {
-    var p = await TestProgram()
+    var p = await Program.testProgramWithMinimalStandardLibrary()
 
     let m0 = p.addModule(
       named: "M0",
@@ -261,16 +263,17 @@ final class ManglingTests: XCTestCase {
           let g = fun (a: Int) -> Void {}
         }
         """)
-    await p.typeCheck(m0)
+    p = await p.typeChecked()
+    failIfContainsError(p)
 
-    for d in p.base[m0].topLevelDeclarations {
-      assertDemanglingIsOk(mangled: p.base.mangled(d))
+    for d in p[m0].topLevelDeclarations {
+      assertDemanglingIsOk(mangled: p.mangled(d))
     }
   }
 
   /// Tests demangling for declarations with more generics.
   func testDeclarationsWithMoreGenerics() async {
-    var p = await TestProgram()
+    var p = await Program.testProgramWithMinimalStandardLibrary()
 
     let m0 = p.addModule(
       named: "M0",
@@ -296,16 +299,17 @@ final class ManglingTests: XCTestCase {
           let y: T.X = x
         }
         """)
-    await p.typeCheck(m0)
+    p = await p.typeChecked()
+    failIfContainsError(p)
 
-    for d in p.base[m0].topLevelDeclarations {
-      assertDemanglingIsOk(mangled: p.base.mangled(d))
+    for d in p[m0].topLevelDeclarations {
+      assertDemanglingIsOk(mangled: p.mangled(d))
     }
   }
 
   /// Tests mangling and demangling in cases where entity lookup is used internally.
   func testReuseScopes() async {
-    var p = await TestProgram()
+    var p = await Program.testProgramWithMinimalStandardLibrary()
 
     let m0 = p.addModule(
       named: "M0",
@@ -328,7 +332,8 @@ final class ManglingTests: XCTestCase {
         }
 
         """)
-    await p.typeCheck(m0)
+    p = await p.typeChecked()
+    failIfContainsError(p)
 
     let expected: [String: (any Syntax.Type, String)] = [
       "A.X": (StructDeclaration.self, "M0.#.A.X"),
@@ -346,11 +351,11 @@ final class ManglingTests: XCTestCase {
     ]
 
     for (n, (t, r)) in expected {
-      guard let d = findDeclaration(t, named: n, in: m0, of: p.base) else {
+      guard let d = findDeclaration(t, named: n, in: m0, of: p) else {
         XCTFail("unable to find declaration \(n)")
         continue
       }
-      assertManglingOf(declaration: d, in: p.base, is: r)
+      assertManglingOf(declaration: d, in: p, is: r)
     }
   }
 
@@ -662,72 +667,15 @@ final class ManglingTests: XCTestCase {
     return nil
   }
 
-  /// A test program with a minimal standard library.
-  struct TestProgram {
 
-    /// The base program.
-    var base: Program
-
-    /// The identity of the standard library module in `base`.
-    let standardLibraryModule: Module.ID
-
-    /// An instance with a minimal standard library, ready for testing.
-    init() async {
-      self.base = .init(allowPartialStandardLibrary: true)
-      self.standardLibraryModule = base.demandModule(Module.standardLibraryName)
-      _ = base[standardLibraryModule].addSource(
-        """
-        @_symbol("Bool")
-        public struct Bool {
-
-          public memberwise init
-
-        }
-
-        @_symbol("Int")
-        public struct Int {
-
-          public memberwise init
-
-        }
-
-        @_symbol("Int64")
-        public struct Int64 {
-
-          public memberwise init
-
-        }
-        """)
-      await typeCheck(standardLibraryModule)
-    }
-
-    /// Adds a new module named `name` with source `source` to `base`, making it depend on the
-    /// standard library, and returns its identity.
-    mutating func addModule(named name: String, source: SourceFile) -> Module.ID {
-      let m = base.demandModule(Module.Name(name))
-      _ = base[m].addSource(source)
-      base[m].addDependency(Module.standardLibraryName)
-      return m
-    }
-
-    /// Type checks `m`, failing the tests if that contains an error.
-    mutating func typeCheck(_ m: Module.ID) async {
-      await base.assignScopes(m)
-      failIfContainsError(m)
-      base.assignTypes(m, loggingInferenceWhere: nil)
-      failIfContainsError(m)
-    }
-
-    /// Fail the tests if `m` contains errors.
-    private func failIfContainsError(_ m: Module.ID) {
-      if base[m].containsError {
-        for d in base[m].diagnostics {
-          print(d)
-        }
-        XCTFail("Unexpected error(s) in module \(base[m].name): \(base[m].diagnostics)")
+  /// Fail the tests if `p` contains errors.
+  private func failIfContainsError(_ p: Program) {
+    if p.containsError {
+      for d in p.diagnostics {
+        print(d)
       }
+      XCTFail("Unexpected error(s) in test program: \(p.diagnostics)")
     }
-
   }
 
 }
