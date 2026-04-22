@@ -94,7 +94,7 @@ doesn't just use its description but is interested in the specific error type.
 - Prefer value types. Reference types (`class`) are appropriate only for identity, shared mutable state, or non-copyable
   resources—document why.
 
-## Naming
+## Naming and API design
 
 - Name mutating methods with imperative verb phrases; name nonmutating variants with past participle or `ing` forms.
 - No abbreviations in APIs unless universally known (e.g. `URL`, `ID`).
@@ -105,6 +105,7 @@ doesn't just use its description but is interested in the specific error type.
   `i`/`j` for indices.
 - When naming a collection of objects, use a plural form (even in case of short names): `files`, `xs`, `ms`.
 - Prefer descriptive labels over `for` as a parameter label.
+- Add explicit access specifiers to declarations, hiding as much as possible, unless there is a good reason to expose something. Exposing previously private details should be discussed during reviews.
 
 ## Testing
 
