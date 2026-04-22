@@ -536,7 +536,7 @@ struct ManglingEncoding: Sendable {
       output.add(operator: .synthesizedFunctionDeclaration)
       append(decl: d, to: &output)
       append(typeArguments: a, to: &output)
-    case .initializer, .existentialized:
+    case .initializer, .existentialized, .implementation:
       // TODO (LucTeo): Implement these
       break
     }
