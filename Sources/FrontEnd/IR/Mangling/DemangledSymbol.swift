@@ -119,8 +119,17 @@ public indirect enum DemangledEntity: Hashable, Sendable {
   /// A function bundle declaration.
   case functionBundleDeclaration(name: Name, type: DemangledType)
 
+  /// An initializer.
+  case initializer(DemangledEntity)
+
   /// A synthesized function.
   case synthesizedFunction(DemangledEntity, [DemangledType.TypeApplicationArgument])
+
+  /// An implementation IR function.
+  case implementation(DemangledEntity, DemangledEntity, [DemangledType.TypeApplicationArgument])
+
+  /// An existentialized declaration.
+  case existentialized(DemangledEntity)
 
   /// A variant.
   case variant(AccessEffect)
@@ -172,9 +181,16 @@ extension DemangledEntity: CustomStringConvertible {
       return "\(isStatic ? "static " : "")fun \(name): \(type)"
     case .functionBundleDeclaration(let name, let type):
       return "fun bundle \(name): \(type)"
+    case .initializer(let e):
+      return "init \(e)"
     case .synthesizedFunction(let e, let arguments):
       let args = arguments.map { "[\($0.formal): \($0.argument)]" }.joined(separator: ", ")
       return "\(e)<\(args)>"
+    case .implementation(let e, let c, let a):
+      let args = a.map { "[\($0.formal): \($0.argument)]" }.joined(separator: ", ")
+      return "\(e) implements \(c)<\(args)>"
+    case .existentialized(let e):
+      return "some \(e)"
     case .variant(let e):
       return "\(e)"
     case .qualified(let head, let previous):

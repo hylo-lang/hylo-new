@@ -139,8 +139,14 @@ struct ManglingEncoding: Sendable {
           demangled = takeStaticFunctionDeclaration(from: &source)
         case .functionBundleDeclaration:
           demangled = takeFunctionBundleDeclaration(from: &source)
+        case .initializerDeclaration:
+          demangled = takeInitializerDeclaration(from: &source)
         case .synthesizedFunctionDeclaration:
           demangled = takeSynthesizedFunctionDeclaration(from: &source)
+        case .implementationDeclaration:
+          demangled = takeImplementationDeclaration(from: &source)
+        case .existentializedDeclaration:
+          demangled = takeExistentializedDeclaration(from: &source)
         case .genericParameterDeclaration:
           demangled = takeUnqualifiedEntity(from: &source)
         case .importDeclaration:
@@ -528,18 +534,40 @@ struct ManglingEncoding: Sendable {
   private mutating func append(
     function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
   ) {
-    switch program[m].ir[s].name {
+    append(function: program[m].ir[s].name, of: m, to: &output)
+  }
+
+  /// Writes the mangled representation of `s` defined in `m`, to `output`.
+  private mutating func append(
+    function s: IRFunction.Name, of m: Module.ID, to output: inout ManglingContext
+  ) {
+    switch s {
     case .lowered(let d):
       // Note: no symbol needed; we assume it's a lowered function.
       append(decl: d, to: &output)
+    case .initializer(let d):
+      output.add(operator: .initializerDeclaration)
+      append(unqualified: d, to: &output)
     case .synthesized(let d, let a):
       output.add(operator: .synthesizedFunctionDeclaration)
       append(decl: d, to: &output)
       append(typeArguments: a, to: &output)
-    case .initializer, .existentialized, .implementation:
-      // TODO (LucTeo): Implement these
-      break
+    case .implementation(let d, let c, let a):
+      output.add(operator: .implementationDeclaration)
+      append(decl: d, to: &output)
+      append(conformance: c, to: &output)
+      append(typeArguments: a, to: &output)
+    case .existentialized(let s):
+      output.add(operator: .existentializedDeclaration)
+      append(function: s, of: m, to: &output)
     }
+  }
+
+  /// Demangles an initializer declaration from `source`.
+  private static func takeInitializerDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    .initializer(takeEntity(from: &source))
   }
 
   /// Demangles a synthesized function declaration from `source`.
@@ -549,6 +577,23 @@ struct ManglingEncoding: Sendable {
     let e = takeEntity(from: &source)
     let a = takeTypeArguments(from: &source)
     return .synthesizedFunction(e, a)
+  }
+
+  /// Demangles an implementation declaration from `source`.
+  private static func takeImplementationDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    let e = takeEntity(from: &source)
+    let c = takeConformanceDeclaration(from: &source)
+    let a = takeTypeArguments(from: &source)
+    return .implementation(e, c, a)
+  }
+
+  /// Demangles an existentialized declaration from `source`.
+  private static func takeExistentializedDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    .existentialized(takeEntity(from: &source))
   }
 
   /// Writes the mangled representation of `s` to `output`.

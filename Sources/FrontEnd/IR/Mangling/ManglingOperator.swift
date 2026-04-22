@@ -50,8 +50,17 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a function bundle declaration symbol.
   case functionBundleDeclaration = "bF"
 
+  /// Starts an initializer declaration symbol.
+  case initializerDeclaration = "iF"
+
   /// Starts a synthesized function declaration symbol.
   case synthesizedFunctionDeclaration = "xF"
+
+  /// Starts a function implementation declaration symbol.
+  case implementationDeclaration = "mF"
+
+  /// Starts an existentialized function declaration symbol.
+  case existentializedDeclaration = "eF"
 
   /// Starts a generic parameter declaration symbol.
   case genericParameterDeclaration = "G"
@@ -193,8 +202,9 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
     case .lookup, .lookupRelative, .reserved, .associatedTypeDeclaration, .enumCaseDeclaration,
       .enumDeclaration, .bindingDeclaration, .conformanceDeclaration, .extensionDeclaration,
       .importDeclaration, .functionDeclaration, .staticFunctionDeclaration,
-      .functionBundleDeclaration,
-      .synthesizedFunctionDeclaration, .genericParameterDeclaration, .parameterDeclaration,
+      .functionBundleDeclaration, .initializerDeclaration,
+      .synthesizedFunctionDeclaration, .implementationDeclaration, .existentializedDeclaration,
+      .genericParameterDeclaration, .parameterDeclaration,
       .structDeclaration, .typealiasDeclaration, .traitDeclaration, .variableDeclaration,
       .variantDeclaration, .anonymousScope, .module, .translationUnit, .virtualTranslationUnit:
       return true
