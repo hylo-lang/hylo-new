@@ -155,7 +155,7 @@ struct ManglingEncoding: Sendable {
           demangled = takeUnqualifiedEntity(from: &source)
         case .structDeclaration:
           demangled = takeUnqualifiedEntity(from: &source)
-        case .typealiasDeclaration:
+        case .typeAliasDeclaration:
           demangled = takeUnqualifiedEntity(from: &source)
         case .traitDeclaration:
           demangled = takeUnqualifiedEntity(from: &source)
@@ -266,7 +266,7 @@ struct ManglingEncoding: Sendable {
     case TraitDeclaration.self:
       output.add(operator: .traitDeclaration)
     case TypeAliasDeclaration.self:
-      output.add(operator: .typealiasDeclaration)
+      output.add(operator: .typeAliasDeclaration)
     case VariableDeclaration.self:
       output.add(operator: .variableDeclaration)
     default:

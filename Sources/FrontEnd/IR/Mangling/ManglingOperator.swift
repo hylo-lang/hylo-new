@@ -1,7 +1,5 @@
-import Utilities
-
 /// Short identifier specifying how to interpret the next fragment of mangled data.
-public enum ManglingOperator: String, CaseIterable, Sendable {
+enum ManglingOperator: String, CaseIterable, Sendable {
 
   // Convention: operator strings are matching regex "[a-z]*[A-Z]"
 
@@ -72,7 +70,7 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
   case structDeclaration = "S"
 
   /// Starts a typealias declaration symbol.
-  case typealiasDeclaration = "A"
+  case typeAliasDeclaration = "A"
 
   /// Starts a trait declaration symbol.
   case traitDeclaration = "C"
@@ -204,7 +202,7 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
       .functionBundleDeclaration, .initializerDeclaration,
       .synthesizedFunctionDeclaration, .implementationDeclaration, .existentializedDeclaration,
       .genericParameterDeclaration, .parameterDeclaration,
-      .structDeclaration, .typealiasDeclaration, .traitDeclaration, .variableDeclaration,
+      .structDeclaration, .typeAliasDeclaration, .traitDeclaration, .variableDeclaration,
       .variantDeclaration, .anonymousScope, .module, .translationUnit, .virtualTranslationUnit:
       return true
     default:
@@ -232,7 +230,7 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
 
 extension ManglingOperator: TextOutputStreamable {
 
-  public func write<T: TextOutputStream>(to output: inout T) {
+  func write<T: TextOutputStream>(to output: inout T) {
     output.write(rawValue)
   }
 

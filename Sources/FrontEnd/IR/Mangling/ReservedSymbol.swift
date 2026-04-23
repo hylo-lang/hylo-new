@@ -23,7 +23,7 @@ enum ReservedSymbol: UInt8 {
 
 extension ReservedSymbol: TextOutputStreamable {
 
-  public func write<T: TextOutputStream>(to output: inout T) {
+  func write<T: TextOutputStream>(to output: inout T) {
     output.write(Base64Digit(rawValue: rawValue)!.description)
   }
 

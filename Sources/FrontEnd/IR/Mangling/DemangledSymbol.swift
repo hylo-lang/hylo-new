@@ -1,10 +1,10 @@
 /// The demangled description of an entity.
-public indirect enum DemangledSymbol: Hashable, Sendable {
+indirect enum DemangledSymbol: Hashable, Sendable {
 
   /// An instance decoding the symbol mangled in `s`.
   ///
   /// May produce an error if the mangled string is malformed.
-  public init(_ s: String) {
+  init(_ s: String) {
     if let x = String(assemblySanitized: s) {
       var source = DemanglingContext(stream: x[...])
       self = ManglingEncoding.demangle(from: &source)
@@ -84,7 +84,7 @@ extension DemangledSymbol: CustomStringConvertible {
 }
 
 /// The payload of a `DemangledSymbol.entity`.
-public indirect enum DemangledEntity: Hashable, Sendable {
+indirect enum DemangledEntity: Hashable, Sendable {
 
   /// A reference to the innermost enclosing entity.
   case relative
@@ -141,7 +141,7 @@ public indirect enum DemangledEntity: Hashable, Sendable {
   case error
 
   /// An instance representing a core type declaration.
-  public init(coreType: String) {
+  init(coreType: String) {
     self = .qualified(head: .scope(coreType), previous: .hylo)
   }
 
@@ -203,7 +203,7 @@ extension DemangledEntity: CustomStringConvertible {
 }
 
 /// The payload of a `DemangledSymbol.type`.
-public indirect enum DemangledType: Hashable, Sendable {
+indirect enum DemangledType: Hashable, Sendable {
 
   /// An error encountered during demangling of a type.
   case error
@@ -292,7 +292,7 @@ public indirect enum DemangledType: Hashable, Sendable {
   case universalType(parameters: [DemangledType], head: DemangledType)
 
   /// A type application argument.
-  public struct TypeApplicationArgument: Hashable, Sendable {
+  struct TypeApplicationArgument: Hashable, Sendable {
 
     /// The formal parameter.
     let formal: DemangledType
@@ -303,7 +303,7 @@ public indirect enum DemangledType: Hashable, Sendable {
   }
 
   /// A parameter of a callable symbol.
-  public struct Parameter: Hashable, Sendable {
+  struct Parameter: Hashable, Sendable {
 
     /// The parameter label, if any.
     let label: String?

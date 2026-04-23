@@ -5,7 +5,7 @@ import Archivist
 public struct Kind: Sendable {
 
   /// The type of a kind's raw value.
-  public typealias RawValue = UInt32
+  internal typealias RawValue = UInt32
 
   /// Creates an instance with the given raw value.
   internal init(rawValue: RawValue) {
@@ -18,7 +18,7 @@ public struct Kind: Sendable {
   /// `0` denotes the kind of proper types and `1` denotes an arrow whose right-hand and left-hand
   /// sides are serialized next, in that order. For instance, the value `0010011` denotes the kind
   /// `(* -> *) -> (* -> *)`.
-  public let rawValue: RawValue
+  internal let rawValue: RawValue
 
   /// If `self` is an arrow, returns its left-hand and right-hand sides.
   public var arrow: (lhs: Kind, rhs: Kind)? {
