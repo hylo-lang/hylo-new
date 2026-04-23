@@ -1,7 +1,7 @@
 /// An unsigned integer whose textual representation uses a variable-length code in base 64.
 ///
 /// The textual representation of a `Base64VarUInt` is satisfies the following properties:
-/// * Small values use fewer characters than larger values.
+/// * Smaller values use fewer or equal number of characters than larger values.
 /// * The length of the representation can be determined by looking at just the first character.
 ///
 /// The textual representation of `v` is composed of 1 to `n` ASCII characters (`0 < n < 12`),
@@ -15,7 +15,7 @@ public struct Base64VarUInt: Hashable {
   /// The value of the digit, in the range `0 ..< UInt64.max`.
   public let rawValue: UInt64
 
-  /// Creates an instance from its.
+  /// Creates an instance representing `n`.
   ///
   /// - Requires: `n >= 0`
   public init<T: BinaryInteger>(_ n: T) {
@@ -44,6 +44,7 @@ extension Base64VarUInt: Comparable {
 
 extension Base64VarUInt: TextOutputStreamable {
 
+  /// Writes the base-64 representation of `self` to `output`.
   public func write<T: TextOutputStream>(to output: inout T) {
     if rawValue < 51 {
       output.write(Base64Digit(rawValue)!.description)
@@ -78,6 +79,7 @@ extension Base64VarUInt: TextOutputStreamable {
 
 extension Base64VarUInt: LosslessStringConvertible {
 
+  /// Creates a new instance by parsing its base-64 representation.
   public init?(_ description: String) {
     guard
       let (d, i) = Self.decode(from: description),
@@ -86,6 +88,7 @@ extension Base64VarUInt: LosslessStringConvertible {
     self = d
   }
 
+  /// The base-64 representation.
   public var description: String {
     var s = ""
     write(to: &s)

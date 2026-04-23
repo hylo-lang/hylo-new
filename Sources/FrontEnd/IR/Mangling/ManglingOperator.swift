@@ -137,9 +137,8 @@ public enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a metatype type.
   case metatypeType = "mT"
 
-  /// Starts a module type.
+  /// Starts an opaque environment type.
   case opaqueEnvironmentType = "oeT"
-
   /// Starts a remote type.
   case remoteType = "rT"
 

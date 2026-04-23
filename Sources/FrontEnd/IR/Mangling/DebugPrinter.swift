@@ -3,8 +3,7 @@
 internal struct DebugPrinter {
 
   /// Whether to print debug information at all.
-  public let enabled: Bool
-
+  internal let enabled: Bool
   /// The current indentation level.
   private var indentation: Int = 0
 

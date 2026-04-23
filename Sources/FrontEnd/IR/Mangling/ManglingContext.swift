@@ -5,7 +5,7 @@
 struct ManglingContext {
 
   /// The mangled string being built.
-  public private(set) var output: String
+  internal private(set) var output: String
 
   /// A table mapping mangled strings to their position in the string lookup table.
   private var stringPosition: [String: Int] = [:]
@@ -153,8 +153,8 @@ struct ManglingContext {
     }
   }
 
-  /// Writes a lookup reference to `s` and returns `true` iff `s` in the lookup table. Otherwise,
-  /// returns `false` without modifying `self`.
+  /// Writes a lookup reference to `s` and returns `true` iff `s` is in the lookup table.
+  /// Otherwise, returns `false` without modifying `self`.
   private mutating func addIf(recorded s: MangledSymbol, in program: Program) -> Bool {
     if let p = symbolPosition[s] {
       if case .type = s {
@@ -185,6 +185,8 @@ struct ManglingContext {
   mutating func writing(
     decl d: DeclarationIdentity, program: Program, _ action: (_ source: inout Self) -> Void
   ) {
+    // `withScope` needs access to `debug`, but only at its beginning and end. 
+    // It guarantees the invariants of the type in the middle, so it's safe for it to be reentrant through `me`.
     withUnsafeMutablePointer(to: &self) { (me) in
       me.pointee.debug.withScope("write decl: \(program.debugName(of: d))") {
         action(&me.pointee)

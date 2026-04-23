@@ -1220,9 +1220,9 @@ extension ScopeIdentity {
   /// The mangling symbol corresponding to `self`.
   fileprivate var asSymbol: MangledSymbol {
     if isFile {
-      return .fileScope(self)
+      .fileScope(self)
     } else {
-      return .node(node!)
+      .node(node!)
     }
   }
 }
