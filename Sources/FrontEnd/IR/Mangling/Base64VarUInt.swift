@@ -1,6 +1,6 @@
 /// An unsigned integer whose textual representation uses a variable-length code in base 64.
 ///
-/// The textual representation of a `Base64VarUInt` is satisfies the following properties:
+/// The textual representation of a `Base64VarUInt` satisfies the following properties:
 /// * Smaller values use fewer or equal number of characters than larger values.
 /// * The length of the representation can be determined by looking at just the first character.
 ///
