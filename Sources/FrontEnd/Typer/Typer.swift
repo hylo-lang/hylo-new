@@ -861,7 +861,7 @@ public struct Typer {
     }
   }
 
-  /// Returns `true` iff there exists a buil-in conformance of `conformer` to `concept`.
+  /// Returns `true` iff there exists a built-in conformance of `conformer` to `concept`.
   private mutating func isBuiltin(
     conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity
   ) -> Bool {
@@ -878,7 +878,7 @@ public struct Typer {
   }
 
   /// The result of a structural conformance lookup.
-  private enum StructualConformanceLookupResult {
+  private enum StructuralConformanceLookupResult {
 
     /// No structural conformance.
     case failure
@@ -906,7 +906,7 @@ public struct Typer {
   private mutating func structurallyConforms(
     storageOf conformer: AnyTypeIdentity, to concept: TraitDeclaration.ID,
     in scopeOfUse: ScopeIdentity
-  ) -> StructualConformanceLookupResult {
+  ) -> StructuralConformanceLookupResult {
     guard let parts = storage(of: conformer) else { return .failure }
 
     var isTriviallySynthetic = true
@@ -929,7 +929,7 @@ public struct Typer {
   private mutating func structurallyConforms(
     _ conformer: Tuple.ID, to concept: TraitDeclaration.ID,
     in scopeOfUse: ScopeIdentity
-  ) -> StructualConformanceLookupResult {
+  ) -> StructuralConformanceLookupResult {
     switch program.types[conformer] {
     case .cons(let head, let tail):
       return
@@ -946,7 +946,7 @@ public struct Typer {
   private mutating func isDerivable(
     conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity,
     in scopeOfUse: ScopeIdentity
-  ) -> StructualConformanceLookupResult {
+  ) -> StructuralConformanceLookupResult {
     assert(isStructurallySynthesizable(conformanceTo: concept))
     if program.types[conformer] is MachineType {
       return .success(true)
@@ -1653,7 +1653,7 @@ public struct Typer {
 
   /// Computes the types of the given context parameters, introducing them in order.
   private mutating func initializeContext(_ parameters: ContextParameters) {
-    // Parameters are pushed onto the stack and removed after they have been visted so that, given
+    // Parameters are pushed onto the stack and removed after they have been visited so that, given
     // two parameters `p` and `q` such that `q` occurs after `p`, resolution can't "see" `q` while
     // it is computing the type of `p`.
     declarationsOnStack.formUnion(parameters.usings)
@@ -1814,7 +1814,7 @@ public struct Typer {
     program[p.module].setType(t, for: p)
   }
 
-  /// Returns `true` iff the argument labels occuring in `p` are compatible with those of `d`.
+  /// Returns `true` iff the argument labels occurring in `p` are compatible with those of `d`.
   private func labelsCompatible(_ lhs: ExtractorPattern.ID, _ rhs: [Parameter]) -> Bool {
     program[lhs].elements.elementsEqual(rhs) { (l, r) in
       (l.label == nil) || (l.label?.value == r.label)
@@ -2938,7 +2938,7 @@ public struct Typer {
       u = program.types.substituteVariableForError(in: u)
       program[n.module].setType(u, for: n)
 
-      // The uncheked cast is okay because type of an identity is irrelevant.
+      // The unchecked cast is okay because type of an identity is irrelevant.
       cache.declarationToTentativeType[.init(uncheckedFrom: n)] = nil
     }
 
@@ -4587,7 +4587,7 @@ public struct Typer {
 
   /// Returns `true` iff `t` is a standard library integer type (e.g., `Hylo.Int`).
   ///
-  /// The module containing the standard library must have been loaded in the `self.progam`, or
+  /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
     guard program.containsStandardLibrary else { return false }
@@ -4606,7 +4606,7 @@ public struct Typer {
   /// Unlike `Program.standardLibraryType(_:)`, this method may be called while `self` is typing
   /// the standard library (i.e., when `self.module` is the standard library).
   ///
-  /// The module containing the standard library must have been loaded in the `self.progam`, or
+  /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func standardLibraryType(
     _ n: Program.StandardLibraryEntity

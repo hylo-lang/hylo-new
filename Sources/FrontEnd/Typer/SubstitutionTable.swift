@@ -16,7 +16,7 @@ public struct SubstitutionTable: Hashable, Sendable {
     types.isEmpty
   }
 
-  /// The key/value pairs in this table, orderd by keys.
+  /// The key/value pairs in this table, ordered by keys.
   internal var assignments: [(key: TypeVariable.ID, value: AnyTypeIdentity)] {
     types.sorted(by: \.key.erased.bits)
   }

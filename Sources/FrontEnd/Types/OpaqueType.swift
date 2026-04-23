@@ -1,6 +1,6 @@
 import Archivist
 
-/// A type whose definition is abtract in sources but known to the compiler.
+/// A type whose definition is abstract in sources but known to the compiler.
 @Archivable
 public enum OpaqueType: TypeTree {
 

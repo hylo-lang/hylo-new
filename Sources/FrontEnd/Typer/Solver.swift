@@ -43,14 +43,14 @@ internal struct Solver {
 
   /// A mapping from an expression to its elaboration.
   ///
-  /// This map is monotonically extended when inference determines that an exression should be
+  /// This map is monotonically extended when inference determines that an expression should be
   /// coerced or desugared.
   private var elaborations: [(ExpressionIdentity, WitnessExpression)] = []
 
   /// A table from call expression to its arguments after elaboration.
   private var argumentElaborations: [(Call.ID, ParameterBindings)] = []
 
-  /// The current identation level for logging message, or `-1` if logging is disabled.
+  /// The current indentation level for logging message, or `-1` if logging is disabled.
   private var indentation: Int
 
   /// Creates an instance for discharging `obligations`, logging a trace of inference steps iff
@@ -697,7 +697,7 @@ internal struct Solver {
   }
 
   /// Reschedules `g` to be solved once the solver has inferred more information about at least one
-  /// of the free variables occuring in `g`.
+  /// of the free variables occurring in `g`.
   private mutating func postpone(_ g: GoalIdentity) -> GoalOutcome {
     stale.append(g)
     return .pending
@@ -710,7 +710,7 @@ internal struct Solver {
     }
   }
 
-  /// Returns the result of calling `action` on a projection of `self` where `identation` has been
+  /// Returns the result of calling `action` on a projection of `self` where `indentation` has been
   /// incremented if logging is enabled.
   private mutating func indenting<T>(_ action: (inout Self) -> T) -> T {
     if indentation < 0 {

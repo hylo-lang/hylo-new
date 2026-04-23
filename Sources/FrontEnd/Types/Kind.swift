@@ -34,7 +34,7 @@ public struct Kind: Sendable {
   }
 
   /// Returns the number of bits in the part of `self` identified by `component`, which is a bit
-  /// mask identifiying the least significant bit of `self` or a part thereof.
+  /// mask identifying the least significant bit of `self` or a part thereof.
   private func bitWidth(component m: RawValue) -> Int {
     if (rawValue & m) == 0 {
       return 1

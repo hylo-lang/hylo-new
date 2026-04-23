@@ -24,7 +24,7 @@ extension IRFunction {
     var work: [IRBlock.ID] = .init(minimumCapacity: blocks.count)
     /// The set of basic blocks that have been visited.
     var visited: IRBlockSet = .init()
-    /// A map from slide block to a yield instruction in one of its preceeding ramp blocks.
+    /// A map from slide block to a yield instruction in one of its preceding ramp blocks.
     var slide: SortedDictionary<IRBlock.ID, AnyInstructionIdentity> = [:]
 
     // Phase 1: Determine which blocks are part of the ramp.

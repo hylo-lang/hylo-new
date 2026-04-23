@@ -34,7 +34,7 @@ public enum DeclarationReference: Hashable, Sendable {
   /// meaning that it does not involve any user code. This property is set during typing.
   case synthetic(DeclarationIdentity, transitively: Bool)
 
-  /// `true` iff this referennce mentions open variable.
+  /// `true` iff this reference mentions open variable.
   public var hasVariable: Bool {
     switch self {
     case .builtin, .direct, .member, .synthetic:
@@ -55,7 +55,7 @@ public enum DeclarationReference: Hashable, Sendable {
 
   /// `true` iff `self` is a synthetic implementation of some trait requirement that does not
   /// involve any user code.
-  public var isTransitivelySynthethic: Bool {
+  public var isTransitivelySynthetic: Bool {
     if case .synthetic(_, let t) = self {
       return t
     } else {

@@ -311,7 +311,7 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `n` is a trait requirement.
   ///
-  /// - Rquires: The module containing `n` is scoped.
+  /// - Requires: The module containing `n` is scoped.
   public func isRequirement<T: SyntaxIdentity>(_ n: T) -> Bool {
     traitRequiring(n) != nil
   }
@@ -330,7 +330,7 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `n` declares a member entity in an type extension.
   ///
-  /// - Rquires: The module containing `n` is scoped.
+  /// - Requires: The module containing `n` is scoped.
   public func isExtensionMember<T: SyntaxIdentity>(_ n: T) -> Bool {
     extensionContaining(n) != nil
   }
@@ -760,7 +760,7 @@ public struct Program: Sendable {
   /// If `n` declares a member entity in an extension, returns the that declaration. Otherwise,
   /// returns `nil`.
   ///
-  /// - Rquires: The module containing `n` is scoped.
+  /// - Requires: The module containing `n` is scoped.
   public func extensionContaining<T: SyntaxIdentity>(_ n: T) -> ExtensionDeclaration.ID? {
     switch tag(of: n) {
     case VariantDeclaration.self:
@@ -822,7 +822,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Retutns whether `m` or `n` is lexically closer to `s`.
+  /// Returns whether `m` or `n` is lexically closer to `s`.
   ///
   /// - Requires: The module containing `s` is scoped.
   public func compareLexicalDistances<T: SyntaxIdentity, U: SyntaxIdentity>(
@@ -1268,21 +1268,21 @@ public struct Program: Sendable {
     }
   }
 
-  /// Reports that `n` was not expected in the current executation path and exits the program.
+  /// Reports that `n` was not expected in the current execution path and exits the program.
   public func unexpected<T: SyntaxIdentity>(
     _ n: T, file: StaticString = #file, line: UInt = #line
   ) -> Never {
     unreachable("unexpected node '\(tag(of: n))' at \(self[n].site)", file: file, line: line)
   }
 
-  /// Reports that `t` was not expected in the current executation path and exits the program.
+  /// Reports that `t` was not expected in the current execution path and exits the program.
   public func unexpected(
     _ t: AnyTypeIdentity, file: StaticString = #file, line: UInt = #line
   ) -> Never {
     unreachable("unexpected type '\(show(t))'", file: file, line: line)
   }
 
-  /// Returns a source span suitable to emit a disgnostic related to `n` as a whole.
+  /// Returns a source span suitable to emit a diagnostic related to `n` as a whole.
   public func spanForDiagnostic<T: SyntaxIdentity>(about n: T) -> SourceSpan {
     switch tag(of: n) {
     case AssociatedTypeDeclaration.self:
@@ -1321,7 +1321,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns a source span suitable to emit a disgnostic related to `n` as a whole.
+  /// Returns a source span suitable to emit a diagnostic related to `n` as a whole.
   public func spanForDiagnostic(about n: ConformanceDeclaration.ID) -> SourceSpan {
     if self[n].isAdjunct {
       return spanForDiagnostic(about: self[n].witness)
@@ -1330,7 +1330,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns a source span suitable to emit a disgnostic related to `n` as a whole.
+  /// Returns a source span suitable to emit a diagnostic related to `n` as a whole.
   public func spanForDiagnostic(about n: Return.ID) -> SourceSpan {
     if let i = self[n].introducer {
       return .empty(at: i.site.start)
@@ -1352,11 +1352,11 @@ public struct Program: Sendable {
   /// assert(s == "'Void' is a type")
   /// ```
   ///
-  /// Each element to show is represented by a placehoder, which is a string starting with "%". The
+  /// Each element to show is represented by a placeholder, which is a string starting with "%". The
   /// i-th placeholder occurring in `message` (except `%%`) must have a corresponding value at the
   /// i-th position of `arguments`.
   ///
-  /// Valid placehoders are:
+  /// Valid placeholders are:
   /// - `%S`: The textual description of an arbitrary value.
   /// - `%T`: A type.
   /// - `%%`: The percent sign; does not consume any argument.

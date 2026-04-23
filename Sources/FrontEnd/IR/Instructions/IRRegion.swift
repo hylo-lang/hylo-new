@@ -24,7 +24,7 @@ public struct IRRegionEnd<T: IRRegionEntry>: Instruction {
     self.anchor = anchor
   }
 
-  /// Creates a copy of `other`, substituting its properities with `ss`.
+  /// Creates a copy of `other`, substituting its properties with `ss`.
   public init(_ other: Self, substituting ss: IRSubstitutionTable) {
     self.operands = [ss[other.start]]
     self.anchor = other.anchor

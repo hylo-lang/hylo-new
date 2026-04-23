@@ -66,7 +66,7 @@ public struct StableSet<Element: Hashable> {
   }
 
   /// Adds `member` to `self` if it is not already present and returns `(inserted: i, position: p)`
-  /// where `i` is `true` iff the insertion occured and `p` is the position of `member` in `self`.
+  /// where `i` is `true` iff the insertion occurred and `p` is the position of `member` in `self`.
   @discardableResult
   public mutating func insert(_ member: Element) -> (inserted: Bool, position: Int) {
     contents.assignValue(.init(), forKey: member)

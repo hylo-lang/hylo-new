@@ -139,7 +139,7 @@ public struct IRFunction: Sendable {
     output != .indirect
   }
 
-   /// `true` iff the function returns a unit value (i.e., an isntance of `Hylo.Void`).
+   /// `true` iff the function returns a unit value (i.e., an instance of `Hylo.Void`).
   public var isProcedure: Bool {
     returnRegister.flatMap(result(of:))?.type == .void
   }
@@ -273,7 +273,7 @@ public struct IRFunction: Sendable {
     slots[i.erased.address].instruction as! T
   }
 
-  /// Returns the register asssigned by `i`, if any.
+  /// Returns the register assigned by `i`, if any.
   public func definition(_ i: AnyInstructionIdentity) -> IRValue? {
     if at(i).type != .nothing {
       return .register(i)
@@ -387,7 +387,7 @@ public struct IRFunction: Sendable {
 
   /// Returns `t` without any relative definition.
   ///
-  /// - Requires: `v` is either a constant or an isntruction in this function.
+  /// - Requires: `v` is either a constant or an instruction in this function.
   public func resolved(_ t: IRType) -> (type: AnyTypeIdentity, isPlace: Bool)? {
     switch t {
     case .place(let u):
@@ -708,7 +708,7 @@ public struct IRFunction: Sendable {
 
   /// Assigns the definition of `self` to that of `other`, which has the same signature.
   ///
-  /// `other` is the (possibly modofied) result of `self.move()` and `self` has not have been
+  /// `other` is the (possibly modified) result of `self.move()` and `self` has not have been
   /// modified in the meantime.
   public mutating func take(definition other: consuming IRFunction) {
     assert((self.name == other.name) && !isDefined)

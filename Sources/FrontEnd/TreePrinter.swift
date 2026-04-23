@@ -13,7 +13,7 @@ public struct TreePrinter {
   /// Settings used for printing syntax and type trees.
   public struct Configuration {
 
-    /// `true` if types shouls be printed with a verbose representation.
+    /// `true` if types should be printed with a verbose representation.
     public let useVerboseTypes: Bool
 
     /// Creates an instance with the given properties.

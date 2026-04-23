@@ -32,7 +32,7 @@ public struct SourceSpan: Hashable, Sendable {
   /// The source text covered by this span.
   public var text: Substring { source.text[region] }
 
-  /// Returns `true` iff `self` covers a region in commen with `other`.
+  /// Returns `true` iff `self` covers a region in common with `other`.
   public func intersects(_ other: SourceSpan) -> Bool { !intersection(other).region.isEmpty }
 
   /// Returns a range covering the region that `self` and `other` cover in common.
