@@ -126,6 +126,14 @@ doesn't just use its description but is interested in the specific error type.
 - Use `// MARK:` comments to organize sections in large files.
 - Use `self.` in initializers when assigning to stored properties.
 - Use single-expression function / computed property bodies over explicit return statements where possible.
+- Avoid calling methods on the result of a function applied with trailing closure syntax:
+  ```swift
+  array.first { (e) in
+    ...
+  }.doSomething() // discouraged
+  ```
+- We should wrap as little code as possible in try blocks.
+- Add parenthesis around the parameter names of closures (e.g. `{ (e) in ... }`)
 
 ## File names
 
