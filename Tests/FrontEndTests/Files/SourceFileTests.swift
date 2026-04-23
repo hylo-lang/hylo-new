@@ -65,7 +65,7 @@ final class SourceFileTests: XCTestCase {
     XCTAssertEqual(l.description, "virtual://350c8wstjkie0:1")
   }
 
-  func testPositionDescrption() throws {
+  func testPositionDescription() throws {
     let f = SourceFile.helloWorld
     let i1 = try XCTUnwrap(f.text.firstIndex(of: ","))
     let p1 = SourcePosition(i1, in: f)

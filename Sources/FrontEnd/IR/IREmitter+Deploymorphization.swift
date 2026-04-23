@@ -104,7 +104,7 @@ extension IREmitter {
   ///   - user: The user of a `type_apply` instantiating the polymorphic function of which `mono`is
   ///     the existentialization.
   ///   - mono: The identity of an existentialized function.
-  ///   - witnesses: witnesses for each type paramete in the original polymorphic function.
+  ///   - witnesses: witnesses for each type parameter in the original polymorphic function.
   ///   - parameters: The types of the term parameters of the polymorphic function.
   ///   - f: The function containing`uer`.
   private mutating func depolymorphize(

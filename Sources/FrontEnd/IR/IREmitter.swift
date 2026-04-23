@@ -138,7 +138,7 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates IR for initializating the bindings declared in `lhs`, which refer to parts of
+  /// Generates IR for initializing the bindings declared in `lhs`, which refer to parts of
   /// `storage`, by consuming `rhs`.
   private mutating func lowerInitialization(
     bindingsIn lhs: PatternIdentity, storedIn storage: IRValue,
@@ -630,7 +630,7 @@ internal struct IREmitter {
     let onFailure = insertionContext.function!.addBlock()
     let tail = insertionContext.function!.addBlock()
 
-    // Typer should have guaranteed that the expression is single-expresion bodied.
+    // Typer should have guaranteed that the expression is single-expression bodied.
     let (e0, e1) = program.branches(of: e)!
     for c in program[e].conditions {
       insertionContext.point = .end(of: lowerCondition(c, onFailure: onFailure))
@@ -692,7 +692,7 @@ internal struct IREmitter {
     lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
   }
 
-  /// Implements `lower(store:to:)` for synthethic expressions.
+  /// Implements `lower(store:to:)` for synthetic expressions.
   private mutating func lower(store e: SyntheticExpression.ID, to target: IRValue) {
     lowering(e) { (me) in
       let v = me._emit(witness: me.program[e].value)
@@ -1694,7 +1694,7 @@ internal struct IREmitter {
     insert(IRMove(source: source, target: target, anchor: currentAnchor))
   }
 
-  /// Inserts a `palce_cast` instruction.
+  /// Inserts a `place_cast` instruction.
   internal mutating func _place_cast<T: TypeIdentity>(_ source: IRValue, as target: T) -> IRValue {
     let t = program.types.dealiased(target.erased)
     let s = IRPlaceCast(source: source, target: t, anchor: currentAnchor)
@@ -1787,7 +1787,7 @@ internal struct IREmitter {
     return insert(s)!
   }
 
-  /// Insertes an `unreachable` instruction.
+  /// Inserts an `unreachable` instruction.
   internal mutating func _unreachable() {
     insert(IRUnreachable(anchor: currentAnchor))
   }

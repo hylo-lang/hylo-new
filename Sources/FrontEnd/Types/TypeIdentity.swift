@@ -76,7 +76,7 @@ public struct AnyTypeIdentity: Hashable, Sendable {
     self.bits = (UInt64(TypeProperties.hasVariable.rawValue) << 56) | (0b11 << 54) | UInt64(n)
   }
 
-  /// Creates an instance identifying the predifined type `n`, having properties `ps`.
+  /// Creates an instance identifying the predefined type `n`, having properties `ps`.
   private init(predefined n: UInt64, properties ps: TypeProperties) {
     assert(n >> 54 == 0)
     self.bits = (UInt64(ps.rawValue) << 56) | (0b10 << 54) | n

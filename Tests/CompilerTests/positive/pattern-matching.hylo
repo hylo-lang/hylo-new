@@ -3,7 +3,7 @@
 enum A<T> {
   case one()
   case two(x: sink T)
-  case thr(_ y: sink T)
+  case the(_ y: sink T)
 }
 
 struct B<U> {
@@ -18,7 +18,7 @@ public fun main() {
   let y = match x {
     case .one() { B(u: ()) }
     case .two(sink let a) { B(u: a) }
-    case .thr(y: sink let a) { B(u: a) }
+    case .the(y: sink let a) { B(u: a) }
   }
   check<B<Void>>(y)
 }

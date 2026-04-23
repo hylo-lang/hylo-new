@@ -42,7 +42,7 @@ public struct WitnessTable: Hashable, Sendable {
 
   /// `true` iff `self` witnesses a synthetic conformance that does not involve any user code.
   public var isTransitivelySynthetic: Bool {
-    !members.isEmpty && members.allSatisfy(\.value.isTransitivelySynthethic)
+    !members.isEmpty && members.allSatisfy(\.value.isTransitivelySynthetic)
   }
 
   /// Assigns `i` to `r`, which is a base trait requirement.

@@ -15,14 +15,14 @@ public fun main() {
   // Implicit captures are allowed.
   fun g[...]() { a.m() }
 
-  // Implcit captures are allowed and the lambda is mutating; everything it allowed.
+  // Implicit captures are allowed and the lambda is mutating; everything it allowed.
   let f0 = fun() inout {
     g()
     a.m()
     &a.x = ()
   }
 
-  // Implcit captures are allowed but the lambda is `let`; no mutating capture is allowed.
+  // Implicit captures are allowed but the lambda is `let`; no mutating capture is allowed.
   let f1 = fun() {
     g()
     a.m()

@@ -163,7 +163,7 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
   ///
   /// `i` identifies a register in `f` that results in either an object or a place. In the first
   /// case, an new object is assigned to `i` directly. In the second case, a new place is created
-  /// to contain the new oject and the register is assigned to that place.
+  /// to contain the new object and the register is assigned to that place.
   ///
   /// The new object is defined as a uniform value `v`.
   internal mutating func declare<T: InstructionIdentity>(

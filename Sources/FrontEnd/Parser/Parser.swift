@@ -2265,7 +2265,7 @@ public struct Parser {
   ) throws -> StatementIdentity {
     let l = try parseExpression(in: &file)
     if let a = take(.assign) {
-      if !withespacesAround(a.site) { report(inconsistentWhitespaces(around: a.site)) }
+      if !whitespacesAround(a.site) { report(inconsistentWhitespaces(around: a.site)) }
       let r = try parseExpression(in: &file)
       let n = file.insert(
         Assignment(lhs: l, rhs: r, site: file[l].site.extended(upTo: position.index)))
@@ -2431,7 +2431,7 @@ public struct Parser {
   }
 
   /// Returns `true` iff there are whitespaces immediately before and after `s`.
-  private func withespacesAround(_ s: SourceSpan) -> Bool {
+  private func whitespacesAround(_ s: SourceSpan) -> Bool {
     let text = tokens.source
 
     if (s.start.index != text.startIndex) && (s.end.index != text.endIndex) {
@@ -2498,7 +2498,7 @@ public struct Parser {
     (next(is: k) && !whitespaceBeforeNextToken()) ? take() : nil
   }
 
-  /// Consumes and returns the next token iff it satisifies `predicate`.
+  /// Consumes and returns the next token iff it satisfies `predicate`.
   private mutating func take(if predicate: (Token) -> Bool) -> Token? {
     next(satisfies: predicate) ? take() : nil
   }

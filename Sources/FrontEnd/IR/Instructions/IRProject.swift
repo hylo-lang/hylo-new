@@ -30,7 +30,7 @@ public struct IRProject: IRRegionEntry {
     self.access = access
   }
 
-  /// Creates a copy of `other`, substituting its properities with `ss`.
+  /// Creates a copy of `other`, substituting its properties with `ss`.
   public init(_ other: Self, substituting ss: IRSubstitutionTable) {
     self.operands = other.operands.map({ (o) in ss[o] })
     self.anchor = other.anchor
@@ -60,7 +60,7 @@ public struct IRProject: IRRegionEntry {
 
   /// Asserts that the well-formedness conditions of the instruction hold.
   ///
-  /// Returns `true` iff the followig conditions hold:
+  /// Returns `true` iff the following conditions hold:
   ///
   /// * The callee is a term abstraction.
   /// * The callee is a constant and the call effect of its type is `.let` or the callee is an

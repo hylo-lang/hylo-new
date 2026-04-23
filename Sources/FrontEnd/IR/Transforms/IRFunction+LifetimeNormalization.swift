@@ -48,7 +48,7 @@ extension IRFunction {
 /// A transfer function for interpreting IR during lifetime normalization.
 private struct Transfer: AbstractTransferFunction {
 
-  /// The module containing the instructions intepreted by this function.
+  /// The module containing the instructions interpreted by this function.
   private let module: Module.ID
 
   /// A typer for querying type relations and resolve names.
@@ -85,7 +85,7 @@ private struct Transfer: AbstractTransferFunction {
     }
 
     // Are there unstable states that need fixing?
-    let changed = stablilize(predecessors: predecessors, from: &f)
+    let changed = stabilize(predecessors: predecessors, from: &f)
     if !changed.isEmpty { return changed }
 
     // Interpret the instructions of the block.
@@ -145,7 +145,7 @@ private struct Transfer: AbstractTransferFunction {
   /// Inserts deinitialization instructions into `predecessors` to ensure that the initialization
   /// state of all storage reachable in `self.context` does not depend on control flow, and returns
   /// the basic blocks that have been modified, if any.
-  private mutating func stablilize(
+  private mutating func stabilize(
     predecessors: SortedDictionary<IRBlock.ID, Context>, from f: inout IRFunction
   ) -> [IRBlock.ID] {
     var changed: [IRBlock.ID] = []
@@ -211,7 +211,7 @@ private struct Transfer: AbstractTransferFunction {
     // Access is expected to be reified at this stage.
     let k = access.capabilities.uniqueElement!
 
-    // Built-in values are implictly copied.
+    // Built-in values are implicitly copied.
     if (k == .sink) && f.isBuiltinValue(access.source, using: program) {
       context.declare(i, from: f, initially: .initialized)
       return f.instruction(after: i.erased)
@@ -618,7 +618,7 @@ private struct Transfer: AbstractTransferFunction {
     let t = f.result(of: place)!
     assert(t.isPlace)
 
-    // Built-in values are implictly copied.
+    // Built-in values are implicitly copied.
     if program.types.isBuiltin(t.type) {
       return
     }
@@ -729,7 +729,7 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` statisfies the preconditions of a
+  /// Ensures that the state of the object stored at place `v` satisfies the preconditions of a
   /// parameter `k`, inserting deinitialization before `i`, which is in `f`, is necessary.
   private mutating func applyParameterPrecondition(
     _ k: AccessEffect, _ v: IRValue,
@@ -755,7 +755,7 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` statisfies the postconditions of a
+  /// Ensures that the state of the object stored at place `v` satisfies the postconditions of a
   /// parameter `k`.
   private mutating func applyParameterPostcondition(_ k: AccessEffect, _ v: IRValue) {
     if k == .set {
@@ -765,7 +765,7 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` statisfies the pre/postconditions of
+  /// Ensures that the state of the object stored at place `v` satisfies the pre/postconditions of
   /// a parameter `k`, inserting deinitialization before `i`, which is in `f`, is necessary.
   private mutating func passArgument(
     _ k: AccessEffect, _ v: IRValue,

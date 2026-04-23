@@ -13,7 +13,7 @@ public protocol Instruction: Hashable, Showable, Sendable {
   /// `true` iff `self` extends the lifetime of its operands.
   var isExtendingOperandLifetimes: Bool { get }
 
-  /// Creates a copy of `other`, substituting its properities with `ss`.
+  /// Creates a copy of `other`, substituting its properties with `ss`.
   init(_ other: Self, substituting ss: IRSubstitutionTable)
 
   /// Asserts that the well-formedness conditions of the instruction hold.

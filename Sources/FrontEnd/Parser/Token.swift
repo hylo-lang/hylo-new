@@ -50,7 +50,7 @@ public struct Token: Hashable, Sendable {
     case floatingPointLiteral
     case stringLiteral
 
-    // Pound keyords and literals
+    // Pound keywords and literals
     case poundLiteral
 
     // Operators

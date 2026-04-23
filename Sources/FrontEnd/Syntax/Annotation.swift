@@ -24,7 +24,7 @@ public struct Annotation: Hashable, Sendable {
       if case .number(let n) = self { return n } else { return nil }
     }
 
-    /// A textual descrption of this argument.
+    /// A textual description of this argument.
     public var description: String {
       switch self {
       case .string(let s): return s

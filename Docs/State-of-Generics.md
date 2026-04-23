@@ -4,7 +4,7 @@ This document describes the current state of Hylo's support for generic programm
 It is intended as a light introduction to the theoretical foundations of Hylo's type systems and as a basis to discuss possible developments.
 
 Unless stated otherwise, the examples presented in this document are supposed to be already supported by the compiler.
-Of course it is possible that some features are still under developement and therefore buggy or subject to changes.
+Of course it is possible that some features are still under development and therefore buggy or subject to changes.
 
 ## Background
 
@@ -53,13 +53,13 @@ public fun main() { f1() ; f2() }
 ```
 
 The function `log` takes `logger` as a contextual parameter and uses it to log a message.
-The body of the function is not particularly suprising but its call sites in `f1` and `f2` are more interesting:
+The body of the function is not particularly surprising but its call sites in `f1` and `f2` are more interesting:
 
 - `f1` takes a logger as a contextual parameter, which will be used implicitly in the call `log("Hello")`.
 - `f2` introduces a new logger in the implicit context (with the keyword `given`), which will be used implicitly in the call to `log("World")`.
 
 The main function calls both `f1` and `f2`, causing the program to print `Hello, World!\n`.
-In the first call, `global_logger` is passed implicitly to `f1` whereas no implict parameter has to be provided to `f2`.
+In the first call, `global_logger` is passed implicitly to `f1` whereas no implicit parameter has to be provided to `f2`.
 
 This somewhat contrived setup shows that contextual parameters can be used to modify the context in which expressions will be evaluated across function boundaries.
 In particular, by introducing a logger in the implicit context, `f2` can influence the behavior of the `log`.
@@ -73,7 +73,7 @@ We'll keep this mechanism abstract for the time being and just assume the existe
 
 ### Parametric polymorphism
 
-One of the simplest ways to support generic programming is to abstract over concrete data stuctures by introducing type parameters.
+One of the simplest ways to support generic programming is to abstract over concrete data structures by introducing type parameters.
 For example, consider the following program, which features a non-generic algorithm:
 
 ```hylo
@@ -111,7 +111,7 @@ public fun main() {
 }
 ```
 
-This more generic definition is certainly cumbersome to use but it shows that support for standard parametric polymoprhism is enough to get quite far.
+This more generic definition is certainly cumbersome to use but it shows that support for standard parametric polymorphism is enough to get quite far.
 
 ### Type classes
 
@@ -203,7 +203,7 @@ Specifically, we're referring to a type that is a member of `w`, which is a valu
 #### Instance uniqueness
 
 Swift, Rust and Haskell's type systems are not expressive enough to manipulate type class instances explicitly but their underlying model is similar to that of Hylo or Scala nonetheless.
-One subtelty, however, is all of these languages adopt a discpline often referred to as "global uniqueness of type class instances", which prescribes that there can be at most one instance of any type class application (i.e., a type class together with arguments for each of its generic parameters), and that such an instance should be defined globally.
+One subtlety, however, is all of these languages adopt a discipline often referred to as "global uniqueness of type class instances", which prescribes that there can be at most one instance of any type class application (i.e., a type class together with arguments for each of its generic parameters), and that such an instance should be defined globally.
 The most important benefit of this restriction is that the mere knowledge that a constraint requiring some type `T` to be conform to a concept `P` has been satisfied is enough to assume that any witness of such a conformance will have the same value.
 Further, since instances are defined globally, the value of any witness does not need to be passed down as a parameter or stored anywhere; it can simply be obtained on demand.
 
@@ -717,7 +717,7 @@ However, this strategy is not ideal either as it would bring significant complex
 A fundamental issue is that witnesses are values and thus any effort to bring them into type signatures requires some form of dependent typing.
 
 Yet another idea would be to store the witness in instances of `S<T>`.
-This strategy is problably the most promising but it is not expressive enough to handle some of the use cases Swift handles.
+This strategy is probably the most promising but it is not expressive enough to handle some of the use cases Swift handles.
 In particular, one would need an instance of `S<T>` to determine the value of the witness that was used to construct it.
 As a result, one would not be able to write definitions like the following:
 
