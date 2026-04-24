@@ -62,17 +62,24 @@ final class SourceFileTests: XCTestCase {
   func testLineDescription() {
     let f = SourceFile.helloWorld
     let l = f.line(containing: f.text.startIndex)
-    XCTAssertEqual(l.description, "virtual://350c8wstjkie0:1")
+    XCTAssertEqual(l.description, "virtual:///350c8wstjkie0:1")
   }
 
-  func testPositionDescription() throws {
+  func testVirtualPositionDescription() throws {
     let f = SourceFile.helloWorld
     let i1 = try XCTUnwrap(f.text.firstIndex(of: ","))
     let p1 = SourcePosition(i1, in: f)
-    XCTAssertEqual(p1.description, "virtual://350c8wstjkie0:1:6")
+    XCTAssertEqual(p1.description, "virtual:///350c8wstjkie0:1:6")
     let i2 = try XCTUnwrap(f.text.firstIndex(of: "!"))
     let p2 = SourcePosition(i2, in: f)
-    XCTAssertEqual(p2.description, "virtual://350c8wstjkie0:2:6")
+    XCTAssertEqual(p2.description, "virtual:///350c8wstjkie0:2:6")
+  }
+
+  func testFilePositionDescription() throws {
+    let f = SourceFile(name: .virtual(URL(string: "file:///home/hylo/a.hylo")!), contents: "")
+    let p = SourcePosition(f.startIndex, in: f)
+    XCTAssertEqual(f.name.description, "/home/hylo/a.hylo")
+    XCTAssertEqual(p.description, "/home/hylo/a.hylo:1:1")
   }
 
   func testLineCount() {
@@ -108,10 +115,40 @@ final class SourceFileTests: XCTestCase {
   }
 
   func testInMemoryContents() {
-    let f = SourceFile(localPath: URL(string: "file:///tmp/test.hylo")!, contents: "fun main()")
+    let f = SourceFile(name: .local(URL(string: "file:///tmp/test.hylo")!), contents: "fun main()")
     XCTAssertEqual(f.text, "fun main()")
     XCTAssertEqual(f.name, .local(URL(string: "file:///tmp/test.hylo")!))
   }
+
+  /// Tests that when a file is created with a relative URL, it is equivalent 
+  /// to creating it with an absolute URL.
+  func testRelativePath() {
+    let nonCanonical = URL(fileURLWithPath: "a/../README.md")
+    let relative = URL(fileURLWithPath: "README.md")
+    let absolute = relative.absoluteURL
+
+    let sn = SourceFile(name: .local(nonCanonical), contents: "hello")
+    let sr = SourceFile(name: .local(relative), contents: "hello")
+    let sa = SourceFile(name: .local(absolute), contents: "hello")
+
+    XCTAssertEqual(sr.baseName, "README")
+    XCTAssertEqual(sa.baseName, "README")
+    XCTAssertEqual(sn.baseName, "README")
+
+    XCTAssertEqual(sr, sa)
+    XCTAssertEqual(sn, sa)
+    XCTAssertEqual(sr.hashValue, sa.hashValue)
+    XCTAssertEqual(sn.hashValue, sa.hashValue)
+
+    XCTAssertEqual(sr.name.url, absolute)
+    XCTAssertEqual(sn.name.url, absolute)
+  }
+
+  func testVirtualBaseName() {
+    let s = SourceFile(name: .virtual(URL(string: "virtual:///tests/something.txt")!), contents: "")
+    XCTAssertEqual(s.baseName, "something")
+  }
+
 }
 
 extension SourceFile {

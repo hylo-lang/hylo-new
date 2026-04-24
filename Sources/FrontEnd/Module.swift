@@ -347,6 +347,13 @@ public struct Module: Sendable {
     sources.values.map(\.topLevelDeclarations).joined()
   }
 
+  /// Returns the identity of a contained source file named `f`, if any.
+  public func sourceFile(named f: FileName) -> SourceFile.ID? {
+    if let i = sources.index(forKey: f) {
+      SourceFile.ID(module: identity, offset: i)
+    } else { nil }
+  }
+
   /// Projects the source file identified by `f`.
   internal subscript(f: SourceFile.ID) -> SourceContainer {
     _read {
