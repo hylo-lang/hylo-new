@@ -134,6 +134,15 @@ doesn't just use its description but is interested in the specific error type.
   ```
 - We should wrap as little code as possible in try blocks.
 - Add parenthesis around the parameter names of closures (e.g. `{ (e) in ... }`)
+- When the parameters of a function/subscript declaration don't fit in a single line, use this formatting style:
+  ```swift
+  func resolve(
+    _ p: SourcePosition, in program: Program, reportingTo l: Logger,
+    in f: SourceFile.ID
+  ) -> DefinitionResponse {
+    // body
+  }
+  ``` 
 
 ## File names
 
