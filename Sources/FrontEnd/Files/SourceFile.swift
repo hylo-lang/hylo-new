@@ -47,7 +47,18 @@ public struct SourceFile: Hashable, Sendable {
 
   /// Creates a source file with the contents of the file at `path`.
   public init(contentsOf path: URL) throws {
-    try self.init(name: .local(path), contents: .init(contentsOf: path, encoding: .utf8))
+    let contents = try String(contentsOf: path, encoding: .utf8)
+    self.init(localPath: path, contents: contents)
+  }
+
+  /// Creates a source file with given `contents`, representing a local file at `p`.
+  ///
+  /// - Note: `p` can be non-existent or contain different contents on disk,
+  ///   e.g. when called by the LSP.
+  /// - Requires: `p` has a file name component.
+  public init(localPath p: URL, contents: String) {
+    precondition(!p.pathComponents.isEmpty)
+    self.init(name: .local(p), contents: contents)
   }
 
   /// Creates a virtual source file with the given contents.

@@ -269,6 +269,8 @@ public struct Module: Sendable {
   }
 
   /// Adds a source file to this module.
+  /// 
+  /// - Requires: File name `s.name` is not already present in the program.
   @discardableResult
   public mutating func addSource(_ s: SourceFile) -> (inserted: Bool, identity: SourceFile.ID) {
     if let f = sources.index(forKey: s.name) {
