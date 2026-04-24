@@ -1676,12 +1676,10 @@ fileprivate struct ChildrenEnumerator: SyntaxVisitor {
 
 extension Program {
 
-  /// Returns the identity of source file named `f`, if any.
+  /// Returns the identity of a contained source file named `f`, if any.
   public func sourceFile(named f: FileName) -> SourceFile.ID? {
     modules.values.indices.firstNonNil { (m) in
-      if let i = self[m].sources.index(forKey: f) {
-        SourceFile.ID(module: m, offset: i)
-      } else { nil }
+      self[m].sourceFile(named: f)
     }
   }
 
@@ -1705,7 +1703,7 @@ extension Program {
   /// - Requires: `m` has been type checked.
   public mutating func givens(in m: Module.ID, visibleFrom scopeOfUse: ScopeIdentity) -> [Given] {
     withTyper(typing: m, { (t) in
-      t.givens(visibleFrom: scopeOfUse).flatMap({ $0 }) 
+      t.givens(visibleFrom: scopeOfUse).flatMap({ $0 })
     })
   }
 
