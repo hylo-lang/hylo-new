@@ -75,6 +75,33 @@ final class SourceFileTests: XCTestCase {
     XCTAssertEqual(p2.description, "virtual://350c8wstjkie0:2:6")
   }
 
+  func testLineCount() {
+    XCTAssertEqual(SourceFile.helloWorld.lineCount, 2)
+  }
+
+  func testIndexAtStartOfFile() throws {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 1, column: 1), f.text.startIndex)
+  }
+
+  func testIndexWithinFirstLine() throws {
+    let f = SourceFile.helloWorld
+    let comma = try XCTUnwrap(f.text.firstIndex(of: ","))
+    XCTAssertEqual(f.index(line: 1, column: 6), comma)
+  }
+
+  func testIndexAtStartOfSecondLine() throws {
+    let f = SourceFile.helloWorld
+    let line2Start = f.text.index(after: try XCTUnwrap(f.text.firstIndex(where: \.isNewline)))
+    XCTAssertEqual(f.index(line: 2, column: 1), line2Start)
+  }
+
+  func testIndexAtLastCharacter() throws {
+    let f = SourceFile.helloWorld
+    let bang = try XCTUnwrap(f.text.firstIndex(of: "!"))
+    XCTAssertEqual(f.index(line: 2, column: 6), bang)
+  }
+
   func testArchive() throws {
     let f = SourceFile.helloWorld
     try XCTAssertEqual(f, f.storedAndLoaded())
