@@ -107,6 +107,11 @@ final class SourceFileTests: XCTestCase {
     try XCTAssertEqual(f, f.storedAndLoaded())
   }
 
+  func testInMemoryContents() {
+    let f = SourceFile(localPath: URL(string: "file:///tmp/test.hylo")!, contents: "fun main()")
+    XCTAssertEqual(f.text, "fun main()")
+    XCTAssertEqual(f.name, .local(URL(string: "file:///tmp/test.hylo")!))
+  }
 }
 
 extension SourceFile {

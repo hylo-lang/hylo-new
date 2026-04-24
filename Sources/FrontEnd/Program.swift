@@ -3,6 +3,8 @@ import OrderedCollections
 import Utilities
 
 /// A Hylo program.
+/// 
+/// - Invariant: The FileName of source files in `self` are unique.
 public struct Program: Sendable {
 
   /// The modules loaded in this program.
@@ -1667,6 +1669,44 @@ fileprivate struct ChildrenEnumerator: SyntaxVisitor {
   fileprivate mutating func willEnter(_ n: AnySyntaxIdentity, in program: Program) -> Bool {
     if n != parent { children.append(n) }
     return n == parent
+  }
+
+}
+
+
+extension Program {
+
+  /// Returns the identity of source file named `f`, if any.
+  public func sourceFile(named f: FileName) -> SourceFile.ID? {
+    modules.values.indices.firstNonNil { (m) in
+      if let i = self[m].sources.index(forKey: f) {
+        SourceFile.ID(module: m, offset: i)
+      } else { nil }
+    }
+  }
+
+  /// Returns the source file identified by `f`.
+  public subscript(sourceFile f: SourceFile.ID) -> SourceFile {
+    self[f].source
+  }
+
+  /// Returns the diagnostics in source file `f`.
+  public func diagnostics(in f: SourceFile.ID) -> DiagnosticSet {
+    self[f].diagnostics
+  }
+
+  /// Returns the top-level declarations in source file `f`.
+  public func topLevelDeclarations(in f: SourceFile.ID) -> some Sequence<DeclarationIdentity> {
+    self[f].topLevelDeclarations
+  }
+
+  /// Returns the givens whose definitions are visible from `scopeOfUse`.
+  ///
+  /// - Requires: `m` has been type checked.
+  public mutating func givens(in m: Module.ID, visibleFrom scopeOfUse: ScopeIdentity) -> [Given] {
+    withTyper(typing: m, { (t) in
+      t.givens(visibleFrom: scopeOfUse).flatMap({ $0 }) 
+    })
   }
 
 }

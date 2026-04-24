@@ -3722,7 +3722,7 @@ public struct Typer {
   /// type is being computed.
   ///
   /// The result does not include built-in givens.
-  private mutating func givens(visibleFrom scopeOfUse: ScopeIdentity) -> [[Given]] {
+  internal mutating func givens(visibleFrom scopeOfUse: ScopeIdentity) -> [[Given]] {
     var gs: [[Given]] = []
 
     // Gather the givens in the current file.

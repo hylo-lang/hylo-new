@@ -157,7 +157,7 @@ extension Program {
   }
 
   /// Visits `ns` and their children in pre-order, calling back `v` when a node is entered or left.
-  public func visit<T: SyntaxVisitor, U: Collection>(
+  public func visit<T: SyntaxVisitor, U: Sequence>(
     _ ns: U, calling v: inout T
   ) where U.Element: SyntaxIdentity {
     for n in ns {
