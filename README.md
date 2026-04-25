@@ -26,3 +26,34 @@ If `m` denotes a trait requirement, then name resolution should bind it to the e
 ## Questions
 
 - Is it desirable to write extensions of context functions?
+
+## Building Instructions
+
+Clone the repository, initializing the submodules:
+```
+git clone https://github.com/hylo-lang/hylo-new
+cd hylo-new
+git submodule update --init
+```
+
+### Linux
+- Install `zstd`'s development package: `sudo apt-get install libzstd-dev`
+- Install the latest Swift compiler using [swiftly](https://github.com/swift-server/swiftly)
+- Download and install [Hylo's LLVM build](https://github.com/hylo-lang/llvm-build)
+- `swift test`
+
+### Windows
+- Install the latest Swift compiler from [swift.org](https://www.swift.org/install/windows/)
+- Download and install [Hylo's LLVM build](https://github.com/hylo-lang/llvm-build)
+- `swift test`
+
+### MacOS
+- Install the latest Swift compiler from [swift.org](https://www.swift.org/install/macos)
+- Download and install [Hylo's LLVM build](https://github.com/hylo-lang/llvm-build)
+- `swift test`
+- TODO see if any dependencies are missing
+
+
+## Hylo Compiler's Runtime Dependencies
+`hc` uses `clang` and `lld` for linking, resolving them from PATH. On macOS, you will need `xcrun` 
+on PATH so the compiler can find the SDK.

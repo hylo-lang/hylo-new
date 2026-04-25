@@ -4,7 +4,7 @@ import Utilities
 /// A test manifest.
 struct Manifest {
 
-  /// A stage of the compilation pipelne.
+  /// A stage of the compilation pipeline.
   enum Stage: String {
 
     /// After the abstract syntax tree has been parsed.
@@ -16,8 +16,11 @@ struct Manifest {
     /// After IR lowering.
     case lowering
 
-    /// After the program has been compiled to binary.
-    case codegen
+    /// After LLVM lowering.
+    case llvmLowering
+
+    /// After the program has been linked into an executable.
+    case executableLinking
 
   }
 
@@ -25,7 +28,7 @@ struct Manifest {
   private(set) var requiresStandardLibrary: Bool = true
 
   /// The stage up to which the input should be compiled.
-  private(set) var stage: Stage = .codegen
+  private(set) var stage: Stage = .llvmLowering
 
   /// Creates an instance with a default configuration.
   init() {}
