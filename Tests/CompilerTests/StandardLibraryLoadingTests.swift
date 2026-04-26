@@ -12,12 +12,17 @@ final class StandardLibraryLoadingTests: XCTestCase {
 
   func testStandardLibraryLoadingBundled() async throws {
     var driver = try Driver(targetSpecification: .native())
-    try await driver.load(Module.standardLibraryName, withSourcesAt: bundledStandardLibrarySources)
+    try await driver.load(Module.standardLibraryName, withSourcesAt: StandardLibraryRoot.bundledFull().root)
   }
 
   func testStandardLibraryLoadingLocal() async throws {
     var driver = try Driver(targetSpecification: .native())
-    try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
+    try await driver.load(Module.standardLibraryName, withSourcesAt: StandardLibraryRoot.localFull().root)
+  }
+
+  func testStandardLibraryLoadingMinimal() async throws {
+    var driver = try Driver(targetSpecification: .native())
+    try await driver.load(Module.standardLibraryName, withSourcesAt: StandardLibraryRoot.localMinimal().root)
   }
 
 }

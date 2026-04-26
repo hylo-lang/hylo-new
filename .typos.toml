@@ -3,7 +3,7 @@
 
 [files]
 # Swifty-LLVM is a separate project. Its spelling is managed upstream.
-extend-exclude = ["Swifty-LLVM"]
+extend-exclude = ["Swifty-LLVM", "Demo"]
 
 [default.extend-identifiers]
 # `WriteableArchive` is part of the external `Archivist` dependency's API

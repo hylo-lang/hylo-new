@@ -24,8 +24,13 @@ public struct Program: Sendable {
   /// or by `self.load(module:from:)` after the standard library has been deserialized.
   private var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
 
+  /// The `Never` type of Hylo.
+  public let never: AnyTypeIdentity
+
   /// Creates an empty program.
-  public init() {}
+  public init() {
+    self.never = types.never().erased
+  }
 
   /// `true` if the program has errors.
   public var containsError: Bool {
@@ -1479,6 +1484,9 @@ extension Program {
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
+    /// `Hylo.UInt8`.
+    case uint8 = "UInt8"
+
     /// `Hylo.Float32`.
     case float32 = "Float32"
 
@@ -1566,7 +1574,7 @@ extension Program {
         let a = identity(module: Module.standardLibraryName),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
-      else { fatalError("missing or corrupt standard library") }
+      else { fatalError("missing or corrupt standard library; missing '\(n.rawValue)'") }
       standardLibraryDeclarations[n] = d
     }
   }
