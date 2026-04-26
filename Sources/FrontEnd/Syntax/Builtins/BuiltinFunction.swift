@@ -1105,7 +1105,7 @@ extension BuiltinFunction {
       self = .markUninitialized
 
     //    case "advanced":
-    //      guard let ((_, _), t) = (exactly("by") ++ exactly("bytes") ++ machineType)(&tokens)
+    //      guard let ((_, _), t) = (exactly("by") + exactly("bytes") + machineType)(&tokens)
     //      else { return nil }
     //      self = .advancedByBytes(byteOffset: t)
 
@@ -1124,19 +1124,19 @@ extension BuiltinFunction {
     //      self = .shl(p, t)
     //
     //    case "udiv":
-    //      guard let (p, t) = (maybe("exact") ++ machineType)(&tokens) else { return nil }
+    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .udiv(exact: p != nil, t)
     //
     //    case "sdiv":
-    //      guard let (p, t) = (maybe("exact") ++ machineType)(&tokens) else { return nil }
+    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .sdiv(exact: p != nil, t)
     //
     //    case "lshr":
-    //      guard let (p, t) = (maybe("exact") ++ machineType)(&tokens) else { return nil }
+    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .lshr(exact: p != nil, t)
     //
     //    case "ashr":
-    //      guard let (p, t) = (maybe("exact") ++ machineType)(&tokens) else { return nil }
+    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .ashr(exact: p != nil, t)
     //
     //    case "urem":
@@ -1179,23 +1179,23 @@ extension BuiltinFunction {
       self = .icmp(p, s.demand(t))
 
     //    case "trunc":
-    //      guard let (s, d) = (machineType ++ machineType)(&tokens) else { return nil }
+    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
     //      self = .trunc(s, d)
     //
     //    case "zext":
-    //      guard let (s, d) = (machineType ++ machineType)(&tokens) else { return nil }
+    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
     //      self = .zext(s, d)
     //
     //    case "sext":
-    //      guard let (s, d) = (machineType ++ machineType)(&tokens) else { return nil }
+    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
     //      self = .sext(s, d)
     //
     //    case "uitofp":
-    //      guard let (s, d) = (machineType ++ machineType)(&tokens) else { return nil }
+    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
     //      self = .uitofp(s, d)
     //
     //    case "sitofp":
-    //      guard let (s, d) = (machineType ++ machineType)(&tokens) else { return nil }
+    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
     //      self = .sitofp(s, d)
     //
     //    case "inttoptr":
