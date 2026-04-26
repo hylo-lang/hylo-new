@@ -25,7 +25,7 @@ public enum FloatingPointPredicate: String, Hashable, Sendable {
   case oge
 
   /// Values are ordered and LHS is less than RHS.
-  case old
+  case olt
 
   /// Values are ordered and LHS is less than or equal to RHS.
   case ole
