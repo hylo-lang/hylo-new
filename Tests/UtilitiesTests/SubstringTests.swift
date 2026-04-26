@@ -21,4 +21,10 @@ final class SubstringTests: XCTestCase {
     XCTAssertEqual(t, "bc")
   }
 
+  func testSans() {
+    let s = "vadalma"
+    let t = s.sans("a")
+    XCTAssertEqual(t, "vdlm")
+  }
+
 }

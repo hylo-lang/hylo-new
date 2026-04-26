@@ -1,8 +1,8 @@
 import Archivist
 
-/// The expression of an integer literal.
+/// The expression of a floating point number literal.
 @Archivable
-public struct IntegerLiteral: LiteralExpression {
+public struct FloatingPointLiteral: LiteralExpression {
 
   /// The site from which `self` was parsed.
   public let site: SourceSpan
@@ -15,11 +15,11 @@ public struct IntegerLiteral: LiteralExpression {
   /// The value of the literal.
   public var value: Substring { site.text }
 
-  public static let literalType: LiteralType = .integer
+  public static let literalType: LiteralType = .float
 
 }
 
-extension IntegerLiteral: Showable {
+extension FloatingPointLiteral: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {

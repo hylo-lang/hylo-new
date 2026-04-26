@@ -558,6 +558,8 @@ internal struct IREmitter {
       lower(store: program.castUnchecked(e, to: InoutExpression.self), to: target)
     case IntegerLiteral.self:
       lower(store: program.castUnchecked(e, to: IntegerLiteral.self), to: target)
+    case FloatingPointLiteral.self:
+      lower(store: program.castUnchecked(e, to: FloatingPointLiteral.self), to: target)
     case NameExpression.self:
       lower(store: program.castUnchecked(e, to: NameExpression.self), to: target)
     case SyntheticExpression.self:
@@ -683,6 +685,11 @@ internal struct IREmitter {
 
   /// Implements `lower(store:to:)` for integer literals.
   private mutating func lower(store e: IntegerLiteral.ID, to target: IRValue) {
+    unreachable()
+  }
+  
+  /// Implements `lower(store:to:)` for integer literals.
+  private mutating func lower(store e: FloatingPointLiteral.ID, to target: IRValue) {
     unreachable()
   }
 
@@ -1116,9 +1123,12 @@ internal struct IREmitter {
     case .expressibleByIntegerLiteralInit:
       let s = program.cast(source.value, to: IntegerLiteral.self)!
       return loweredBuiltinIntegerLiteralConversion(from: s, to: target)
+    case .expressibleByFloatingPointLiteralInit:
+      let s = program.cast(source.value, to: FloatingPointLiteral.self)!
+      return loweredBuiltinFloatingPointLiteralConversion(from: s, to: target)
 
     default:
-      program.unexpected(e)
+      unreachable("unexpected call to '\(program.show(e))' applied to '\(f)'")
     }
   }
 
@@ -1141,7 +1151,28 @@ internal struct IREmitter {
     case program.standardLibraryType(.int64):
       return .integer(value, program.types.demand(MachineType.i(64)))
     default:
-      program.unexpected(source)
+      program.unexpected(target)
+    }
+  }
+
+  /// Returns the value denoted by `source` interpreted as the floating point
+  /// type `target`, defined in the standard library.
+  ///
+  /// Standard library floating point types are thin wrappers around a machine type. For instance, `Float32` wraps
+  /// a single `Builtin.float32` property. This method returns the value of that property converted from
+  /// a floating point number literal.
+  private mutating func loweredBuiltinFloatingPointLiteralConversion(
+    from source: FloatingPointLiteral.ID, to target: AnyTypeIdentity
+  ) -> IRValue {
+    let value = program[source].value.sans("_")
+
+    switch target {
+    case program.standardLibraryType(.float32):
+      return .floatingPoint(literal: value, program.types.demand(.float32))
+    case program.standardLibraryType(.float64):
+      return .floatingPoint(literal: value, program.types.demand(.float64))
+    default:
+      program.unexpected(target)
     }
   }
 

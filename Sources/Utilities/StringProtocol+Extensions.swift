@@ -24,6 +24,11 @@ extension StringProtocol {
     return r
   }
 
+  /// Returns `self` with each occurrence of `c` removed.
+  public func sans(_ c: Character) -> String {
+    .init(filter({ (a) in a != c }))
+  }
+
 }
 
 extension StringProtocol where SubSequence == Substring {
