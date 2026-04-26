@@ -1,0 +1,3 @@
+/// Prints `value` to standard output followed by a newline.
+@extern("hylo_print_int")
+public fun print(value: Int)

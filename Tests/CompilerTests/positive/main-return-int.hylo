@@ -1,0 +1,6 @@
+//! stage:run stdlib:minimal assert-exit-code:11
+
+
+public fun main() -> Int {
+  11
+}

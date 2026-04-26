@@ -1,0 +1,52 @@
+/// A value that can be either `true` or `false`.
+@_symbol("Bool")
+public struct Bool is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i1
+
+  /// Creates an instance with its raw value.
+  @extern("hylo_bool_memberwise_init")
+  public init(_ value: Builtin.i1)
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_i1()
+  }
+
+  /// Returns the logical conjunction of `self` and `other`.
+  ///
+  /// This operation has short-circuit behavior: `other` is evaluated iff `self` is `true`.
+  public fun infix&& (other: lazy Bool) -> Bool {
+    if self { Bool(value: other.value) } else { Bool() }
+  }
+
+  /// Returns the logical disjunction of `self` and `other`.
+  ///
+  /// This operation has short-circuit behavior: `other` is evaluated iff `self` is `false`.
+  public fun infix|| (other: lazy Bool) -> Bool {
+    if self { Bool(value: self.value) } else { Bool(value: other.value) }
+  }
+
+  /// Returns negation of `self`.
+  public fun prefix! () -> Bool {
+    // `Bool(value: self.value != 0)`
+    Bool(value: Builtin.icmp_eq_i1(self.value, Builtin.zeroinitializer_i1()))
+  }
+
+  public fun infix== (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_eq_i1(self.value, other.value))
+  }
+
+  public fun infix!= (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_ne_i1(self.value, other.value))
+  }
+
+  @extern("hylo_make_false")
+  public static fun makeFalse() -> Bool
+
+  @extern("hylo_make_true")
+  public static fun makeTrue() -> Bool
+}
+
+public given Bool is Movable {}

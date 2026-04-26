@@ -1,0 +1,11 @@
+//! stage:lowering
+
+fun abs(x: Int) -> Int {
+  let _ = 3 // dummy statement
+
+  if x < 0 {
+    return 0 - x
+  } else {
+    return 0 + x
+  }
+}
