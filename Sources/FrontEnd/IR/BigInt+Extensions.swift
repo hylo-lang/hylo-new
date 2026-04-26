@@ -39,11 +39,3 @@ extension BigUInt {
 
 }
 
-extension StringProtocol {
-
-  /// Returns `self` with each occurrence of `c` removed.
-  fileprivate func sans(_ c: Character) -> String {
-    .init(filter({ (a) in a != c }))
-  }
-
-}

@@ -1,0 +1,6 @@
+//! stage:lowering
+
+fun float_literal_conversions() {
+  let a1: Float32 = 0.5
+  let a2: Float64 = -0.5
+}

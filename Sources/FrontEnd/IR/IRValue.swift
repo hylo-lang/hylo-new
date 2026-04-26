@@ -12,6 +12,11 @@ public enum IRValue: Hashable, Sendable {
   /// A constant integer.
   indirect case integer(BigInt, MachineType.ID)
 
+  /// A constant floating point number.
+  ///
+  /// `literal` contains the string representation of the floating point number without underscores.
+  indirect case floatingPoint(literal: String, MachineType.ID)
+
   /// A reference to a lowered function.
   indirect case function(IRFunction.Name, AnyTypeIdentity)
 
@@ -71,6 +76,8 @@ extension IRValue: Showable {
       return "%r\(i.address.rawValue)"
     case .integer(let n, let t):
       return "\(printer.show(t)) \(n)"
+    case .floatingPoint(let f, let t):
+      return "\(printer.show(t)) \(f)"
     case .function(let n, _):
       return printer.show(n)
     case .type(let t, _):

@@ -872,6 +872,8 @@ public struct Typer {
     switch concept {
     case program.standardLibraryDeclaration(.expressibleByIntegerLiteral):
       return isStandardLibraryIntegerType(conformer)
+    case program.standardLibraryDeclaration(.expressibleByFloatingPointLiteral):
+      return isStandardLibraryFloatingPointType(conformer)
     default:
       return false
     }
@@ -1942,6 +1944,8 @@ public struct Typer {
       return inferredType(of: castUnchecked(e, to: InoutExpression.self), in: &context)
     case IntegerLiteral.self:
       return inferredType(of: castUnchecked(e, to: IntegerLiteral.self), in: &context)
+    case FloatingPointLiteral.self:
+      return inferredType(of: castUnchecked(e, to: FloatingPointLiteral.self), in: &context)
     case Lambda.self:
       return inferredType(of: castUnchecked(e, to: Lambda.self), in: &context)
     case NameExpression.self:
@@ -2261,6 +2265,45 @@ public struct Typer {
           site: program[e].site))
 
       let qualification = context.expectedType ?? standardLibraryType(.int)
+      return context.withSubcontext(expectedType: qualification) { (ctx) in
+        inferredType(of: c, in: &ctx)
+      }
+    }
+  }
+
+  /// Returns the inferred type of `e`.
+  private mutating func inferredType(
+    of e: FloatingPointLiteral.ID, in context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    // Did we already elaborate this expression?
+    if let t = program[e.module].type(assignedTo: e) {
+      return context.obligations.assume(e, hasType: t, at: program[e].site)
+    }
+
+    // Otherwise, elaborate to `.new(floating_point_literal: e)`.
+    else {
+      let s = SourceSpan.empty(at: program[e].site.start)
+      let p = program.parent(containing: e)
+
+      let literal = program[e.module].insert(program[e], in: p)
+      let float = demand(LiteralType.float).erased
+      program[e.module].setType(float, for: literal)
+
+      let q = program[e.module].insert(
+        ImplicitQualification(site: s), in: p)
+      let n = program[e.module].insert(
+        NameExpression(qualification: nil, name: .init("init", at: s), site: s), in: p)
+      let m = program[e.module].insert(
+        New(qualification: .init(q), target: n, site: s), in: p)
+      let c = program[e.module].replace(
+        .init(e),
+        with: Call(
+          callee: .init(m),
+          arguments: [.init(label: Parsed("floating_point_literal", at: s), value: .init(literal))],
+          style: .parenthesized,
+          site: program[e].site))
+
+      let qualification = context.expectedType ?? standardLibraryType(.float64)
       return context.withSubcontext(expectedType: qualification) { (ctx) in
         inferredType(of: c, in: &ctx)
       }
@@ -4595,6 +4638,21 @@ public struct Typer {
     case standardLibraryType(.int),
         standardLibraryType(.int32),
         standardLibraryType(.int64):
+      return true
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff `t` is a standard library floating point type (e.g., `Hylo.Float32`).
+  ///
+  /// The module containing the standard library must have been loaded in the `self.program`, or
+  /// `self.module` is the standard library.
+  private mutating func isStandardLibraryFloatingPointType(_ t: AnyTypeIdentity) -> Bool {
+    guard program.containsStandardLibrary else { return false }
+    switch program.types.dealiased(t) {
+    case standardLibraryType(.float32),
+        standardLibraryType(.float64):
       return true
     default:
       return false

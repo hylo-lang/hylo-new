@@ -109,27 +109,37 @@ public enum BuiltinFunction: Hashable, Sendable {
   //  case inttoptr(MachineType.ID)
   //
   //  case ptrtoint(MachineType.ID)
-  //
-  //  case fadd(MathFlags, MachineType.ID)
-  //
-  //  case fsub(MathFlags, MachineType.ID)
-  //
-  //  case fmul(MathFlags, MachineType.ID)
-  //
-  //  case fdiv(MathFlags, MachineType.ID)
-  //
-  //  case frem(MathFlags, MachineType.ID)
-  //
-  //  case fcmp(MathFlags, FloatingPointPredicate, MachineType.ID)
-  //
-  //  case fptrunc(MachineType.ID, MachineType.ID)
-  //
-  //  case fpext(MachineType.ID, MachineType.ID)
-  //
-  //  case fptoui(MachineType.ID, MachineType.ID)
-  //
-  //  case fptosi(MachineType.ID, MachineType.ID)
-  //
+
+  /// In LLVM: `fadd`.
+  case fadd(MathFlags, MachineType.ID)
+
+  /// In LLVM: `fsub`.
+  case fsub(MathFlags, MachineType.ID)
+
+  /// In LLVM: `fmul`.
+  case fmul(MathFlags, MachineType.ID)
+
+  /// In LLVM: `fdiv`.
+  case fdiv(MathFlags, MachineType.ID)
+
+  /// In LLVM: `frem`.
+  case frem(MathFlags, MachineType.ID)
+
+  /// In LLVM: `fcmp`.
+  case fcmp(MathFlags, FloatingPointPredicate, MachineType.ID)
+
+  /// In LLVM: `fptrunc .. to`.
+  case fptrunc(MachineType.ID, MachineType.ID)
+
+  /// In LLVM: `fpext .. to`.
+  case fpext(MachineType.ID, MachineType.ID)
+
+  /// In LLVM: `fptoui`.
+  case fptoui(MachineType.ID, MachineType.ID)
+
+  /// In LLVM: `fptosi`.
+  case fptosi(MachineType.ID, MachineType.ID)
+
   //  case ctpop(MachineType.ID)
   //
   //  case ctlz(MachineType.ID)
@@ -462,26 +472,26 @@ extension BuiltinFunction {
     //      return .init(^t, to: .builtin(.ptr))
     //    case .ptrtoint(let t):
     //      return .init(.builtin(.ptr), to: ^t)
-    //    case .fadd(_, let t):
-    //      return .init(^t, ^t, to: ^t)
-    //    case .fsub(_, let t):
-    //      return .init(^t, ^t, to: ^t)
-    //    case .fmul(_, let t):
-    //      return .init(^t, ^t, to: ^t)
-    //    case .fdiv(_, let t):
-    //      return .init(^t, ^t, to: ^t)
-    //    case .frem(_, let t):
-    //      return .init(^t, ^t, to: ^t)
-    //    case .fcmp(_, _, let t):
-    //      return .init(^t, ^t, to: .builtin(.i(1)))
-    //    case .fptrunc(let s, let d):
-    //      return .init(^s, to: ^d)
-    //    case .fpext(let s, let d):
-    //      return .init(^s, to: ^d)
-    //    case .fptoui(let s, let d):
-    //      return .init(^s, to: ^d)
-    //    case .fptosi(let s, let d):
-    //      return .init(^s, to: ^d)
+    case .fadd(_, let t):
+      return s.demand(Arrow(t, t, to: t))
+    case .fsub(_, let t):
+      return s.demand(Arrow(t, t, to: t))
+    case .fmul(_, let t):
+      return s.demand(Arrow(t, t, to: t))
+    case .fdiv(_, let t):
+      return s.demand(Arrow(t, t, to: t))
+    case .frem(_, let t):
+      return s.demand(Arrow(t, t, to: t))
+    case .fcmp(_, _, let t):
+      return s.demand(Arrow(t, t, to: i1))
+    case .fptrunc(let f, let d):
+      return s.demand(Arrow(f, to: d))
+    case .fpext(let f, let d):
+      return s.demand(Arrow(f, to: d))
+    case .fptoui(let f, let d):
+      return s.demand(Arrow(f, to: d))
+    case .fptosi(let f, let d):
+      return s.demand(Arrow(f, to: d))
     //    case .ctpop(let t):
     //      return .init(^t, to: ^t)
     //    case .ctlz(let t):
@@ -800,26 +810,26 @@ extension BuiltinFunction: Showable {
     //      return "inttoptr_\(t)"
     //    case .ptrtoint(let t):
     //      return "ptrtoint_\(t)"
-    //    case .fadd(let f, let t):
-    //      return f.isEmpty ? "fadd_\(t)" : "fadd_\(f)_\(t)"
-    //    case .fsub(let f, let t):
-    //      return f.isEmpty ? "fsub_\(t)" : "fsub_\(f)_\(t)"
-    //    case .fmul(let f, let t):
-    //      return f.isEmpty ? "fmul_\(t)" : "fmul_\(f)_\(t)"
-    //    case .fdiv(let f, let t):
-    //      return f.isEmpty ? "fdiv_\(t)" : "fdiv_\(f)_\(t)"
-    //    case .frem(let f, let t):
-    //      return f.isEmpty ? "frem_\(t)" : "frem_\(f)_\(t)"
-    //    case .fcmp(let f, let p, let t):
-    //      return f.isEmpty ? "fcmp_\(p)_\(t)" : "fcmp_\(f)_\(p)_\(t)"
-    //    case .fptrunc(let l, let r):
-    //      return "fptrunc_\(l)_\(r)"
-    //    case .fpext(let l, let r):
-    //      return "fpext_\(l)_\(r)"
-    //    case .fptoui(let l, let r):
-    //      return "fptoui_\(l)_\(r)"
-    //    case .fptosi(let l, let r):
-    //      return "fptosi_\(l)_\(r)"
+    case .fadd(let f, let t):
+      return f.isEmpty ? "fadd_\(t)" : "fadd_\(f)_\(t)"
+    case .fsub(let f, let t):
+      return f.isEmpty ? "fsub_\(t)" : "fsub_\(f)_\(t)"
+    case .fmul(let f, let t):
+      return f.isEmpty ? "fmul_\(t)" : "fmul_\(f)_\(t)"
+    case .fdiv(let f, let t):
+      return f.isEmpty ? "fdiv_\(t)" : "fdiv_\(f)_\(t)"
+    case .frem(let f, let t):
+      return f.isEmpty ? "frem_\(t)" : "frem_\(f)_\(t)"
+    case .fcmp(let f, let p, let t):
+      return f.isEmpty ? "fcmp_\(p)_\(t)" : "fcmp_\(f)_\(p)_\(t)"
+    case .fptrunc(let l, let r):
+      return "fptrunc_\(l)_\(r)"
+    case .fpext(let l, let r):
+      return "fpext_\(l)_\(r)"
+    case .fptoui(let l, let r):
+      return "fptoui_\(l)_\(r)"
+    case .fptosi(let l, let r):
+      return "fptosi_\(l)_\(r)"
     //    case .ctpop(let t):
     //      return "ctpop_\(t)"
     //    case .ctlz(let t):
@@ -1196,45 +1206,46 @@ extension BuiltinFunction {
     //      guard let t = machineType(&tokens) else { return nil }
     //      self = .ptrtoint(t)
     //
-    //    case "fadd":
-    //      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
-    //      self = .fadd(p, t)
-    //
-    //    case "fsub":
-    //      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
-    //      self = .fsub(p, t)
-    //
-    //    case "fmul":
-    //      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
-    //      self = .fmul(p, t)
-    //
-    //    case "fdiv":
-    //      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
-    //      self = .fdiv(p, t)
-    //
-    //    case "frem":
-    //      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
-    //      self = .frem(p, t)
-    //
-    //    case "fcmp":
-    //      guard let (p, t) = floatingPointComparisonTail(&tokens) else { return nil }
-    //      self = .fcmp(p.0, p.1, t)
-    //
-    //    case "fptrunc":
-    //      guard let (s, d) = (builtinType ++ builtinType)(&tokens) else { return nil }
-    //      self = .fptrunc(s, d)
-    //
-    //    case "fpext":
-    //      guard let (s, d) = (builtinType ++ builtinType)(&tokens) else { return nil }
-    //      self = .fpext(s, d)
-    //
-    //    case "fptoui":
-    //      guard let (s, d) = (machineType ++ machineType)(&tokens) else { return nil }
-    //      self = .fptoui(s, d)
-    //
-    //    case "fptosi":
-    //      guard let (s, d) = (machineType ++ machineType)(&tokens) else { return nil }
-    //      self = .fptosi(s, d)
+    case "fadd":
+      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
+      self = .fadd(p, s.demand(t))
+
+    case "fsub":
+      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
+      self = .fsub(p, s.demand(t))
+
+    case "fmul":
+      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
+      self = .fmul(p, s.demand(t))
+
+    case "fdiv":
+      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
+      self = .fdiv(p, s.demand(t))
+
+    case "frem":
+      guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
+      self = .frem(p, s.demand(t))
+
+    case "fcmp":
+      guard let (p, t) = floatingPointComparisonTail(&tokens) else { return nil }
+      self = .fcmp(p.0, p.1, s.demand(t))
+
+    case "fptrunc":
+      guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
+      self = .fptrunc(s.demand(f), s.demand(d))
+
+    case "fpext":
+      guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
+      self = .fpext(s.demand(f), s.demand(d))
+
+    case "fptoui":
+      guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
+      self = .fptoui(s.demand(f), s.demand(d))
+
+    case "fptosi":
+      guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
+      self = .fptosi(s.demand(f), s.demand(d))
+
     //
     //    case "ctpop":
     //      guard let t = machineType(&tokens) else { return nil }

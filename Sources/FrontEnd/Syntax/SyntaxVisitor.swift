@@ -94,7 +94,7 @@ extension Program {
       break
     case InoutExpression.self:
       traverse(castUnchecked(n, to: InoutExpression.self), calling: &v)
-    case IntegerLiteral.self:
+    case IntegerLiteral.self, FloatingPointLiteral.self:
       break
     case KindExpression.self:
       traverse(castUnchecked(n, to: KindExpression.self), calling: &v)

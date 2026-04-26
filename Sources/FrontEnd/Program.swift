@@ -640,6 +640,8 @@ public struct Program: Sendable {
     switch m {
     case standardLibraryDeclaration(.expressibleByIntegerLiteralInit):
       return .expressibleByIntegerLiteralInit
+    case standardLibraryDeclaration(.expressibleByFloatingPointLiteralInit):
+      return .expressibleByFloatingPointLiteralInit
     default:
       return nil
     }
@@ -1429,6 +1431,12 @@ extension Program {
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
+    /// `Hylo.Float32`.
+    case float32 = "Float32"
+
+    /// `Hylo.Float64`.
+    case float64 = "Float64"
+
     /// `Hylo.Deinitializable`.
     case deinitializable = "Deinitializable"
 
@@ -1449,6 +1457,12 @@ extension Program {
 
     /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
     case expressibleByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
+
+    /// `Hylo.ExpressibleByFloatingPointLiteral`.
+    case expressibleByFloatingPointLiteral = "ExpressibleByFloatingPointLiteral"
+
+    /// `Hylo.ExpressibleByFloatingPointLiteral.init(floating_point_literal:)`.
+    case expressibleByFloatingPointLiteralInit = "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
 
   }
 

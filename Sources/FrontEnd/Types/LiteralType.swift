@@ -24,7 +24,7 @@ extension LiteralType: CustomStringConvertible {
     case .integer:
       return "IntegerLiteral"
     case .float:
-      return "FloatingPointerLiteral"
+      return "FloatingPointLiteral"
     }
   }
 
@@ -36,7 +36,7 @@ extension LiteralType: LosslessStringConvertible {
     switch description {
     case "IntegerLiteral":
       self = .integer
-    case "FloatingPointerLiteral":
+    case "FloatingPointLiteral":
       self = .float
     default:
       return nil

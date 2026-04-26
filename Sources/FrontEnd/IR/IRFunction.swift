@@ -381,6 +381,8 @@ public struct IRFunction: Sendable {
       return resolved(at(i).type)
     case .integer(_, let t):
       return (t.erased, false)
+    case .floatingPoint(_, let t):
+      return (t.erased, false)
     case .function(_, let t):
       return (t, true)
     case .type(_, let t):

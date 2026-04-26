@@ -1485,6 +1485,8 @@ public struct Parser {
       return .init(file.insert(BooleanLiteral(site: take()!.site)))
     case .integerLiteral:
       return .init(file.insert(IntegerLiteral(site: take()!.site)))
+    case .floatingPointLiteral:
+      return .init(file.insert(FloatingPointLiteral(site: take()!.site)))
     case .stringLiteral:
       return .init(file.insert(StringLiteral(site: take()!.site)))
     case .underscore:
