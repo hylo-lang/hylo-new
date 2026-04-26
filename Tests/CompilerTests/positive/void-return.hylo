@@ -1,0 +1,11 @@
+//! stage:run stdlib:minimal
+
+fun f() -> Void {
+  print(Int.one())
+  print(Int.zero())
+}
+
+public fun main() {
+  f()
+  f()
+}

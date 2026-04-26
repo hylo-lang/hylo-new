@@ -1,0 +1,27 @@
+fun hello(x: Int) {
+  println(x * 2)
+}
+
+fun println(x: Bool) {
+  if x {
+    println(1)
+  } else {
+    println(0)
+  }
+}
+
+@extern("exposed")
+fun exposed() -> Void
+
+public fun main() -> Int {
+  let v = 0.5 + 0.25
+  println(v)
+  println(v + 2.0E2)
+
+  if v != 0.7532_32 {
+    println(1)
+  } else {
+    println(0)
+  }
+  return 0
+}

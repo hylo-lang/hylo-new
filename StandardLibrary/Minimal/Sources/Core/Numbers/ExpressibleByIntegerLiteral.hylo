@@ -1,0 +1,8 @@
+/// A type whose instances can be expressed by an integer literal.
+@_symbol("ExpressibleByIntegerLiteral")
+public trait ExpressibleByIntegerLiteral {
+
+  @_symbol("ExpressibleByIntegerLiteral.init(integer_literal:)")
+  init(integer_literal literal: Builtin.IntegerLiteral)
+
+}

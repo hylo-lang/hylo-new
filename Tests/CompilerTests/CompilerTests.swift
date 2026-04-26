@@ -4,6 +4,7 @@ import FrontEnd
 import StandardLibrary
 import Utilities
 import XCTest
+typealias Host = Utilities.Host
 
 /// The driver for generated compiler tests.
 ///
@@ -24,10 +25,21 @@ final class CompilerTests: XCTestCase {
     /// The manifest of the test.
     let manifest: Manifest
 
+    /// What the program is expected to print to stdout when `self` is a run-stage test.
+    var expectedStandardOutput: String?
+
     /// Creates an instance with the given properties.
     init(_ path: String) throws {
       self.root = URL(filePath: path)
       self.manifest = try Manifest(contentsOf: root)
+
+      self.expectedStandardOutput = try? String(
+        contentsOf: root.deletingPathExtension().appendingPathExtension("stdout.expected"),
+        encoding: .utf8)
+
+      if manifest.stage != .run && self.expectedStandardOutput != nil {
+        throw TestFailure.invalidTestDescription(message: "stdout assertion requires stage:run")
+      }
     }
 
     /// `true` iff `self` describes a package.
@@ -55,6 +67,15 @@ final class CompilerTests: XCTestCase {
         root.appending(component: ".\(tag).observed")
       } else {
         root.deletingPathExtension().appendingPathExtension("\(tag).observed")
+      }
+    }
+
+    /// Returns where to save the generated executable upon failure.
+    func executableDestination() -> URL {
+      if isPackage {
+        root.appending(component: ".executable\(Host.nativeExecutableSuffix)")
+      } else {
+        root.deletingPathExtension().appendingPathExtension("executable\(Host.nativeExecutableSuffix)")
       }
     }
 
@@ -101,6 +122,11 @@ final class CompilerTests: XCTestCase {
     /// The compiled IR artifact of the tested module, if any.
     var llvmIR: String?
 
+    /// The URL of the generated executable residing in a temporary directory, if any.
+    ///
+    /// Copied to the test case destination upon test case failure.
+    var executable: URL?
+
     /// Saves the artifacts into test-case-level observation files of `test`.
     func save(into test: TestDescription) throws {
       if let rawIR {
@@ -112,8 +138,16 @@ final class CompilerTests: XCTestCase {
       if let llvmIR {
         try test.saveTestCaseLevelObservation(llvmIR, tag: "ll")
       }
+      if let executable {
+        try FileManager.default.copyItem(at: executable, to: test.executableDestination())
+      }
     }
 
+  }
+
+  /// Whether the test case has recorded any failures or uncaught exceptions.
+  var testFailed: Bool {
+    if let testRun, testRun.totalFailureCount > 0 { true } else { false }
   }
 
   /// The test case currently being run.
@@ -124,37 +158,76 @@ final class CompilerTests: XCTestCase {
 
   /// Saves any available compilation artifacts on test failure
   /// or if `alwaysSaveArtifacts` is true to facilitate diagnosis.
-  ///
-  /// Run by XCTest after each test case.
-  override func tearDownWithError() throws {
-    if let testRun, testRun.failureCount > 0 || alwaysSaveArtifacts, let testCase {
+  func saveArtifactsIfNeeded() throws {
+    if testFailed || alwaysSaveArtifacts, let testCase {
       try artifacts.save(into: testCase)
     }
   }
 
+  /// Run by XCTest after each test case.
+  override func tearDownWithError() throws {
+    try saveArtifactsIfNeeded()
+  }
+
+  /// The result of a successful compilation.
+  private struct CompilationResult {
+
+    /// The driver used to compile the test program.
+    var driver: Driver
+
+    /// The main module being compiled.
+    let module: FrontEnd.Module.ID
+
+    /// The expected diagnostics for each source file.
+    let expectedDiagnostics: [FileName: String]
+
+  }
+
   /// Compiles `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    let (program, _) = try await compile(input)
-    assertSansError(program)
+    do {
+      let r = try await compile(input)
+      try assertSansError(r.driver.program)
+
+      guard input.manifest.stage == .run else { return }
+
+      guard let executable = artifacts.executable else {
+        XCTFail("missing executable output")
+        throw TestFailure.missingExecutableOutput
+      }
+      let execution = try Process.executionResult(executable)
+      try execution.standardOutput.write(to: input.root.deletingPathExtension().appendingPathExtension("stdout.observed"), atomically: true, encoding: .utf8)
+
+      assertExitCode(input.manifest.assertedExitCode ?? 0, in: execution, testCaseRoot: input.root)
+      if let expected = input.expectedStandardOutput {
+        assertStandardOutput(expected, in: execution, testCaseRoot: input.root)
+      }
+    } catch let error as TestFailure {
+      XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
+    }
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    let (program, expectations) = try await compile(input)
-    XCTAssert(program.containsError, "program compiled but an error was expected")
-    assertExpectations(expectations, program.diagnostics)
+    do {
+      let r = try await compile(input)
+      XCTAssert(r.driver.program.containsError, "program compiled but an error was expected.\nSource: \(input.root.path)\n")
+      assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
+    } catch let error as TestFailure {
+      XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
+    }
   }
 
-  /// Compiles `input` into `p` and returns expected diagnostics for each compiled source file.
+  /// Compiles `input` into `outputDirectory` and returns expected diagnostics for each compiled source file.
   ///
   /// Sets up the `testCase` context and populates `artifacts` as soon as compilation stages succeed.
-  private func compile(_ input: TestDescription) async throws -> (Program, [FileName: String]) {
+  private func compile(_ input: TestDescription) async throws -> CompilationResult {
     self.testCase = input
 
-    var driver = Driver(moduleCachePath: CompilerTests.moduleCachePath.url)
+    var driver = try Driver(moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native(), standardLibrary: input.manifest.standardLibrary)
 
     if input.manifest.requiresStandardLibrary {
-      try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
+      try await driver.loadStandardLibrary()
     }
 
     let m = driver.program.demandModule(.init("Test"))
@@ -172,8 +245,11 @@ final class CompilerTests: XCTestCase {
       expectedDiagnostics[source.name] = expected
     }
 
-    func done() -> (Program, [FileName: String]) {
-      (driver.program, expectedDiagnostics)
+    func done() -> CompilationResult {
+      .init(
+        driver: driver,
+        module: m,
+        expectedDiagnostics: expectedDiagnostics)
     }
 
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -196,12 +272,84 @@ final class CompilerTests: XCTestCase {
 
     if input.manifest.stage == .lowering { return done() }
 
-    // Code generation.
-    assert(input.manifest.stage == .codegen)
+    // LLVM Lowering.
+    if (try driver.lowerToLLVM(m)).containsError { return done() }
+    artifacts.llvmIR = driver.llvmIR(of: m)!
+    if input.manifest.stage == .llvmLowering { return done() }
+
+    // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
+    if input.manifest.requiresStandardLibrary {
+      // let stdlibID = driver.program.demandModule(Module.standardLibraryName)
+      // if await driver.lower(stdlibID).containsError { return done() }
+      // if await driver.applyTransformationPasses(stdlibID).containsError { return done() }
+      // if (try driver.lowerToLLVM(stdlibID)).containsError { return done() }
+    }
+
+    if input.manifest.stage == .executableLinking || input.manifest.stage == .run {
+      let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
+
+      let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
+      _ = try driver.generateExecutable(from: m, writingTo: executable)
+      artifacts.executable = executable
+    }
+
     return done()
   }
 
-  private func compile(_ m: Module.ID, driver: inout Driver) {
+  /// Asserts that the exit code of `observed` matches `expected`.
+  private func assertExitCode(_ expected: Int32, in observed: Process.ExecutionResult, testCaseRoot: URL) {
+    XCTAssertEqual(
+      observed.exitCode,
+      expected,
+      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)\nSource: \(testCaseRoot.path)\n")
+  }
+
+  /// Asserts that the standard output of `observed` matches `expected`.
+  private func assertStandardOutput(_ expected: String, in observed: Process.ExecutionResult, testCaseRoot: URL) {
+    XCTAssertEqual(
+      observed.standardOutput,
+      expected,
+      "mismatched stdout.\nSource: \(testCaseRoot.path)\n")
+  }
+
+  private func execute(_ executable: URL) throws -> Process.ExecutionResult {
+    let process = Process()
+    let standardOutput = Pipe()
+    let standardError = Pipe()
+    process.executableURL = executable
+    process.standardOutput = standardOutput
+    process.standardError = standardError
+    try process.run()
+    process.waitUntilExit()
+
+    let stdout = String(decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    let stderr = String(decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+
+    return .init(
+      standardOutput: stdout,
+      standardError: stderr,
+      exitCode: process.terminationStatus)
+  }
+
+  /// An error thrown to signal test failure with given reason.
+  private enum TestFailure: Error {
+
+    case missingExecutableOutput
+
+    case compilationError(message: String)
+
+    case invalidTestDescription(message: String)
+
+    var localizedDescription: String {
+      switch self {
+      case .missingExecutableOutput:
+        return "missing executable output"
+      case .compilationError(let message):
+        return "Compilation failure:\n\(message)"
+      case .invalidTestDescription(let d):
+        return "Invalid test description (\(d))"
+      }
+    }
 
   }
 
@@ -242,7 +390,7 @@ final class CompilerTests: XCTestCase {
   }
 
   /// Asserts that `program` does not contain any error.
-  private func assertSansError(_ program: Program) {
+  private func assertSansError(_ program: Program) throws {
     if !program.containsError { return }
 
     let root = URL(filePath: #filePath).deletingLastPathComponent()
@@ -261,7 +409,7 @@ final class CompilerTests: XCTestCase {
       }
       report.write(o)
     }
-    XCTFail(report)
+    throw TestFailure.compilationError(message:report)
   }
 
   /// Returns a message explaining `delta`, which is the result of comparing `expectation` to some

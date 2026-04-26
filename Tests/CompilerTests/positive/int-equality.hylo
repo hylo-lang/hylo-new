@@ -1,0 +1,18 @@
+//! stage:run stdlib:minimal
+
+
+public fun main() {
+  // Should print 1.
+  if 2 == 2 {
+    print(1)
+  } else {
+    print(0)
+  }
+
+  // Should print 0.
+  if 2 != 2 {
+    print(1)
+  } else {
+    print(0)
+  }
+}

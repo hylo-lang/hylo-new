@@ -6,18 +6,23 @@ import StandardLibrary
 final class StandardLibraryLoadingTests: XCTestCase {
 
   func testStandardLibraryLoading() async throws {
-    var driver = Driver()
+    var driver = try Driver(targetSpecification: .native())
     try await driver.loadStandardLibrary()
   }
 
   func testStandardLibraryLoadingBundled() async throws {
-    var driver = Driver()
-    try await driver.load(Module.standardLibraryName, withSourcesAt: bundledStandardLibrarySources)
+    var driver = try Driver(targetSpecification: .native())
+    try await driver.load(Module.standardLibraryName, withSourcesAt: StandardLibraryRoot.bundledFull().root)
   }
 
   func testStandardLibraryLoadingLocal() async throws {
-    var driver = Driver()
-    try await driver.load(Module.standardLibraryName, withSourcesAt: localStandardLibrarySources)
+    var driver = try Driver(targetSpecification: .native())
+    try await driver.load(Module.standardLibraryName, withSourcesAt: StandardLibraryRoot.localFull().root)
+  }
+
+  func testStandardLibraryLoadingMinimal() async throws {
+    var driver = try Driver(targetSpecification: .native())
+    try await driver.load(Module.standardLibraryName, withSourcesAt: StandardLibraryRoot.localMinimal().root)
   }
 
 }

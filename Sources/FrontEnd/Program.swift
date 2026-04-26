@@ -22,8 +22,13 @@ public struct Program: Sendable {
   /// or by `self.load(module:from:)` after the standard library has been deserialized.
   private var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
 
+  /// The `Never` type of Hylo.
+  public let never: AnyTypeIdentity
+
   /// Creates an empty program.
-  public init() {}
+  public init() {
+    self.never = types.never().erased
+  }
 
   /// `true` if the program has errors.
   public var containsError: Bool {
@@ -635,6 +640,8 @@ public struct Program: Sendable {
     switch m {
     case standardLibraryDeclaration(.expressibleByIntegerLiteralInit):
       return .expressibleByIntegerLiteralInit
+    case standardLibraryDeclaration(.expressibleByFloatingPointLiteralInit):
+      return .expressibleByFloatingPointLiteralInit
     default:
       return nil
     }
@@ -1424,6 +1431,12 @@ extension Program {
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
+    /// `Hylo.Float32`.
+    case float32 = "Float32"
+
+    /// `Hylo.Float64`.
+    case float64 = "Float64"
+
     /// `Hylo.Deinitializable`.
     case deinitializable = "Deinitializable"
 
@@ -1444,6 +1457,12 @@ extension Program {
 
     /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
     case expressibleByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
+
+    /// `Hylo.ExpressibleByFloatingPointLiteral`.
+    case expressibleByFloatingPointLiteral = "ExpressibleByFloatingPointLiteral"
+
+    /// `Hylo.ExpressibleByFloatingPointLiteral.init(floating_point_literal:)`.
+    case expressibleByFloatingPointLiteralInit = "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
 
   }
 
@@ -1495,7 +1514,7 @@ extension Program {
         let a = identity(module: Module.standardLibraryName),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
-      else { fatalError("missing or corrupt standard library") }
+      else { fatalError("missing or corrupt standard library; missing '\(n.rawValue)'") }
       standardLibraryDeclarations[n] = d
     }
   }

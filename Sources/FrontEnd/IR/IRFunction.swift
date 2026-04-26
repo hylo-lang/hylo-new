@@ -154,6 +154,11 @@ public struct IRFunction: Sendable {
     blocks.firstAddress
   }
 
+  /// `true` iff `self` accepts generic type parameters.
+  public var isGeneric: Bool {
+    !typeParameters.isEmpty
+  }
+
   /// Returns `true` iff the last instruction of `b` is a terminator.
   public func isTerminated(_ b: IRBlock.ID) -> Bool {
     if let i = blocks[b].last {
@@ -375,6 +380,8 @@ public struct IRFunction: Sendable {
     case .register(let i):
       return resolved(at(i).type)
     case .integer(_, let t):
+      return (t.erased, false)
+    case .floatingPoint(_, let t):
       return (t.erased, false)
     case .function(_, let t):
       return (t, true)
