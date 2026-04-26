@@ -125,3 +125,117 @@ void hylo_int_gt(const intptr_t* self, const intptr_t* other, char* result) {
 void hylo_int_ge(const intptr_t* self, const intptr_t* other, char* result) {
     *result = (char)(*self >= *other);
 }
+
+/// Sets `result` to zero.
+///
+/// Definition of `Hylo.Float32.init()`.
+void hylo_float32_init(float* result) {
+    *result = 0.0f;
+}
+
+/// Sets `result` to `self == other`.
+void hylo_float32_eq(const float* self, const float* other, char* result) {
+    *result = (char)(*self == *other);
+}
+
+/// Sets `result` to `self != other`.
+void hylo_float32_ne(const float* self, const float* other, char* result) {
+    *result = (char)(*self != *other);
+}
+
+/// Sets `result` to `self < other`.
+void hylo_float32_lt(const float* self, const float* other, char* result) {
+    *result = (char)(*self < *other);
+}
+
+/// Sets `result` to `self <= other`.
+void hylo_float32_le(const float* self, const float* other, char* result) {
+    *result = (char)(*self <= *other);
+}
+
+/// Sets `result` to `self > other`.
+void hylo_float32_gt(const float* self, const float* other, char* result) {
+    *result = (char)(*self > *other);
+}
+
+/// Sets `result` to `self >= other`.
+void hylo_float32_ge(const float* self, const float* other, char* result) {
+    *result = (char)(*self >= *other);
+}
+
+/// Sets `result` to `self + other`.
+void hylo_float32_infix_add(const float* self, const float* other, float* result) {
+    *result = *self + *other;
+}
+
+/// Sets `result` to `self - other`.
+void hylo_float32_infix_subtract(const float* self, const float* other, float* result) {
+    *result = *self - *other;
+}
+
+/// Sets `result` to `self * other`.
+void hylo_float32_infix_multiply(const float* self, const float* other, float* result) {
+    *result = *self * *other;
+}
+
+/// Sets `result` to zero.
+///
+/// Definition of `Hylo.Float64.init()`.
+void hylo_float64_init(double* result) {
+    *result = 0.0;
+}
+
+/// Sets `result` to `self == other`.
+void hylo_float64_eq(const double* self, const double* other, char* result) {
+    *result = (char)(*self == *other);
+}
+
+/// Sets `result` to `self != other`.
+void hylo_float64_ne(const double* self, const double* other, char* result) {
+    *result = (char)(*self != *other);
+}
+
+/// Sets `result` to `self < other`.
+void hylo_float64_lt(const double* self, const double* other, char* result) {
+    *result = (char)(*self < *other);
+}
+
+/// Sets `result` to `self <= other`.
+void hylo_float64_le(const double* self, const double* other, char* result) {
+    *result = (char)(*self <= *other);
+}
+
+/// Sets `result` to `self > other`.
+void hylo_float64_gt(const double* self, const double* other, char* result) {
+    *result = (char)(*self > *other);
+}
+
+/// Sets `result` to `self >= other`.
+void hylo_float64_ge(const double* self, const double* other, char* result) {
+    *result = (char)(*self >= *other);
+}
+
+/// Sets `result` to `self + other`.
+void hylo_float64_infix_add(const double* self, const double* other, double* result) {
+    *result = *self + *other;
+}
+
+/// Sets `result` to `self - other`.
+void hylo_float64_infix_subtract(const double* self, const double* other, double* result) {
+    *result = *self - *other;
+}
+
+/// Sets `result` to `self * other`.
+void hylo_float64_infix_multiply(const double* self, const double* other, double* result) {
+    *result = *self * *other;
+}
+
+/// Prints `x` with 4 fractional digits, followed by a newline.
+void hylo_print_float32(float* x, void* result) {
+    printf("%.4f\n", *x);
+}
+
+/// Prints `x` with 4 fractional digits, followed by a newline.
+void hylo_print_float64(double* x, void* result) {
+    printf("%.4f\n", *x);
+}

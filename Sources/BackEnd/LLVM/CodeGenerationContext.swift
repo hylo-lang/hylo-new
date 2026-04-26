@@ -588,41 +588,41 @@ private struct CodeGenerationContext: ~Copyable {
       //   let source = llvm(s.operands[0])
       //   register[.register(i)] = insertPtrToInt(source, to: target, at: insertionPoint).erased
 
-      // case .fadd:
-      //   let l = llvm(s.operands[0])
-      //   let r = llvm(s.operands[1])
-      //   register[.register(i)] = insertFAdd(l, r, at: insertionPoint).erased
+      case .fadd:
+        let l = llvmOperand(s.operands[0])
+        let r = llvmOperand(s.operands[1])
+        register[.register(i)] = llvm.insertFAdd(l, r, at: insertionPoint).erased
 
-      // case .fsub:
-      //   let l = llvm(s.operands[0])
-      //   let r = llvm(s.operands[1])
-      //   register[.register(i)] = insertFSub(l, r, at: insertionPoint).erased
+      case .fsub:
+        let l = llvmOperand(s.operands[0])
+        let r = llvmOperand(s.operands[1])
+        register[.register(i)] = llvm.insertFSub(l, r, at: insertionPoint).erased
 
-      // case .fmul:
-      //   let l = llvm(s.operands[0])
-      //   let r = llvm(s.operands[1])
-      //   register[.register(i)] = insertFMul(l, r, at: insertionPoint).erased
+      case .fmul:
+        let l = llvmOperand(s.operands[0])
+        let r = llvmOperand(s.operands[1])
+        register[.register(i)] = llvm.insertFMul(l, r, at: insertionPoint).erased
 
-      // case .fdiv:
-      //   let l = llvm(s.operands[0])
-      //   let r = llvm(s.operands[1])
-      //   register[.register(i)] = insertFDiv(l, r, at: insertionPoint).erased
+      case .fdiv:
+        let l = llvmOperand(s.operands[0])
+        let r = llvmOperand(s.operands[1])
+        register[.register(i)] = llvm.insertFDiv(l, r, at: insertionPoint).erased
 
-      // case .frem:
-      //   let l = llvm(s.operands[0])
-      //   let r = llvm(s.operands[1])
-      //   register[.register(i)] = insertFRem(l, r, at: insertionPoint).erased
+      case .frem:
+        let l = llvmOperand(s.operands[0])
+        let r = llvmOperand(s.operands[1])
+        register[.register(i)] = llvm.insertFRem(l, r, at: insertionPoint).erased
 
-      // case .fcmp(_, let p, _):
-      //   let l = llvm(s.operands[0])
-      //   let r = llvm(s.operands[1])
-      //   register[.register(i)] =
-      //     insertFloatingPointComparison(.init(p), l, r, at: insertionPoint).erased
+      case .fcmp(_, let p, _):
+        let l = llvmOperand(s.operands[0])
+        let r = llvmOperand(s.operands[1])
+        register[.register(i)] =
+          llvm.insertFloatingPointComparison(.init(p), l, r, at: insertionPoint).erased
 
-      // case .fptrunc(_, let t):
-      //   let target = program.llvmType(from: t, in: &llvm)
-      //   let source = llvm(s.operands[0])
-      //   register[.register(i)] = insertFPTrunc(source, to: target, at: insertionPoint).erased
+      case .fptrunc(_, let t):
+        let target = program.llvmType(from: t, in: &llvm)
+        let source = llvmOperand(s.operands[0])
+        register[.register(i)] = llvm.insertFPTrunc(source, to: target, at: insertionPoint).erased
 
       // case .ctpop(let t):
       //   let source = llvm(s.operands[0])
@@ -1180,6 +1180,10 @@ private struct CodeGenerationContext: ~Copyable {
         let llvmType = IntegerType.UnsafeReference(
           uncheckedFrom: program.llvmType(from: t, in: &llvm))
         return llvmType.unsafe[].constant(v).erased
+      case .floatingPoint(let v, let t):
+        let llvmType = FloatingPointType.UnsafeReference(
+          uncheckedFrom: program.llvmType(from: t, in: &llvm))
+        return llvmType.unsafe[].constant(parsing: v).erased
       case .function(let name, let t):
         return llvmFunction(named: name, type: t).erased
       case .type(let t, let w):
