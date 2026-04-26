@@ -2,6 +2,7 @@ import ArgumentParser
 import Driver
 import Foundation
 import FrontEnd
+import StandardLibrary
 import SwiftyLLVM
 import Utilities
 
@@ -84,6 +85,14 @@ private typealias Module = FrontEnd.Module
     help: "Do not load the standard library")
   private var noStandardLibrary: Bool = false
 
+  /// The standard library variant to use.
+  @Option(
+    name: [.customLong("stdlib")],
+    help: ArgumentHelp(
+      "Standard library variant: minimal, full, or a path to a custom root directory.",
+      valueName: "variant"))
+  private var standardLibrary: StandardLibraryRoot = .full()
+
   /// The kind of output that should be produced by the compiler.
   @Option(
     name: [.customLong("emit")],
@@ -133,7 +142,8 @@ private typealias Module = FrontEnd.Module
       optimization: optimizationLevel,
       relocation: relocationModel ?? defaultRelocationModel(),
       codeModel: codeModel ?? .default,
-      librarySearchPaths: librarySearchPaths)
+      librarySearchPaths: librarySearchPaths,
+      standardLibrary: standardLibrary)
 
     do {
       // Load the standard library.
@@ -510,6 +520,27 @@ extension ProcessInfo {
   /// `true` iff the terminal supports coloring.
   fileprivate static let ansiTerminalIsConnected =
     !["", "dumb", nil].contains(processInfo.environment["TERM"])
+
+}
+
+extension StandardLibraryRoot: ExpressibleByArgument {
+
+  /// Creates an instance from the command-line argument `argument`.
+  ///
+  /// `"minimal"` and `"full"` select the local minimal and full standard libraries respectively.
+  /// Any other value is treated as a path to the root directory of a custom standard library.
+  public init?(argument: String) {
+    switch argument {
+    case "minimal": self = .localMinimal()
+    case "full":    self = .full()
+    default:        self = .custom(URL(fileURLWithPath: argument))
+    }
+  }
+
+  /// A description of `self` suitable for use as the default value in command-line help.
+  public var defaultValueDescription: String {
+    root.path
+  }
 
 }
 

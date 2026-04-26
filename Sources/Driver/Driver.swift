@@ -42,12 +42,15 @@ public struct Driver {
   /// `true` iff the standard library and its shim should be excluded from compilation and linking.
   public var noStandardLibrary: Bool = false
 
+  /// The standard library to use during compilation.
+  public var standardLibrary: StandardLibraryRoot
+
   /// The program being compiled by the driver.
   public var program: Program
 
   /// The corresponding LLVM module for each Hylo module.
   ///
-  /// Populated by `lowerToLLVM(_:)`.
+  /// Populated during LLVM lowering.
   private var llvmModules: [Module.ID: LLVMModuleBox] = [:]
 
   /// Creates an instance with the given properties.
@@ -56,7 +59,8 @@ public struct Driver {
     optimization: OptimizationLevel = .none,
     relocation: RelocationModel = .default,
     codeModel: CodeModel = .default,
-    librarySearchPaths: [URL] = [], librariesToLink: [String] = []
+    librarySearchPaths: [URL] = [], librariesToLink: [String] = [],
+    standardLibrary: StandardLibraryRoot = .full()
   ) {
     self.moduleCachePath = moduleCachePath
     self.target = targetSpecification
@@ -65,6 +69,8 @@ public struct Driver {
     self.codeModel = codeModel
     self.librarySearchPaths = librarySearchPaths
     self.librariesToLink = librariesToLink
+    self.standardLibrary = standardLibrary
+
     self.program = .init()
   }
 
@@ -211,10 +217,18 @@ public struct Driver {
   public func writeObjectFiles(
     for modules: [Module.ID], into destinationDirectory: URL
   ) throws -> [URL] {
-    let objectFiles = try modules.map { (module) in
+    var objectFiles = try modules.map { (module) in
       let object = destinationDirectory.appendingPathComponent(moduleName(module) + ".o", isDirectory: false)
       try llvmModules[module]!.module.write(.objectFile, to: object.path)
       return object
+    }
+
+    if !noStandardLibrary {
+      let shimsObject = destinationDirectory.appendingPathComponent("stdlib_shims.o", isDirectory: false)
+      _ = try Process.executionOutput(
+        try Host.findNativeExecutable(invokedAs: "clang"),
+        arguments: ["-c", standardLibrary.shim.path, "-o", shimsObject.path])
+      objectFiles.append(shimsObject)
     }
     return objectFiles
   }
@@ -274,18 +288,9 @@ public struct Driver {
     }
   }
 
-  /// Loads the standard library with `load(_:withSourcesAt:)`.
-  /// 
-  /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the 
-  /// bundled or local standard library is used. Defaults to local.
+  /// Loads the standard library according to `self.standardLibrary`.
   public mutating func loadStandardLibrary() async throws {
-    let sourceRoot: URL
-    #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
-    sourceRoot = bundledStandardLibrarySources
-    #else
-    sourceRoot = localStandardLibrarySources
-    #endif
-    try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
+    try await load(Module.standardLibraryName, withSourcesAt: standardLibrary.root)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.

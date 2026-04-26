@@ -1,0 +1,12 @@
+//! stage:run stdlib:minimal
+
+/// Returns `x * 2`.
+fun double(x: Int) -> Int {
+  return x + x
+}
+
+public fun main() {
+  print(double(0))
+  print(double(1))
+  print(double(2))
+}

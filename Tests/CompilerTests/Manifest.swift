@@ -1,4 +1,5 @@
 import Foundation
+import StandardLibrary
 import Utilities
 
 /// A test manifest.
@@ -22,13 +23,22 @@ struct Manifest {
     /// After the program has been linked into an executable.
     case executableLinking
 
+    /// After the program has been linked and executed.
+    case run
+
   }
 
   /// `true` iff `self` requires a standard library.
   private(set) var requiresStandardLibrary: Bool = true
 
+  /// The standard library variant to use.
+  private(set) var standardLibrary: StandardLibraryRoot = .localFull()
+
   /// The stage up to which the input should be compiled.
   private(set) var stage: Stage = .llvmLowering
+
+  /// The expected exit code of the compiled program and run program, if applicable.
+  private(set) var assertedExitCode: Int32?
 
   /// Creates an instance with a default configuration.
   init() {}
@@ -65,6 +75,10 @@ struct Manifest {
     else {
       self.init()
     }
+
+    if assertedExitCode != nil && stage != .run {
+      throw ManifestError.invalidStage("assert-exit-code requires stage:run")
+    }
   }
 
   /// Updates the configuration of `self` with the option parsed from `s`.
@@ -76,8 +90,16 @@ struct Manifest {
     switch k {
     case "no-std":
       requiresStandardLibrary = false
+    case "stdlib":
+      switch v {
+      case "minimal": standardLibrary = .localMinimal()
+      case "full": standardLibrary = .localFull()
+      default: throw ManifestError.unknownOption
+      }
     case "stage":
       stage = try Stage(rawValue: v).unwrapOrThrow(ManifestError.invalidStage(v))
+    case "assert-exit-code":
+      assertedExitCode = try Int32(v).unwrapOrThrow(ManifestError.invalidExitCode(v))
     default:
       throw ManifestError.unknownOption
     }
@@ -117,5 +139,8 @@ enum ManifestError: Error {
 
   /// An invalid stage argument.
   case invalidStage(String)
+
+  /// An invalid exit code argument.
+  case invalidExitCode(String)
 
 }

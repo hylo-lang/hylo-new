@@ -1355,7 +1355,7 @@ internal struct IREmitter {
     let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
     var terms: [IRParameter] = []
 
-    precondition(program.tag(of: d) == FunctionDeclaration.self, "TODO")
+    precondition(program.tag(of: d) == FunctionDeclaration.self, "TODO \(program.show(d)))")
 
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {

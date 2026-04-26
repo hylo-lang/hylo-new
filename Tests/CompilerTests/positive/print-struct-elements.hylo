@@ -1,0 +1,23 @@
+//! stage:run stdlib:minimal
+
+struct Triple is Deinitializable {
+  let a: Int
+  let b: Int
+  let c: Int
+
+  /// Initializes the instance from its parts.
+  init(_ a: sink Int, _ b: sink Int, _ c: sink Int) {
+    &self.a = a
+    &self.b = b
+    &self.c = c
+  }
+}
+
+
+public fun main() {
+  let c = Triple(a: 1, b: 2, c: 3)
+
+  print(c.a)
+  print(c.b)
+  print(c.c)
+}
