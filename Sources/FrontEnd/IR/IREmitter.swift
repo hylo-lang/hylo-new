@@ -1271,7 +1271,7 @@ internal struct IREmitter {
     let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
     var result: [IRParameter] = []
 
-    precondition(program.tag(of: d) == FunctionDeclaration.self, "TODO")
+    precondition(program.tag(of: d) == FunctionDeclaration.self, "TODO \(program.show(d)))")
 
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {
@@ -1971,7 +1971,7 @@ internal struct IREmitter {
       return _type_apply(x, to: a)
 
     default:
-      fatalError()
+      unreachable("unexpected witness value: \(program.show(witness.value)) : \(program.show(witness.type))")
     }
   }
 

@@ -52,4 +52,46 @@ extension Process {
 
     return output
   }
+
+  /// Runs `executable` with `arguments` and returns its result (exit code, standard output, and standard error).
+  public static func executionResult(_ executable: URL) throws -> ExecutionResult {
+    let process = Process()
+    let standardOutput = Pipe()
+    let standardError = Pipe()
+    process.executableURL = executable
+    process.standardOutput = standardOutput
+    process.standardError = standardError
+    try process.run()
+    process.waitUntilExit()
+
+    let stdout = String(decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    let stderr = String(decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+
+    return .init(
+      standardOutput: stdout,
+      standardError: stderr,
+      exitCode: process.terminationStatus)
+  }
+
+
+  /// The result of executing a process.
+  public struct ExecutionResult {
+
+    /// The standard output of the process.
+    public let standardOutput: String
+
+    /// The standard error of the process.
+    public let standardError: String
+
+    /// The exit code of the process.
+    public let exitCode: Int32
+
+    /// Creates an instance from its parts.
+    public init(standardOutput: String, standardError: String, exitCode: Int32) {
+      self.standardOutput = standardOutput
+      self.standardError = standardError
+      self.exitCode = exitCode
+    }
+
+  }
 }

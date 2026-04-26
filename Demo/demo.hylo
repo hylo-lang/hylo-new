@@ -1,0 +1,35 @@
+@extern("hylo_print_int")
+fun println(x: Int)
+
+
+fun hello(x: Int) {
+  println(x * 2)
+}
+
+fun println(x: Bool) {
+  if x {
+    println(1)
+  } else {
+    println(0)
+  }
+}
+
+@extern("exposed")
+fun exposed() -> Void
+
+public fun main() -> Int {
+  hello(12)
+  hello(32)
+
+  exposed()
+  
+  if 12 < 43 {
+    hello(1)
+  } else {
+    hello(3)
+  }
+
+  println(4 < 2)
+
+  return 0
+}

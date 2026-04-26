@@ -1,5 +1,6 @@
 // swift-tools-version:6.2
 import PackageDescription
+import Foundation
 
 #if os(Windows)
   let onWindows = true
@@ -44,6 +45,7 @@ let package = Package(
       dependencies: [
         .target(name: "Driver"),
         .target(name: "FrontEnd"),
+        .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
@@ -102,7 +104,8 @@ let package = Package(
     .target(
       name: "StandardLibrary",
       path: "StandardLibrary",
-      resources: [.copy("Sources")],
+      exclude: [],
+      resources: [.copy("Full"), .copy("Minimal")],
       swiftSettings: commonSwiftSettings),
 
     .target(
@@ -121,7 +124,7 @@ let package = Package(
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
       ],
-      exclude: ["negative", "positive", "README.md"],
+      exclude: ["README.md"] + allNonSwiftFiles(in: "Tests/CompilerTests"),
       swiftSettings: commonSwiftSettings,
       plugins: ["CompilerTestsPlugin"]),
 
@@ -161,3 +164,33 @@ let package = Package(
         .target(name: "hc-tests")
       ]),
   ])
+
+/// Returns the list of relative urls of all non-swift files in the given directory.
+func allNonSwiftFiles(in directory: String) -> [String] {
+  guard let enumerator: FileManager.DirectoryEnumerator = FileManager.default.enumerator(atPath: directory) 
+  else { return [] }
+  
+  let l = enumerator.compactMap { $0 as? String }
+    .filter { !$0.hasSuffix(".swift") && !isDirectory(directory + "/" + $0) }
+
+  return l
+}
+
+/// Returns `true` iff the given path represents a directory.
+/// 
+/// Common file formats are detected with a heuristic, otherwise checking based on file system.
+func isDirectory(_ path: String) -> Bool {
+  // Heuristic for common file formats:
+  if path.hasSuffix(".hylo") || path.hasSuffix(".swift") || path.hasSuffix(".observed") ||
+    path.hasSuffix(".expected") || path.hasSuffix(".diagnostics") || path.hasSuffix(".c") ||
+    path.hasSuffix(".executable") || path.hasSuffix(".exe") {
+    return false
+  }
+
+  // Fallback to filesystem check
+  var isDirectory: ObjCBool = true
+  if !FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) {
+    fatalError("Expected file or directory at recently scanned path: \(path)\nPlease rerun the build.")
+  }
+  return isDirectory.boolValue
+}

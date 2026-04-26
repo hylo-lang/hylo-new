@@ -25,10 +25,21 @@ final class CompilerTests: XCTestCase {
     /// The manifest of the test.
     let manifest: Manifest
 
+    /// What the program is expected to print to stdout when `self` is a run-stage test.
+    var expectedStandardOutput: String?
+
     /// Creates an instance with the given properties.
     init(_ path: String) throws {
       self.root = URL(filePath: path)
       self.manifest = try Manifest(contentsOf: root)
+
+      self.expectedStandardOutput = try? String(
+        contentsOf: root.deletingPathExtension().appendingPathExtension("stdout.expected"),
+        encoding: .utf8)
+
+      if manifest.stage != .run && self.expectedStandardOutput != nil {
+        throw TestFailure.invalidTestDescription(message: "stdout assertion requires stage:run")
+      }
     }
 
     /// `true` iff `self` describes a package.
@@ -177,6 +188,20 @@ final class CompilerTests: XCTestCase {
     do {
       let r = try await compile(input)
       try assertSansError(r.driver.program)
+
+      guard input.manifest.stage == .run else { return }
+
+      guard let executable = artifacts.executable else {
+        XCTFail("missing executable output")
+        throw TestFailure.missingExecutableOutput
+      }
+      let execution = try Process.executionResult(executable)
+      try execution.standardOutput.write(to: input.root.deletingPathExtension().appendingPathExtension("stdout.observed"), atomically: true, encoding: .utf8)
+
+      assertExitCode(input.manifest.assertedExitCode ?? 0, in: execution, testCaseRoot: input.root)
+      if let expected = input.expectedStandardOutput {
+        assertStandardOutput(expected, in: execution, testCaseRoot: input.root)
+      }
     } catch let error as TestFailure {
       XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
     }
@@ -199,7 +224,7 @@ final class CompilerTests: XCTestCase {
   private func compile(_ input: TestDescription) async throws -> CompilationResult {
     self.testCase = input
 
-    var driver = try Driver(moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native())
+    var driver = try Driver(moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native(), standardLibrary: input.manifest.standardLibrary)
 
     if input.manifest.requiresStandardLibrary {
       try await driver.loadStandardLibrary()
@@ -260,7 +285,7 @@ final class CompilerTests: XCTestCase {
       // if (try driver.lowerToLLVM(stdlibID)).containsError { return done() }
     }
 
-    if input.manifest.stage == .executableLinking {
+    if input.manifest.stage == .executableLinking || input.manifest.stage == .run {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
 
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
@@ -271,12 +296,49 @@ final class CompilerTests: XCTestCase {
     return done()
   }
 
+  /// Asserts that the exit code of `observed` matches `expected`.
+  private func assertExitCode(_ expected: Int32, in observed: Process.ExecutionResult, testCaseRoot: URL) {
+    XCTAssertEqual(
+      observed.exitCode,
+      expected,
+      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)\nSource: \(testCaseRoot.path)\n")
+  }
+
+  /// Asserts that the standard output of `observed` matches `expected`.
+  private func assertStandardOutput(_ expected: String, in observed: Process.ExecutionResult, testCaseRoot: URL) {
+    XCTAssertEqual(
+      observed.standardOutput,
+      expected,
+      "mismatched stdout.\nSource: \(testCaseRoot.path)\n")
+  }
+
+  private func execute(_ executable: URL) throws -> Process.ExecutionResult {
+    let process = Process()
+    let standardOutput = Pipe()
+    let standardError = Pipe()
+    process.executableURL = executable
+    process.standardOutput = standardOutput
+    process.standardError = standardError
+    try process.run()
+    process.waitUntilExit()
+
+    let stdout = String(decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    let stderr = String(decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+
+    return .init(
+      standardOutput: stdout,
+      standardError: stderr,
+      exitCode: process.terminationStatus)
+  }
+
   /// An error thrown to signal test failure with given reason.
   private enum TestFailure: Error {
 
     case missingExecutableOutput
-    case compilationError(String)
-    case invalidTestDescription(String)
+
+    case compilationError(message: String)
+
+    case invalidTestDescription(message: String)
 
     var localizedDescription: String {
       switch self {
@@ -347,7 +409,7 @@ final class CompilerTests: XCTestCase {
       }
       report.write(o)
     }
-    throw TestFailure.compilationError(report)
+    throw TestFailure.compilationError(message:report)
   }
 
   /// Returns a message explaining `delta`, which is the result of comparing `expectation` to some

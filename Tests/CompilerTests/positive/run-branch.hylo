@@ -1,0 +1,17 @@
+//! stage:run stdlib:minimal
+
+public fun main() {
+  // Should print 1.
+  if true {
+    print(1)
+  } else {
+    print(0)
+  }
+
+  // Should print 0.
+  if false {
+    print(1)
+  } else {
+    print(0)
+  }
+}

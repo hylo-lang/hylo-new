@@ -80,7 +80,7 @@ public enum Host: Sendable {
 
   /// Error thrown when an executable is not found on the PATH.
   public struct ExecutableNotFound: Error, CustomStringConvertible {
-    
+
     /// Name of the executable without native executable suffix.
     public let name: String
 

@@ -1,0 +1,95 @@
+//! stage:run stdlib:minimal
+
+
+public struct SimpleInt is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.word
+
+  /// Creates an instance with its raw value.
+  internal init(_ value: Builtin.word) {
+    &self.value = value
+  }
+
+  /// Creates an instance equal to `false`.
+  public init() {
+    &self.value = Builtin.zeroinitializer_word()
+  }
+
+  /// Returns `self + 1`.
+  @extern("hylo_successor_int")
+  public fun successor() -> Self
+
+  /// Returns `true` iff `self` and `other` are equal.
+  public fun infix== (other: Self) -> Bool {
+    Bool.new(value: Builtin.icmp_eq_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` and `other` are not equal.
+  public fun infix!= (other: Self) -> Bool {
+    Bool.new(value: Builtin.icmp_ne_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    Bool.new(value: Builtin.icmp_slt_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    Bool.new(value: Builtin.icmp_sle_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    Bool.new(value: Builtin.icmp_sgt_word(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (other: Self) -> Bool {
+    Bool.new(value: Builtin.icmp_sge_word(self.value, other.value))
+  }
+
+}
+
+/// Prints `b` as `0` or `1`.
+fun print_bool(b: Bool) {
+  if b {
+    print(1)
+  } else {
+    print(0)
+  }
+}
+
+/// Prints `i` as an integer.
+fun print_simple_int(i: SimpleInt) {
+  print(Int(from_raw: i.value))
+}
+
+public fun main() {
+  print_simple_int(SimpleInt())
+  print_bool(true)
+  print_bool(false)
+
+  print_bool(SimpleInt().successor() == SimpleInt())
+  print_bool(SimpleInt().successor() != SimpleInt())
+  print_bool(SimpleInt().successor() < SimpleInt())
+  print_bool(SimpleInt().successor() <= SimpleInt())
+  print_bool(SimpleInt().successor() > SimpleInt())
+  print_bool(SimpleInt().successor() >= SimpleInt())
+
+  print_bool(SimpleInt() == SimpleInt())
+  print_bool(SimpleInt() != SimpleInt())
+  print_bool(SimpleInt() < SimpleInt())
+  print_bool(SimpleInt() <= SimpleInt())
+  print_bool(SimpleInt() > SimpleInt())
+  print_bool(SimpleInt() >= SimpleInt())
+
+  print_bool(SimpleInt() == SimpleInt().successor())
+  print_bool(SimpleInt() != SimpleInt().successor())
+  print_bool(SimpleInt() < SimpleInt().successor())
+  print_bool(SimpleInt() <= SimpleInt().successor())
+  print_bool(SimpleInt() > SimpleInt().successor())
+  print_bool(SimpleInt() >= SimpleInt().successor())
+
+}
