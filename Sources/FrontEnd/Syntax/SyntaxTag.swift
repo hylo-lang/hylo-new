@@ -55,6 +55,7 @@ public struct SyntaxTag: Sendable {
     ImplicitQualification.self,
     InoutExpression.self,
     IntegerLiteral.self,
+    FloatingPointLiteral.self,
     KindExpression.self,
     Lambda.self,
     NameExpression.self,
