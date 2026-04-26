@@ -1,0 +1,11 @@
+/// Prints `value` to standard output followed by a newline.
+@extern("hylo_print_int")
+public fun print(value: Int)
+
+/// Prints `x` with 4 fractional digits, followed by a newline.
+@extern("hylo_print_float32")
+fun print(x: Float32)
+
+/// Prints `x` with 4 fractional digits, followed by a newline.
+@extern("hylo_print_float64")
+fun print(x: Float64)

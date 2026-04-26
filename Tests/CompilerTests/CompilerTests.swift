@@ -23,10 +23,21 @@ final class CompilerTests: XCTestCase {
     /// The manifest of the test.
     let manifest: Manifest
 
+    /// What the program is expected to print to stdout when `self` is a run-stage test.
+    var expectedStandardOutput: String?
+
     /// Creates an instance with the given properties.
     init(_ path: String) throws {
       self.root = URL(filePath: path)
       self.manifest = try Manifest(contentsOf: root)
+
+      self.expectedStandardOutput = try? String(
+        contentsOf: root.deletingPathExtension().appendingPathExtension("stdout.expected"),
+        encoding: .utf8)
+
+      if manifest.stage != .run && self.expectedStandardOutput != nil {
+        throw TestFailure.invalidTestDescription(message: "stdout assertion requires stage:run")
+      }
     }
 
     /// `true` iff `self` describes a package.
@@ -136,10 +147,10 @@ final class CompilerTests: XCTestCase {
     case missingExecutableOutput
 
     /// The test failed because of a compilation error.
-    case compilationError(String)
+    case compilationError(message: String)
 
     /// The test failed because its description was invalid.
-    case invalidTestDescription(String)
+    case invalidTestDescription(message: String)
 
     var localizedDescription: String {
       switch self {
@@ -147,8 +158,8 @@ final class CompilerTests: XCTestCase {
         return "missing executable output"
       case .compilationError(let message):
         return "Compilation failure:\n\(message)"
-      case .invalidTestDescription(let d):
-        return "Invalid test description (\(d))"
+      case .invalidTestDescription(let message):
+        return "Invalid test description (\(message))"
       }
     }
 
@@ -197,6 +208,20 @@ final class CompilerTests: XCTestCase {
     do {
       let r = try await compile(input)
       try assertSansError(r.driver.program)
+
+      guard input.manifest.stage == .run else { return }
+
+      guard let executable = artifacts.executable else {
+        XCTFail("missing executable output")
+        throw TestFailure.missingExecutableOutput
+      }
+      let execution = try Process.execute(executable)
+      try execution.standardOutput.write(to: input.root.deletingPathExtension().appendingPathExtension("stdout.observed"), atomically: true, encoding: .utf8)
+
+      assertExitCode(input.manifest.assertedExitCode ?? 0, in: execution, testCaseRoot: input.root)
+      if let expected = input.expectedStandardOutput {
+        assertStandardOutput(expected, in: execution, testCaseRoot: input.root)
+      }
     } catch let error as TestFailure {
       XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
     }
@@ -221,7 +246,8 @@ final class CompilerTests: XCTestCase {
     self.testCase = input
 
     var driver = try Driver(
-      moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native())
+      moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native(),
+      standardLibrary: input.manifest.standardLibrary)
 
     if input.manifest.requiresStandardLibrary {
       try await driver.loadStandardLibrary()
@@ -282,7 +308,7 @@ final class CompilerTests: XCTestCase {
       // if (try driver.lowerToLLVM(stdlibID)).containsError { return done() }
     }
 
-    if input.manifest.stage == .executableLinking {
+    if input.manifest.stage == .executableLinking || input.manifest.stage == .run {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
 
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
@@ -291,6 +317,22 @@ final class CompilerTests: XCTestCase {
     }
 
     return done()
+  }
+
+  /// Asserts that the exit code of `observed` matches `expected`.
+  private func assertExitCode(_ expected: Int32, in observed: Process.ExecutionReport, testCaseRoot: URL) {
+    XCTAssertEqual(
+      observed.exitCode,
+      expected,
+      "mismatched exit code.\nstdout:\n\(observed.standardOutput)\nstderr:\n\(observed.standardError)\nSource: \(testCaseRoot.path)\n")
+  }
+
+  /// Asserts that the standard output of `observed` matches `expected`.
+  private func assertStandardOutput(_ expected: String, in observed: Process.ExecutionReport, testCaseRoot: URL) {
+    XCTAssertEqual(
+      observed.standardOutput.normalizedLineEndings(),
+      expected.normalizedLineEndings(),
+      "mismatched stdout.\nSource: \(testCaseRoot.path)\n")
   }
 
   /// Asserts that the expected `diagnostics` of each source file in `expectations` match those
@@ -349,7 +391,7 @@ final class CompilerTests: XCTestCase {
       }
       report.write(o)
     }
-    throw TestFailure.compilationError(report)
+    throw TestFailure.compilationError(message: report)
   }
 
   /// Returns a message explaining `delta`, which is the result of comparing `expectation` to some

@@ -4620,7 +4620,8 @@ public struct Typer {
     switch program.types.dealiased(t) {
     case standardLibraryType(.int),
         standardLibraryType(.int32),
-        standardLibraryType(.int64):
+        standardLibraryType(.int64),
+        standardLibraryType(.uint8):
       return true
     default:
       return false
