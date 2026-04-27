@@ -163,3 +163,8 @@ For example:
 Avoid defining multiple types, protocols, or traits in the same file unless they are scoped by a main entity or meant to
 be used only in that file. Usually, conformances and custom error types are small and are defined in the same file as
 the type to which they apply.
+
+
+# Project-specific conventions
+
+- Use the term `kind` exclusively to refer to the kind of a type.
