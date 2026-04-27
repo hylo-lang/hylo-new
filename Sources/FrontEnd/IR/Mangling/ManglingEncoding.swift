@@ -1,6 +1,6 @@
 import Utilities
 
-/// Hylo's mangling encoding algorithm.
+/// Hylo's mangling algorithm.
 struct ManglingEncoding: Sendable {
 
   // Mangling conventions:
@@ -187,12 +187,8 @@ struct ManglingEncoding: Sendable {
           source.record(symbol: .entity(qualifiedEntity!))
         }
 
-        // Stop if we've encountered an error.
-        if demangled == .error {
-          break
-        }
-        // Stop if we reached the end.
-        if source.isComplete {
+        // Stop if we've encountered an error or reached the end.
+        if demangled == .error || source.isComplete {
           break
         }
 
@@ -279,8 +275,7 @@ struct ManglingEncoding: Sendable {
   private static func takeUnqualifiedEntity(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    guard let s = source.takeString() else { return .error }
-    return .scope(s)
+    source.takeString().map({ (s) in .scope(s) }) ?? .error
   }
 
   /// Writes the mangled representation of `d` sans qualification to `output`.
@@ -313,8 +308,7 @@ struct ManglingEncoding: Sendable {
 
   /// Demangles a module declaration from `source`.
   private static func takeModule(from source: inout DemanglingContext) -> DemangledEntity {
-    guard let s = source.takeString() else { return .error }
-    return .module(s)
+    source.takeString().map({ (s) in .module(s) }) ?? .error
   }
 
   /// Writes the mangled representation of `s` to `output`.
@@ -322,8 +316,9 @@ struct ManglingEncoding: Sendable {
     if output.addIf(reservedOrRecorded: s.asSymbol, in: program) { return }
 
     let q = output.record(qualification: s)
+    
+    // Does `s` point to regular scope?
     if let n = s.node {
-      // `s` points to regular scope.
       switch program.tag(of: n) {
       case Block.self:
         append(anonymous: s, to: &output)
@@ -352,8 +347,10 @@ struct ManglingEncoding: Sendable {
       default:
         program.unexpected(n)
       }
-    } else {
-      // `s` points to a translation unit.
+    }
+
+    // `s` points to a translation unit.
+    else {
       precondition(s.isFile)
       append(translationUnit: s.file, to: &output)
     }
@@ -444,9 +441,12 @@ struct ManglingEncoding: Sendable {
   private static func takeFunctionDeclaration(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    guard let n = takeName(from: &source) else { return .error }
-    let t = takeType(from: &source)
-    return .functionDeclaration(name: n, type: t, isStatic: false)
+    if let n = takeName(from: &source) {
+      let t = takeType(from: &source)
+      return .functionDeclaration(name: n, type: t, isStatic: false)
+    } else {
+      .error
+    }
   }
 
   /// Demangles a static function declaration from `source`.
@@ -1182,6 +1182,7 @@ struct ManglingEncoding: Sendable {
     guard let tag = source.take(Base64Digit.self)?.rawValue else { return nil }
     let hasIntroducer = (tag & 0x80) != 0
     guard let notation = OperatorNotation(rawValue: tag & 0x7F) else { return nil }
+    
     let introducer: AccessEffect?
     if hasIntroducer {
       guard let rawIntroducer = source.take(Base64Digit.self)?.rawValue else { return nil }
@@ -1195,8 +1196,7 @@ struct ManglingEncoding: Sendable {
 
   /// Returns the entity in `s` if it is an entity, or `.error` otherwise.
   private static func entityOrError(_ s: DemangledSymbol?) -> DemangledEntity {
-    guard let s = s else { return .error }
-    if case .entity(let e) = s {
+    if case .some(.entity(let e)) = s {
       return e
     } else {
       return .error
@@ -1205,8 +1205,7 @@ struct ManglingEncoding: Sendable {
 
   /// Returns the type in `s` if it is a type, or `.error` otherwise.
   private static func typeOrError(_ s: DemangledSymbol?) -> DemangledType {
-    guard let s = s else { return .error }
-    if case .type(let t) = s {
+    if case .some(.type(let t)) = s {
       return t
     } else {
       return .error

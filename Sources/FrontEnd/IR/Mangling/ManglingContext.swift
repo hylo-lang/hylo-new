@@ -1,4 +1,4 @@
-/// The context for mangling a symbol, type, or scope.
+/// The context for mangling a symbol.
 ///
 /// It maintains the state of the mangling process, including the output being built, as well as
 /// the lookup tables and current qualification.
@@ -46,8 +46,7 @@ struct ManglingContext {
 
   /// Extends `self.reserved` to associate the declaration of `d` to the reserved symbol `s`.
   private mutating func registerStandardLibraryDeclaration(
-    _ d: Program.StandardLibraryEntity, as s: ReservedSymbol,
-    in program: Program
+    _ d: Program.StandardLibraryEntity, as s: ReservedSymbol, in program: Program
   ) {
     reserved[.node(AnySyntaxIdentity(program.standardLibraryDeclaration(d)))] = s
   }
@@ -136,8 +135,8 @@ struct ManglingContext {
     addIf(reserved: s) || addIf(recorded: s, in: program)
   }
 
-  /// Writes a lookup reference to `s` and returns `true` iff `s` is a reserved
-  /// mangling symbol. Otherwise, returns `false` without modifying `self`.
+  /// Writes a lookup reference to `s` and returns `true` iff `s` is a reserved mangling symbol.
+  // Otherwise, returns `false` without modifying `self`.
   private mutating func addIf(reserved s: MangledSymbol) -> Bool {
     if let r = reserved[s] {
       if case .type = s {
@@ -171,7 +170,7 @@ struct ManglingContext {
   }
 
   /// If `q` is the qualification accumulated so far, writes a lookup reference to it and returns
-  /// `true`. Otherwise, returns `false`.
+  /// `true`. Otherwise, returns `false` without modifying `self`.
   mutating func addIf(qualification q: ScopeIdentity) -> Bool {
     if q == qualification {
       add(operator: .lookupRelative)
@@ -194,7 +193,7 @@ struct ManglingContext {
     }
   }
 
-  /// Executes `action` on a mutable `self`, performing debug logging saying that we are writing a
+  /// Returns the result of `action` applied on `self`, performing debug logging saying that we are writing a
   /// qualification.
   mutating func writingQualification(
     _ action: (_ source: inout Self) -> Void
@@ -206,7 +205,7 @@ struct ManglingContext {
     }
   }
 
-  /// Executes `action` on a mutable `self`, performing debug logging for `t` in `program`.
+  /// Returns the result of `action` applied on `self`, performing debug logging for `t`, which is in `program`.
   mutating func writing(
     type t: AnyTypeIdentity, program: Program, _ action: (_ source: inout Self) -> Void
   ) {

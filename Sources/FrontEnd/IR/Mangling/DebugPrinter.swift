@@ -8,13 +8,15 @@ internal struct DebugPrinter {
   private var indentation: Int = 0
 
   /// An instance with the given properties.
-  init(enabled: Bool) {
+  internal init(enabled: Bool) {
     self.enabled = enabled
   }
 
   /// Returns the application of `action`, logging the scope described by `description` and the
   /// resulting value if debug printing is enabled.
-  mutating func withScope<T>(_ description: @autoclosure () -> String, _ action: () -> T) -> T {
+  internal mutating func withScope<T>(
+    _ description: @autoclosure () -> String, _ action: () -> T
+  ) -> T {
     if enabled {
       let d = description()
       print("- enter \(d)")
@@ -29,7 +31,9 @@ internal struct DebugPrinter {
   }
 
   /// Executes `action`, logging the scope described by `description` if debug printing is enabled.
-  mutating func withScope(_ description: @autoclosure () -> String, _ action: () -> Void) {
+  internal mutating func withScope(
+    _ description: @autoclosure () -> String, _ action: () -> Void
+  ) {
     if enabled {
       let d = description()
       print("- enter \(d)")
@@ -44,7 +48,7 @@ internal struct DebugPrinter {
 
   /// Prints `x` to the standard output, prefixed by indentation reflecting the current nesting
   /// level iff `enabled` is `true`. Does nothing otherwise.
-  func print<T>(_ x: @autoclosure () -> T) {
+  internal func printWithIndentation<T>(_ x: @autoclosure () -> T) {
     if enabled {
       printIndentation()
       Swift.print(x())

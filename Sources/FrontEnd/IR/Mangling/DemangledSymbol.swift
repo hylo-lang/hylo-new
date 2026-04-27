@@ -1,9 +1,9 @@
 /// The demangled description of an entity.
 indirect enum DemangledSymbol: Hashable, Sendable {
 
-  /// An instance decoding the symbol mangled in `s`.
+  /// Creates an instance decoding the symbol mangled in `s`.
   ///
-  /// May produce an error if the mangled string is malformed.
+  /// `self` is assigned to an error if `s` is malformed.
   init(_ s: String) {
     if let x = String(assemblySanitized: s) {
       var source = DemanglingContext(stream: x[...])
@@ -47,7 +47,7 @@ indirect enum DemangledSymbol: Hashable, Sendable {
   }
 
   /// A textual description of the kind of symbol represented by `self`, without any details.
-  var kind: String {
+  var tag: String {
     switch self {
     case .entity:
       return "entity"
@@ -93,7 +93,7 @@ indirect enum DemangledEntity: Hashable, Sendable {
   case module(String)
 
   /// A translation unit.
-  case translationUnit(String)
+  case sourceFile(String)
 
   /// A virtual translation unit.
   case virtualTranslationUnit(Int)
@@ -397,7 +397,7 @@ extension DemangledType: CustomStringConvertible {
       return "typealias \(declaration) = \(aliasee)"
 
     case .typeApplication(let abstraction, let arguments):
-      let args = arguments.map { "[\($0.formal): \($0.argument)]" }.joined(separator: ", ")
+      let args = arguments.map({ (a) in "[\(a.formal): \(a.argument)]" }).joined(separator: ", ")
       return "\(abstraction)<\(args)>"
     case .universalType(let parameters, let head):
       let params = parameters.map { "\($0)" }.joined(separator: ", ")
@@ -405,14 +405,14 @@ extension DemangledType: CustomStringConvertible {
     }
   }
 
-  /// If `self` is a tuple type, returns the list of its element types;
-  /// otherwise, returns a singleton list containing `self`.
-  private var tupleAsList: [DemangledType] {
-    if case .tupleConsType(let head, let tail) = self {
+  /// If `self` is a tuple type, returns its components. Otherwise, returns `[self]`.
+  private func tupleAsList() -> [DemangledType] {
+    switch self {
+    case .tupleConsType(let head, let tail):
       return [head] + tail.tupleAsList
-    } else if case .tupleEmptyType = self {
+    case .tupleEmptyType:
       return []
-    } else {
+    default:
       return [self]
     }
   }

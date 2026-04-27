@@ -41,23 +41,15 @@ extension Program {
       """
       @_symbol("Bool")
       public struct Bool {
-
         public memberwise init
-
       }
-
       @_symbol("Int")
       public struct Int {
-
         public memberwise init
-
       }
-
       @_symbol("Int64")
       public struct Int64 {
-
         public memberwise init
-
       }
       """)
     return await r.typeChecked()

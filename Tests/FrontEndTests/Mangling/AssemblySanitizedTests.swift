@@ -33,7 +33,7 @@ final class AssemblySanitizedTests: XCTestCase {
     "infix+++",
     "日本語",
     "Bang!",
-    "étoile",
+    "On ne naît pas femme : on le devient.",
     "ALL men by nature desire to know",
     ".",
     "$",

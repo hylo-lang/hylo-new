@@ -5,18 +5,18 @@ struct DemanglingContext {
   /// The stream being parsed.
   private var stream: Substring
 
-  /// The list of demangled strings, in order of appearance (a.k.a. the string lookup table).
+  /// The list of demangled strings, in order of occurrence (a.k.a. the string lookup table).
   private var strings: [Substring] = []
 
-  /// The list of demangled symbols, in order of appearance (a.k.a. the symbol lookup table).
+  /// The list of demangled symbols, in order of occurrence (a.k.a. the symbol lookup table).
   private var symbols: [DemangledSymbol] = []
 
-  /// Object used for printing debugging information during demangling.
+  /// A helper for printing debugging information during demangling.
   ///
-  /// Set `enabled` to `true` to enable debug printing.
+  /// The helper won't print anything unless `debug.enabled` is assigned to `true`.
   private var debug = DebugPrinter(enabled: false)
 
-  /// The characters remaining to be parsed.
+  /// The characters left to parse.
   var remaining: String {
     String(stream)
   }
@@ -26,13 +26,12 @@ struct DemanglingContext {
     stream.isEmpty
   }
 
-  /// An instance that will parse `stream`.
-  init(stream: Substring) {
+  /// Creates an instance that parses the contents of `stream`.
+  internal init(stream: Substring) {
     self.stream = stream
   }
 
-  /// If `stream` starts with a mangling operator, consumes and returns it; returns
-  /// `nil` without mutating `stream` otherwise.
+  /// Consumes and returns a mangling operator iff `stream` starts with one.
   mutating func takeOperator() -> ManglingOperator? {
     guard let r = ManglingOperator(prefixing: stream) else { return nil }
     debug.print("- op: \(r)")
@@ -40,25 +39,26 @@ struct DemanglingContext {
     return r
   }
 
-  /// If `stream` starts with a mangling operator, returns it; returns `nil` otherwise.
+  /// Returns the mangling operator at the start of `stream`, if any, without consuming it.
   func peekOperator() -> ManglingOperator? {
     .init(prefixing: stream)
   }
 
-  /// Assuming `stream` starts with a mangled string, consumes and returns it. Returns `nil` iff
-  /// the data is corrupted.
+  /// Consumes and returns and mangled string, returning `nil` iff the data is corrupted.
   mutating func takeString() -> String? {
     guard let length = takeInteger()?.rawValue else { return nil }
     switch length {
     case 0:
       return String(stream[stream.startIndex ..< stream.startIndex])
+
     case 1:
       guard let n = takeInteger() else { return nil }
       guard n.rawValue < strings.count else {
-        debug.print("ERROR: out of bounds when referring to string \(n)")
+        debug.print("ERROR: invalid string reference \(n), only \(strings.count) strings demangled so far")
         return nil
       }
       return String(strings[Int(n.rawValue)])
+
     case let n:
       let j = stream.index(stream.startIndex, offsetBy: Int(n - 2))
       guard j <= stream.endIndex else {
@@ -113,12 +113,9 @@ struct DemanglingContext {
   }
 
   /// Demangles a list of `T`s from `stream`, calling `takeItem` to parse each individual element.
-  mutating func takeItems<T>(
-    takingEachWith takeItem: (inout Self) -> T?
-  ) -> [T]? {
+  mutating func takeItems<T>(takingEachWith takeItem: (inout Self) -> T?) -> [T]? {
     guard let n = takeInteger() else { return nil }
-    var xs: [T] = []
-    xs.reserveCapacity(Int(n.rawValue))
+    var xs: [T] = .init(minimumCapacity: Int(n.rawValue))
 
     for _ in 0 ..< n.rawValue {
       guard let x = takeItem(&self) else { return nil }
@@ -135,7 +132,7 @@ struct DemanglingContext {
   }
 
   /// Demangles a reference to a symbol already seen by `self`.
-  mutating func takeLookup() -> DemangledSymbol? {
+  mutating func takeLookupReference() -> DemangledSymbol? {
     guard let n = takeInteger() else { return nil }
     guard n.rawValue < symbols.count else {
       debug.print("ERROR: out of bounds when looking up \(n)")
