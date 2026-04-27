@@ -178,6 +178,11 @@ void hylo_float32_infix_multiply(const float* self, const float* other, float* r
     *result = *self * *other;
 }
 
+/// Sets `result` to `self / other`.
+void hylo_float32_infix_divide(const float* self, const float* other, float* result) {
+    *result = *self / *other;
+}
+
 /// Sets `result` to zero.
 ///
 /// Definition of `Hylo.Float64.init()`.
@@ -228,6 +233,11 @@ void hylo_float64_infix_subtract(const double* self, const double* other, double
 /// Sets `result` to `self * other`.
 void hylo_float64_infix_multiply(const double* self, const double* other, double* result) {
     *result = *self * *other;
+}
+
+/// Sets `result` to `self / other`.
+void hylo_float64_infix_divide(const double* self, const double* other, double* result) {
+    *result = *self / *other;
 }
 
 /// Prints `x` with 4 fractional digits, followed by a newline.

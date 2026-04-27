@@ -36,6 +36,9 @@ struct Float64 is Deinitializable {
 
   @extern("hylo_float64_infix_multiply")
   public fun infix* (other: Self) -> Self
+
+  @extern("hylo_float64_infix_divide")
+  public fun infix/ (other: Self) -> Self
 }
 
 public given Float64 is ExpressibleByFloatingPointLiteral { /* built-in */ }

@@ -11,7 +11,7 @@ trap 'rm -rf "$OBJDIR"' EXIT
 swift run hc --stdlib=minimal --emit=object -o "$OBJDIR" .
 
 # Compile the C shim against raylib's headers (also exposes rlgl via raylib.h).
-cc -c shim.c -Iraylib/include -o "$OBJDIR/shim.o"
+cc -c shim.cc -Iraylib/include -o "$OBJDIR/shim.o"
 
 # Link Hylo objects + shim against raylib (which includes rlgl) into an executable.
 cc "$OBJDIR"/*.o \

@@ -36,6 +36,9 @@ public struct Float32 is Deinitializable {
 
   @extern("hylo_float32_infix_multiply")
   public fun infix* (other: Self) -> Self
+  
+  @extern("hylo_float32_infix_divide")
+  public fun infix/ (other: Self) -> Self
 }
 
 public given Float32 is ExpressibleByFloatingPointLiteral { /* built-in */ }
