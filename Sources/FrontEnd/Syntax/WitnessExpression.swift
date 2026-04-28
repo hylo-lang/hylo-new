@@ -192,7 +192,7 @@ extension WitnessExpression.Value: Showable {
     case .typeApplication(let w, let ts):
       return "\(printer.show(w))<\(printer.show(ts.values))>"
     case .nested(let w):
-      return "$<nested given>(\(printer.show(w))"
+      return "$<nested given>(\(printer.show(w)))"
     }
   }
 

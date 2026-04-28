@@ -1,0 +1,12 @@
+/// Projects an instance of `T` obtained from the implicit context.
+///
+/// Use this subscript to project a possibly anonymous instance from the implicit context. The type
+/// parameter is usually inferred from the expression passed in square brackets. For example:
+///
+///     public fun main() {
+///       given Int = 42
+///       print(summon[Int]) // Prints 42
+///     }
+///
+/// The result of `summon` is always an immutable projection.
+public subscript summon<T where let w : T>(x: Metatype<T>) -> T { w }
