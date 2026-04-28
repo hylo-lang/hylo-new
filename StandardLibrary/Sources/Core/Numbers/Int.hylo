@@ -13,19 +13,6 @@ public struct Int is Deinitializable {
     &self.value = Builtin.zeroinitializer_word()
   }
 
-  // /// Returns the absolute value of `self`.
-  // public fun abs() -> Int {
-
-  // }
-
-}
-
-public given Int is ExpressibleByIntegerLiteral { /* built-in */ }
-
-public given Int is Movable {}
-
-public given Int is Equatable {
-
   public fun infix== (other: Self) -> Bool {
     .new(value: Builtin.icmp_eq_word(self.value, other.value))
   }
@@ -33,10 +20,6 @@ public given Int is Equatable {
   public fun infix!= (other: Self) -> Bool {
     .new(value: Builtin.icmp_ne_word(self.value, other.value))
   }
-
-}
-
-public given Int is Comparable {
 
   public fun infix< (other: Self) -> Bool {
     .new(value: Builtin.icmp_slt_word(self.value, other.value))
@@ -53,10 +36,6 @@ public given Int is Comparable {
   public fun infix>= (_ other: Self) -> Bool {
     .new(value: Builtin.icmp_sge_word(self.value, other.value))
   }
-
-}
-
-public given Int is AdditiveArithmetic {
 
   fun infix+ (other: Self) -> Self {
     let (result, overflow) = Builtin.sadd_with_overflow_word(self.value, other.value)
@@ -80,12 +59,14 @@ public given Int is AdditiveArithmetic {
     .new()
   }
 
-}
-
-public given Int is Numeric {
-
   fun infix* (other: Self) -> Self {
     .new(value: Builtin.mul_word(self.value, other.value))
   }
-
 }
+
+public given Int is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given Int is Movable {}
+
+
+

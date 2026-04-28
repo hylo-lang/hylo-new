@@ -33,12 +33,6 @@ public struct Bool is Deinitializable {
     Bool(value: Builtin.icmp_eq_i1(self.value, Builtin.zeroinitializer_i1()))
   }
 
-}
-
-public given Bool is Movable {}
-
-public given Bool is Equatable {
-
   public fun infix== (other: Self) -> Bool {
     Bool(value: Builtin.icmp_eq_i1(self.value, other.value))
   }
@@ -48,3 +42,5 @@ public given Bool is Equatable {
   }
 
 }
+
+public given Bool is Movable {}

@@ -861,7 +861,7 @@ internal struct IREmitter {
       }
 
     default:
-      unreachable()
+      unreachable("Unexpected \(program.show(d)))")
     }
   }
 
@@ -1199,6 +1199,7 @@ internal struct IREmitter {
     if let i = program[module].ir.functions.index(forKey: name) {
       return i
     } else {
+      // cast crashes on FunctionBundleDeclaration:
       let d = program.castUnchecked(requirement, to: FunctionDeclaration.self)
       let (ps, o) = prototype(d, applying: arguments)
       return program[module].ir.addFunction(
@@ -1292,7 +1293,7 @@ internal struct IREmitter {
     let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
     var terms: [IRParameter] = []
 
-    precondition(program.tag(of: d) == FunctionDeclaration.self, "TODO")
+    precondition(program.tag(of: d) == FunctionDeclaration.self, "TODO - unimplemented lowering for \(program.tag(of: d))")
 
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {

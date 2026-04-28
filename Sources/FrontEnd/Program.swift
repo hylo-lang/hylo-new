@@ -737,7 +737,9 @@ public struct Program: Sendable {
   ///
   /// - Requires: The module containing `d` is typed.
   public func implementations(definedBy d: ConformanceDeclaration.ID) -> WitnessTable {
-    self[d.module].implementations(definedBy: d) ?? unreachable("untyped node at \(self[d].site)")
+    var t = TreePrinter(program: self)
+    let p = self[d].show(using: &t)
+    return self[d.module].implementations(definedBy: d) ?? unreachable("untyped node at \(self[d].site); \nSee\n\(p)")
   }
 
   /// If `n` is a requirement, returns the traits that introduces it. Otherwise, returns `nil`.
