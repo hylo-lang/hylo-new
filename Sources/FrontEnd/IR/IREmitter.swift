@@ -564,6 +564,8 @@ internal struct IREmitter {
       lower(store: program.castUnchecked(e, to: IntegerLiteral.self), to: target)
     case NameExpression.self:
       lower(store: program.castUnchecked(e, to: NameExpression.self), to: target)
+    case StaticCall.self:
+      lower(store: program.castUnchecked(e, to: StaticCall.self), to: target)
     case SyntheticExpression.self:
       lower(store: program.castUnchecked(e, to: SyntheticExpression.self), to: target)
     case TupleLiteral.self:
@@ -696,7 +698,13 @@ internal struct IREmitter {
     lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
   }
 
-  /// Implements `lower(store:to:)` for synthetic expressions.
+  /// Implements `lower(store:to:)` for static calls.
+  private mutating func lower(store e: StaticCall.ID, to target: IRValue) {
+    let v = lowered(lvalue: e)
+    lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
+  }
+
+  /// Implements `lower(store:to:)` for synthethic expressions.
   private mutating func lower(store e: SyntheticExpression.ID, to target: IRValue) {
     lowering(e) { (me) in
       let v = me._emit(witness: me.program[e].value)
@@ -1027,6 +1035,8 @@ internal struct IREmitter {
       return lowered(lvalue: program.castUnchecked(e, to: InoutExpression.self))
     case NameExpression.self:
       return lowered(lvalue: program.castUnchecked(e, to: NameExpression.self))
+    case StaticCall.self:
+      return lowered(lvalue: program.castUnchecked(e, to: StaticCall.self))
     case TupleMember.self:
       return lowered(lvalue: program.castUnchecked(e, to: TupleMember.self))
     default:
@@ -1072,7 +1082,11 @@ internal struct IREmitter {
   private mutating func lowered(lvalue e: NameExpression.ID) -> IRValue {
     switch program.declaration(referredToBy: e) {
     case .direct(let d):
-      return lowering(e, { (me) in me._emit(referenceTo: d) })
+      if program.isTypeDeclaration(d) {
+        return lowering(e, { $0._emitTypeWitnesse(expressedBy: .init(e)) })
+      } else {
+        return lowering(e, { $0._emit(referenceTo: d) })
+      }
 
     case .member(let d):
       // Emit the receiver.
@@ -1088,6 +1102,15 @@ internal struct IREmitter {
 
     default:
       fatalError()
+    }
+  }
+
+  /// Implements `lower(lvalue:)` for static calls.
+  private mutating func lowered(lvalue e: StaticCall.ID) -> IRValue {
+    if program.isReferringToTypeDeclaration(program[e].callee) {
+      return lowering(e, { $0._emitTypeWitnesse(expressedBy: .init(e)) })
+    } else {
+      unimplemented("static call")
     }
   }
 
@@ -1906,13 +1929,6 @@ internal struct IREmitter {
       return _emit(referenceTo: c, applyingNullary: applyNullary)
     }
 
-    // Is `d` a type declaration?
-    else if program.isTypeDeclaration(d) {
-      let t = program.type(assignedTo: d, assuming: Metatype.self)
-      let u = program.types.dealiased(program.types[t].inhabitant)
-      return .type(u, program.types.demand(TypeWitness()))
-    }
-
     switch program.tag(of: d) {
     case ConformanceDeclaration.self:
       let e = program.castUnchecked(d, to: ConformanceDeclaration.self)
@@ -1985,6 +2001,19 @@ internal struct IREmitter {
     }
 
     _return()
+  }
+
+  /// Generates the IR for storing the type witness expressed by `e` into a temporary alloca and
+  /// returns that alloca.
+  ///
+  /// - Requires: The evaluation of `e` has no side effects.
+  private mutating func _emitTypeWitnesse(expressedBy e: ExpressionIdentity) -> IRValue {
+    let t = program.type(assignedTo: e, assuming: Metatype.self)
+    let u = program.types.dealiased(program.types[t].inhabitant)
+    let v = program.types.demand(TypeWitness())
+    let x = _alloca(v.erased)
+    _emitInitialize(x, with: .type(u, v))
+    return x
   }
 
   /// Generates the IR for computing the lvalue referred to by `witness`.
@@ -2350,6 +2379,16 @@ extension Program {
     var usings = extensionContaining(d).map({ (x) in self[x].contextParameters.usings }) ?? []
     usings.append(contentsOf: self[d].contextParameters.usings)
     return .init(explicit: self[d].parameters, usings: usings, captures: [])
+  }
+
+  /// Returns `true` iff `e` is a name expressing referring to a type declaration.
+  fileprivate func isReferringToTypeDeclaration(_ e: ExpressionIdentity) -> Bool {
+    switch cast(e, to: NameExpression.self).flatMap(declaration(referredToBy:)) {
+    case .some(.direct(let d)):
+      return isTypeDeclaration(d)
+    default:
+      return false
+    }
   }
 
 }
