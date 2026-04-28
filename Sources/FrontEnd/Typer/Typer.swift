@@ -1066,6 +1066,17 @@ public struct Typer {
     assert(t == .void)
   }
 
+  /// Type checks `e`, which occurs as a statement.
+  private mutating func check(_ e: While.ID) {
+    if program[e.module].type(assignedTo: e) != nil { return }
+
+    var c = InferenceContext(expectedType: .void)
+    let t = inferredType(of: e, in: &c)
+
+    discharge(c.obligations, relatedTo: e)
+    assert(t == .void)
+  }
+
   /// Type checks `s`.
   private mutating func check(_ s: StatementIdentity) {
     switch program.tag(of: s) {
@@ -1077,6 +1088,8 @@ public struct Typer {
       checkAsStatement(program.castUnchecked(s, to: If.self))
     case Return.self:
       check(program.castUnchecked(s, to: Return.self))
+    case While.self:
+      check(program.castUnchecked(s, to: While.self))
     case Yield.self:
       check(program.castUnchecked(s, to: Yield.self))
     case _ where program.isExpression(s):
@@ -2203,6 +2216,19 @@ public struct Typer {
       report(.error, "branches of if-expression cannot contain statements", about: e)
       return context.obligations.assume(e, hasType: .error, at: site)
     }
+  }
+
+  /// Returns the inferred type of `e`.
+  private mutating func inferredType(
+    of e: While.ID, in context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    for n in program[e].conditions { check(n) }
+
+    // Is the expression occurring as a statement?
+    context.withSubcontext { (ctx) in
+      _ = inferredType(of: program[e].body, occurringAsStatement: true, in: &ctx)
+    }
+    return context.obligations.assume(e, hasType: .void, at: program[e].site)
   }
 
   /// Returns the inferred type of `e`.
