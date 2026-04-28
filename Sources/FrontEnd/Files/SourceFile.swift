@@ -4,12 +4,16 @@ import Foundation
 import Utilities
 
 /// A source file.
+/// 
+/// - Invariant: `name` contains an absolute path.
+/// - Note: A local file name doesn't imply that the file actually exists on disk or that we can 
+///   re-read its contents. It might be supplied by the LSP without having the file saved.
 public struct SourceFile: Hashable, Sendable {
 
   /// The internal representation of a source file.
   private final class Properties: Hashable, Sendable {
 
-    /// The name of the file that the source came from.
+    /// The absolute name of the file that the source came from.
     let name: FileName
 
     /// The contents of the file.
@@ -40,21 +44,27 @@ public struct SourceFile: Hashable, Sendable {
   /// The properties of `self`.
   private let properties: Properties
 
-  /// Creates a source file with the given name and contents.
-  private init(name: FileName, contents: String) {
-    self.properties = .init(name: name, text: contents)
+  /// Creates a source file with given `contents`, associated with the file `n`.
+  ///
+  /// - Requires: `n` has a file name component.
+  public init(name n: FileName, contents: String) {
+    precondition(n.url.pathComponents.count >= 2) // The 0th component is `/`, followed by the real components.
+    self.properties = .init(name: n.absolute, text: contents)
   }
 
-  /// Creates a source file with the contents of the file at `path`.
+  /// Creates a local source file with the contents of the file at `path`.
   public init(contentsOf path: URL) throws {
-    try self.init(name: .local(path), contents: .init(contentsOf: path, encoding: .utf8))
+    let contents = try String(contentsOf: path, encoding: .utf8)
+    self.init(name: .local(path), contents: contents)
   }
 
-  /// Creates a virtual source file with the given contents.
+  /// Creates a virtual source file with the given `contents`.
   public init(contents: String) {
     var hasher = FNV()
     hasher.combine(contents)
-    self.init(name: .virtual(hasher.state), contents: contents)
+    self.init(
+      name: .virtual(URL(string: "virtual:///\(String(UInt(bitPattern: hasher.state), radix: 36))")!),
+      contents: contents)
   }
 
   /// The name of the file that the source came from.
@@ -64,12 +74,7 @@ public struct SourceFile: Hashable, Sendable {
 
   /// The name of the source file, sans path qualification or extension.
   public var baseName: String {
-    switch name {
-    case .local(let u):
-      return u.deletingPathExtension().lastPathComponent
-    case .virtual(let i):
-      return String(UInt(bitPattern: i), radix: 36)
-    }
+    name.url.deletingPathExtension().lastPathComponent
   }
 
   /// The contents of the file.
@@ -141,6 +146,11 @@ public struct SourceFile: Hashable, Sendable {
     let lineNumber = line(containing: i).number
     let columnNumber = text.distance(from: properties.lineStarts[lineNumber - 1], to: i) + 1
     return (lineNumber, columnNumber)
+  }
+
+  /// Returns the index in `text` corresponding to the 1-based `line` and `column`.
+  public func index(line: Int, column: Int) -> Index {
+    text.index(properties.lineStarts[line - 1], offsetBy: column - 1)
   }
 
   /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`.

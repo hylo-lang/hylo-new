@@ -269,6 +269,8 @@ public struct Module: Sendable {
   }
 
   /// Adds a source file to this module.
+  /// 
+  /// - Requires: File name `s.name` is not already present in the program.
   @discardableResult
   public mutating func addSource(_ s: SourceFile) -> (inserted: Bool, identity: SourceFile.ID) {
     if let f = sources.index(forKey: s.name) {
@@ -343,6 +345,13 @@ public struct Module: Sendable {
   /// The top-level declarations in `self`.
   public var topLevelDeclarations: some Collection<DeclarationIdentity> {
     sources.values.map(\.topLevelDeclarations).joined()
+  }
+
+  /// Returns the identity of a contained source file named `f`, if any.
+  public func sourceFile(named f: FileName) -> SourceFile.ID? {
+    if let i = sources.index(forKey: f) {
+      SourceFile.ID(module: identity, offset: i)
+    } else { nil }
   }
 
   /// Projects the source file identified by `f`.
