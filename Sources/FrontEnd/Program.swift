@@ -707,6 +707,9 @@ public struct Program: Sendable {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
+  /// Returns `true` iff `n` contains a reference to `d`.
+  ///
+  /// - Requires: The module containing `n` is typed.
   public func occurs<T: SyntaxIdentity>(referenceTo d: DeclarationIdentity, in n: T) -> Bool {
     switch tag(of: n) {
     case NameExpression.self:
