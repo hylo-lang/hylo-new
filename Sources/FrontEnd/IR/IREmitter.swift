@@ -704,7 +704,7 @@ internal struct IREmitter {
     lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
   }
 
-  /// Implements `lower(store:to:)` for synthethic expressions.
+  /// Implements `lower(store:to:)` for synthetic expressions.
   private mutating func lower(store e: SyntheticExpression.ID, to target: IRValue) {
     lowering(e) { (me) in
       let v = me._emit(witness: me.program[e].value)

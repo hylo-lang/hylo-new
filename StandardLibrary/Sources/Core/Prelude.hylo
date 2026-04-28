@@ -1,4 +1,4 @@
-/// Projets an instance of `T` obtained from the implicit context.
+/// Projects an instance of `T` obtained from the implicit context.
 ///
 /// Use this subscript to project a possibly anonymous instance from the implicit context. The type
 /// parameter is usually inferred from the expression passed in square brackets. For example:
