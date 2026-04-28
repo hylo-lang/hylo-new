@@ -1,0 +1,6 @@
+//! stage:lowering
+
+fun f() {
+  var x = 10
+  &x = x - 1
+}

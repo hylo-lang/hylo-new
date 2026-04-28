@@ -713,13 +713,12 @@ public struct Program: Sendable {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
+  /// Returns `true` iff `d` is referred to by `n` or one of its descendants.
   public func occurs<T: SyntaxIdentity>(referenceTo d: DeclarationIdentity, in n: T) -> Bool {
-    switch tag(of: n) {
-    case NameExpression.self:
-      return declaration(referredToBy: castUnchecked(n)).target == d
-    default:
-      return children(n).contains(where: { (c) in occurs(referenceTo: d, in: c) })
+    if tag(of: n) == NameExpression.self, declaration(referredToBy: castUnchecked(n)).target == d {
+      return true
     }
+    return children(n).contains(where: { (c) in occurs(referenceTo: d, in: c) })
   }
 
   /// Returns the associated type and member requirements of `t`.
