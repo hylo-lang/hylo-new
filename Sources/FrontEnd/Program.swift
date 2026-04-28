@@ -707,13 +707,18 @@ public struct Program: Sendable {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
+  /// Returns `true` iff `n` contains a reference to `d`.
+  ///
+  /// - Requires: The module containing `n` is typed.
   public func occurs<T: SyntaxIdentity>(referenceTo d: DeclarationIdentity, in n: T) -> Bool {
-    switch tag(of: n) {
-    case NameExpression.self:
-      return declaration(referredToBy: castUnchecked(n)).target == d
-    default:
-      return children(n).contains(where: { (c) in occurs(referenceTo: d, in: c) })
+    var work: [AnySyntaxIdentity] = [n.erased]
+    while let w = work.popLast() {
+      if let e = cast(w, to: NameExpression.self), declaration(referredToBy: e).target == d {
+        return true
+      }
+      work.append(contentsOf: children(w))
     }
+    return false
   }
 
   /// Returns the associated type and member requirements of `t`.
