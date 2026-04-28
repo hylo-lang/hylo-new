@@ -190,21 +190,30 @@ internal struct IREmitter {
       for m in ms { lower(m) }
     }
 
-    // TODO: Construct the function that projects the witness.
-    withClearContext({ (me) in me.lowerDefinitionInClearContext(d) })
+    let conformance = demandLoweredDeclaration(functionOrConformance: .init(d))
+    defining(conformance) { (me) in
+      me.lowerDefinition(d)
+    }
   }
 
   /// Generates the IR of the subscript that projects the witness declared by `d`.
-  private mutating func lowerDefinitionInClearContext(_ d: ConformanceDeclaration.ID) {
-    let conformance = demandLoweredDeclaration(functionOrConformance: .init(d))
-    assert(!program[module].ir[conformance].isDefined, "conformance already lowered")
+  private mutating func lowerDefinition(_ d: ConformanceDeclaration.ID) {
+    insertionContext.anchor = .init(site: program[d].introducer.site, scope: .init(node: d))
+    let (_, w) = currentFunction.output.remote!
 
-    insertionContext.function = program[module].ir[conformance]
-    insertionContext.point = .end(of: insertionContext.function!.addBlock())
-    defer { program[module].ir[conformance] = insertionContext.function.sink() }
+    // If the conformance is a nested given, we can simply extract the witness from the parameter
+    // accepting a witness of a conformance to the enclosing trait.
+    if program.isRequirement(d) {
+      let x0 = _property(.init(d), of: .parameter(0), withType: w)
+      let x1 = _access([.let], from: x0)
+      _yield(x1)
+      _return()
+      return
+    }
 
-    // For each function or subscript requirement, we create a so-called "interface" function that
-    // calls the appropriate implementation, as resolved during typing We do not emit any IR for
+    // Otherwise we must create and project a new witness table. For each function or subscript
+    // requirement, we create an "interface" function that simply forwards its arguments to the
+    // corresponding implementation, which was resolved during typing. We do not emit any IR for
     // the interface of synthetic implementations.
 
     let table = program.implementations(definedBy: d)
@@ -259,19 +268,14 @@ internal struct IREmitter {
 
     precondition(associatedTypes.isEmpty, "not implemented")
 
-    let w = program.types.demand(
-      TypeApplication(abstraction: table.concept.erased, arguments: table.arguments))
-
-    lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
-      let x0 = me._alloca(w.erased)
-      let x1 = me._witnesstable(type: w.erased, members: members)
-      me._emitInitialize(x0, to: x1)
-      let x2 = me._access([.let], from: x0)
-      me._yield(x2)
-      me._end(IRAccess.self, openedBy: x2)
-      me._emitDeinitialize(x0)
-      me._return()
-    }
+    let x0 = _alloca(w.erased)
+    let x1 = _witnesstable(type: w.erased, members: members)
+    _emitInitialize(x0, with: x1)
+    let x2 = _access([.let], from: x0)
+    _yield(x2)
+    _end(IRAccess.self, openedBy: x2)
+    _emitDeinitialize(x0)
+    _return()
   }
 
   /// Generates the IR of `d`.
