@@ -580,7 +580,7 @@ internal struct IREmitter {
     let v = IRValue.integer(
       program[e].value ? 1 : 0,
       program.types.demand(MachineType.i(1)))
-    lowering(e, { $0._emitInitialize(target, to: v) })
+    lowering(e, { $0._emitInitialize(target, with: v) })
   }
 
   /// Implements `lower(store:to:)` for call expressions.
@@ -1118,8 +1118,8 @@ internal struct IREmitter {
     }
   }
 
-  /// Returns the value denoted by `source` interpreted the contents of the integer type `target`,
-  /// defined in the standard library.
+  /// Returns the value denoted by `source` interpreted as the integer type `target`, defined in
+  /// the standard library.
   ///
   /// Standard library integer are thin wrappers around a machine type. For instance, `Int8` wraps
   /// a single `Builtin.i8` property. This method returns the value of that property converted from
@@ -1341,8 +1341,8 @@ internal struct IREmitter {
 
     // If the conformance declares an abstract given, accept a witness of conformance of the
     // enclosing trait.
-    if let container = program.traitRequiring(d) {
-      let s = program.withTyper(typing: module) { (tp) in tp.typeOfTraitSelf(in: container) }
+    if let enclosure = program.traitRequiring(d) {
+      let s = program.withTyper(typing: module) { (tp) in tp.typeOfTraitSelf(in: enclosure) }
       let t = program.types.dealiased(s)
       let u = program.types.substitute(substitutions, in: t)
       terms.append(IRParameter(type: u, access: .let, declaration: nil))
@@ -1964,7 +1964,7 @@ internal struct IREmitter {
     return _subfield(x, at: p!)
   }
 
-  /// Generates this IR for forwarding the arguments of the current function to `f`.
+  /// Generates the IR for forwarding the arguments of the current function to `f`.
   ///
   /// This method is called during the construction of a witness table to generate the definition
   /// of the current function, which is an interface function wrapping a call to `f`.
@@ -2081,7 +2081,7 @@ internal struct IREmitter {
   }
 
   // Generates the IR for storing `source` into `target`.
-  internal mutating func _emitInitialize(_ target: IRValue, to source: IRValue) {
+  internal mutating func _emitInitialize(_ target: IRValue, with source: IRValue) {
     let x0 = _access([.set], from: target)
     _store(source, to: x0)
     _end(IRAccess.self, openedBy: x0)
@@ -2283,7 +2283,7 @@ internal struct IREmitter {
     if ps.isEmpty {
       let u = program.types.demand(TypeWitness())
       let a = _alloca(u.erased)
-      _emitInitialize(a, to: .type(t.erased, u))
+      _emitInitialize(a, with: .type(t.erased, u))
       witnesses[t.erased] = a
 
       swap(&insertionContext.point, &p)
