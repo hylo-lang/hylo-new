@@ -1,0 +1,18 @@
+//! stage:lowering
+
+trait P {}
+
+// A trait refinement is a nested given. The following desugars to a conformance declaration that
+// can be used to derive `P<T>` in any context having `Q<T>`.
+trait Q refines P {}
+
+// Nested givens can apply on arbitrary types. The following states that we can derive `P<Void>` in
+// any context having `R<T>`, for any `T`.
+trait R { given Void is P }
+
+fun use<T>(x: T) {}
+
+fun f<T is Q & R>() {
+  use(summon[P<T>])
+  use(summon[P<Void>])
+}
