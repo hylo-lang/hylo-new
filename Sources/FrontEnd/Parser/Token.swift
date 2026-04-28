@@ -43,6 +43,7 @@ public struct Token: Hashable, Sendable {
     case type
     case `var`
     case `where`
+    case `while`
     case yield
 
     // Scalar literals

@@ -1330,7 +1330,8 @@ public struct Program: Sendable {
 
     case Return.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
-
+    case While.self:
+      return self[castUnchecked(n, to: While.self)].introducer.site
     default:
       return self[n].site
     }
