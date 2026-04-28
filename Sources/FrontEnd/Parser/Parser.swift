@@ -2192,6 +2192,8 @@ public struct Parser {
       return try .init(parseDiscardStement(in: &file))
     case .return:
       return try .init(parseReturnStatement(in: &file))
+    case .while:
+      return try .init(parseWhileStatement(in: &file))
     case .yield:
       return try .init(parseYieldStatement(in: &file))
     case _ where head.isDeclarationHead:
@@ -2236,6 +2238,21 @@ public struct Parser {
     }
 
     return file.insert(Return(introducer: i, value: v, site: span(from: i)))
+  }
+
+  /// Parses a while statement.
+  ///
+  ///     while-statement ::=
+  ///       'while' condition block
+  ///
+  private mutating func parseWhileStatement(
+    in file: inout Module.SourceContainer
+  ) throws -> While.ID {
+    let i = try take(.while) ?? expected("'while'")
+    let c = try parseConditionList(in: &file)
+    let s = try parseConditionalBody(in: &file)
+
+    return file.insert(While(introducer: i, condition: c, body: s, site: span(from: i)))
   }
 
   /// Parses a yield statement.

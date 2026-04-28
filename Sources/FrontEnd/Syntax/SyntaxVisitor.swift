@@ -140,6 +140,8 @@ extension Program {
       traverse(castUnchecked(n, to: Discard.self), calling: &v)
     case Return.self:
       traverse(castUnchecked(n, to: Return.self), calling: &v)
+    case While.self:
+      traverse(castUnchecked(n, to: While.self), calling: &v)
     case Yield.self:
       traverse(castUnchecked(n, to: Yield.self), calling: &v)
 
@@ -396,6 +398,12 @@ extension Program {
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: Return.ID, calling v: inout T) {
     visit(self[n].value, calling: &v)
+  }
+
+  /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
+  public func traverse<T: SyntaxVisitor>(_ n: While.ID, calling v: inout T) {
+    visit(self[n].conditions, calling: &v)
+    visit(self[n].body, calling: &v)
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
