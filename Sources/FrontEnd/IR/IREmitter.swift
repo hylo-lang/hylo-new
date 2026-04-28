@@ -2121,49 +2121,35 @@ internal struct IREmitter {
   @discardableResult
   internal mutating func _emitDeinitialize(_ source: IRValue) -> Bool {
     let (typeOfSource, _) = currentFunction.result(of: source) ?? badOperand()
-
-    // Nothing to do for machine types.
-    if program.types.tag(of: typeOfSource) == MachineType.self {
-      _assume_state(source, initialized: false)
-      return true
-    }
-
-    // Nothing to do for conformance witnesses.
-    else if program.types.seenAsTraitApplication(typeOfSource) != nil {
-      _assume_state(source, initialized: false)
-      return true
-    }
-
-    // Other types need a conformance to `Hylo.Deinitializable`.
-    guard let w = conformanceWitness(of: typeOfSource, is: .deinitializable) else {
+    switch witnessOfDeinitializable(for: typeOfSource) {
+    case .none:
       _ = _apply_builtin(.trap, to: [])
       return false
-    }
 
-    // Does the conformance have any operational semantics.
-    if program.isTransitivelySyntheticConformance(w) {
+    case .trivial:
       _assume_state(source, initialized: false)
       return true
+
+    case .nontrivial(let w):
+      let deinitializable = _emit(witness: w)
+      let member = program.standardLibraryDeclaration(.deinitializableDeinit)
+      let t0 = program.types.demand(
+        Arrow(inputs: [.init(access: .sink, type: typeOfSource)], output: .void))
+
+      let x0 = _alloca(.void)
+      let x1 = _access([.sink], from: source)
+      let x2 = _access([.set], from: x0)
+      let x3 = _property(member, of: deinitializable, withType: t0.erased)
+      let x4 = _access([.let], from: x3)
+
+      _ = _apply(x4, [x1], into: x2, afterFormingAccesses: false)
+
+      _end(IRAccess.self, openedBy: x4)
+      _end(IRAccess.self, openedBy: x2)
+      _end(IRAccess.self, openedBy: x1)
+
+      return true
     }
-
-    let deinitializable = _emit(witness: w)
-    let member = program.standardLibraryDeclaration(.deinitializableDeinit)
-    let t0 = program.types.demand(
-      Arrow(inputs: [.init(access: .sink, type: typeOfSource)], output: .void))
-
-    let x0 = _alloca(.void)
-    let x1 = _access([.sink], from: source)
-    let x2 = _access([.set], from: x0)
-    let x3 = _property(member, of: deinitializable, withType: t0.erased)
-    let x4 = _access([.let], from: x3)
-
-    _ = _apply(x4, [x1], into: x2, afterFormingAccesses: false)
-
-    _end(IRAccess.self, openedBy: x4)
-    _end(IRAccess.self, openedBy: x2)
-    _end(IRAccess.self, openedBy: x1)
-
-    return true
   }
 
   /// Generates the IR for move-initializing or move-assigning `target` with `source`.
@@ -2266,28 +2252,6 @@ internal struct IREmitter {
     _end(IRAccess.self, openedBy: x0)
   }
 
-  /// Returns a witness of the conformance of `t` to `p`, if any.
-  ///
-  /// The conformance is looked up in the scope associated with the current anchor. If no witness
-  /// could be resolved, a diagnostic is reported and the result if `nil`.
-  private mutating func conformanceWitness(
-    of t: AnyTypeIdentity, is p: Program.StandardLibraryEntity
-  ) -> WitnessExpression? {
-    let goal = program.typeOfWitness(of: t, is: p)
-    let scopeOfUse = insertionContext.anchor!.scope
-    let candidates = program.withTyper(typing: module) { (tp) in
-      tp.summon(goal, in: scopeOfUse)
-    }
-
-    // Fail if there isn't a unique candidate.
-    if let pick = candidates.uniqueElement {
-      return pick.witness
-    } else {
-      report(program.noUniqueGivenInstance(of: goal, found: candidates, at: currentAnchor.site))
-      return nil
-    }
-  }
-
   /// Generates the IR for accessing a run-time witness of `t`, caching results into `witnesses`.
   ///
   /// `witnesses` is a table mapping a type to a place containing a corresponding witness. It is
@@ -2328,6 +2292,65 @@ internal struct IREmitter {
 
       swap(&insertionContext.point, &p)
       return _access([.let], from: a)
+    }
+  }
+
+  /// Information necessary to emit the deinitialization of an instance.
+  private enum DeinitializableWitness {
+
+    /// Deinitialization has no operational semantics.
+    ///
+    /// Instances of trivially deinitializable types do not own references to external resources
+    /// and can thus be marked deinitialized without performing any operation at run-time.
+    case trivial
+
+    /// Deinitialization should be lowered using the conformance witness in the payload.
+    case nontrivial(WitnessExpression)
+
+    /// Deinitialization is not possible.
+    case none
+
+  }
+
+  /// Returns a witness of the conformance of `t` to `Hylo.Deinitializable`, if any.
+  private mutating func witnessOfDeinitializable(
+    for t: AnyTypeIdentity
+  ) -> DeinitializableWitness {
+    switch program.types.tag(of: t) {
+    case MachineType.self:
+      return .trivial
+    case TypeWitness.self:
+      return .trivial
+    case _ where program.types.seenAsTraitApplication(t) != nil:
+      return .trivial
+    default:
+      if let w = conformanceWitness(of: t, is: .deinitializable) {
+        return program.isTransitivelySyntheticConformance(w) ? .trivial : .nontrivial(w)
+      } else {
+        return .none
+      }
+    }
+  }
+
+  /// Returns a witness of the conformance of `t` to `p`, if any.
+  ///
+  /// The conformance is looked up in the scope associated with the current anchor. If no witness
+  /// could be resolved, a diagnostic is reported and the result if `nil`.
+  private mutating func conformanceWitness(
+    of t: AnyTypeIdentity, is p: Program.StandardLibraryEntity
+  ) -> WitnessExpression? {
+    let goal = program.typeOfWitness(of: t, is: p)
+    let scopeOfUse = insertionContext.anchor!.scope
+    let candidates = program.withTyper(typing: module) { (tp) in
+      tp.summon(goal, in: scopeOfUse)
+    }
+
+    // Fail if there isn't a unique candidate.
+    if let pick = candidates.uniqueElement {
+      return pick.witness
+    } else {
+      report(program.noUniqueGivenInstance(of: goal, found: candidates, at: currentAnchor.site))
+      return nil
     }
   }
 
