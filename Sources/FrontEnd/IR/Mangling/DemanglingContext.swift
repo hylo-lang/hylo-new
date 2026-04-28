@@ -34,7 +34,7 @@ struct DemanglingContext {
   /// Consumes and returns a mangling operator iff `stream` starts with one.
   mutating func takeOperator() -> ManglingOperator? {
     guard let r = ManglingOperator(prefixing: stream) else { return nil }
-    debug.print("- op: \(r)")
+    debug.printWithIndentation("- op: \(r)")
     stream = stream.dropFirst(r.rawValue.count)
     return r
   }
@@ -54,7 +54,7 @@ struct DemanglingContext {
     case 1:
       guard let n = takeInteger() else { return nil }
       guard n.rawValue < strings.count else {
-        debug.print("ERROR: invalid string reference \(n), only \(strings.count) strings demangled so far")
+        debug.printWithIndentation("ERROR: invalid string reference \(n), only \(strings.count) strings demangled so far")
         return nil
       }
       return String(strings[Int(n.rawValue)])
@@ -62,7 +62,7 @@ struct DemanglingContext {
     case let n:
       let j = stream.index(stream.startIndex, offsetBy: Int(n - 2))
       guard j <= stream.endIndex else {
-        debug.print("ERROR: out of bounds when reading string")
+        debug.printWithIndentation("ERROR: out of bounds when reading string")
         return nil
       }
       let r = stream[..<j]
@@ -127,7 +127,7 @@ struct DemanglingContext {
   /// Demangles a reserved symbol.
   mutating func takeReserved() -> DemangledSymbol? {
     let r = take(ReservedSymbol.self).map(DemangledSymbol.init(reserved:))
-    debug.print("- reading reserved \(r?.description ?? "nil")")
+    debug.printWithIndentation("- reading reserved \(r?.description ?? "nil")")
     return r
   }
 
@@ -135,19 +135,19 @@ struct DemanglingContext {
   mutating func takeLookupReference() -> DemangledSymbol? {
     guard let n = takeInteger() else { return nil }
     guard n.rawValue < symbols.count else {
-      debug.print("ERROR: out of bounds when looking up \(n)")
+      debug.printWithIndentation("ERROR: out of bounds when looking up \(n)")
       return nil
     }
     if debug.enabled {
       let s = symbols[Int(n.rawValue)]
-      debug.print("- lookup at \(n): \(s) \(s.kind)")
+      debug.printWithIndentation("- lookup at \(n): \(s) \(s.tag)")
     }
     return symbols[Int(n.rawValue)]
   }
 
   /// Records that we've seen `s`.
   mutating func record(symbol s: DemangledSymbol) {
-    debug.print("- recording \(s.kind) \(s) at \(symbols.count)")
+    debug.printWithIndentation("- recording \(s.tag) \(s) at \(symbols.count)")
     symbols.append(s)
   }
 

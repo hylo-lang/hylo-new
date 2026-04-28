@@ -96,7 +96,7 @@ indirect enum DemangledEntity: Hashable, Sendable {
   case sourceFile(String)
 
   /// A virtual translation unit.
-  case virtualTranslationUnit(Int)
+  case virtualSourceFile(Int)
 
   /// A scope.
   case scope(String)
@@ -160,9 +160,9 @@ extension DemangledEntity: CustomStringConvertible {
       return ".."
     case .module(let name):
       return name
-    case .translationUnit(let name):
+    case .sourceFile(let name):
       return name
-    case .virtualTranslationUnit:
+    case .virtualSourceFile:
       // Don't report the ID; useful for testing with exact match.
       return "#"
     case .scope(let name):
@@ -390,7 +390,7 @@ extension DemangledType: CustomStringConvertible {
       return e.description
 
     case .tupleConsType, .tupleEmptyType:
-      let l = tupleAsList.map { "\($0)" }.joined(separator: ", ")
+      let l = tupleAsList().map { "\($0)" }.joined(separator: ", ")
       return "(\(l))"
 
     case .typeAlias(let declaration, let aliasee):
@@ -409,7 +409,7 @@ extension DemangledType: CustomStringConvertible {
   private func tupleAsList() -> [DemangledType] {
     switch self {
     case .tupleConsType(let head, let tail):
-      return [head] + tail.tupleAsList
+      return [head] + tail.tupleAsList()
     case .tupleEmptyType:
       return []
     default:

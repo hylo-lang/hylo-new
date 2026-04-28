@@ -19,11 +19,11 @@ internal struct DebugPrinter {
   ) -> T {
     if enabled {
       let d = description()
-      print("- enter \(d)")
+      printWithIndentation("- enter \(d)")
       indentation += 1
       let r = action()
       indentation -= 1
-      print("- leave \(d): \(r)")
+      printWithIndentation("- leave \(d): \(r)")
       return r
     } else {
       return action()
@@ -36,11 +36,11 @@ internal struct DebugPrinter {
   ) {
     if enabled {
       let d = description()
-      print("- enter \(d)")
+      printWithIndentation("- enter \(d)")
       indentation += 1
       action()
       indentation -= 1
-      print("- leave \(d)")
+      printWithIndentation("- leave \(d)")
     } else {
       action()
     }
@@ -51,14 +51,14 @@ internal struct DebugPrinter {
   internal func printWithIndentation<T>(_ x: @autoclosure () -> T) {
     if enabled {
       printIndentation()
-      Swift.print(x())
+      print(x())
     }
   }
 
   /// Prints the indentation corresponding to the current nesting level.
   private func printIndentation() {
     for _ in 0..<indentation {
-      Swift.print("  ", terminator: "")
+      print("  ", terminator: "")
     }
   }
 

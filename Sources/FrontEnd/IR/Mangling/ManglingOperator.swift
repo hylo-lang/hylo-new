@@ -167,11 +167,11 @@ enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a module name.
   case module = "M"
 
-  /// Starts a translation unit.
-  case translationUnit = "U"
+  /// Starts a source file.
+  case sourceFile = "U"
 
-  /// Starts a virtual translation unit.
-  case virtualTranslationUnit = "vU"
+  /// Starts a virtual source file.
+  case virtualSourceFile = "vU"
 
   /// Starts a witness table symbol.
   case witnessTable = "wW"
@@ -203,7 +203,7 @@ enum ManglingOperator: String, CaseIterable, Sendable {
       .synthesizedFunctionDeclaration, .implementationDeclaration, .existentializedDeclaration,
       .genericParameterDeclaration, .parameterDeclaration,
       .structDeclaration, .typeAliasDeclaration, .traitDeclaration, .variableDeclaration,
-      .variantDeclaration, .anonymousScope, .module, .translationUnit, .virtualTranslationUnit:
+      .variantDeclaration, .anonymousScope, .module, .sourceFile, .virtualSourceFile:
       return true
     default:
       return false

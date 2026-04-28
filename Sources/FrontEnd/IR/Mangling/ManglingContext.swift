@@ -100,7 +100,7 @@ struct ManglingContext {
   /// Writes `o` to `output`.
   mutating func add(operator o: ManglingOperator) {
     o.write(to: &output)
-    debug.print("- op: \(o)")
+    debug.printWithIndentation("- op: \(o)")
   }
 
   /// Writes the mangled representation of `items` to `output`, calling `addItem` to mangle each
@@ -118,7 +118,7 @@ struct ManglingContext {
   /// Records `s` in the symbol lookup table if it is not reserved or already recorded.
   mutating func record(symbol s: MangledSymbol, in program: Program) {
     if symbolPosition.keys.contains(s) || reserved.keys.contains(s) { return }
-    debug.print("- recording \(Self.debugName(symbol: s, in: program)): \(symbolPosition.count)")
+    debug.printWithIndentation("- recording \(Self.debugName(symbol: s, in: program)): \(symbolPosition.count)")
     symbolPosition[s] = symbolPosition.count
   }
 
@@ -145,7 +145,7 @@ struct ManglingContext {
         add(operator: .reserved)
       }
       r.write(to: &output)
-      debug.print("- writing reserved \(s)")
+      debug.printWithIndentation("- writing reserved \(s)")
       return true
     } else {
       return false
@@ -162,7 +162,7 @@ struct ManglingContext {
         add(operator: .lookup)
       }
       add(integer: p)
-      debug.print("- lookup at \(p): \(Self.debugName(symbol: s, in: program))")
+      debug.printWithIndentation("- lookup at \(p): \(Self.debugName(symbol: s, in: program))")
       return true
     } else {
       return false

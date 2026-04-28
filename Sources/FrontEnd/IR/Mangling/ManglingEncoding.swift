@@ -116,7 +116,7 @@ struct ManglingEncoding: Sendable {
 
         switch o {
         case .lookup:
-          demangled = entityOrError(source.takeLookup())
+          demangled = entityOrError(source.takeLookupReference())
         case .lookupRelative:
           demangled = .relative
         case .reserved:
@@ -167,10 +167,10 @@ struct ManglingEncoding: Sendable {
           demangled = takeAnonymousScope(from: &source)
         case .module:
           demangled = takeModule(from: &source)
-        case .translationUnit:
-          demangled = takeTranslationUnit(from: &source)
-        case .virtualTranslationUnit:
-          demangled = takeVirtualTranslationUnit(from: &source)
+        case .sourceFile:
+          demangled = takeSourceFile(from: &source)
+        case .virtualSourceFile:
+          demangled = takeVirtualSourceFile(from: &source)
         default:
           demangled = .error
           break
@@ -445,7 +445,7 @@ struct ManglingEncoding: Sendable {
       let t = takeType(from: &source)
       return .functionDeclaration(name: n, type: t, isStatic: false)
     } else {
-      .error
+      return .error
     }
   }
 
@@ -506,28 +506,28 @@ struct ManglingEncoding: Sendable {
     switch program[file].source.name {
     case .local(let u):
       // Note: assumes all files in a module have a different base name.
-      output.add(operator: .translationUnit)
+      output.add(operator: .sourceFile)
       output.add(string: u.deletingPathExtension().lastPathComponent)
     case .virtual(let i):
-      output.add(operator: .virtualTranslationUnit)
+      output.add(operator: .virtualSourceFile)
       output.add(integer: Int(i))
     }
   }
 
-  /// Demangles a translation unit from `source`.
-  private static func takeTranslationUnit(
+  /// Demangles a source file from `source`.
+  private static func takeSourceFile(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     guard let s = source.takeString() else { return .error }
-    return .translationUnit(s)
+    return .sourceFile(s)
   }
 
-  /// Demangles a virtual translation unit from `source`.
-  private static func takeVirtualTranslationUnit(
+  /// Demangles a virtual source file from `source`.
+  private static func takeVirtualSourceFile(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     guard let i = source.takeInt() else { return .error }
-    return .virtualTranslationUnit(i)
+    return .virtualSourceFile(i)
   }
 
   /// Writes the mangled representation of `s` defined in `m`, to `output`.
@@ -675,7 +675,7 @@ struct ManglingEncoding: Sendable {
 
       switch o {
       case .lookupType:
-        demangled = typeOrError(source.takeLookup())
+        demangled = typeOrError(source.takeLookupReference())
       case .reservedType:
         demangled = typeOrError(source.takeReserved())
       case .arrowType:
