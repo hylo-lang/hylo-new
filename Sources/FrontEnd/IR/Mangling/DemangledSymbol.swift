@@ -119,6 +119,9 @@ indirect enum DemangledEntity: Hashable, Sendable {
   /// A function bundle declaration.
   case functionBundleDeclaration(name: Name, type: DemangledType)
 
+  /// A variant.
+  case variant(AccessEffect)
+
   /// An initializer.
   case initializer(DemangledEntity)
 
@@ -130,9 +133,6 @@ indirect enum DemangledEntity: Hashable, Sendable {
 
   /// An existentialized declaration.
   case existentialized(DemangledEntity)
-
-  /// A variant.
-  case variant(AccessEffect)
 
   /// A qualified entity with `head` as the innermost component and `previous` as the qualification.
   case qualified(head: DemangledEntity, previous: DemangledEntity)
@@ -181,6 +181,8 @@ extension DemangledEntity: CustomStringConvertible {
       return "\(isStatic ? "static " : "")fun \(name): \(type)"
     case .functionBundleDeclaration(let name, let type):
       return "fun bundle \(name): \(type)"
+    case .variant(let e):
+      return "\(e)"
     case .initializer(let e):
       return "init \(e)"
     case .synthesizedFunction(let e, let arguments):
@@ -191,8 +193,6 @@ extension DemangledEntity: CustomStringConvertible {
       return "\(e) implements \(c)<\(args)>"
     case .existentialized(let e):
       return "some \(e)"
-    case .variant(let e):
-      return "\(e)"
     case .qualified(let head, let previous):
       return "\(previous).\(head)"
     case .error:

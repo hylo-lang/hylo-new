@@ -60,8 +60,7 @@ struct DemanglingContext {
       return String(strings[Int(n.rawValue)])
 
     case let n:
-      let j = stream.index(stream.startIndex, offsetBy: Int(n - 2))
-      guard j <= stream.endIndex else {
+      guard let j = stream.index(stream.startIndex, offsetBy: Int(n - 2), limitedBy: stream.endIndex) else {
         debug.printWithIndentation("ERROR: out of bounds when reading string")
         return nil
       }

@@ -62,7 +62,11 @@ struct ManglingEncoding: Sendable {
     } else if o.isTypeOperator {
       r = .type(takeType(from: &source))
     } else {
-      r = takeWitnessTable(from: &source)
+      if source.takeOperator() == .witnessTable {
+        r = takeWitnessTable(from: &source)
+      } else {
+        return .error(nil, remaining: source.remaining)
+      }
     }
     return source.isComplete ? r : .error(r, remaining: source.remaining)
   }
@@ -283,7 +287,7 @@ struct ManglingEncoding: Sendable {
     unqualified d: BindingDeclaration.ID, to output: inout ManglingContext
   ) {
     output.add(operator: .bindingDeclaration)
-    output.add(items: program.names(introducedBy: d)) { (n, o) in
+    output.add(items: program.names(introducedBy: d)) { (o, n) in
       append(name: n, to: &o)
     }
   }
@@ -292,11 +296,14 @@ struct ManglingEncoding: Sendable {
   private static func takeBindingDeclaration(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    let names =
+    if let names =
       source.takeItems(takingEachWith: { (s) in
         takeName(from: &s)
-      }) ?? []
-    return .binding(names: names)
+      }) {
+      return .binding(names: names)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `m` to `output`.
@@ -316,7 +323,7 @@ struct ManglingEncoding: Sendable {
     if output.addIf(reservedOrRecorded: s.asSymbol, in: program) { return }
 
     let q = output.record(qualification: s)
-    
+
     // Does `s` point to regular scope?
     if let n = s.node {
       switch program.tag(of: n) {
@@ -366,8 +373,7 @@ struct ManglingEncoding: Sendable {
 
   /// Demangles an anonymous scope from `source`.
   private static func takeAnonymousScope(from source: inout DemanglingContext) -> DemangledEntity {
-    guard let n = source.takeUInt64() else { return .error }
-    return .anonymousScope(n)
+    source.takeUInt64().map({ (n) in .anonymousScope(n) }) ?? .error
   }
 
   /// Writes the mangled representation of `d` to `output`.
@@ -376,7 +382,7 @@ struct ManglingEncoding: Sendable {
   ) {
     output.add(operator: .conformanceDeclaration)
     append(typeOf: DeclarationIdentity(d), to: &output)
-    output.add(items: program[d].contextParameters.usings) { (u, o) in
+    output.add(items: program[d].contextParameters.usings) { (o, u) in
       append(decl: u, to: &o)
     }
   }
@@ -386,11 +392,14 @@ struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     let t = takeType(from: &source)
-    let usings =
+    if let usings =
       source.takeItems(takingEachWith: { (s) -> DemangledEntity in
         takeEntity(from: &s)
-      }) ?? []
-    return .conformanceDeclaration(type: t, usings: usings)
+      }) {
+      return .conformanceDeclaration(type: t, usings: usings)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `d` to `output`.
@@ -399,7 +408,7 @@ struct ManglingEncoding: Sendable {
   ) {
     output.add(operator: .extensionDeclaration)
     append(typeOf: d, to: &output)
-    output.add(items: program[d].contextParameters.usings) { (u, o) in
+    output.add(items: program[d].contextParameters.usings) { (o, u) in
       append(decl: u, to: &o)
     }
   }
@@ -409,11 +418,14 @@ struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     let t = takeType(from: &source)
-    let usings =
+    if let usings =
       source.takeItems(takingEachWith: { (s) -> DemangledEntity in
         takeEntity(from: &s)
-      }) ?? []
-    return .extensionDeclaration(type: t, usings: usings)
+      }) {
+      return .extensionDeclaration(type: t, usings: usings)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `d` to `output`.
@@ -453,9 +465,12 @@ struct ManglingEncoding: Sendable {
   private static func takeStaticFunctionDeclaration(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    guard let n = takeName(from: &source) else { return .error }
-    let t = takeType(from: &source)
-    return .functionDeclaration(name: n, type: t, isStatic: true)
+    if let n = takeName(from: &source) {
+      let t = takeType(from: &source)
+      return .functionDeclaration(name: n, type: t, isStatic: true)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `d` to `output`.
@@ -477,9 +492,12 @@ struct ManglingEncoding: Sendable {
   private static func takeFunctionBundleDeclaration(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    guard let n = takeName(from: &source) else { return .error }
-    let t = takeType(from: &source)
-    return .functionBundleDeclaration(name: n, type: t)
+    if let n = takeName(from: &source) {
+      let t = takeType(from: &source)
+      return .functionBundleDeclaration(name: n, type: t)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `d` to `output`.
@@ -492,11 +510,12 @@ struct ManglingEncoding: Sendable {
   private static func takeVariantDeclaration(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    guard
-      let d = source.takeBase64Digit(),
-      let v = AccessEffect(rawValue: d.rawValue)
-    else { return .error }
-    return .variant(v)
+    if let d = source.takeBase64Digit(),
+      let v = AccessEffect(rawValue: d.rawValue) {
+      return .variant(v)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `file` to `output`.
@@ -518,16 +537,14 @@ struct ManglingEncoding: Sendable {
   private static func takeSourceFile(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    guard let s = source.takeString() else { return .error }
-    return .sourceFile(s)
+    source.takeString().map({ (s) in .sourceFile(s) }) ?? .error
   }
 
   /// Demangles a virtual source file from `source`.
   private static func takeVirtualSourceFile(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    guard let i = source.takeInt() else { return .error }
-    return .virtualSourceFile(i)
+    source.takeInt().map({ (s) in .virtualSourceFile(s) }) ?? .error
   }
 
   /// Writes the mangled representation of `s` defined in `m`, to `output`.
@@ -575,8 +592,11 @@ struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     let e = takeEntity(from: &source)
-    let a = takeTypeArguments(from: &source)
-    return .synthesizedFunction(e, a)
+    if let a = takeTypeArguments(from: &source) {
+      return .synthesizedFunction(e, a)
+    } else {
+      return .error
+    }
   }
 
   /// Demangles an implementation declaration from `source`.
@@ -585,8 +605,11 @@ struct ManglingEncoding: Sendable {
   ) -> DemangledEntity {
     let e = takeEntity(from: &source)
     let c = takeConformanceDeclaration(from: &source)
-    let a = takeTypeArguments(from: &source)
-    return .implementation(e, c, a)
+    if let a = takeTypeArguments(from: &source) {
+      return .implementation(e, c, a)
+    } else {
+      return .error
+    }
   }
 
   /// Demangles an existentialized declaration from `source`.
@@ -751,7 +774,7 @@ struct ManglingEncoding: Sendable {
     output.add(base64Digit: t.style)
     output.add(base64Digit: t.effect)
     append(type: t.environment, to: &output)
-    output.add(items: t.inputs) { (i, o) in
+    output.add(items: t.inputs) { (o, i) in
       o.add(string: i.label ?? "")
       append(type: i.type, to: &o)
     }
@@ -760,15 +783,16 @@ struct ManglingEncoding: Sendable {
 
   /// Demangles an arrow type from `source`.
   private static func takeArrowType(from source: inout DemanglingContext) -> DemangledType {
-    guard
+    if
       let c = source.take(Call.Style.self),
-      let a = source.take(AccessEffect.self)
-    else { return .error }
-    let e = takeType(from: &source)
-    let inputs = source.takeItems(takingEachWith: { (s) in takeParameter(from: &s) }) ?? []
-    let output = takeType(from: &source)
-
-    return .arrow(style: c, effect: a, environment: e, inputs: inputs, output: output)
+      let a = source.take(AccessEffect.self),
+      let e = Optional.some(takeType(from: &source)),
+      let inputs = source.takeItems(takingEachWith: { (s) in takeParameter(from: &s) }) {
+      let output = takeType(from: &source)
+      return .arrow(style: c, effect: a, environment: e, inputs: inputs, output: output)
+    } else {
+      return .error
+    }
   }
 
   /// Demangles a parameter or tuple element from `stream`.
@@ -804,8 +828,11 @@ struct ManglingEncoding: Sendable {
   /// Demangles a bundle type from `source`.
   private static func takeBundle(from source: inout DemanglingContext) -> DemangledType {
     let s = takeType(from: &source)
-    guard let v = source.takeBase64Digit() else { return .error }
-    return .bundle(shape: s, variants: AccessEffectSet(rawValue: v.rawValue))
+    if let v = source.takeBase64Digit() {
+      return .bundle(shape: s, variants: AccessEffectSet(rawValue: v.rawValue))
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `t` to `output`.
@@ -840,7 +867,7 @@ struct ManglingEncoding: Sendable {
     functionPointer t: FunctionPointer, to output: inout ManglingContext
   ) {
     output.add(operator: .functionPointerType)
-    output.add(items: t.inputs) { (i, o) in
+    output.add(items: t.inputs) { (o, i) in
       append(type: i, to: &o)
     }
     append(type: t.output, to: &output)
@@ -850,11 +877,12 @@ struct ManglingEncoding: Sendable {
   private static func takeFunctionPointerType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    guard let inputs = source.takeItems(takingEachWith: { (s) in takeType(from: &s) }) else {
+    if let inputs = source.takeItems(takingEachWith: { (s) in takeType(from: &s) }) {
+      let output = takeType(from: &source)
+      return .functionPointer(inputs: inputs, output: output)
+    } else {
       return .error
     }
-    let output = takeType(from: &source)
-    return .functionPointer(inputs: inputs, output: output)
   }
 
   /// Writes the mangled representation of `t` to `output`.
@@ -882,8 +910,7 @@ struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    guard let k = takeKind(from: &source) else { return .error }
-    return .genericParameterConformer(declaration: d, kind: k)
+    return takeKind(from: &source).map({ (k) in .genericParameterConformer(declaration: d, kind: k) }) ?? .error
   }
 
   /// Demangles a generic parameter user type from `source`.
@@ -891,23 +918,24 @@ struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    guard let k = takeKind(from: &source) else { return .error }
-    return .genericParameterUser(declaration: d, kind: k)
+    return takeKind(from: &source).map({ (k) in .genericParameterUser(declaration: d, kind: k) }) ?? .error
   }
 
   /// Demangles a generic parameter nth type from `source`.
   private static func takeGenericParameterNthType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    guard let n = source.takeInt() else { return .error }
-    guard let k = takeKind(from: &source) else { return .error }
-    return .genericParameterNth(index: n, kind: k)
+    if let n = source.takeInt(), let k = takeKind(from: &source) {
+      return .genericParameterNth(index: n, kind: k)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `t` to `output`.
   private mutating func append(implication t: Implication, to output: inout ManglingContext) {
     output.add(operator: .implicationType)
-    output.add(items: t.usings) { (u, o) in
+    output.add(items: t.usings) { (o, u) in
       append(type: u, to: &o)
     }
     append(type: t.head, to: &output)
@@ -917,9 +945,12 @@ struct ManglingEncoding: Sendable {
   private static func takeImplicationType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    let usings = source.takeItems(takingEachWith: { (s) in takeType(from: &s) }) ?? []
-    let head = takeType(from: &source)
-    return .implication(usings: usings, head: head)
+    if let usings = source.takeItems(takingEachWith: { (s) in takeType(from: &s) }) {
+      let head = takeType(from: &source)
+      return .implication(usings: usings, head: head)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `t` to `output`.
@@ -961,10 +992,7 @@ struct ManglingEncoding: Sendable {
   private static func takeMachineIntegerType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    guard let width = source.takeInt().map({ UInt8(truncatingIfNeeded: $0) }) else {
-      return .error
-    }
-    return .machine(.i(width))
+    return source.takeInt().map({ (n) in .machine(.i(UInt8(truncatingIfNeeded: n))) }) ?? .error
   }
 
   /// Demangles a machine float type from `source`.
@@ -993,8 +1021,7 @@ struct ManglingEncoding: Sendable {
 
   /// Demangles a metakind from `stream`.
   private static func takeMetakindType(from source: inout DemanglingContext) -> DemangledType {
-    guard let k = takeKind(from: &source) else { return .error }
-    return .metakind(k)
+    takeKind(from: &source).map({ (k) in .metakind(k) }) ?? .error
   }
 
   /// Writes the mangled representation of `k` to `output`.
@@ -1045,8 +1072,11 @@ struct ManglingEncoding: Sendable {
   /// Demangles a remote type from `stream`.
   private static func takeRemoteType(from source: inout DemanglingContext) -> DemangledType {
     let t = takeType(from: &source)
-    guard let a = source.take(AccessEffect.self) else { return .error }
-    return .remote(t, a)
+    if let a = source.take(AccessEffect.self) {
+      return .remote(t, a)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `t` to `output`.
@@ -1124,13 +1154,16 @@ struct ManglingEncoding: Sendable {
   /// Demangles an application type from `source`.
   private static func takeApplicationType(from source: inout DemanglingContext) -> DemangledType {
     let t = takeType(from: &source)
-    let a = takeTypeArguments(from: &source)
-    return .typeApplication(abstraction: t, arguments: a)
+    if let a = takeTypeArguments(from: &source) {
+      return .typeApplication(abstraction: t, arguments: a)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `a` to `output`.
   private mutating func append(typeArguments a: TypeArguments, to output: inout ManglingContext) {
-    output.add(items: a.elements) { (e, o) in
+    output.add(items: a.elements) { (o, e) in
       append(type: e.key.erased, to: &o)
       append(type: e.value, to: &o)
     }
@@ -1139,19 +1172,19 @@ struct ManglingEncoding: Sendable {
   /// Demangles type arguments from `source`.
   private static func takeTypeArguments(
     from source: inout DemanglingContext
-  ) -> [DemangledType.TypeApplicationArgument] {
+  ) -> [DemangledType.TypeApplicationArgument]? {
     let takeArgument = { (s: inout DemanglingContext) -> DemangledType.TypeApplicationArgument? in
       let k = takeType(from: &s)
       let v = takeType(from: &s)
       return .init(formal: k, argument: v)
     }
-    return source.takeItems(takingEachWith: takeArgument) ?? []
+    return source.takeItems(takingEachWith: takeArgument)
   }
 
   /// Writes the mangled representation of `t` to `output`.
   private mutating func append(universal t: UniversalType, to output: inout ManglingContext) {
     output.add(operator: .universalType)
-    output.add(items: t.parameters) { (p, o) in
+    output.add(items: t.parameters) { (o, p) in
       append(type: p.erased, to: &o)
     }
     append(type: t.head, to: &output)
@@ -1159,9 +1192,12 @@ struct ManglingEncoding: Sendable {
 
   /// Demangles a universal type from `source`.
   private static func takeUniversalType(from source: inout DemanglingContext) -> DemangledType {
-    let p = source.takeItems(takingEachWith: { (s) in takeType(from: &s) }) ?? []
-    let h = takeType(from: &source)
-    return .universalType(parameters: p, head: h)
+    if let p = source.takeItems(takingEachWith: { (s) in takeType(from: &s) }) {
+      let h = takeType(from: &source)
+      return .universalType(parameters: p, head: h)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `name` to `output`.
@@ -1182,7 +1218,7 @@ struct ManglingEncoding: Sendable {
     guard let tag = source.take(Base64Digit.self)?.rawValue else { return nil }
     let hasIntroducer = (tag & 0x80) != 0
     guard let notation = OperatorNotation(rawValue: tag & 0x7F) else { return nil }
-    
+
     let introducer: AccessEffect?
     if hasIntroducer {
       guard let rawIntroducer = source.take(Base64Digit.self)?.rawValue else { return nil }

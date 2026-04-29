@@ -12,7 +12,7 @@
 /// - Otherwise, `n = a0` and `v` is the sum of `ai * 64^(a0 - i)` for `1 <= i < a0`.
 public struct Base64VarUInt: Hashable {
 
-  /// The value of the digit, in the range `0 ..< UInt64.max`.
+  /// The numeric value, in the range `0 ..< UInt64.max`.
   public let rawValue: UInt64
 
   /// Creates an instance representing `n`.

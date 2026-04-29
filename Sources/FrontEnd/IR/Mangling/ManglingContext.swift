@@ -19,9 +19,9 @@ struct ManglingContext {
   /// A table mapping known symbols to their reserved mangled identifier.
   private var reserved: [MangledSymbol: ReservedSymbol] = [:]
 
-  /// Object used for printing debugging information during mangling.
+  /// A helper for printing debugging information during mangling.
   ///
-  /// Set `enabled` to `true` to enable debug printing.
+  /// The helper won't print anything unless `debug.enabled` is assigned to `true`.
   private var debug = DebugPrinter(enabled: false)
 
   /// Creates an instance for mangling symbols in `program`.
@@ -107,11 +107,11 @@ struct ManglingContext {
   /// individual element.
   mutating func add<T: Collection>(
     items: T,
-    appendingEachWith addItem: (T.Element, inout Self) -> Void
+    appendingEachWith addItem: (inout Self, T.Element) -> Void
   ) {
     add(integer: items.count)
     for i in items {
-      addItem(i, &self)
+      addItem(&self, i)
     }
   }
 
