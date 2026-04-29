@@ -65,6 +65,89 @@ void hylo_make_zero_i32(int32_t* result) {
     *result = 0;
 }
 
+/// Sets `result` to zero.
+///
+/// Definition of `Hylo.UInt8.init()`.
+void hylo_init_uint8(uint8_t* result) {
+    *result = 0;
+}
+
+/// Initializes `self` with the raw integer value in `value`.
+void hylo_init_uint8_from_raw(uint8_t* self, const uint8_t* value) {
+    *self = *value;
+}
+
+/// Sets `result` to zero.
+///
+/// Definition of `Hylo.UInt8.zero(:) -> UInt8`.
+void hylo_make_zero_uint8(uint8_t* result) {
+    *result = 0;
+}
+
+/// Sets `result` to one.
+///
+/// Definition of `Hylo.UInt8.one(:) -> UInt8`.
+void hylo_make_one_uint8(uint8_t* result) {
+    *result = 1;
+}
+
+/// Sets `result` to `self + 1`.
+///
+/// Definition of `Hylo.UInt8.successor(self: UInt8) -> UInt8`.
+void hylo_successor_uint8(const uint8_t* self, uint8_t* result) {
+    *result = (uint8_t)(*self + 1);
+}
+
+/// Sets `result` to the value of `self`.
+void hylo_uint8_get_value(const uint8_t* self, uint8_t* result) {
+    *result = *self;
+}
+
+/// Sets `result` to `self == other`.
+void hylo_uint8_eq(const uint8_t* self, const uint8_t* other, char* result) {
+    *result = (char)(*self == *other);
+}
+
+/// Sets `result` to `self != other`.
+void hylo_uint8_ne(const uint8_t* self, const uint8_t* other, char* result) {
+    *result = (char)(*self != *other);
+}
+
+/// Sets `result` to `self < other`.
+void hylo_uint8_lt(const uint8_t* self, const uint8_t* other, char* result) {
+    *result = (char)(*self < *other);
+}
+
+/// Sets `result` to `self <= other`.
+void hylo_uint8_le(const uint8_t* self, const uint8_t* other, char* result) {
+    *result = (char)(*self <= *other);
+}
+
+/// Sets `result` to `self > other`.
+void hylo_uint8_gt(const uint8_t* self, const uint8_t* other, char* result) {
+    *result = (char)(*self > *other);
+}
+
+/// Sets `result` to `self >= other`.
+void hylo_uint8_ge(const uint8_t* self, const uint8_t* other, char* result) {
+    *result = (char)(*self >= *other);
+}
+
+/// Sets `result` to `self + other`.
+void hylo_uint8_infix_add(const uint8_t* self, const uint8_t* other, uint8_t* result) {
+    *result = (uint8_t)(*self + *other);
+}
+
+/// Sets `result` to `self - other`.
+void hylo_uint8_infix_subtract(const uint8_t* self, const uint8_t* other, uint8_t* result) {
+    *result = (uint8_t)(*self - *other);
+}
+
+/// Sets `result` to `self * other`.
+void hylo_uint8_infix_multiply(const uint8_t* self, const uint8_t* other, uint8_t* result) {
+    *result = (uint8_t)(*self * *other);
+}
+
 /// Allocates `size` bytes and stores the address in `result`.
 void malloc_shim(intptr_t const* size, void** result) {
     *result = malloc(*size);
@@ -89,6 +172,26 @@ void hylo_make_true(char* result) {
 /// Initializes `result` with `value`.
 void hylo_bool_memberwise_init(char* result, const char* value) {
     *result = *value;
+}
+
+/// Bool.init() — sets `result` to false.
+void hylo_init_bool(char* result) {
+    *result = 0;
+}
+
+/// Sets `result` to the logical negation of `*self`.
+void hylo_bool_prefix_not(const char* self, char* result) {
+    *result = (char)(*self == 0);
+}
+
+/// Sets `result` to `self == other`.
+void hylo_bool_eq(const char* self, const char* other, char* result) {
+    *result = (char)((*self != 0) == (*other != 0));
+}
+
+/// Sets `result` to `self != other`.
+void hylo_bool_ne(const char* self, const char* other, char* result) {
+    *result = (char)((*self != 0) != (*other != 0));
 }
 
 /// Sets `result` to the value of `self`.
