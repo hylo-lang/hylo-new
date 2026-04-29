@@ -833,12 +833,12 @@ internal struct IREmitter {
 
     case .direct(let d):
       // The callee refers to a function directly.
-      return loweredCallee(referringTo: d, boundTo: nil, output: result)
+      return loweredCallee(referringTo: d, boundTo: nil, output: result, at: anchor)
 
     case .member(let d):
       // The callee refers to a bound member.
       let q = receiver(&self)
-      return loweredCallee(referringTo: d, boundTo: q, output: result)
+      return loweredCallee(referringTo: d, boundTo: q, output: result, at: anchor)
 
     case .inherited(let w, let m, let statically):
       // The callee refers to a member declared in extension.
@@ -846,7 +846,7 @@ internal struct IREmitter {
 
       // Is the member declared in an extension?
       if program.isExtensionMember(m) {
-        let target = loweredCallee(referringTo: m, boundTo: q, output: result)
+        let target = loweredCallee(referringTo: m, boundTo: q, output: result, at: anchor)
         return lowering(at: anchor.site, in: anchor.scope) { (me) in
           let (ts, xs) = me._emitArguments(of: w)
           let f = ts.isEmpty ? target.value : me._type_apply(target.value, to: ts)
@@ -874,17 +874,18 @@ internal struct IREmitter {
 
   /// Generates the IR for a callee referring to `d`, optionally bound to `receiver`.
   private mutating func loweredCallee(
-    referringTo d: DeclarationIdentity, boundTo receiver: IRValue?, output result: IRValue
+    referringTo d: DeclarationIdentity, boundTo receiver: IRValue?, output result: IRValue,
+    at anchor: Anchor
   ) -> LoweredCallee {
     switch program.tag(of: d) {
     case FunctionDeclaration.self:
       let f = demandLoweredDeclaration(functionOrConformance: d)
-      return loweredCallee(referringTo: f, boundTo: receiver, output: result)
+      return loweredCallee(referringTo: f, boundTo: receiver, output: result, at: anchor)
 
     case EnumCaseDeclaration.self:
       let f = demandLoweredDeclaration(
         constructor: program.castUnchecked(d, to: EnumCaseDeclaration.self))
-      return loweredCallee(referringTo: f, boundTo: receiver, output: result)
+      return loweredCallee(referringTo: f, boundTo: receiver, output: result, at: anchor)
 
     default:
       program.unexpected(d)
@@ -893,9 +894,20 @@ internal struct IREmitter {
 
   /// Generates the IR for a callee referring to `function`, optionally bound to `receiver`.
   private mutating func loweredCallee(
-    referringTo function: IRFunction.ID, boundTo receiver: IRValue?, output result: IRValue
+    referringTo function: IRFunction.ID, boundTo receiver: IRValue?, output result: IRValue,
+    at anchor: Anchor
   ) -> LoweredCallee {
-    let v = functionReference(to: function)
+    var v = functionReference(to: function)
+
+    // If the reference is bound to a generic type, its type arguments have to be extracted from
+    // the receiver's expression.
+    if let r = receiver {
+      let q = currentFunction.result(of: r)!.type
+      if let ts = program.types.select(q, \TypeApplication.arguments) {
+        v = lowering(at: anchor.site, in: anchor.scope, { $0._type_apply(v, to: ts) })
+      }
+    }
+
     return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
   }
 

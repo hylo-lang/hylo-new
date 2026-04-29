@@ -1,0 +1,10 @@
+//! stage:lowering
+
+struct A<U> is Deinitializable {
+  public fun f(x: U) {}
+  public memberwise init
+}
+
+fun use(a: A<Void>) { a.f(()) }
+
+public fun main() {}
