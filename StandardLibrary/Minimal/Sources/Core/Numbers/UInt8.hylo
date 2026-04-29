@@ -1,0 +1,69 @@
+/// An 8-bit unsigned integer value.
+@_symbol("UInt8")
+public struct UInt8 is Deinitializable {
+
+  /// The raw value of this instance.
+  internal var value: Builtin.i8
+
+  /// Creates an instance with its raw value.
+  internal memberwise init
+
+  /// Creates an instance equal to `0`.
+  @extern("hylo_init_uint8")
+  public init()
+
+  @extern("hylo_init_uint8_from_raw")
+  public init(from_raw value: Builtin.i8)
+
+  /// Returns 0.
+  ///
+  /// Defined in shim.c.
+  @extern("hylo_make_zero_uint8")
+  public static fun zero() -> Self
+
+  /// Returns 1.
+  ///
+  /// Defined in shim.c.
+  @extern("hylo_make_one_uint8")
+  public static fun one() -> Self
+
+  /// Returns `self + 1`.
+  ///
+  /// Defined in shim.c.
+  @extern("hylo_successor_uint8")
+  public fun successor() -> Self
+
+  @extern("hylo_uint8_get_value")
+  public fun get_value() -> Builtin.i8
+
+  @extern("hylo_uint8_eq")
+  public fun infix== (other: Self) -> Bool
+
+  @extern("hylo_uint8_ne")
+  public fun infix!= (other: Self) -> Bool
+
+  @extern("hylo_uint8_lt")
+  public fun infix< (other: Self) -> Bool
+
+  @extern("hylo_uint8_le")
+  public fun infix<= (other: Self) -> Bool
+
+  @extern("hylo_uint8_gt")
+  public fun infix> (other: Self) -> Bool
+
+  @extern("hylo_uint8_ge")
+  public fun infix>= (other: Self) -> Bool
+
+  @extern("hylo_uint8_infix_add")
+  fun infix+ (other: Self) -> Self
+
+  @extern("hylo_uint8_infix_subtract")
+  fun infix- (other: Self) -> Self
+
+  @extern("hylo_uint8_infix_multiply")
+  fun infix* (other: Self) -> Self
+}
+
+public given UInt8 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given UInt8 is Movable {}
