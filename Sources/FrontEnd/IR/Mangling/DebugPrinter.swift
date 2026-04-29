@@ -12,17 +12,29 @@ internal struct DebugPrinter {
     self.enabled = enabled
   }
 
+  /// Increases the indentation level by one iff `enabled` is `true`.
+  mutating func indent() {
+    if enabled {
+      indentation += 1
+    }
+  }
+
+  /// Decreases the indentation level by one iff `enabled` is `true`.
+  mutating func dedent() {
+    if enabled {
+      indentation -= 1
+    }
+  }
+
   /// Returns the application of `action`, logging the scope described by `description` and the
   /// resulting value if debug printing is enabled.
-  internal mutating func withScope<T>(
+  internal func withScope<T>(
     _ description: @autoclosure () -> String, _ action: () -> T
   ) -> T {
     if enabled {
       let d = description()
       printWithIndentation("- enter \(d)")
-      indentation += 1
       let r = action()
-      indentation -= 1
       printWithIndentation("- leave \(d): \(r)")
       return r
     } else {
@@ -31,15 +43,13 @@ internal struct DebugPrinter {
   }
 
   /// Executes `action`, logging the scope described by `description` if debug printing is enabled.
-  internal mutating func withScope(
+  internal func withScope(
     _ description: @autoclosure () -> String, _ action: () -> Void
   ) {
     if enabled {
       let d = description()
       printWithIndentation("- enter \(d)")
-      indentation += 1
       action()
-      indentation -= 1
       printWithIndentation("- leave \(d)")
     } else {
       action()

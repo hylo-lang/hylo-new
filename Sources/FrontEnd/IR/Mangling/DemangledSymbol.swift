@@ -386,9 +386,9 @@ extension DemangledType: CustomStringConvertible {
       return e.description
 
     case .tupleConsType, .tupleEmptyType:
-      let l = tupleAsList().map { "\($0)" }.joined(separator: ", ")
-      return "(\(l))"
-
+      let ts = tupleAsList()
+      return if let t = ts.uniqueElement { "(\(t),)" } else { "(\(list: ts))" }
+      
     case .typeAlias(let declaration, let aliasee):
       return "typealias \(declaration) = \(aliasee)"
 

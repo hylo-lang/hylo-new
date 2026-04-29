@@ -152,20 +152,20 @@ struct DemanglingContext {
 
   /// Returns the result of applying `action` on `self`, logging the reading of an entity.
   mutating func readingEntity<T>(_ action: (_ source: inout Self) -> T) -> T {
-    withUnsafeMutablePointer(to: &self) { (me) in
-      me.pointee.debug.withScope("read entity") {
-        action(&me.pointee)
-      }
+    debug.indent()
+    defer { debug.dedent()}
+    return debug.withScope("read entity") {
+      action(&self)
     }
   }
 
   /// Returns the application of `action` on a mutable `self`, performing debug logging for reading
   /// a type.
   mutating func readingType<T>(_ action: (_ source: inout Self) -> T) -> T {
-    withUnsafeMutablePointer(to: &self) { (me) in
-      me.pointee.debug.withScope("read type") {
-        action(&me.pointee)
-      }
+    debug.indent()
+    defer { debug.dedent()}
+    return debug.withScope("read type") {
+      action(&self)
     }
   }
 

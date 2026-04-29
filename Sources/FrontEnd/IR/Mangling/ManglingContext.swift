@@ -184,12 +184,10 @@ struct ManglingContext {
   mutating func writing(
     decl d: DeclarationIdentity, program: Program, _ action: (_ source: inout Self) -> Void
   ) {
-    // `withScope` needs access to `debug`, but only at its beginning and end. 
-    // It guarantees the invariants of the type in the middle, so it's safe for it to be reentrant through `me`.
-    withUnsafeMutablePointer(to: &self) { (me) in
-      me.pointee.debug.withScope("write decl: \(program.debugName(of: d))") {
-        action(&me.pointee)
-      }
+    debug.indent()
+    defer { debug.dedent()}
+    debug.withScope("write decl: \(program.debugName(of: d))") {
+      action(&self)
     }
   }
 
@@ -198,10 +196,10 @@ struct ManglingContext {
   mutating func writingQualification(
     _ action: (_ source: inout Self) -> Void
   ) {
-    withUnsafeMutablePointer(to: &self) { (me) in
-      me.pointee.debug.withScope("write qualification") {
-        action(&me.pointee)
-      }
+    debug.indent()
+    defer { debug.dedent()}
+    debug.withScope("write qualification") {
+      action(&self)
     }
   }
 
@@ -209,10 +207,10 @@ struct ManglingContext {
   mutating func writing(
     type t: AnyTypeIdentity, program: Program, _ action: (_ source: inout Self) -> Void
   ) {
-    withUnsafeMutablePointer(to: &self) { (me) in
-      me.pointee.debug.withScope("write type: \(Self.debugName(of: t, in: program))") {
-        action(&me.pointee)
-      }
+    debug.indent()
+    defer { debug.dedent()}
+    debug.withScope("write type: \(Self.debugName(of: t, in: program))") {
+      action(&self)
     }
   }
 
