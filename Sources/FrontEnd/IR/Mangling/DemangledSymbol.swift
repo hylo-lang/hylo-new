@@ -344,10 +344,7 @@ extension DemangledType: CustomStringConvertible {
       return "\(lhs) == \(rhs)"
 
     case .functionPointer(let inputs, let output):
-      let i = inputs.map { (t) -> String in
-        "\(t)"
-      }
-      return "ptr (\(list: i)) -> \(output)"
+      return "ptr (\(list: inputs)) -> \(output)"
 
     case .genericParameterConformer(let declaration, let kind):
       return "GenericParameterConformer<\(declaration), \(kind)>"
@@ -359,8 +356,7 @@ extension DemangledType: CustomStringConvertible {
       return "GenericParameterNth<\(index), \(kind)>"
 
     case .implication(let usings, let head):
-      let u = usings.map { "\($0)" }
-      return "(\(list: u)) => \(head)"
+      return "(\(list: usings)) => \(head)"
 
     case .integerLiteral:
       return "IntegerLiteral"
@@ -400,8 +396,7 @@ extension DemangledType: CustomStringConvertible {
       let args = arguments.map({ (a) in "[\(a.formal): \(a.argument)]" }).joined(separator: ", ")
       return "\(abstraction)<\(args)>"
     case .universalType(let parameters, let head):
-      let params = parameters.map { "\($0)" }.joined(separator: ", ")
-      return "<\(params)> \(head)"
+      return "<\(list: parameters)> \(head)"
     }
   }
 

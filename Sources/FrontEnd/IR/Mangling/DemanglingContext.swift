@@ -150,8 +150,7 @@ struct DemanglingContext {
     symbols.append(s)
   }
 
-  /// Returns the application of `action` on a mutable `self`, performing debug logging for reading
-  /// an entity.
+  /// Returns the result of applying `action` on `self`, logging the reading of an entity.
   mutating func readingEntity<T>(_ action: (_ source: inout Self) -> T) -> T {
     withUnsafeMutablePointer(to: &self) { (me) in
       me.pointee.debug.withScope("read entity") {
