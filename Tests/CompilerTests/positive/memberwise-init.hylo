@@ -6,4 +6,11 @@ struct A {
   public let m1: Void
 }
 
+struct B {
+  public memberwise init
+  public let (m0, _, m1): {Void, Void, Void}
+}
+
 fun a() -> A { A(m0: (), m1: ()) }
+
+fun b() -> B { B(m0: (), m1: ()) }

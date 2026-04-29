@@ -1307,8 +1307,10 @@ public struct Typer {
       for b in program.collect(BindingDeclaration.self, in: program[s].members) {
         _ = declaredType(of: b)
         program.forEachVariable(introducedBy: b) { (v, _) in
-          let t = program[b.module].type(assignedTo: b) ?? .error
-          inputs.append(Parameter(label: program[v].identifier.value, access: .sink, type: t))
+          let l = program[v].identifier.value
+          let t = program[b.module].type(assignedTo: v)
+            .flatMap({ (u) in program.types.select(u, \RemoteType.projectee) })
+          inputs.append(Parameter(label: l, access: .sink, type: t ?? .error))
         }
       }
     }
