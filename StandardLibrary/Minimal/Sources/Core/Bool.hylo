@@ -10,9 +10,8 @@ public struct Bool is Deinitializable {
   public init(_ value: Builtin.i1)
 
   /// Creates an instance equal to `false`.
-  public init() {
-    &self.value = Builtin.zeroinitializer_i1()
-  }
+  @extern("hylo_init_bool")
+  public init()
 
   /// Returns the logical conjunction of `self` and `other`.
   ///
@@ -29,18 +28,14 @@ public struct Bool is Deinitializable {
   }
 
   /// Returns negation of `self`.
-  public fun prefix! () -> Bool {
-    // `Bool(value: self.value != 0)`
-    Bool(value: Builtin.icmp_eq_i1(self.value, Builtin.zeroinitializer_i1()))
-  }
+  @extern("hylo_bool_prefix_not")
+  public fun prefix! () -> Bool
 
-  public fun infix== (other: Self) -> Bool {
-    Bool(value: Builtin.icmp_eq_i1(self.value, other.value))
-  }
+  @extern("hylo_bool_eq")
+  public fun infix== (other: Self) -> Bool
 
-  public fun infix!= (other: Self) -> Bool {
-    Bool(value: Builtin.icmp_ne_i1(self.value, other.value))
-  }
+  @extern("hylo_bool_ne")
+  public fun infix!= (other: Self) -> Bool
 
   @extern("hylo_make_false")
   public static fun makeFalse() -> Bool
