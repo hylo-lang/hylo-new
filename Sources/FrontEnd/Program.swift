@@ -1431,6 +1431,9 @@ extension Program {
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
+    /// `Hylo.UInt8`.
+    case uint8 = "UInt8"
+
     /// `Hylo.Float32`.
     case float32 = "Float32"
 

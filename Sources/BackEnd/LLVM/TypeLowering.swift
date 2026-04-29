@@ -75,9 +75,11 @@ extension Program {
   }
 
   /// The types of each stored property of a struct in declaration order.
-  func storedPropertyTypes(of structType: Struct.ID) -> [AnyTypeIdentity] {
-    storedProperties(of: types[structType].declaration).map { variableDeclaration in
-      type(assignedTo: variableDeclaration)
+  func storedPropertyTypes(of s: Struct.ID) -> [AnyTypeIdentity] {
+    storedProperties(of: types[s].declaration).map { (variable) in
+      // Variable declarations are typed as `RemoteType` projections; the stored
+      // property's layout is determined by the projectee's type.
+      (types[type(assignedTo: variable)] as! RemoteType).projectee
     }
   }
 

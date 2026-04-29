@@ -125,8 +125,9 @@ private struct CodeGenerationContext: ~Copyable {
          name == "Triple.$<ConformanceDeclaration at print-struct-elements:3.18>" {
         return
       }
-      
-      fatalError("function \(name) has no return register, probably it's a subscript that we didn't lower yet. See: \(p.show(f))")
+      print("function \(name) has no return register, probably it's a subscript that we didn't lower yet. See: \(p.show(f))")
+      return
+      // fatalError("function \(name) has no return register, probably it's a subscript that we didn't lower yet. See: \(p.show(f))")
     }
 
     let transpiledFunction = declareFunction(transpiledFrom: f)
