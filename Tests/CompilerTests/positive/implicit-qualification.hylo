@@ -4,6 +4,9 @@ struct A<T> {
   public var x: T
   public memberwise init
   public static fun make(x: sink T) -> A<T> { .new(x: x) }
+}
+
+extension <T> A<T> {
   public fun id() sink -> Self { self }
 }
 
