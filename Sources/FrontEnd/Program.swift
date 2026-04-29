@@ -87,6 +87,7 @@ public struct Program: Sendable {
     _ m: Module.ID,
     loggingInferenceWhere isLoggingEnabled: ((AnySyntaxIdentity, Program) -> Bool)?
   ) {
+    types.reserveCapacity(max(types.underestimatedCount << 1, 10000))
     var typer = Typer(typing: m, of: consume self, loggingInferenceWhere: isLoggingEnabled)
     typer.apply()
     self = typer.release()
@@ -316,7 +317,7 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `n` is a trait requirement.
   ///
-  /// - Rquires: The module containing `n` is scoped.
+  /// - Requires: The module containing `n` is scoped.
   public func isRequirement<T: SyntaxIdentity>(_ n: T) -> Bool {
     traitRequiring(n) != nil
   }
@@ -335,7 +336,7 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `n` declares a member entity in an type extension.
   ///
-  /// - Rquires: The module containing `n` is scoped.
+  /// - Requires: The module containing `n` is scoped.
   public func isExtensionMember<T: SyntaxIdentity>(_ n: T) -> Bool {
     extensionContaining(n) != nil
   }
@@ -640,6 +641,8 @@ public struct Program: Sendable {
     switch m {
     case standardLibraryDeclaration(.expressibleByIntegerLiteralInit):
       return .expressibleByIntegerLiteralInit
+    case standardLibraryDeclaration(.expressibleByFloatingPointLiteralInit):
+      return .expressibleByFloatingPointLiteralInit
     default:
       return nil
     }
@@ -711,13 +714,18 @@ public struct Program: Sendable {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
+  /// Returns `true` iff `n` contains a reference to `d`.
+  ///
+  /// - Requires: The module containing `n` is typed.
   public func occurs<T: SyntaxIdentity>(referenceTo d: DeclarationIdentity, in n: T) -> Bool {
-    switch tag(of: n) {
-    case NameExpression.self:
-      return declaration(referredToBy: castUnchecked(n)).target == d
-    default:
-      return children(n).contains(where: { (c) in occurs(referenceTo: d, in: c) })
+    var work: [AnySyntaxIdentity] = [n.erased]
+    while let w = work.popLast() {
+      if let e = cast(w, to: NameExpression.self), declaration(referredToBy: e).target == d {
+        return true
+      }
+      work.append(contentsOf: children(w))
     }
+    return false
   }
 
   /// Returns the associated type and member requirements of `t`.
@@ -765,7 +773,7 @@ public struct Program: Sendable {
   /// If `n` declares a member entity in an extension, returns the that declaration. Otherwise,
   /// returns `nil`.
   ///
-  /// - Rquires: The module containing `n` is scoped.
+  /// - Requires: The module containing `n` is scoped.
   public func extensionContaining<T: SyntaxIdentity>(_ n: T) -> ExtensionDeclaration.ID? {
     switch tag(of: n) {
     case VariantDeclaration.self:
@@ -827,7 +835,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Retutns whether `m` or `n` is lexically closer to `s`.
+  /// Returns whether `m` or `n` is lexically closer to `s`.
   ///
   /// - Requires: The module containing `s` is scoped.
   public func compareLexicalDistances<T: SyntaxIdentity, U: SyntaxIdentity>(
@@ -1273,21 +1281,21 @@ public struct Program: Sendable {
     }
   }
 
-  /// Reports that `n` was not expected in the current executation path and exits the program.
+  /// Reports that `n` was not expected in the current execution path and exits the program.
   public func unexpected<T: SyntaxIdentity>(
     _ n: T, file: StaticString = #file, line: UInt = #line
   ) -> Never {
     unreachable("unexpected node '\(tag(of: n))' at \(self[n].site)", file: file, line: line)
   }
 
-  /// Reports that `t` was not expected in the current executation path and exits the program.
+  /// Reports that `t` was not expected in the current execution path and exits the program.
   public func unexpected(
     _ t: AnyTypeIdentity, file: StaticString = #file, line: UInt = #line
   ) -> Never {
     unreachable("unexpected type '\(show(t))'", file: file, line: line)
   }
 
-  /// Returns a source span suitable to emit a disgnostic related to `n` as a whole.
+  /// Returns a source span suitable to emit a diagnostic related to `n` as a whole.
   public func spanForDiagnostic<T: SyntaxIdentity>(about n: T) -> SourceSpan {
     switch tag(of: n) {
     case AssociatedTypeDeclaration.self:
@@ -1326,7 +1334,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns a source span suitable to emit a disgnostic related to `n` as a whole.
+  /// Returns a source span suitable to emit a diagnostic related to `n` as a whole.
   public func spanForDiagnostic(about n: ConformanceDeclaration.ID) -> SourceSpan {
     if self[n].isAdjunct {
       return spanForDiagnostic(about: self[n].witness)
@@ -1335,7 +1343,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns a source span suitable to emit a disgnostic related to `n` as a whole.
+  /// Returns a source span suitable to emit a diagnostic related to `n` as a whole.
   public func spanForDiagnostic(about n: Return.ID) -> SourceSpan {
     if let i = self[n].introducer {
       return .empty(at: i.site.start)
@@ -1357,11 +1365,11 @@ public struct Program: Sendable {
   /// assert(s == "'Void' is a type")
   /// ```
   ///
-  /// Each element to show is represented by a placehoder, which is a string starting with "%". The
+  /// Each element to show is represented by a placeholder, which is a string starting with "%". The
   /// i-th placeholder occurring in `message` (except `%%`) must have a corresponding value at the
   /// i-th position of `arguments`.
   ///
-  /// Valid placehoders are:
+  /// Valid placeholders are:
   /// - `%S`: The textual description of an arbitrary value.
   /// - `%T`: A type.
   /// - `%%`: The percent sign; does not consume any argument.
@@ -1429,6 +1437,12 @@ extension Program {
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
+    /// `Hylo.Float32`.
+    case float32 = "Float32"
+
+    /// `Hylo.Float64`.
+    case float64 = "Float64"
+
     /// `Hylo.Deinitializable`.
     case deinitializable = "Deinitializable"
 
@@ -1449,6 +1463,12 @@ extension Program {
 
     /// `Hylo.ExpressibleByIntegerLiteral.init(integer_literal:)`.
     case expressibleByIntegerLiteralInit = "ExpressibleByIntegerLiteral.init(integer_literal:)"
+
+    /// `Hylo.ExpressibleByFloatingPointLiteral`.
+    case expressibleByFloatingPointLiteral = "ExpressibleByFloatingPointLiteral"
+
+    /// `Hylo.ExpressibleByFloatingPointLiteral.init(floating_point_literal:)`.
+    case expressibleByFloatingPointLiteralInit = "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
 
   }
 
@@ -1548,6 +1568,7 @@ extension Program {
     // Reserve an identity for the new module.
     let m = modules.count
     var c = Module.SerializationContext(identities: [name: m], types: .init())
+    types.reserveCapacity(max(types.underestimatedCount << 1, 10000))
 
     // Configure the serialization context.
     swap(&c.types, &types)

@@ -861,7 +861,7 @@ public struct Typer {
     }
   }
 
-  /// Returns `true` iff there exists a buil-in conformance of `conformer` to `concept`.
+  /// Returns `true` iff there exists a built-in conformance of `conformer` to `concept`.
   private mutating func isBuiltin(
     conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity
   ) -> Bool {
@@ -872,13 +872,15 @@ public struct Typer {
     switch concept {
     case program.standardLibraryDeclaration(.expressibleByIntegerLiteral):
       return isStandardLibraryIntegerType(conformer)
+    case program.standardLibraryDeclaration(.expressibleByFloatingPointLiteral):
+      return isStandardLibraryFloatingPointType(conformer)
     default:
       return false
     }
   }
 
   /// The result of a structural conformance lookup.
-  private enum StructualConformanceLookupResult {
+  private enum StructuralConformanceLookupResult {
 
     /// No structural conformance.
     case failure
@@ -906,7 +908,7 @@ public struct Typer {
   private mutating func structurallyConforms(
     storageOf conformer: AnyTypeIdentity, to concept: TraitDeclaration.ID,
     in scopeOfUse: ScopeIdentity
-  ) -> StructualConformanceLookupResult {
+  ) -> StructuralConformanceLookupResult {
     guard let parts = storage(of: conformer) else { return .failure }
 
     var isTriviallySynthetic = true
@@ -929,7 +931,7 @@ public struct Typer {
   private mutating func structurallyConforms(
     _ conformer: Tuple.ID, to concept: TraitDeclaration.ID,
     in scopeOfUse: ScopeIdentity
-  ) -> StructualConformanceLookupResult {
+  ) -> StructuralConformanceLookupResult {
     switch program.types[conformer] {
     case .cons(let head, let tail):
       return
@@ -946,7 +948,7 @@ public struct Typer {
   private mutating func isDerivable(
     conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity,
     in scopeOfUse: ScopeIdentity
-  ) -> StructualConformanceLookupResult {
+  ) -> StructuralConformanceLookupResult {
     assert(isStructurallySynthesizable(conformanceTo: concept))
     if program.types[conformer] is MachineType {
       return .success(true)
@@ -1307,8 +1309,10 @@ public struct Typer {
       for b in program.collect(BindingDeclaration.self, in: program[s].members) {
         _ = declaredType(of: b)
         program.forEachVariable(introducedBy: b) { (v, _) in
-          let t = program[b.module].type(assignedTo: b) ?? .error
-          inputs.append(Parameter(label: program[v].identifier.value, access: .sink, type: t))
+          let l = program[v].identifier.value
+          let t = program[b.module].type(assignedTo: v)
+            .flatMap({ (u) in program.types.select(u, \RemoteType.projectee) })
+          inputs.append(Parameter(label: l, access: .sink, type: t ?? .error))
         }
       }
     }
@@ -1653,7 +1657,7 @@ public struct Typer {
 
   /// Computes the types of the given context parameters, introducing them in order.
   private mutating func initializeContext(_ parameters: ContextParameters) {
-    // Parameters are pushed onto the stack and removed after they have been visted so that, given
+    // Parameters are pushed onto the stack and removed after they have been visited so that, given
     // two parameters `p` and `q` such that `q` occurs after `p`, resolution can't "see" `q` while
     // it is computing the type of `p`.
     declarationsOnStack.formUnion(parameters.usings)
@@ -1814,7 +1818,7 @@ public struct Typer {
     program[p.module].setType(t, for: p)
   }
 
-  /// Returns `true` iff the argument labels occuring in `p` are compatible with those of `d`.
+  /// Returns `true` iff the argument labels occurring in `p` are compatible with those of `d`.
   private func labelsCompatible(_ lhs: ExtractorPattern.ID, _ rhs: [Parameter]) -> Bool {
     program[lhs].elements.elementsEqual(rhs) { (l, r) in
       (l.label == nil) || (l.label?.value == r.label)
@@ -1941,7 +1945,11 @@ public struct Typer {
     case InoutExpression.self:
       return inferredType(of: castUnchecked(e, to: InoutExpression.self), in: &context)
     case IntegerLiteral.self:
-      return inferredType(of: castUnchecked(e, to: IntegerLiteral.self), in: &context)
+      return inferredType(of: castUnchecked(e, to: IntegerLiteral.self), in: &context, 
+        conversionLabel: "integer_literal", defaultInferredType: .int)
+    case FloatingPointLiteral.self:
+      return inferredType(of: castUnchecked(e, to: FloatingPointLiteral.self), in: &context,
+        conversionLabel: "floating_point_literal", defaultInferredType: .float64)
     case Lambda.self:
       return inferredType(of: castUnchecked(e, to: Lambda.self), in: &context)
     case NameExpression.self:
@@ -2228,23 +2236,24 @@ public struct Typer {
     return context.obligations.assume(e, hasType: t, at: program[e].site)
   }
 
-  /// Returns the inferred type of `e`.
-  private mutating func inferredType(
-    of e: IntegerLiteral.ID, in context: inout InferenceContext
+  /// Returns the inferred type of a primitive literal `e`, ensuring `e` is elaborated to a call 
+  /// to the inferred type's `.new(<conversionLabel>: e)` initializer.
+  private mutating func inferredType<Literal: LiteralExpression>(
+    of e: Literal.ID, in context: inout InferenceContext, conversionLabel: String,
+    defaultInferredType: Program.StandardLibraryEntity
   ) -> AnyTypeIdentity {
     // Did we already elaborate this expression?
     if let t = program[e.module].type(assignedTo: e) {
       return context.obligations.assume(e, hasType: t, at: program[e].site)
     }
 
-    // Otherwise, elaborate to `.new(integer_literal: e)`.
+    // Otherwise, elaborate to `.new(<Literal.conversionLabel>: e)`.
     else {
       let s = SourceSpan.empty(at: program[e].site.start)
       let p = program.parent(containing: e)
 
       let literal = program[e.module].insert(program[e], in: p)
-      let integer = demand(LiteralType.integer).erased
-      program[e.module].setType(integer, for: literal)
+      program[e.module].setType(demand(Literal.literalType).erased, for: literal)
 
       let q = program[e.module].insert(
         ImplicitQualification(site: s), in: p)
@@ -2256,11 +2265,11 @@ public struct Typer {
         .init(e),
         with: Call(
           callee: .init(m),
-          arguments: [.init(label: Parsed("integer_literal", at: s), value: .init(literal))],
+          arguments: [.init(label: Parsed(conversionLabel, at: s), value: .init(literal))],
           style: .parenthesized,
           site: program[e].site))
 
-      let qualification = context.expectedType ?? standardLibraryType(.int)
+      let qualification = context.expectedType ?? standardLibraryType(defaultInferredType)
       return context.withSubcontext(expectedType: qualification) { (ctx) in
         inferredType(of: c, in: &ctx)
       }
@@ -2938,7 +2947,7 @@ public struct Typer {
       u = program.types.substituteVariableForError(in: u)
       program[n.module].setType(u, for: n)
 
-      // The uncheked cast is okay because type of an identity is irrelevant.
+      // The unchecked cast is okay because type of an identity is irrelevant.
       cache.declarationToTentativeType[.init(uncheckedFrom: n)] = nil
     }
 
@@ -4587,7 +4596,7 @@ public struct Typer {
 
   /// Returns `true` iff `t` is a standard library integer type (e.g., `Hylo.Int`).
   ///
-  /// The module containing the standard library must have been loaded in the `self.progam`, or
+  /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
     guard program.containsStandardLibrary else { return false }
@@ -4601,12 +4610,27 @@ public struct Typer {
     }
   }
 
+  /// Returns `true` iff `t` is a standard library floating point type (e.g., `Hylo.Float32`).
+  ///
+  /// The module containing the standard library must have been loaded in the `self.program`, or
+  /// `self.module` is the standard library.
+  private mutating func isStandardLibraryFloatingPointType(_ t: AnyTypeIdentity) -> Bool {
+    guard program.containsStandardLibrary else { return false }
+    switch program.types.dealiased(t) {
+    case standardLibraryType(.float32),
+        standardLibraryType(.float64):
+      return true
+    default:
+      return false
+    }
+  }
+
   /// Returns the type of the given standard library entity.
   ///
   /// Unlike `Program.standardLibraryType(_:)`, this method may be called while `self` is typing
   /// the standard library (i.e., when `self.module` is the standard library).
   ///
-  /// The module containing the standard library must have been loaded in the `self.progam`, or
+  /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func standardLibraryType(
     _ n: Program.StandardLibraryEntity

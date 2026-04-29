@@ -198,7 +198,7 @@ public struct DeclarationIdentity: SyntaxIdentity {
 
 }
 
-/// The type-erased identitiy of an abstract syntax tree denoting an expression.
+/// The type-erased identity of an abstract syntax tree denoting an expression.
 public struct ExpressionIdentity: SyntaxIdentity {
 
   /// The type-erased value of this identity.

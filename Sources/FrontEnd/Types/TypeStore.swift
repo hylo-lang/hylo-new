@@ -30,6 +30,16 @@ public struct TypeStore: Sendable {
     self.nextFreshIdentifier = 0
   }
 
+  /// Returns a number less than the number of types created with this store.
+  public var underestimatedCount: Int {
+    types.count
+  }
+
+  /// Reserves enough space to store `minimumCapacity` types without allocating new storage.
+  public mutating func reserveCapacity(_ minimumCapacity: Int) {
+    self.types.reserveCapacity(minimumCapacity)
+  }
+
   /// Returns the identity of a fresh type variable.
   public mutating func fresh() -> TypeVariable.ID {
     defer { nextFreshIdentifier += 1 }
@@ -106,7 +116,7 @@ public struct TypeStore: Sendable {
     tag(of: n) == EqualityWitness.self
   }
 
-  /// Returns `true` iff `n` identifies a metatype whose inhabitant satifies `predicate`.
+  /// Returns `true` iff `n` identifies a metatype whose inhabitant satisfies `predicate`.
   public func isMetatype<T: TypeIdentity>(
     _ n: T, of predicate: (AnyTypeIdentity) -> Bool
   ) -> Bool {
@@ -344,7 +354,7 @@ public struct TypeStore: Sendable {
   }
 
   /// Assuming `a` identifies the (possibly polymorphic) type of a callable abstraction with an
-  /// environement `e`, returns a copy of `a` where `e` is taken as first parameter if `e` is
+  /// environment `e`, returns a copy of `a` where `e` is taken as first parameter if `e` is
   /// non-empty or `a` unchanged otherwise.
   ///
   /// For example, if `a` is of the form `[let T]() let -> U`, the result is `[](let T) let -> U`.
@@ -752,7 +762,7 @@ public struct TypeStore: Sendable {
     // Nothing to do if there aren't any open type variable.
     if !n[.hasVariable] { return n }
 
-    // Reduce type applications if the abstaction is a universal type.
+    // Reduce type applications if the abstraction is a universal type.
     var t = substitutions[n]
     while let a = self[t] as? TypeApplication, let f = self[a.abstraction] as? UniversalType {
       t = substitute(.init(mapping: f.parameters, to: a.arguments.values), in: f.head)
@@ -811,7 +821,7 @@ public struct TypeStore: Sendable {
       return n
     } else {
       return self.map(n) { (s, t) in
-        // The uncheked cast is okay because type of an identity is irrelevant to `Hashable`.
+        // The unchecked cast is okay because type of an identity is irrelevant to `Hashable`.
         if let u = substitutions[.init(uncheckedFrom: t)] { .stepOver(u) } else { .stepInto(t) }
       }
     }

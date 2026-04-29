@@ -92,7 +92,7 @@ extension MachineType: LosslessStringConvertible {
     }
   }
 
-  /// Creates `.i(n)` where `n` is a non-negative integer pased from `s`.
+  /// Creates `.i(n)` where `n` is a non-negative integer parsed from `s`.
   private init?<S: StringProtocol>(i s: S) {
     if let bitWidth = UInt8(s) {
       self = .i(bitWidth)

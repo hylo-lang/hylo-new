@@ -20,7 +20,7 @@ public struct TypeProperties: Hashable, OptionSet, Sendable {
   /// The value contains open variables.
   public static let hasVariable = TypeProperties(rawValue: 1 << 1)
 
-  /// The value contains type aliasess.
+  /// The value contains type aliases.
   public static let hasAliases = TypeProperties(rawValue: 1 << 2)
 
   /// The value contains generic type parameters.

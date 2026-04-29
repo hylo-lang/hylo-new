@@ -12,7 +12,7 @@ public func modify<T, U>(_ value: inout T, _ action: (inout T) throws -> U) reth
 public func modify<T, U>(
   _ value: inout Any, as: T.Type, _ action: (inout T) throws -> U
 ) rethrows -> U {
-  var v = value as! T
+  var v = consume value as! T
   defer { value = v }
   return try action(&v)
 }

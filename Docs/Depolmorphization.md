@@ -5,5 +5,5 @@ The implementation (aka definition) of a monomorphic function may feature uses o
 to machine code.
 This transformation is referred to as *depolymorphization*.
 
-Both monomorphization and existentialization essentially consist of creating a copy of the polymoprhic function.
+Both monomorphization and existentialization essentially consist of creating a copy of the polymorphic function.
 In the former case, type arguments are simply substituted for their corresponding parameters. In the latter case, the type parameters are transformed into term parameters accepting type witnesses at run-time.

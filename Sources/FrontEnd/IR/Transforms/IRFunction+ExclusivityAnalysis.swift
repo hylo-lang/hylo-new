@@ -36,7 +36,7 @@ extension IRFunction {
   ///
   /// - Parameters:
   ///   - bs  The instructions having formed an access on the place to bind.
-  ///   - s   The access instruction in `bs` from wich the access to form reborrows.
+  ///   - s   The access instruction in `bs` from which the access to form reborrows.
   fileprivate func isValidImmutableAccess(
     reborrowingFrom s: IRAccess.ID?, sharedBy bs: Transfer.Domain.Users
   ) -> Bool {
@@ -51,7 +51,7 @@ extension IRFunction {
   ///
   /// - Parameters:
   ///   - bs  The instructions having formed an access on the place to bind.
-  ///   - s   The access instruction in `bs` from wich the access to form reborrows.
+  ///   - s   The access instruction in `bs` from which the access to form reborrows.
   fileprivate func isValidMutableAccess(
     reborrowingFrom s: IRAccess.ID?, sharedBy bs: Transfer.Domain.Users
   ) -> Bool {
@@ -67,7 +67,7 @@ extension IRFunction {
 /// A transfer function for interpreting IR during exclusivity analysis.
 private struct Transfer: AbstractTransferFunction {
 
-  /// The module containing the instructions intepreted by this function.
+  /// The module containing the instructions interpreted by this function.
   private let module: Module.ID
 
   /// A typer for querying type relations and resolve names.
@@ -141,7 +141,7 @@ private struct Transfer: AbstractTransferFunction {
     // Access is expected to be reified at this stage.
     let k = access.capabilities.uniqueElement!
 
-    // Built-in values are implictly copied.
+    // Built-in values are implicitly copied.
     if (k == .sink) && f.isBuiltinValue(access.source, using: program) {
       context.declare(i.erased, from: f, initially: .unique)
       return f.instruction(after: i.erased)

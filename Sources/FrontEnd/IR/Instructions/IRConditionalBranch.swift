@@ -19,7 +19,7 @@ public struct IRConditionalBranch: Terminator {
     self.successors = [onSuccess, onFailure]
   }
 
-  /// Creates a copy of `other`, substituting its properities with `ss`.
+  /// Creates a copy of `other`, substituting its properties with `ss`.
   public init(_ other: Self, substituting ss: IRSubstitutionTable) {
     self.operands = other.operands.map({ (o) in ss[o] })
     self.anchor = other.anchor

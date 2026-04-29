@@ -229,7 +229,7 @@ final class CompilerTests: XCTestCase {
     }
 
     if !report.isEmpty {
-      XCTFail("observed output does match expecation:" + report)
+      XCTFail("observed output does match expectation:" + report)
     }
   }
 

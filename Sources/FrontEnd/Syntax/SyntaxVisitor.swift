@@ -88,6 +88,8 @@ extension Program {
       traverse(castUnchecked(n, to: Conversion.self), calling: &v)
     case EqualityWitnessExpression.self:
       traverse(castUnchecked(n, to: EqualityWitnessExpression.self), calling: &v)
+    case FloatingPointLiteral.self:
+      break
     case If.self:
       traverse(castUnchecked(n, to: If.self), calling: &v)
     case ImplicitQualification.self:

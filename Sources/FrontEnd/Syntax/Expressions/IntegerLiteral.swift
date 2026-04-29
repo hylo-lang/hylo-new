@@ -2,7 +2,7 @@ import Archivist
 
 /// The expression of an integer literal.
 @Archivable
-public struct IntegerLiteral: Expression {
+public struct IntegerLiteral: LiteralExpression {
 
   /// The site from which `self` was parsed.
   public let site: SourceSpan
@@ -14,6 +14,8 @@ public struct IntegerLiteral: Expression {
 
   /// The value of the literal.
   public var value: Substring { site.text }
+
+  public static let literalType: LiteralType = .integer
 
 }
 

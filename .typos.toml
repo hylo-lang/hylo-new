@@ -1,0 +1,19 @@
+# Configuration for the `typos` spell checker (https://github.com/crate-ci/typos).
+# See CONTRIBUTING.md for instructions on running it locally.
+
+[files]
+# Swifty-LLVM is a separate project. Its spelling is managed upstream.
+extend-exclude = ["Swifty-LLVM"]
+
+[default.extend-identifiers]
+# `WriteableArchive` is part of the external `Archivist` dependency's API
+# and cannot be renamed here.
+WriteableArchive = "WriteableArchive"
+
+[default.extend-words]
+inout = "inout"           # Mutable projection keyword
+olt = "olt"               # Abbreviation for "ordered less than"
+
+# Title of a cited paper by Odersky et al. (2017):
+# "Simplicitly: Foundations and applications of implicit function types."
+Simplicitly = "Simplicitly"

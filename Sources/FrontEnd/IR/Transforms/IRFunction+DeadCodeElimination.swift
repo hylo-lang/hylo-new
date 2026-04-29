@@ -62,10 +62,10 @@ extension IRFunction {
   /// `Never` is encoded as `<T> T`, meaning that a never-returning expression will typically be
   /// wrapped into a type application so that the it matches the expected type. This method can
   /// therefore identify the instruction denoting the lowered form of a never-returning expression
-  /// right before any type applicaiton.
+  /// right before any type application.
   private func returns(never: AnyTypeIdentity, _ i: AnyInstructionIdentity) -> Bool {
     // Note that it's fine to compare the return type of applications with `Never` because the
-    // expression shoud still have the form `<T> T` at this point.
+    // expression should still have the form `<T> T` at this point.
     switch at(i) {
     case let s as IRApply:
       return result(of: s.result)?.type == never
