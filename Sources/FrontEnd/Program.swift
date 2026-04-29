@@ -22,8 +22,13 @@ public struct Program: Sendable {
   /// or by `self.load(module:from:)` after the standard library has been deserialized.
   private var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
 
+  /// `true` iff the program is allowed to have an only partially loaded standard library.
+  private var allowPartialStandardLibrary: Bool = false
+
   /// Creates an empty program.
-  public init() {}
+  public init(allowPartialStandardLibrary: Bool = false) {
+    self.allowPartialStandardLibrary = allowPartialStandardLibrary
+  }
 
   /// `true` if the program has errors.
   public var containsError: Bool {
@@ -1515,7 +1520,10 @@ extension Program {
         let a = identity(module: Module.standardLibraryName),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
-      else { fatalError("missing or corrupt standard library") }
+      else {
+         precondition(allowPartialStandardLibrary, "missing or corrupt standard library")
+         continue
+      }
       standardLibraryDeclarations[n] = d
     }
   }
