@@ -860,10 +860,14 @@ internal struct IREmitter {
       let q = statically ? nil : receiver(&self)
 
       // Is the member declared in an extension?
-      if program.isExtensionMember(m) {
+      if let parent = program.extensionContaining(m) {
         let target = loweredCallee(referringTo: m, boundTo: q, output: result)
         return lowering(at: anchor.site, in: anchor.scope) { (me) in
-          let (ts, xs) = me._emitArguments(of: w)
+          /// References to members in extensions are expressed using a witness representing the
+          /// type and term arguments passed to parameters declared on the extension itself.
+          let (e, ts, xs) = me._emit(decompose: w)
+          assert(e.value == .reference(.init(parent)))
+
           let f = ts.isEmpty ? target.value : me._type_apply(target.value, to: ts)
           return LoweredCallee(value: f, arguments: xs + target.arguments, result: target.result)
         }
@@ -1973,7 +1977,7 @@ internal struct IREmitter {
     switch program.tag(of: d) {
     case ConformanceDeclaration.self:
       let e = program.castUnchecked(d, to: ConformanceDeclaration.self)
-      return _emit(referenceTo: e, instantiatedWith: [:], applyingNullary: applyNullary)
+      return _emit(referenceTo: e, applyingNullary: applyNullary)
 
     case VariableDeclaration.self:
       // Since `d` wasn't in the local symbol table, we can assume it's a global symbol.
@@ -1989,17 +1993,15 @@ internal struct IREmitter {
   /// If `applyNullary` is `true` and `d` refers to a nullary conformance declaration, the result
   /// is an application of corresponding lowered function.
   private mutating func _emit(
-    referenceTo d: ConformanceDeclaration.ID, instantiatedWith a: TypeArguments,
-    applyingNullary applyNullary: Bool
+    referenceTo d: ConformanceDeclaration.ID, applyingNullary applyNullary: Bool
   ) -> IRValue {
     let f = demandLoweredDeclaration(functionOrConformance: .init(d))
     let g = functionReference(to: f)
-    let h = a.isEmpty ? g : _type_apply(g, to: a)
 
     if program[module].ir[f].termParameters.isEmpty && applyNullary {
-      return _project(h, [], afterFormingAccesses: false)
+      return _project(g, [], afterFormingAccesses: false)
     } else {
-      return h
+      return g
     }
   }
 
@@ -2059,40 +2061,74 @@ internal struct IREmitter {
     return x
   }
 
-  /// Generates the IR for computing the lvalue referred to by `witness`.
-  ///
-  /// If `applyNullary` is `true` and `witness` either refers to or is a type application of a
-  /// nullary conformance declaration, the corresponding lowered function is applied without any
-  /// argument in the result.
-  private mutating func _emit(
-    witness: WitnessExpression, applyingNullary applyNullary: Bool = true
-  ) -> IRValue {
-    switch witness.value {
+  /// Generates the IR for computing the lvalue referred to by `w`.
+  private mutating func _emit(witness w: WitnessExpression) -> IRValue {
+    let (abstraction, types, terms) = _emit(decompose: w)
+
+    var result: IRValue
+    switch abstraction.value {
     case .identity(let e):
-      return lowered(lvalue: e)
-
+      result = lowered(lvalue: e)
     case .reference(let d):
-      return _emit(referenceTo: d, applyingNullary: applyNullary)
-
-    case .termApplication(let f, let a):
-      let (abstraction, arguments) = _emit(curriedApplicationOf: f, to: a)
-      let callee = _emit(witness: abstraction, applyingNullary: false)
-      return _project(callee, arguments, afterFormingAccesses: true)
-
+      result = _emit(referenceTo: d, applyingNullary: false)
     case .typeApplication(let f, let a):
-      if case .reference(let d) = f.value, program.tag(of: d) == ConformanceDeclaration.self {
-        let c = program.castUnchecked(d, to: ConformanceDeclaration.self)
-        return _emit(referenceTo: c, instantiatedWith: a, applyingNullary: applyNullary)
-      } else {
-        let x = _emit(witness: f, applyingNullary: applyNullary)
-        return _type_apply(x, to: a)
-      }
-
-    case .nested(let w):
-      return _emit(witness: w, applyingNullary: applyNullary)
-
+      let x0 = _emit(witness: f)
+      result = _type_apply(x0, to: a)
     default:
       fatalError()
+    }
+
+    // Type arguments always apply first.
+    if !types.isEmpty {
+      result = _type_apply(result, to: types)
+    }
+
+    // Witnesses referring to a nullary conformance declaration have to be applied. In this case
+    // the type of `result` should have the form `() -> P<T>`, where `P<T>` is the type of the
+    // witness we're supposed to return.
+    let expected = program.types.dealiased(w.type)
+    if !terms.isEmpty || (currentFunction.result(of: result)!.type != expected) {
+      result = _project(result, terms.reversed(), afterFormingAccesses: true)
+    }
+
+    assert(currentFunction.result(of: result)!.type == expected)
+    return result
+  }
+
+  /// If `w` is an type or term application, returns `(f, ts, xs)` where `f` is the abstraction
+  /// being applied while `ts` and `xs` contain the types and term parameters, respectively.
+  /// Otherwise, returns `(w, [:], [])`.
+  ///
+  /// Term applications are represented in curried form. A call to a generic term abstraction `f`
+  /// taking two term parameters is encoded as `(f(a0))(a1)`. This method "decomposes" such an
+  /// encoding, returning term arguments in an array.
+  ///
+  /// The expression of the abstraction being applied is always returned unapplied, even if it is
+  /// a nullary conformance declaration. In this case, it should be applied to an empty argument
+  /// list before it can be used as an instance of `w.type`.
+  private mutating func _emit(
+    decompose w: WitnessExpression
+  ) -> (WitnessExpression, TypeArguments, [IRValue]) {
+    var expression = w
+    var types: TypeArguments = [:]
+    var terms: [IRValue] = []
+
+    while true {
+      switch expression.value {
+      case .nested(let f):
+        expression = f
+
+      case .termApplication(let f, let x):
+        expression = f
+        terms.append(_emit(witness: x))
+
+      case .typeApplication(let f, let a) where types.isEmpty:
+        expression = f
+        types = a
+
+      default:
+        return (expression, types, terms.reversed())
+      }
     }
   }
 
@@ -2104,11 +2140,11 @@ internal struct IREmitter {
   private mutating func _emit(
     curriedApplicationOf f: WitnessExpression, to a: WitnessExpression
   ) -> (WitnessExpression, [IRValue]) {
-    var stack = [_emit(witness: a, applyingNullary: true)]
+    var stack = [_emit(witness: a)]
     var abstraction = f
     while true {
       if case .termApplication(let g, let b) = abstraction.value {
-        stack.append(_emit(witness: b, applyingNullary: true))
+        stack.append(_emit(witness: b))
         abstraction = g
       } else {
         return (abstraction, stack.reversed())
