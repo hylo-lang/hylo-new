@@ -5,13 +5,19 @@ struct A<U> is Deinitializable {
   public memberwise init
 }
 
-extension A<Void> {
-  public fun g(x: Void) {}
+extension <T> A<T> {
+  public fun g(x: T) {}
+}
+
+trait P { fun h(x: Void) }
+given <T> A<T> is P {
+  public fun h(x: Void) {}
 }
 
 fun use(a: A<Void>) {
   a.f(())
   a.g(())
+  a.h(())
 }
 
 public fun main() {

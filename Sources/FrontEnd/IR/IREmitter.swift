@@ -1970,15 +1970,10 @@ internal struct IREmitter {
       unimplemented("lowering for \(program.debugName(of: d))")
     }
 
-    // Is `d` a conformance declaration?
-    else if let c = program.cast(d, to: ConformanceDeclaration.self) {
-      return _emit(referenceTo: c, applyingNullary: applyNullary)
-    }
-
     switch program.tag(of: d) {
     case ConformanceDeclaration.self:
       let e = program.castUnchecked(d, to: ConformanceDeclaration.self)
-      return _emit(referenceTo: e, applyingNullary: applyNullary)
+      return _emit(referenceTo: e, instantiatedWith: [:], applyingNullary: applyNullary)
 
     case VariableDeclaration.self:
       // Since `d` wasn't in the local symbol table, we can assume it's a global symbol.
@@ -1994,15 +1989,17 @@ internal struct IREmitter {
   /// If `applyNullary` is `true` and `d` refers to a nullary conformance declaration, the result
   /// is an application of corresponding lowered function.
   private mutating func _emit(
-    referenceTo d: ConformanceDeclaration.ID, applyingNullary applyNullary: Bool
+    referenceTo d: ConformanceDeclaration.ID, instantiatedWith a: TypeArguments,
+    applyingNullary applyNullary: Bool
   ) -> IRValue {
     let f = demandLoweredDeclaration(functionOrConformance: .init(d))
-    let v = functionReference(to: f)
+    let g = functionReference(to: f)
+    let h = a.isEmpty ? g : _type_apply(g, to: a)
 
     if program[module].ir[f].termParameters.isEmpty && applyNullary {
-      return _project(v, [], afterFormingAccesses: false)
+      return _project(h, [], afterFormingAccesses: false)
     } else {
-      return v
+      return h
     }
   }
 
@@ -2083,8 +2080,13 @@ internal struct IREmitter {
       return _project(callee, arguments, afterFormingAccesses: true)
 
     case .typeApplication(let f, let a):
-      let x = _emit(witness: f, applyingNullary: applyNullary)
-      return _type_apply(x, to: a)
+      if case .reference(let d) = f.value, program.tag(of: d) == ConformanceDeclaration.self {
+        let c = program.castUnchecked(d, to: ConformanceDeclaration.self)
+        return _emit(referenceTo: c, instantiatedWith: a, applyingNullary: applyNullary)
+      } else {
+        let x = _emit(witness: f, applyingNullary: applyNullary)
+        return _type_apply(x, to: a)
+      }
 
     case .nested(let w):
       return _emit(witness: w, applyingNullary: applyNullary)
