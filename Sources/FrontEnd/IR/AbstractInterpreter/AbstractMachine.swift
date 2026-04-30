@@ -26,13 +26,15 @@ internal protocol AbstractTransferFunction {
   /// a subset of the predecessors of `b` to their corresponding post-context. This map is only
   /// defined for the basic blocks that have been visited at least once.
   ///
+  /// `controlFlow` is the control-flow graph of `f`.
+  ///
   /// The return value is a set containing the basic blocks that may have been modified during the
   /// application of this method. Those blocks are placed back to the work list of the interpreter
   /// during the computation of a fixed point.
   mutating func apply(
     _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
     precededBy predecessors: SortedDictionary<IRBlock.ID, Context>,
-    using typer: inout Typer
+    controlFlow: ControlFlowGraph, using typer: inout Typer
   ) -> [IRBlock.ID]
 
 }
@@ -213,7 +215,8 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
     using interpret: inout Transfer, _ typer: inout Typer
   ) -> (next: Transfer.Context, updated: [IRBlock.ID]) {
     var next = initialContext
-    let updated = interpret.apply(b, from: &f, in: &next, precededBy: predecessors, using: &typer)
+    let updated = interpret.apply(
+      b, from: &f, in: &next, precededBy: predecessors, controlFlow: cfg, using: &typer)
     return (next, updated)
   }
 
