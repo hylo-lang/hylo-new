@@ -8,8 +8,10 @@
 /// is nonetheless possible to allocate storage for a fixed number of contiguous instances using a
 /// tuple (e.g., `Int[8]` in surface syntax).
 ///
-/// Stack allocations should generally be emitted in the entry block of the function. `alloca`s
-/// occurring in loops are illegal.
+/// Repeated allocas may happen in loops, in which case only the first allocation is effective.
+/// Upon repeated allocations, the existing value in the storage must have been deinitialized.
+/// Moving all allocas to the entry block of the function is done in the StaticAllocationHoisting
+/// transformation pass.
 public struct IRAlloca: Instruction {
 
   /// The region of the code corresponding to this instruction.
