@@ -257,10 +257,8 @@ internal struct IREmitter {
           me.associate(.init(d), with: .parameter(0))
 
           let o = me.currentFunction.returnRegister ?? .poison(.place(.error))
-          let f = me.loweredCallee(implementation, output: o, at: me.currentAnchor) { _ in
-            // We cannot get here because we create witness tables using unbound references.
-            unreachable()
-          }
+          let f = me.loweredCallee(
+            implementation, qualifiedBy: nil, output: o, at: me.currentAnchor)
           me._emitCallToRequirementImplementation(f)
         }
       }
@@ -821,15 +819,14 @@ internal struct IREmitter {
   ) -> LoweredCallee {
     let d = program.declaration(referredToBy: e)
     let a = Anchor(site: program[e].site, scope: program.parent(containing: e))
-    return loweredCallee(d, output: result, at: a) { [q = program[e].qualification] (me) in
-      me.lowered(lvalue: q!)
-    }
+    return loweredCallee(d, qualifiedBy: program[e].qualification, output: result, at: a)
   }
 
-  /// Generates the IR for using `d`, which occurs as a callee, optionally bound to `receiver`.
+  /// Generates the IR at `anchor` for using `d`, which occurs as a callee that is optionally
+  /// qualified by `q`.
   private mutating func loweredCallee(
-    _ d: DeclarationReference, output result: IRValue, at anchor: Anchor,
-    computingReceiverWith receiver: (inout Self) -> IRValue
+    _ d: DeclarationReference, qualifiedBy q: ExpressionIdentity?, output result: IRValue,
+    at anchor: Anchor
   ) -> LoweredCallee {
     switch d {
     case .builtin:
@@ -838,16 +835,24 @@ internal struct IREmitter {
 
     case .direct(let d):
       // The callee refers to a function directly.
-      return loweredCallee(referringTo: d, boundTo: nil, output: result)
+      let f = loweredCallee(referringTo: d, boundTo: nil, output: result)
+
+      // The qualification may define type arguments.
+      if let ts = q.flatMap({ (e) in argumentsFromStaticQualification(e) }) {
+        let g = lowering(at: anchor.site, in: anchor.scope, { $0._type_apply(f.value, to: ts) })
+        return f.substituting(value: g)
+      } else {
+        return f
+      }
 
     case .member(let d):
       // The callee refers to a bound member.
-      let q = receiver(&self)
-      let f = loweredCallee(referringTo: d, boundTo: q, output: result)
+      let receiver = lowered(lvalue: q!)
+      let f = loweredCallee(referringTo: d, boundTo: receiver, output: result)
 
       // If the reference is bound to a generic type, its type arguments have to be extracted from
       // the receiver's expression.
-      let r = currentFunction.result(of: q)!.type
+      let r = currentFunction.result(of: receiver)!.type
       if let ts = program.types.select(r, \TypeApplication.arguments) {
         let g = lowering(at: anchor.site, in: anchor.scope, { $0._type_apply(f.value, to: ts) })
         return f.substituting(value: g)
@@ -857,11 +862,11 @@ internal struct IREmitter {
 
     case .inherited(let w, let m, let statically):
       // The callee refers to a member declared in extension.
-      let q = statically ? nil : receiver(&self)
+      let receiver = statically ? nil : lowered(lvalue: q!)
 
       // Is the member declared in an extension?
       if let parent = program.extensionContaining(m) {
-        let target = loweredCallee(referringTo: m, boundTo: q, output: result)
+        let target = loweredCallee(referringTo: m, boundTo: receiver, output: result)
         return lowering(at: anchor.site, in: anchor.scope) { (me) in
           /// References to members in extensions are expressed using a witness representing the
           /// type and term arguments passed to parameters declared on the extension itself.
@@ -882,7 +887,7 @@ internal struct IREmitter {
         return lowering(at: anchor.site, in: anchor.scope) { (me) in
           let x0 = me._emit(witness: w)
           let x1 = me._property(m, of: x0, withType: typeOfImplementation)
-          return LoweredCallee(value: x1, arguments: Array(contentsOf: q), result: result)
+          return LoweredCallee(value: x1, arguments: Array(contentsOf: receiver), result: result)
         }
       }
 
@@ -923,11 +928,19 @@ internal struct IREmitter {
     _ e: New.ID, output result: IRValue
   ) -> LoweredCallee {
     // When the callee is a new expression (e.g., `T.new(x)`), then `result` is passed as the first
-    // argument of the underlying initializer.
+    // argument of the underlying initializer. The return type of the initializer is a unit value.
     let r = lowering(e, { (me) in me._alloca(.void) })
     let f = loweredCallee(program[e].target, output: result)
-    return LoweredCallee(
-      value: f.value, arguments: Array(f.arguments, terminatedBy: f.result), result: r)
+
+    // The qualification may define type arguments.
+    let g = if let ts = argumentsFromStaticQualification(program[e].qualification) {
+      lowering(e, { $0._type_apply(f.value, to: ts) })
+    } else {
+      f.value
+    }
+
+    let xs = Array(f.arguments, terminatedBy: f.result)
+    return LoweredCallee(value: g, arguments: xs, result: r)
   }
 
   /// Implements `loweredCallee(_:writingTo)` for static calls.
@@ -2444,6 +2457,20 @@ internal struct IREmitter {
     let s = program[module].ir[f].signature()
     let t = program.types.demand(s)
     return .function(n, t)
+  }
+
+  /// Returns the type arguments defined in the type of `q`, which occurs as qualification for a
+  /// reference to a static member, if any.
+  private mutating func argumentsFromStaticQualification(
+    _ q: ExpressionIdentity
+  ) -> TypeArguments? {
+    let t = program.type(assignedTo: q)
+    let u = program.types.dealiased(t)
+    if let v = program.types.select(u, \Metatype.inhabitant, as: TypeApplication.self) {
+      return program.types[v].arguments
+    } else {
+      return nil
+    }
   }
 
 }

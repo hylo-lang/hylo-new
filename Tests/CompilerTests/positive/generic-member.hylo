@@ -1,24 +1,34 @@
 //! stage:lowering
 
 struct A<U> is Deinitializable {
-  public fun f(x: U) {}
   public memberwise init
+  public fun f(x: U) {}
+  public static fun sf(x: U) {}
 }
 
 extension <T> A<T> {
   public fun g(x: T) {}
+  public static fun sg(x: T) {}
 }
 
-trait P { fun h(x: Void) }
-given <T> A<T> is P {
-  public fun h(x: Void) {}
+trait P<T> {
+  fun h(x: T)
+  static fun sh(x: T)
+}
+
+given <T> A<T> is P<T> {
+  public fun h(x: T) {}
+  public static fun sh(x: T) {}
 }
 
 fun use(a: A<Void>) {
-  a.f(())
-  a.g(())
-  a.h(())
+  a.f(())         // Native member
+  a.g(())         // Member in extension
+  a.h(())         // Member inherited by conformance
 }
 
 public fun main() {
+  A<Void>.sf(())  // Static native member
+  A<Void>.sg(())  // Static member in extension
+  A<Void>.sh(())  // Static member inherited by conformance
 }
