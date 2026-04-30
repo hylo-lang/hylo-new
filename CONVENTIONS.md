@@ -33,6 +33,8 @@ or usages to infer meaning.
 - Conformance implementations are exempt from documentation when nothing useful can be added beyond the protocol
   requirement itself.
 - Test cases don't need to be documented, but should have a descriptive function name.
+- For types, the summary should say what the type *is*. For functions and subscripts, it should say what they *do* (e.g. returns, yields ...).
+- Describe if there is a significance in the element order of an array.
 
 ## Contracts
 
