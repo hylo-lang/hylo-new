@@ -1,10 +1,15 @@
-//! stage:typing no-std
+//! stage:lowering
 
 struct A<T> {
   public var x: T
   public memberwise init
   public static fun make(x: sink T) -> A<T> { .new(x: x) }
-  public fun id() sink -> Self { self }
+}
+
+given A<Void> is Deinitializable {}
+
+extension <T> A<T> {
+  public fun id() -> Self { fatal_error() }
 }
 
 public fun use<T>(x: A<T>) {}

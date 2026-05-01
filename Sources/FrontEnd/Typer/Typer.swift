@@ -2078,7 +2078,8 @@ public struct Typer {
     if let q = program.implicitQualification(of: callee) {
       let t =
         context.expectedType ?? context.obligations.assume(e, hasType: fresh().erased, at: site)
-      _ = context.withSubcontext(expectedType: t) { (ctx) in inferredType(of: q, in: &ctx) }
+      let u = program.types.demand(Metatype(inhabitant: t)).erased
+      _ = context.withSubcontext(expectedType: u) { (ctx) in inferredType(of: q, in: &ctx) }
     }
 
     let r = SyntaxRole(program[e].style, labels: program[e].labels)
@@ -2419,13 +2420,13 @@ public struct Typer {
       role = .unspecified
     }
 
-    let s = resolveQualification(of: e, in: &context)
-    let t = demand(Metatype(inhabitant: s)).erased
+    let q = program[e].qualification
+    let s = context.withSubcontext { (ctx) in inferredType(of: q, in: &ctx) }
     let u = fresh().erased
 
     context.obligations.assume(
       MemberConstraint(
-        member: program[e].target, role: role, qualification: t, type: u, site: site))
+        member: program[e].target, role: role, qualification: s, type: u, site: site))
     context.obligations.assume(program[e].target, hasType: u, at: site)
 
     let v = fresh().erased
@@ -2585,7 +2586,7 @@ public struct Typer {
   private mutating func inferredType(
     of e: TupleMember.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    let parent = context.withSubcontext() { (ctx) in
+    let parent = context.withSubcontext { (ctx) in
       inferredType(of: program[e].parent, in: &ctx)
     }
 
@@ -3935,17 +3936,6 @@ public struct Typer {
     case .right(let d):
       report(d)
       return .error
-    }
-  }
-
-  /// Resolves and returns the qualification of `e`, which occurs in `context`.
-  private mutating func resolveQualification(
-    of e: New.ID, in context: inout InferenceContext
-  ) -> AnyTypeIdentity {
-    if let q = program.cast(program[e].qualification, to: ImplicitQualification.self) {
-      return inferredType(of: q, in: &context)
-    } else {
-      return evaluatePartialTypeAscription(program[e].qualification, in: &context).result
     }
   }
 
