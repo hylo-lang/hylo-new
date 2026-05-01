@@ -2823,7 +2823,7 @@ public struct Typer {
   /// viable candidate.
   ///
   /// If binding succeeds, `o` is extended with either a assignment mapping `n` to a declaration
-  /// reference or an overload constrain mapping `n` to one of the viable candidates. If binding
+  /// reference or an overload constraint mapping `n` to one of the viable candidates. If binding
   /// failed, `o` is left unchanged and a diagnostic is returned.
   ///
   /// - Requires: `candidates` is not empty.
