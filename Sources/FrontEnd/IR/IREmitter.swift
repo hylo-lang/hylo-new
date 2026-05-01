@@ -461,15 +461,12 @@ internal struct IREmitter {
       return .next
     }
 
-    // If the LHS does not occur in the RHS, we can build the RHS in place.
-    if let n = program.cast(target, to: NameExpression.self) {
-      if case .direct(let d) = program.declaration(referredToBy: n) {
-        if !program.occurs(referenceTo: d, in: program[s].rhs) {
-          let target = lowered(lvalue: target)
-          lower(store: program[s].rhs, to: target)
-          return .next
-        }
-      }
+    // If the LHS is a name chain rooted at a direct declaration that does not occur in the RHS,
+    // we can build the RHS in place rather than storing it to a temporary and moving it.
+    if let d = lvalueRoot(target), !program.occurs(referenceTo: d, in: program[s].rhs) {
+      let l = lowered(lvalue: target)
+      lower(store: program[s].rhs, to: l)
+      return .next
     }
 
     // Otherwise, the right-hand side stored to a temporary and then moved to the LHS.
@@ -480,6 +477,23 @@ internal struct IREmitter {
     lowering(program[s].rhs, { $0._emitMove([.inout, .set], r, to: l) })
 
     return .next
+  }
+
+  /// Returns the declaration at the root of the name chain denoted by `e`, if any.
+  ///
+  /// An lvalue formed by a chain of `NameExpression`s (e.g., `self.foo.bar`) is rooted at the
+  /// direct reference at the head of that chain (e.g., `self`). Returns `nil` if `e` is not such
+  /// a chain or if its head is not a direct reference to a declaration.
+  private func lvalueRoot(_ e: ExpressionIdentity) -> DeclarationIdentity? {
+    var head = e
+    while let n = program.cast(head, to: NameExpression.self) {
+      guard let q = program[n].qualification else {
+        return if case .direct(let d) =
+          program.declaration(referredToBy: n) { d } else { nil }
+      }
+      head = q
+    }
+    return nil
   }
 
   /// Generates the IR of `s`.

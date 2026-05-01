@@ -1,0 +1,40 @@
+//! stage:lowering
+
+/// Regression test for https://github.com/hylo-lang/hylo-new/issues/126.
+///
+/// Assigning a value to a stored property of `self` should build the value in place rather than
+/// storing it into a temporary and moving it. In particular, the type of the assigned value need
+/// not conform to `Movable`, as demonstrated here by omitting a `Movable` witness for `Wrapper`.
+
+struct Wrapper is Deinitializable {
+  var x: Int
+  var y: Int
+  var z: Int
+
+  public init(x: Int, y: Int, z: Int) {
+    &self.x = x + 0
+    &self.y = y + 0
+    &self.z = z + 0
+  }
+
+  public fun manualCopy() -> Wrapper {
+    return Wrapper(
+      self.x + 0,
+      self.y + 0,
+      self.z + 0)
+  }
+}
+
+struct Box is Deinitializable {
+  public var payload: Wrapper
+
+  /// The RHS is an in-place constructor call that does not mention `self`.
+  public init() {
+    &self.payload = Wrapper(0, 0, 0)
+  }
+
+  /// The RHS is a non-constructor call whose arguments do not mention `self`.
+  public init(_ payload: Wrapper) {
+    &self.payload = payload.manualCopy()
+  }
+}
