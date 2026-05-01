@@ -915,11 +915,11 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for a callee referring to `function`, optionally bound to `receiver`.
+  /// Generates the IR for a callee referring to `f`, optionally bound to `receiver`.
   private mutating func loweredCallee(
-    referringTo function: IRFunction.ID, boundTo receiver: IRValue?, output result: IRValue
+    referringTo f: IRFunction.ID, boundTo receiver: IRValue?, output result: IRValue
   ) -> LoweredCallee {
-    let v = functionReference(to: function)
+    let v = functionReference(to: f)
     return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
   }
 
@@ -2109,8 +2109,8 @@ internal struct IREmitter {
   }
 
   /// If `w` is an type or term application, returns `(f, ts, xs)` where `f` is the abstraction
-  /// being applied while `ts` and `xs` contain the types and term parameters, respectively.
-  /// Otherwise, returns `(w, [:], [])`.
+  /// being applied while `ts` and `xs` contain the types and term parameters, respectively;
+  /// otherwise, returns `(w, [:], [])`.
   ///
   /// Term applications are represented in curried form. A call to a generic term abstraction `f`
   /// taking two term parameters is encoded as `(f(a0))(a1)`. This method "decomposes" such an
@@ -2125,6 +2125,11 @@ internal struct IREmitter {
     var expression = w
     var types: TypeArguments = [:]
     var terms: [IRValue] = []
+
+    // Starting from `w` as a root, the loop walks the expression to gather arguments until an
+    // abstraction is reached. Type arguments are not merged. If `w` is a type application of
+    // another type application (e.g., `f<a><b>`), then the latter will be returned as the first
+    // component of this function's result.
 
     while true {
       switch expression.value {
