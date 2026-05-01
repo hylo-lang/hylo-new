@@ -1207,17 +1207,15 @@ struct ManglingEncoding: Sendable {
   private static func takeName(from source: inout DemanglingContext) -> Name? {
     guard let tag = source.take(Base64Digit.self)?.rawValue else { return nil }
     let hasIntroducer = (tag & 0x80) != 0
-    guard let notation = OperatorNotation(rawValue: tag & 0x7F) else { return nil }
-
-    let introducer: AccessEffect?
-    if hasIntroducer {
-      guard let rawIntroducer = source.take(Base64Digit.self)?.rawValue else { return nil }
-      introducer = AccessEffect(rawValue: rawIntroducer)
+    let notation = OperatorNotation(rawValue: tag & 0x7F)
+    let introducer = hasIntroducer
+      ? source.take(Base64Digit.self).flatMap { (d) in AccessEffect(rawValue: d.rawValue) }
+      : nil
+    if let identifier = source.takeString(), let notation = notation {
+      return Name(identifier: identifier, notation: notation, introducer: introducer)
     } else {
-      introducer = nil
+      return nil
     }
-    guard let identifier = source.takeString() else { return nil }
-    return Name(identifier: identifier, notation: notation, introducer: introducer)
   }
 
   /// Returns the entity in `s` if it is an entity, or `.error` otherwise.

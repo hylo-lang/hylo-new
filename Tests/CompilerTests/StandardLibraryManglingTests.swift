@@ -18,7 +18,7 @@ final class StandardLibraryManglingTests: XCTestCase {
         let mangled = driver.program.mangled(d)
         let demangled = DemangledSymbol(mangled).description
         XCTAssertFalse(
-          demangled.contains("?"),
+          demangled.contains("#!"),
           "demangling of \(mangled) contains errors: \(demangled)"
         )
       }

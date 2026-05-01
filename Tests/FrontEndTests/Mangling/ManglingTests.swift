@@ -626,7 +626,7 @@ final class ManglingTests: XCTestCase {
   /// Asserts that the mangling of `t` in `p` equals `expected`.
   private func assertDemanglingIsOk(mangled m: String) {
     let demangled = DemangledSymbol(m).description
-    XCTAssertFalse(demangled.contains("?"), "demangling of \(m) contains errors: \(demangled)")
+    XCTAssertFalse(demangled.contains("#!"), "demangling of \(m) contains errors: \(demangled)")
   }
 
   /// Finds the first top-level declaration of `m` named `n`, returning its identity, or `nil` if

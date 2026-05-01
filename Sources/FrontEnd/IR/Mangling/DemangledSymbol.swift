@@ -74,9 +74,9 @@ extension DemangledSymbol: CustomStringConvertible {
       return "witness table \(t)"
     case .error(let e, let r):
       if let e = e {
-        return "\(e) ??? (remaining: \(r))"
+        return "\(e) #! (remaining: \(r))"
       } else {
-        return "??? (remaining: \(r))"
+        return "#! (remaining: \(r))"
       }
     }
   }
@@ -122,16 +122,16 @@ indirect enum DemangledEntity: Hashable, Sendable {
   /// A variant.
   case variant(AccessEffect)
 
-  /// An initializer.
+  /// An IRFunction with `name == .initializer`.
   case initializer(DemangledEntity)
 
-  /// A synthesized function.
+  /// An IRFunction with `name == .synthesized`.
   case synthesizedFunction(DemangledEntity, [DemangledType.TypeApplicationArgument])
 
-  /// An implementation IR function.
+  /// An IRFunction with `name == .implementation`.
   case implementation(DemangledEntity, DemangledEntity, [DemangledType.TypeApplicationArgument])
 
-  /// An existentialized declaration.
+  /// An IRFunction with `name == .existentialized`.
   case existentialized(DemangledEntity)
 
   /// A qualified entity with `head` as the innermost component and `previous` as the qualification.
@@ -196,7 +196,7 @@ extension DemangledEntity: CustomStringConvertible {
     case .qualified(let head, let previous):
       return "\(previous).\(head)"
     case .error:
-      return "?"
+      return "#!"
     }
   }
 
@@ -320,7 +320,7 @@ extension DemangledType: CustomStringConvertible {
   public var description: String {
     switch self {
     case .error:
-      return "?"
+      return "#!"
 
     case .never:
       return "Never"
