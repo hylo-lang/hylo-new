@@ -19,11 +19,6 @@ struct ManglingContext {
   /// A table mapping known symbols to their reserved mangled identifier.
   private var reserved: [MangledSymbol: ReservedSymbol] = [:]
 
-  /// A helper for printing debugging information during mangling.
-  ///
-  /// The helper won't print anything unless `debug.enabled` is assigned to `true`.
-  private var debug = DebugPrinter(enabled: false)
-
   /// Creates an instance for mangling symbols in `program`.
   init(_ program: Program) {
     output = ""
@@ -100,7 +95,6 @@ struct ManglingContext {
   /// Writes `o` to `output`.
   mutating func add(operator o: ManglingOperator) {
     o.write(to: &output)
-    debug.printWithIndentation("- op: \(o)")
   }
 
   /// Writes the mangled representation of `items` to `output`, calling `addItem` to mangle each
@@ -118,7 +112,6 @@ struct ManglingContext {
   /// Records `s` in the symbol lookup table if it is not reserved or already recorded.
   mutating func record(symbol s: MangledSymbol, in program: Program) {
     if symbolPosition.keys.contains(s) || reserved.keys.contains(s) { return }
-    debug.printWithIndentation("- recording \(Self.debugName(symbol: s, in: program)): \(symbolPosition.count)")
     symbolPosition[s] = symbolPosition.count
   }
 
@@ -145,7 +138,6 @@ struct ManglingContext {
         add(operator: .reserved)
       }
       r.write(to: &output)
-      debug.printWithIndentation("- writing reserved \(s)")
       return true
     } else {
       return false
@@ -162,7 +154,6 @@ struct ManglingContext {
         add(operator: .lookup)
       }
       add(integer: p)
-      debug.printWithIndentation("- lookup at \(p): \(Self.debugName(symbol: s, in: program))")
       return true
     } else {
       return false
@@ -177,61 +168,6 @@ struct ManglingContext {
       return true
     } else {
       return false
-    }
-  }
-
-  /// Executes `action` on a mutable `self`, performing debug logging for `d` in `program`.
-  mutating func writing(
-    decl d: DeclarationIdentity, program: Program, _ action: (_ source: inout Self) -> Void
-  ) {
-    debug.indent()
-    defer { debug.dedent()}
-    debug.withScope("write decl: \(program.debugName(of: d))") {
-      action(&self)
-    }
-  }
-
-  /// Returns the result of `action` applied on `self`, performing debug logging saying that we are writing a
-  /// qualification.
-  mutating func writingQualification(
-    _ action: (_ source: inout Self) -> Void
-  ) {
-    debug.indent()
-    defer { debug.dedent()}
-    debug.withScope("write qualification") {
-      action(&self)
-    }
-  }
-
-  /// Returns the result of `action` applied on `self`, performing debug logging for `t`, which is in `program`.
-  mutating func writing(
-    type t: AnyTypeIdentity, program: Program, _ action: (_ source: inout Self) -> Void
-  ) {
-    debug.indent()
-    defer { debug.dedent()}
-    debug.withScope("write type: \(Self.debugName(of: t, in: program))") {
-      action(&self)
-    }
-  }
-
-  /// Returns the name of `t` in `program` for debug printing purposes.
-  private static func debugName(of t: AnyTypeIdentity, in program: Program) -> String {
-    var printer = TreePrinter(program: program)
-    return printer.show(t)
-  }
-
-  /// Returns the name of `s` in `program` for debug printing purposes.
-  private static func debugName(symbol s: MangledSymbol, in program: Program) -> String {
-    switch s {
-    case .type(let x):
-      return "type \(debugName(of: x, in: program))"
-    case .node(let x):
-      let n = program.name(of: DeclarationIdentity(uncheckedFrom: x))
-      return "entity \(n?.description ?? "scope?")"
-    case .fileScope(let x):
-      return "scope entity \(x.file)"
-    case .module:
-      return "module"
     }
   }
 

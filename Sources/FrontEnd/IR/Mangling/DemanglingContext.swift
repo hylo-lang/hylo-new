@@ -11,11 +11,6 @@ struct DemanglingContext {
   /// The list of demangled symbols, in order of occurrence (a.k.a. the symbol lookup table).
   private var symbols: [DemangledSymbol] = []
 
-  /// A helper for printing debugging information during demangling.
-  ///
-  /// The helper won't print anything unless `debug.enabled` is assigned to `true`.
-  private var debug = DebugPrinter(enabled: false)
-
   /// The characters left to parse.
   var remaining: String {
     String(stream)
@@ -34,7 +29,6 @@ struct DemanglingContext {
   /// Consumes and returns a mangling operator iff `stream` starts with one.
   mutating func takeOperator() -> ManglingOperator? {
     guard let r = ManglingOperator(prefixing: stream) else { return nil }
-    debug.printWithIndentation("- op: \(r)")
     stream = stream.dropFirst(r.rawValue.count)
     return r
   }
@@ -53,17 +47,11 @@ struct DemanglingContext {
 
     case 1:
       guard let n = takeInteger() else { return nil }
-      guard n.rawValue < strings.count else {
-        debug.printWithIndentation("ERROR: invalid string reference \(n), only \(strings.count) strings demangled so far")
-        return nil
-      }
+      guard n.rawValue < strings.count else { return nil }
       return String(strings[Int(n.rawValue)])
 
     case let n:
-      guard let j = stream.index(stream.startIndex, offsetBy: Int(n - 2), limitedBy: stream.endIndex) else {
-        debug.printWithIndentation("ERROR: out of bounds when reading string")
-        return nil
-      }
+      guard let j = stream.index(stream.startIndex, offsetBy: Int(n - 2), limitedBy: stream.endIndex) else { return nil }
       let r = stream[..<j]
       strings.append(r)
       stream = stream[j...]
@@ -125,48 +113,21 @@ struct DemanglingContext {
 
   /// Demangles a reserved symbol.
   mutating func takeReserved() -> DemangledSymbol? {
-    let r = take(ReservedSymbol.self).map(DemangledSymbol.init(reserved:))
-    debug.printWithIndentation("- reading reserved \(r?.description ?? "nil")")
-    return r
+    take(ReservedSymbol.self).map(DemangledSymbol.init(reserved:))
   }
 
   /// Demangles a reference to a symbol already seen by `self`.
   mutating func takeLookupReference() -> DemangledSymbol? {
-    guard let n = takeInteger() else { return nil }
-    guard n.rawValue < symbols.count else {
-      debug.printWithIndentation("ERROR: out of bounds when looking up \(n)")
-      return nil
+    if let n = takeInteger(), n.rawValue < symbols.count {
+        return symbols[Int(n.rawValue)]
+    } else {
+        return nil
     }
-    if debug.enabled {
-      let s = symbols[Int(n.rawValue)]
-      debug.printWithIndentation("- lookup at \(n): \(s) \(s.tag)")
-    }
-    return symbols[Int(n.rawValue)]
   }
 
   /// Records that we've seen `s`.
   mutating func record(symbol s: DemangledSymbol) {
-    debug.printWithIndentation("- recording \(s.tag) \(s) at \(symbols.count)")
     symbols.append(s)
-  }
-
-  /// Returns the result of applying `action` on `self`, logging the reading of an entity.
-  mutating func readingEntity<T>(_ action: (_ source: inout Self) -> T) -> T {
-    debug.indent()
-    defer { debug.dedent()}
-    return debug.withScope("read entity") {
-      action(&self)
-    }
-  }
-
-  /// Returns the application of `action` on a mutable `self`, performing debug logging for reading
-  /// a type.
-  mutating func readingType<T>(_ action: (_ source: inout Self) -> T) -> T {
-    debug.indent()
-    defer { debug.dedent()}
-    return debug.withScope("read type") {
-      action(&self)
-    }
   }
 
 }

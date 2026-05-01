@@ -73,174 +73,168 @@ struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `d` to `output`.
   private mutating func append(decl d: DeclarationIdentity, to output: inout ManglingContext) {
-    output.writing(decl: d, program: program) { (output) in
-      if output.addIf(reservedOrRecorded: .node(.init(d)), in: program) { return }
+    if output.addIf(reservedOrRecorded: .node(.init(d)), in: program) { return }
 
-      // First add the qualification of the declaration.
-      appendQualification(of: d, to: &output)
-      // If this is a scope, then just add it as a scope and finish.
-      if let s = program.castToScope(d) {
-        append(scope: s, to: &output)
-        return
-      }
-
-      // Handle declarations that are not scopes.
-      switch program.tag(of: d) {
-      case AssociatedTypeDeclaration.self:
-        append(unqualified: AssociatedTypeDeclaration.ID(uncheckedFrom: d.erased), to: &output)
-      case BindingDeclaration.self:
-        append(unqualified: BindingDeclaration.ID(uncheckedFrom: d.erased), to: &output)
-      case EnumCaseDeclaration.self:
-        append(unqualified: EnumCaseDeclaration.ID(uncheckedFrom: d.erased), to: &output)
-      case ImportDeclaration.self:
-        append(unqualified: ImportDeclaration.ID(uncheckedFrom: d.erased), to: &output)
-      case GenericParameterDeclaration.self:
-        append(unqualified: GenericParameterDeclaration.ID(uncheckedFrom: d.erased), to: &output)
-      case ParameterDeclaration.self:
-        append(unqualified: ParameterDeclaration.ID(uncheckedFrom: d.erased), to: &output)
-      case VariableDeclaration.self:
-        append(unqualified: VariableDeclaration.ID(uncheckedFrom: d.erased), to: &output)
-      default:
-        program.unexpected(d)
-      }
-
-      output.record(symbol: .node(AnySyntaxIdentity(d)), in: program)
+    // First add the qualification of the declaration.
+    appendQualification(of: d, to: &output)
+    // If this is a scope, then just add it as a scope and finish.
+    if let s = program.castToScope(d) {
+      append(scope: s, to: &output)
+      return
     }
+
+    // Handle declarations that are not scopes.
+    switch program.tag(of: d) {
+    case AssociatedTypeDeclaration.self:
+      append(unqualified: AssociatedTypeDeclaration.ID(uncheckedFrom: d.erased), to: &output)
+    case BindingDeclaration.self:
+      append(unqualified: BindingDeclaration.ID(uncheckedFrom: d.erased), to: &output)
+    case EnumCaseDeclaration.self:
+      append(unqualified: EnumCaseDeclaration.ID(uncheckedFrom: d.erased), to: &output)
+    case ImportDeclaration.self:
+      append(unqualified: ImportDeclaration.ID(uncheckedFrom: d.erased), to: &output)
+    case GenericParameterDeclaration.self:
+      append(unqualified: GenericParameterDeclaration.ID(uncheckedFrom: d.erased), to: &output)
+    case ParameterDeclaration.self:
+      append(unqualified: ParameterDeclaration.ID(uncheckedFrom: d.erased), to: &output)
+    case VariableDeclaration.self:
+      append(unqualified: VariableDeclaration.ID(uncheckedFrom: d.erased), to: &output)
+    default:
+      program.unexpected(d)
+    }
+
+    output.record(symbol: .node(AnySyntaxIdentity(d)), in: program)
   }
 
   /// Demangles a (possibly qualified) entity from `source`.
   static private func takeEntity(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    source.readingEntity { (source) -> DemangledEntity in
-      var qualifiedEntity: DemangledEntity? = nil
+    var qualifiedEntity: DemangledEntity? = nil
 
-      while let o = source.takeOperator() {
-        let demangled: DemangledEntity
+    while let o = source.takeOperator() {
+      let demangled: DemangledEntity
 
-        switch o {
-        case .lookup:
-          demangled = entityOrError(source.takeLookupReference())
-        case .lookupRelative:
-          demangled = .relative
-        case .reserved:
-          demangled = entityOrError(source.takeReserved())
-        case .associatedTypeDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .enumCaseDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .enumDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .bindingDeclaration:
-          demangled = takeBindingDeclaration(from: &source)
-        case .conformanceDeclaration:
-          demangled = takeConformanceDeclaration(from: &source)
-        case .extensionDeclaration:
-          demangled = takeExtensionDeclaration(from: &source)
-        case .functionDeclaration:
-          demangled = takeFunctionDeclaration(from: &source)
-        case .staticFunctionDeclaration:
-          demangled = takeStaticFunctionDeclaration(from: &source)
-        case .functionBundleDeclaration:
-          demangled = takeFunctionBundleDeclaration(from: &source)
-        case .initializerDeclaration:
-          demangled = takeInitializerDeclaration(from: &source)
-        case .synthesizedFunctionDeclaration:
-          demangled = takeSynthesizedFunctionDeclaration(from: &source)
-        case .implementationDeclaration:
-          demangled = takeImplementationDeclaration(from: &source)
-        case .existentializedDeclaration:
-          demangled = takeExistentializedDeclaration(from: &source)
-        case .genericParameterDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .importDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .parameterDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .structDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .typeAliasDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .traitDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .variableDeclaration:
-          demangled = takeUnqualifiedEntity(from: &source)
-        case .variantDeclaration:
-          demangled = takeVariantDeclaration(from: &source)
-        case .anonymousScope:
-          demangled = takeAnonymousScope(from: &source)
-        case .module:
-          demangled = takeModule(from: &source)
-        case .sourceFile:
-          demangled = takeSourceFile(from: &source)
-        case .virtualSourceFile:
-          demangled = takeVirtualSourceFile(from: &source)
-        default:
-          demangled = .error
-          break
-        }
-
-        if qualifiedEntity != nil {
-          qualifiedEntity = .qualified(head: demangled, previous: qualifiedEntity!)
-        } else {
-          qualifiedEntity = demangled
-        }
-
-        // Record that we've seen `demangled`.
-        if o != .lookup && o != .lookupRelative && o != .reserved {
-          source.record(symbol: .entity(qualifiedEntity!))
-        }
-
-        // Stop if we've encountered an error or reached the end.
-        if demangled == .error || source.isComplete {
-          break
-        }
-
-        // Stop if we cannot continue, or if we need to continue with something that cannot be a
-        // scope or a declaration. Also consider the case that we start another declaration.
-        guard let n = source.peekOperator() else { break }
-        if n == .reserved || n == .module || n == .lookupRelative || !n.isEntityOperator {
-          break
-        }
+      switch o {
+      case .lookup:
+        demangled = entityOrError(source.takeLookupReference())
+      case .lookupRelative:
+        demangled = .relative
+      case .reserved:
+        demangled = entityOrError(source.takeReserved())
+      case .associatedTypeDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .enumCaseDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .enumDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .bindingDeclaration:
+        demangled = takeBindingDeclaration(from: &source)
+      case .conformanceDeclaration:
+        demangled = takeConformanceDeclaration(from: &source)
+      case .extensionDeclaration:
+        demangled = takeExtensionDeclaration(from: &source)
+      case .functionDeclaration:
+        demangled = takeFunctionDeclaration(from: &source)
+      case .staticFunctionDeclaration:
+        demangled = takeStaticFunctionDeclaration(from: &source)
+      case .functionBundleDeclaration:
+        demangled = takeFunctionBundleDeclaration(from: &source)
+      case .initializerDeclaration:
+        demangled = takeInitializerDeclaration(from: &source)
+      case .synthesizedFunctionDeclaration:
+        demangled = takeSynthesizedFunctionDeclaration(from: &source)
+      case .implementationDeclaration:
+        demangled = takeImplementationDeclaration(from: &source)
+      case .existentializedDeclaration:
+        demangled = takeExistentializedDeclaration(from: &source)
+      case .genericParameterDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .importDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .parameterDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .structDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .typeAliasDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .traitDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .variableDeclaration:
+        demangled = takeUnqualifiedEntity(from: &source)
+      case .variantDeclaration:
+        demangled = takeVariantDeclaration(from: &source)
+      case .anonymousScope:
+        demangled = takeAnonymousScope(from: &source)
+      case .module:
+        demangled = takeModule(from: &source)
+      case .sourceFile:
+        demangled = takeSourceFile(from: &source)
+      case .virtualSourceFile:
+        demangled = takeVirtualSourceFile(from: &source)
+      default:
+        demangled = .error
+        break
       }
 
-      return qualifiedEntity ?? .error
+      if qualifiedEntity != nil {
+        qualifiedEntity = .qualified(head: demangled, previous: qualifiedEntity!)
+      } else {
+        qualifiedEntity = demangled
+      }
+
+      // Record that we've seen `demangled`.
+      if o != .lookup && o != .lookupRelative && o != .reserved {
+        source.record(symbol: .entity(qualifiedEntity!))
+      }
+
+      // Stop if we've encountered an error or reached the end.
+      if demangled == .error || source.isComplete {
+        break
+      }
+
+      // Stop if we cannot continue, or if we need to continue with something that cannot be a
+      // scope or a declaration. Also consider the case that we start another declaration.
+      guard let n = source.peekOperator() else { break }
+      if n == .reserved || n == .module || n == .lookupRelative || !n.isEntityOperator {
+        break
+      }
     }
+
+    return qualifiedEntity ?? .error
   }
 
   /// Writes the mangled qualification of `n` to `output`.
   private mutating func appendQualification<T: SyntaxIdentity>(
     of n: T, to output: inout ManglingContext
   ) {
-    output.writingQualification { (output) in
-      // Find the prefix of the qualification that should be mangled as a reference.
-      var qs: [ScopeIdentity] = []
-      var earlyExit = false
-      let p = program.parent(containing: n)
-      for s in program.scopes(from: p) {
-        if s.node != nil, output.addIf(reservedOrRecorded: .node(s.node!), in: program) {
-          earlyExit = true
-          break
-        } else if output.addIf(reservedOrRecorded: s.asSymbol, in: program) {
-          earlyExit = true
-          break
-        } else if output.addIf(qualification: s) {
-          precondition(qs.isEmpty)
-          return
-        } else {
-          qs.append(s)
-        }
+    // Find the prefix of the qualification that should be mangled as a reference.
+    var qs: [ScopeIdentity] = []
+    var earlyExit = false
+    let p = program.parent(containing: n)
+    for s in program.scopes(from: p) {
+      if s.node != nil, output.addIf(reservedOrRecorded: .node(s.node!), in: program) {
+        earlyExit = true
+        break
+      } else if output.addIf(reservedOrRecorded: s.asSymbol, in: program) {
+        earlyExit = true
+        break
+      } else if output.addIf(qualification: s) {
+        precondition(qs.isEmpty)
+        return
+      } else {
+        qs.append(s)
       }
+    }
 
-      // Write the mangled representation of the qualification's suffix.
-      if !earlyExit {
-        append(module: p.module, to: &output)
-        output.record(symbol: .module(p.module), in: program)
-      }
-      for s in qs.reversed() {
-        append(scope: s, to: &output)
-        output.record(symbol: s.asSymbol, in: program)
-      }
+    // Write the mangled representation of the qualification's suffix.
+    if !earlyExit {
+      append(module: p.module, to: &output)
+      output.record(symbol: .module(p.module), in: program)
+    }
+    for s in qs.reversed() {
+      append(scope: s, to: &output)
+      output.record(symbol: s.asSymbol, in: program)
     }
   }
 
@@ -638,134 +632,130 @@ struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(type s: AnyTypeIdentity, to output: inout ManglingContext) {
-    output.writing(type: s, program: program) { (output) in
-      if output.addIf(reservedOrRecorded: .type(s), in: program) { return }
+    if output.addIf(reservedOrRecorded: .type(s), in: program) { return }
 
-      let a = program.types[s]
-      switch a {
-      case let t as Arrow:
-        append(arrow: t, to: &output)
-      case let t as AssociatedType:
-        append(associatedType: t, to: &output)
-      case let t as Bundle:
-        append(bundle: t, to: &output)
-      case let t as Enum:
-        append(enum: t, to: &output)
-      case let t as EqualityWitness:
-        append(equalityWitness: t, to: &output)
-      case let t as FunctionPointer:
-        append(functionPointer: t, to: &output)
-      case let t as GenericParameter:
-        append(genericParameter: t, to: &output)
-      case let t as Implication:
-        append(implication: t, to: &output)
-      case let t as LiteralType:
-        append(literalType: t, to: &output)
-      case let t as MachineType:
-        append(machine: t, to: &output)
-      case let t as Metakind:
-        append(metakind: t, to: &output)
-      case let t as Metatype:
-        append(metatype: t, to: &output)
-      case let t as OpaqueType:
-        append(opaque: t, to: &output)
-      case let t as RemoteType:
-        append(remote: t, to: &output)
-      case let t as Struct:
-        append(struct: t, to: &output)
-      case let t as Trait:
-        append(trait: t, to: &output)
-      case let t as Tuple:
-        append(tuple: t, to: &output)
-      case let t as TypeAlias:
-        append(typeAlias: t, to: &output)
-      case let t as TypeApplication:
-        append(typeApplication: t, to: &output)
-      case let t as UniversalType:
-        append(universal: t, to: &output)
-      default:
-        unreachable()
-      }
-      output.record(symbol: .type(s), in: program)
+    let a = program.types[s]
+    switch a {
+    case let t as Arrow:
+      append(arrow: t, to: &output)
+    case let t as AssociatedType:
+      append(associatedType: t, to: &output)
+    case let t as Bundle:
+      append(bundle: t, to: &output)
+    case let t as Enum:
+      append(enum: t, to: &output)
+    case let t as EqualityWitness:
+      append(equalityWitness: t, to: &output)
+    case let t as FunctionPointer:
+      append(functionPointer: t, to: &output)
+    case let t as GenericParameter:
+      append(genericParameter: t, to: &output)
+    case let t as Implication:
+      append(implication: t, to: &output)
+    case let t as LiteralType:
+      append(literalType: t, to: &output)
+    case let t as MachineType:
+      append(machine: t, to: &output)
+    case let t as Metakind:
+      append(metakind: t, to: &output)
+    case let t as Metatype:
+      append(metatype: t, to: &output)
+    case let t as OpaqueType:
+      append(opaque: t, to: &output)
+    case let t as RemoteType:
+      append(remote: t, to: &output)
+    case let t as Struct:
+      append(struct: t, to: &output)
+    case let t as Trait:
+      append(trait: t, to: &output)
+    case let t as Tuple:
+      append(tuple: t, to: &output)
+    case let t as TypeAlias:
+      append(typeAlias: t, to: &output)
+    case let t as TypeApplication:
+      append(typeApplication: t, to: &output)
+    case let t as UniversalType:
+      append(universal: t, to: &output)
+    default:
+      unreachable()
     }
+    output.record(symbol: .type(s), in: program)
   }
 
   /// Demangles a type from `source`.
   static private func takeType(from source: inout DemanglingContext) -> DemangledType {
-    source.readingType { (source) -> DemangledType in
-      guard let o = source.takeOperator() else { return .error }
-      let demangled: DemangledType
+    guard let o = source.takeOperator() else { return .error }
+    let demangled: DemangledType
 
-      switch o {
-      case .lookupType:
-        demangled = typeOrError(source.takeLookupReference())
-      case .reservedType:
-        demangled = typeOrError(source.takeReserved())
-      case .arrowType:
-        demangled = takeArrowType(from: &source)
-      case .associatedType:
-        demangled = takeAssociatedType(from: &source)
-      case .bundleType:
-        demangled = takeBundle(from: &source)
-      case .enumType:
-        demangled = takeEnum(from: &source)
-      case .equalityWitnessType:
-        demangled = takeEqualityWitness(from: &source)
-      case .functionPointerType:
-        demangled = takeFunctionPointerType(from: &source)
-      case .genericParameterConformerType:
-        demangled = takeGenericParameterConformerType(from: &source)
-      case .genericParameterUserType:
-        demangled = takeGenericParameterUserType(from: &source)
-      case .genericParameterNthType:
-        demangled = takeGenericParameterNthType(from: &source)
-      case .implicationType:
-        demangled = takeImplicationType(from: &source)
-      case .literalIntegerType:
-        demangled = .integerLiteral
-      case .literalFloatType:
-        demangled = .floatLiteral
-      case .machineIntegerType:
-        demangled = takeMachineIntegerType(from: &source)
-      case .machineFloatType:
-        demangled = takeMachineFloatType(from: &source)
-      case .machinePointerType:
-        demangled = .machine(.ptr)
-      case .machineWordType:
-        demangled = .machine(.word)
-      case .metakindType:
-        demangled = takeMetakindType(from: &source)
-      case .metatypeType:
-        demangled = takeMetatypeType(from: &source)
-      case .opaqueEnvironmentType:
-        demangled = takeOpaqueEnvironmentType(from: &source)
-      case .remoteType:
-        demangled = takeRemoteType(from: &source)
-      case .structType:
-        demangled = takeStruct(from: &source)
-      case .traitType:
-        demangled = takeTrait(from: &source)
-      case .tupleConsType:
-        demangled = takeTupleConsType(from: &source)
-      case .tupleEmptyType:
-        demangled = takeTupleEmptyType(from: &source)
-      case .typeAliasType:
-        demangled = takeTypeAlias(from: &source)
-      case .typeApplicationType:
-        demangled = takeApplicationType(from: &source)
-      case .universalType:
-        demangled = takeUniversalType(from: &source)
-      default:
-        demangled = .error
-      }
-
-      // Record that we've seen `demangled`.
-      if o != .lookupType && o != .lookupRelative && o != .reservedType {
-        source.record(symbol: .type(demangled))
-      }
-
-      return demangled
+    switch o {
+    case .lookupType:
+      demangled = typeOrError(source.takeLookupReference())
+    case .reservedType:
+      demangled = typeOrError(source.takeReserved())
+    case .arrowType:
+      demangled = takeArrowType(from: &source)
+    case .associatedType:
+      demangled = takeAssociatedType(from: &source)
+    case .bundleType:
+      demangled = takeBundle(from: &source)
+    case .enumType:
+      demangled = takeEnum(from: &source)
+    case .equalityWitnessType:
+      demangled = takeEqualityWitness(from: &source)
+    case .functionPointerType:
+      demangled = takeFunctionPointerType(from: &source)
+    case .genericParameterConformerType:
+      demangled = takeGenericParameterConformerType(from: &source)
+    case .genericParameterUserType:
+      demangled = takeGenericParameterUserType(from: &source)
+    case .genericParameterNthType:
+      demangled = takeGenericParameterNthType(from: &source)
+    case .implicationType:
+      demangled = takeImplicationType(from: &source)
+    case .literalIntegerType:
+      demangled = .integerLiteral
+    case .literalFloatType:
+      demangled = .floatLiteral
+    case .machineIntegerType:
+      demangled = takeMachineIntegerType(from: &source)
+    case .machineFloatType:
+      demangled = takeMachineFloatType(from: &source)
+    case .machinePointerType:
+      demangled = .machine(.ptr)
+    case .machineWordType:
+      demangled = .machine(.word)
+    case .metakindType:
+      demangled = takeMetakindType(from: &source)
+    case .metatypeType:
+      demangled = takeMetatypeType(from: &source)
+    case .opaqueEnvironmentType:
+      demangled = takeOpaqueEnvironmentType(from: &source)
+    case .remoteType:
+      demangled = takeRemoteType(from: &source)
+    case .structType:
+      demangled = takeStruct(from: &source)
+    case .traitType:
+      demangled = takeTrait(from: &source)
+    case .tupleConsType:
+      demangled = takeTupleConsType(from: &source)
+    case .tupleEmptyType:
+      demangled = takeTupleEmptyType(from: &source)
+    case .typeAliasType:
+      demangled = takeTypeAlias(from: &source)
+    case .typeApplicationType:
+      demangled = takeApplicationType(from: &source)
+    case .universalType:
+      demangled = takeUniversalType(from: &source)
+    default:
+      demangled = .error
     }
+
+    // Record that we've seen `demangled`.
+    if o != .lookupType && o != .lookupRelative && o != .reservedType {
+      source.record(symbol: .type(demangled))
+    }
+
+    return demangled
   }
 
   /// Writes the mangled representation of `t` to `output`.
