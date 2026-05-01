@@ -1,4 +1,4 @@
-//! stage:typing no-std
+//! stage:lowering
 
 struct A<T> {
   public var x: T
@@ -6,8 +6,10 @@ struct A<T> {
   public static fun make(x: sink T) -> A<T> { .new(x: x) }
 }
 
+given A<Void> is Deinitializable {}
+
 extension <T> A<T> {
-  public fun id() sink -> Self { self }
+  public fun id() -> Self { fatal_error() }
 }
 
 public fun use<T>(x: A<T>) {}
