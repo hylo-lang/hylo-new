@@ -4,6 +4,9 @@
 /// the lookup tables and current qualification.
 struct ManglingContext {
 
+  // Functions named `addIf` return `true` if the condition is met; otherwise, they return `false`
+  // without modifying `self`.
+
   /// The mangled string being built.
   internal private(set) var output: String
 
@@ -122,14 +125,13 @@ struct ManglingContext {
     return previous
   }
 
-  /// If `s` is reserved or has already been inserted in the symbol lookup table, writes a lookup
-  /// reference to it and returns `true`. Otherwise, returns `false` without modifying `self`.
+  /// Writes a lookup reference to `s` iff `s` is reserved or has already been inserted in the
+  /// symbol lookup table.
   mutating func addIf(reservedOrRecorded s: MangledSymbol, in program: Program) -> Bool {
     addIf(reserved: s) || addIf(recorded: s, in: program)
   }
 
-  /// Writes a lookup reference to `s` and returns `true` iff `s` is a reserved mangling symbol.
-  // Otherwise, returns `false` without modifying `self`.
+  /// Writes a lookup reference to `s` iff `s` is a reserved mangling symbol.
   private mutating func addIf(reserved s: MangledSymbol) -> Bool {
     if let r = reserved[s] {
       if case .type = s {
@@ -144,8 +146,7 @@ struct ManglingContext {
     }
   }
 
-  /// Writes a lookup reference to `s` and returns `true` iff `s` is in the lookup table.
-  /// Otherwise, returns `false` without modifying `self`.
+  /// Writes a lookup reference to `s` iff `s` is in the lookup table.
   private mutating func addIf(recorded s: MangledSymbol, in program: Program) -> Bool {
     if let p = symbolPosition[s] {
       if case .type = s {
@@ -160,8 +161,7 @@ struct ManglingContext {
     }
   }
 
-  /// If `q` is the qualification accumulated so far, writes a lookup reference to it and returns
-  /// `true`. Otherwise, returns `false` without modifying `self`.
+  /// If `q` is the qualification accumulated so far, writes a lookup reference to it.
   mutating func addIf(qualification q: ScopeIdentity) -> Bool {
     if q == qualification {
       add(operator: .lookupRelative)

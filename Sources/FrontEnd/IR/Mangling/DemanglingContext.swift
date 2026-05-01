@@ -2,6 +2,9 @@
 /// tables for strings and symbols.
 struct DemanglingContext {
 
+  // Functions starting with `take` consume the corresponding data from `stream` and return it,
+  // returning `nil` if the data is corrupted.
+
   /// The stream being parsed.
   private var stream: Substring
 
@@ -38,7 +41,7 @@ struct DemanglingContext {
     .init(prefixing: stream)
   }
 
-  /// Consumes and returns and mangled string, returning `nil` iff the data is corrupted.
+  /// Consumes and returns a mangled string.
   mutating func takeString() -> String? {
     guard let length = takeInteger()?.rawValue else { return nil }
     switch length {
@@ -59,26 +62,22 @@ struct DemanglingContext {
     }
   }
 
-  /// Assuming `stream` starts with a mangled `Int` value, consumes and returns it; returns `nil`
-  /// otherwise.
+  /// Consumes and returns a mangled `Int` value.
   mutating func takeInt() -> Int? {
     takeInteger().map({ Int(bitPattern: UInt(truncatingIfNeeded: $0.rawValue)) })
   }
 
-  /// Assuming `stream` starts with a mangled `UInt32` value, consumes and returns it; returns `nil`
-  /// otherwise.
+  /// Consumes and returns a mangled `UInt32` value.
   mutating func takeUInt32() -> UInt32? {
     takeInteger().map({ UInt32(truncatingIfNeeded: $0.rawValue) })
   }
 
-  /// Assuming `stream` starts with a mangled `UInt64` value, consumes and returns it; returns `nil`
-  /// otherwise.
+  /// Consumes and returns a mangled `UInt64` value.
   mutating func takeUInt64() -> UInt64? {
     takeInteger().map({ $0.rawValue })
   }
 
-  /// Assuming `stream` starts with a mangled integer, consumes and returns it; returns `nil`
-  /// otherwise.
+  /// Consumes and returns a mangled integer.
   private mutating func takeInteger() -> Base64VarUInt? {
     guard let (v, i) = Base64VarUInt.decode(from: stream) else {
       return nil
@@ -87,19 +86,18 @@ struct DemanglingContext {
     return v
   }
 
-  /// Assuming `stream` starts with a base 64 digit, consumes and returns it. Returns `nil` iff
-  /// data is corrupted.
+  /// Consumes and returns a mangled base-64 digit value.
   mutating func takeBase64Digit() -> Base64Digit? {
     stream.popFirst().flatMap(Base64Digit.init(_:))
   }
 
-  /// Assuming `stream` starts with a mangled `T`, consumes and returns it. Returns `nil` iff
-  /// data is corrupted.
+  /// Consumes and returns a mangled `T` value.
   mutating func take<T: RawRepresentable>(_: T.Type) -> T? where T.RawValue == UInt8 {
     takeBase64Digit().flatMap({ (d) in T(rawValue: d.rawValue) })
   }
 
-  /// Demangles a list of `T`s from `stream`, calling `takeItem` to parse each individual element.
+  /// Consumes and returns a list of mangled `T` values, calling `takeItem` to parse each
+  /// individual element.
   mutating func takeItems<T>(takingEachWith takeItem: (inout Self) -> T?) -> [T]? {
     guard let n = takeInteger() else { return nil }
     var xs: [T] = .init(minimumCapacity: Int(n.rawValue))
@@ -111,12 +109,12 @@ struct DemanglingContext {
     return xs
   }
 
-  /// Demangles a reserved symbol.
+  /// Consumes and returns a mangled reserved symbol.
   mutating func takeReserved() -> DemangledSymbol? {
     take(ReservedSymbol.self).map(DemangledSymbol.init(reserved:))
   }
 
-  /// Demangles a reference to a symbol already seen by `self`.
+  /// Consumes and returns a reference to a symbol already seen by `self`.
   mutating func takeLookupReference() -> DemangledSymbol? {
     if let n = takeInteger(), n.rawValue < symbols.count {
         return symbols[Int(n.rawValue)]
