@@ -2,3 +2,8 @@
 public fun fatal_error() -> Never {
   Builtin.trap()
 }
+
+/// Stops execution iff `condition` is false.
+public fun precondition(condition: Bool) -> Void {
+  if !condition { fatal_error() }
+}
