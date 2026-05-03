@@ -853,6 +853,8 @@ public struct Typer {
       return true
     case program.standardLibraryDeclaration(.equatable):
       return true
+    case program.standardLibraryDeclaration(.copyable):
+      return true
     case program.standardLibraryDeclaration(.movable):
       return true
     default:
