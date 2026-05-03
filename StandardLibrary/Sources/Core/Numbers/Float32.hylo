@@ -18,6 +18,8 @@ public given Float32 is ExpressibleByFloatingPointLiteral { /* built-in */ }
 
 public given Float32 is Movable {}
 
+public given Float32 is Copyable {}
+
 public given Float32 is Equatable {
 
   public fun infix== (other: Self) -> Bool {

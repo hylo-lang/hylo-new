@@ -1447,6 +1447,9 @@ extension Program {
     /// `Hylo.Equatable`.
     case equatable = "Equatable"
 
+    /// `Hylo.Copyable`
+    case copyable = "Copyable"
+
     /// `Hylo.Movable`.
     case movable = "Movable"
 
@@ -1463,7 +1466,8 @@ extension Program {
     case expressibleByFloatingPointLiteral = "ExpressibleByFloatingPointLiteral"
 
     /// `Hylo.ExpressibleByFloatingPointLiteral.init(floating_point_literal:)`.
-    case expressibleByFloatingPointLiteralInit = "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
+    case expressibleByFloatingPointLiteralInit =
+      "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
 
   }
 

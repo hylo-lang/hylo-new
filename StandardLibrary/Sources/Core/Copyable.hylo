@@ -1,0 +1,15 @@
+/// A type whose instances can be copied.
+@_symbol("Copyable")
+public trait Copyable refines Movable {
+
+  /// Returns a copy of `self`.
+  @_symbol("Copyable.copy(:)")
+  fun copy() -> Self
+
+}
+
+/// A witness that `Void` is `Copyable`.
+public given Void is Copyable {}
+
+/// A witness that a tuple is `Copyable` when its elements are too.
+public given <T is Copyable, U is Copyable> {T, ...U} is Copyable {}
