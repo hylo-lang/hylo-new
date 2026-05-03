@@ -3541,17 +3541,13 @@ public struct Typer {
     then tail: [ResolutionThread.ContinuationItem] = [],
     penalties: Int = 0
   ) -> ResolutionThread {
-    var witness = witness
-    var queried = queried
     var environment = environment
+    var witness = program.types.reify(
+      witness, applying: environment.substitutions, withVariables: .kept)
+    let queried = program.types.reify(
+      queried, applying: environment.substitutions, withVariables: .kept)
 
     while true {
-      // Weak-head normal forms.
-      witness = program.types.reify(
-        witness, applying: environment.substitutions, withVariables: .kept)
-      queried = program.types.reify(
-        queried, applying: environment.substitutions, withVariables: .kept)
-
       // The witness has a universal type?
       if let u = program.types[witness.type] as? UniversalType {
         let a = TypeArguments(mapping: u.parameters, to: { _ in fresh().erased })
