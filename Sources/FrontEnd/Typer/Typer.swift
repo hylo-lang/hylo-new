@@ -3741,7 +3741,7 @@ public struct Typer {
     // Gather the givens in other files of the module.
     var fs: [Given] = []
     for f in program[scopeOfUse.module].sourceFileIdentities where f != scopeOfUse.file {
-      fs.append(contentsOf: givens(lexicallyIn: .init(file: f)).filter(notOnStack(_:)))
+      for g in givens(lexicallyIn: .init(file: f)) where notOnStack(g) { fs.append(g) }
     }
     if !fs.isEmpty { gs.append(fs) }
 
