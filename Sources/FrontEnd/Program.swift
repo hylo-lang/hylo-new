@@ -952,8 +952,8 @@ public struct Program: Sendable {
       return n.description
     } else {
       let s = self[d].site
-      let (l, c) = s.start.lineAndColumn
-      return "$<\(tag(of: d)) at \(s.source.baseName):\(l).\(c)>"
+      let (l, o) = s.start.lineAndOffset
+      return "$<\(tag(of: d)) at \(s.source.baseName):\(l + 1).\(o + 1)>"
     }
   }
 

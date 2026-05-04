@@ -481,9 +481,9 @@ private typealias Module = FrontEnd.Module
         let s = p[n].site
         guard case .local(let u) = s.source.name else { return false }
         if u.absoluteURL.pathComponents.starts(with: l.path.pathComponents) {
-          let (a, _) = s.start.lineAndColumn
-          let (b, _) = s.start.lineAndColumn
-          return (a <= l.line) && (l.line <= b)
+          let (a, _) = s.start.lineAndOffset
+          let (b, _) = s.start.lineAndOffset
+          return (a + 1 <= l.line) && (l.line <= b + 1)
         } else {
           return false
         }

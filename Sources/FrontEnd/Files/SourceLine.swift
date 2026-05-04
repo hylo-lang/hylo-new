@@ -4,13 +4,13 @@ public struct SourceLine: Hashable {
   /// The source file containing the position.
   public let source: SourceFile
 
-  /// The 1-based index of the line in `file`.
-  public let number: Int
+  /// The 0-based index of the line in `file`.
+  public let index: Int
 
   /// Creates an instance representing the line at `index` in `source`.
   init(_ index: Int, in source: SourceFile) {
     self.source = source
-    self.number = index
+    self.index = index
   }
 
   /// The source text contained in this line.
@@ -23,6 +23,6 @@ public struct SourceLine: Hashable {
 
 extension SourceLine: CustomStringConvertible {
 
-  public var description: String { "\(source.name):\(number)" }
+  public var description: String { "\(source.name):\(index + 1)" }
 
 }
