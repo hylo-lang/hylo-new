@@ -80,6 +80,9 @@ extension SourceSpan: CustomStringConvertible {
   /// Returns a textual representation of `self` per the
   /// [GNU coding standards](https://www.gnu.org/prep/standards/html_node/Errors.html) whose path
   /// is shown as `pathStyle`.
+  ///
+  /// Note: columns are only guaranteed to be reported accurately if the line only contains ASCII 
+  /// characters and no tabs.
   public func gnuStandardText(showingPath pathStyle: FileName.PathStyle = .absolute) -> String {
     let n: String = if case .relative(let u) = pathStyle {
       source.name.gnuPath(relativeTo: u) ?? source.name.description
@@ -87,15 +90,15 @@ extension SourceSpan: CustomStringConvertible {
       source.name.description
     }
 
-    let s = start.lineAndColumn
-    let h = "\(n):\(s.line).\(s.column)"
+    let s = start.lineAndOffset
+    let h = "\(n):\(s.line + 1).\(s.offset + 1)"
     if region.isEmpty { return h }
 
-    let e = end.lineAndColumn
+    let e = end.lineAndOffset
     if e.line == s.line {
-      return h + "-\(e.column)"
+      return h + "-\(e.offset + 1)"
     } else {
-      return h + "-\(e.line):\(e.column)"
+      return h + "-\(e.line + 1):\(e.offset + 1)"
     }
   }
 

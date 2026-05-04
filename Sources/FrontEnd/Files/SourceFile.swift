@@ -119,8 +119,8 @@ public struct SourceFile: Hashable, Sendable {
   /// The bounds of given `line`, including any trailing newline.
   public func bounds(of line: SourceLine) -> SourceSpan {
     let starts = properties.lineStarts
-    let end = line.number < starts.count ? starts[line.number] : text.endIndex
-    return SourceSpan(starts[line.number - 1] ..< end, in: self)
+    let end = line.index + 1 < starts.count ? starts[line.index + 1] : text.endIndex
+    return SourceSpan(starts[line.index] ..< end, in: self)
   }
 
   /// Returns the line containing `i`.
@@ -128,29 +128,66 @@ public struct SourceFile: Hashable, Sendable {
   /// - Requires: `i` is a valid index in `contents`.
   /// - Complexity: O(log N) where N is the number of lines in `self`.
   public func line(containing i: Index) -> SourceLine {
-    SourceLine(properties.lineStarts.partitioningIndex(where: { (l) in l > i }), in: self)
+    SourceLine(properties.lineStarts.partitioningIndex(where: { (l) in l > i }) - 1, in: self)
   }
 
-  /// Returns the line at 1-based index `lineNumber`.
-  public func line(_ lineNumber: Int) -> SourceLine {
-    SourceLine(lineNumber, in: self)
+  /// Returns the line at 0-based index `i`.
+  public func line(_ i: Int) -> SourceLine {
+    SourceLine(i, in: self)
   }
 
-  /// Returns the 1-based line and column numbers corresponding to `i`.
+  /// Returns the 0-based line and offset corresponding to `i`.
+  ///
+  /// Offsets are counted in Unicode extended grapheme clusters from line start.
   ///
   /// - Requires: `i` is a valid index in `contents`.
   ///
   /// - Complexity: O(log N) + O(C) where N is the number of lines in `self` and C is the returned
-  ///   column number.
-  func lineAndColumn(_ i: Index) -> (line: Int, column: Int) {
-    let lineNumber = line(containing: i).number
-    let columnNumber = text.distance(from: properties.lineStarts[lineNumber - 1], to: i) + 1
-    return (lineNumber, columnNumber)
+  ///   offset.
+  func lineAndOffset(_ i: Index) -> (line: Int, offset: Int) {
+    let lineNumber = line(containing: i).index
+    let offset = text.distance(from: properties.lineStarts[lineNumber], to: i)
+    return (lineNumber, offset)
   }
 
-  /// Returns the index in `text` corresponding to the 1-based `line` and `column`.
-  public func index(line: Int, column: Int) -> Index {
-    text.index(properties.lineStarts[line - 1], offsetBy: column - 1)
+  /// Returns the 0-based line and UTF-16 offset corresponding to `i`.
+  ///
+  /// - Requires: `i` is a valid index in `contents`.
+  ///
+  /// - Complexity: O(log N) + O(C) where N is the number of lines in `self` and C is the returned
+  ///   offset.
+  func lineAndUTF16Offset(_ i: Index) -> (line: Int, offset: Int) {
+    let lineNumber = line(containing: i).index
+    let offset = text.utf16.distance(from: properties.lineStarts[lineNumber], to: i)
+    return (lineNumber, offset)
+  }
+
+  /// Returns the index in `text` corresponding to the 0-based `line` and `offset`.
+  ///
+  /// Offsets are counted in Unicode extended grapheme clusters from line start.
+  ///
+  /// If `line` or `offset` are out of bounds, the result is clamped to [startIndex, endIndex].
+  /// Note: this means, `endIndex` may be returned, which is illegal to subscript with.
+  public func index(line: Int, extendedGraphemeClusterOffset offset: Int) -> Index {
+    guard line >= 0 else { return startIndex }
+    guard line < lineCount else { return endIndex }
+    
+    let lineStart = properties.lineStarts[line]
+    return text.index(lineStart, offsetBy: offset, limitedBy: text.endIndex) ?? endIndex
+  }
+
+  /// Returns the index in `text` corresponding to the 0-based `line` and `utf16Offset` from line start.
+  ///
+  /// If `line` or `utf16Offset` are out of bounds, the result is clamped to [startIndex, endIndex].
+  /// Note: this means, `endIndex` may be returned, which is illegal to subscript with.
+  public func index(line: Int, utf16Offset: Int) -> Index {
+    guard line >= 0 else { return startIndex }
+    guard line < lineCount else { return endIndex }
+    
+    let lineStart = properties.lineStarts[line]
+    let utf16Line = text[lineStart...].utf16
+
+    return utf16Line.index(utf16Line.startIndex, offsetBy: utf16Offset, limitedBy: endIndex) ?? endIndex
   }
 
   /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`.
