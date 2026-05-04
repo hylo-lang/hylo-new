@@ -138,6 +138,8 @@ public struct SourceFile: Hashable, Sendable {
 
   /// Returns the 1-based line and column numbers corresponding to `i`.
   ///
+  /// Columns are counted in Unicode extended grapheme clusters.
+  ///
   /// - Requires: `i` is a valid index in `contents`.
   ///
   /// - Complexity: O(log N) + O(C) where N is the number of lines in `self` and C is the returned
@@ -148,9 +150,42 @@ public struct SourceFile: Hashable, Sendable {
     return (lineNumber, columnNumber)
   }
 
+  /// Returns the 0-based line and 0-based UTF-16 column numbers corresponding to `i`.
+  ///
+  /// - Requires: `i` is a valid index in `contents`.
+  ///
+  /// - Complexity: O(log N) + O(C) where N is the number of lines in `self` and C is the returned
+  ///   column number.
+  func lineAndUtf16Column(_ i: Index) -> (line: Int, column: Int) {
+    let lineNumber = line(containing: i).number - 1
+    let columnNumber = text.utf16.distance(from: properties.lineStarts[lineNumber], to: i)
+    return (lineNumber, columnNumber)
+  }
+
   /// Returns the index in `text` corresponding to the 1-based `line` and `column`.
-  public func index(line: Int, column: Int) -> Index {
-    text.index(properties.lineStarts[line - 1], offsetBy: column - 1)
+  ///
+  /// If `line` or `column` are out of bounds, the result is clamped to [startIndex, endIndex].
+  /// Note: this means, `endIndex` may be returned, which is illegal to subscript with.
+  public func index(line: Int, extendedGraphemeClusterColumn c: Int) -> Index {
+    guard line > 0 else { return startIndex }
+    guard line <= lineCount else { return endIndex }
+    
+    let lineStart = properties.lineStarts[line - 1]
+    return text.index(lineStart, offsetBy: c - 1, limitedBy: text.endIndex) ?? endIndex
+  }
+
+  /// Returns the index in `text` corresponding to the 0-based `line` and 0-based UTF-16 `column`.
+  ///
+  /// If `line` or `utf16Column` are out of bounds, the result is clamped to [startIndex, endIndex].
+  /// Note: this means, `endIndex` may be returned, which is illegal to subscript with.
+  public func index(line: Int, utf16Column: Int) -> Index {
+    guard line >= 0 else { return startIndex }
+    guard line < lineCount else { return endIndex }
+    
+    let lineStart = properties.lineStarts[line]
+    let utf16Line = text[lineStart...].utf16
+
+    return utf16Line.index(utf16Line.startIndex, offsetBy: utf16Column, limitedBy: endIndex) ?? endIndex
   }
 
   /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`.
