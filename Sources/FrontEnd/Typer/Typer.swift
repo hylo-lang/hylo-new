@@ -57,6 +57,9 @@ public struct Typer {
     /// A table mapping identifiers to declarations.
     fileprivate typealias LookupTable = OrderedDictionary<String, [DeclarationIdentity]>
 
+    /// A pair of types.
+    fileprivate typealias TypePair = Pair<AnyTypeIdentity, AnyTypeIdentity>
+
     /// The cache of `Typer.lookup(_:atTopLevelOf:)`.
     fileprivate var moduleToIdentifierToDeclaration: [LookupTable?]
 
@@ -99,6 +102,9 @@ public struct Typer {
     /// The cache of `Typer.declaredType(of:)` for predefined givens.
     fileprivate var predefinedGivens: [Given: AnyTypeIdentity]
 
+    /// The cache of `Typer.canDeriveCoercion(_:_:applying:)`.
+    fileprivate var canDeriveCoercion: [Given: [TypePair: (Bool, Bool)]]
+
     /// Creates an instance for typing `m`, which is a module in `p`.
     fileprivate init(typing m: Module.ID, in p: Program) {
       self.moduleToIdentifierToDeclaration = .init(repeating: nil, count: p.modules.count)
@@ -115,6 +121,7 @@ public struct Typer {
       self.witnessToAliases = [:]
       self.declarationToTentativeType = [:]
       self.predefinedGivens = [:]
+      self.canDeriveCoercion = [:]
     }
 
   }
@@ -3534,17 +3541,13 @@ public struct Typer {
     then tail: [ResolutionThread.ContinuationItem] = [],
     penalties: Int = 0
   ) -> ResolutionThread {
-    var witness = witness
-    var queried = queried
     var environment = environment
+    var witness = program.types.reify(
+      witness, applying: environment.substitutions, withVariables: .kept)
+    let queried = program.types.reify(
+      queried, applying: environment.substitutions, withVariables: .kept)
 
     while true {
-      // Weak-head normal forms.
-      witness = program.types.reify(
-        witness, applying: environment.substitutions, withVariables: .kept)
-      queried = program.types.reify(
-        queried, applying: environment.substitutions, withVariables: .kept)
-
       // The witness has a universal type?
       if let u = program.types[witness.type] as? UniversalType {
         let a = TypeArguments(mapping: u.parameters, to: { _ in fresh().erased })
@@ -3734,14 +3737,14 @@ public struct Typer {
     // Gather the givens in other files of the module.
     var fs: [Given] = []
     for f in program[scopeOfUse.module].sourceFileIdentities where f != scopeOfUse.file {
-      fs.append(contentsOf: givens(lexicallyIn: .init(file: f)).filter(notOnStack(_:)))
+      for g in givens(lexicallyIn: .init(file: f)) where notOnStack(g) { fs.append(g) }
     }
     if !fs.isEmpty { gs.append(fs) }
 
     // Gather the givens imported from other modules.
     var ms: [Given] = []
     for i in imports(of: scopeOfUse.file) {
-      ms.append(contentsOf: givens(atTopLevelOf: i).filter(notOnStack(_:)))
+      for g in givens(atTopLevelOf: i) where notOnStack(g) { ms.append(g) }
     }
     if !ms.isEmpty { gs.append(ms) }
 
@@ -3829,7 +3832,7 @@ public struct Typer {
     return takeSummonResults(from: threads, in: scopeOfUse)
   }
 
-  /// Returns `true` iff a coercion (i.e., a witness of a type equality) from `a` to `b` can be
+  /// Returns `true` iff a coercion (i.e., a witness of a type equality) from `a` to `b` might be
   /// derived using the givens visible from `scopeOfUse` and those assumed in `environment`.
   ///
   /// This method enumerates givens having heads of the form `T ~ U`, excluding the built-in ones,
@@ -3843,31 +3846,49 @@ public struct Typer {
     var lhs = false
     var rhs = false
 
-    for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined()) {
-      let t = declaredType(of: g)
-      let u = program.types.contextAndHead(t)
-
-      // Can the given match any type (e.g., `<T> T`)?
-      if u.context.parameters.contains(where: { (p) in p == u.head }) {
-        return true
-      }
-
-      // Is the given of the form `T ~ U`?
-      if let e = program.types.cast(u.head, to: EqualityWitness.self) {
-        let l = program.types.open(u.context.parameters, in: program.types[e].lhs)
-        let r = program.types.open(u.context.parameters, in: program.types[e].rhs)
-
-        lhs = lhs || unifiable(a, l) || unifiable(a, r)
-        rhs = rhs || unifiable(b, l) || unifiable(b, r)
-
-        if lhs && rhs {
-          return true
-        }
-      }
+    for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined())  {
+      let (x, y) = canDeriveCoercion(a, b, applying: g)
+      lhs = lhs || x
+      rhs = rhs || y
+      if lhs && rhs { return true }
     }
 
     assert(!lhs || !rhs)
     return false
+  }
+
+  /// Returns `(lhs, rhs)` where `lhs` (respectively `rhs`) is `true` iff a `g` might be used to
+  /// prove a coercion from  from `a` to `x` (respectively `x` to `b`) for some type `x`.
+  private mutating func canDeriveCoercion(
+    _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, applying g: Given
+  ) -> (Bool, Bool) {
+    // Make sure the cache key does not depend on the order in which `a` and `b` have been passed.
+    let p = (b.bits < a.bits) ? Pair(b, a) : Pair(a, b)
+    if let memoized = cache.canDeriveCoercion[g]?[p] { return memoized }
+
+    let t = declaredType(of: g)
+    let u = program.types.contextAndHead(t)
+
+    // Can the given match any type (e.g., `<T> T`)?
+    if u.context.parameters.contains(where: { (p) in p == u.head }) {
+      cache.canDeriveCoercion[g, default: [:]][p] = (true, true)
+      return (true, true)
+    }
+
+    // Is the given of the form `T ~ U`?
+    if let e = program.types.cast(u.head, to: EqualityWitness.self) {
+      let l = program.types.open(u.context.parameters, in: program.types[e].lhs)
+      let r = program.types.open(u.context.parameters, in: program.types[e].rhs)
+
+      let lhs = unifiable(a, l) || unifiable(a, r)
+      let rhs = unifiable(b, l) || unifiable(b, r)
+      cache.canDeriveCoercion[g, default: [:]][p] = (lhs, rhs)
+      return (lhs, rhs)
+    }
+
+    // The given can't be used to form a coercion.
+    cache.canDeriveCoercion[g, default: [:]][p] = (false, false)
+    return (false, false)
   }
 
   // MARK: Name resolution
