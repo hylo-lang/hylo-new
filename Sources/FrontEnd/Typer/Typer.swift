@@ -3744,7 +3744,7 @@ public struct Typer {
     // Gather the givens imported from other modules.
     var ms: [Given] = []
     for i in imports(of: scopeOfUse.file) {
-      ms.append(contentsOf: givens(atTopLevelOf: i).filter(notOnStack(_:)))
+      for g in givens(atTopLevelOf: i) where notOnStack(g) { ms.append(g) }
     }
     if !ms.isEmpty { gs.append(ms) }
 
