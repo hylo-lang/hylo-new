@@ -3862,6 +3862,7 @@ public struct Typer {
   private mutating func canDeriveCoercion(
     _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, applying g: Given
   ) -> (Bool, Bool) {
+    // Make sure the cache key does not depend on the order in which `a` and `b` have been passed.
     let p = (b.bits < a.bits) ? Pair(b, a) : Pair(a, b)
     if let memoized = cache.canDeriveCoercion[g]?[p] { return memoized }
 
