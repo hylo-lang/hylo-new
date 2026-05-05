@@ -1,0 +1,16 @@
+//! stage:lowering
+
+fun loop_without_allocation() {
+  var i: Int = 42
+
+  while i > 0 {
+    var j: Int = i + 0
+
+    while j > 0 {
+      let d = -1
+      &j = j + d
+    }
+
+    &i = i - 1
+  }
+}

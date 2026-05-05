@@ -1,0 +1,8 @@
+//! stage:lowering
+
+fun loop_without_allocation() {
+  var r = 42
+  while r > 0 {
+    &r = 0
+  }
+}

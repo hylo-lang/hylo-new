@@ -2,6 +2,10 @@
 ///
 /// This instruction is similar to `alloca` except that it uses a type witness to determine the
 /// size and alignment of the allocated storage.
+///
+/// IRAllocx instructions are only legal outside of loops, otherwise they might leak memory. The
+/// standard library should provide a `withTemporaryAllocation` function or an `allocx` subscript which guarantee these
+/// allocations happen in their entry block.
 public struct IRAllocx: Instruction {
 
   /// The operands of the instruction.
