@@ -2119,7 +2119,7 @@ public struct Typer {
         inferredType(of: program[e].source, in: &ctx)
       }
 
-      switch program[e].semantics {
+      switch program[e].semantics.value {
       case .up:
         let s = program.spanForDiagnostic(about: program[e].source)
         context.obligations.assume(WideningConstraint(lhs: lhs, rhs: rhs, site: s))
