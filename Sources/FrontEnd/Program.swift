@@ -711,6 +711,13 @@ public struct Program: Sendable {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
+  /// Returns the declaration referred to by `n`, if any.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func declaration(ifReferredToBy n: NameExpression.ID) -> DeclarationReference? {
+    self[n.module].declaration(referredToBy: n)
+  }
+
   /// Returns `true` iff `n` contains a reference to `d`.
   ///
   /// - Requires: The module containing `n` is typed.

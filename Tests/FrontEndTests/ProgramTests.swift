@@ -105,14 +105,15 @@ final class ProgramTests: XCTestCase {
 
     // Query givens visible from the file level.
     let givens = p.givens(in: m, visibleFrom: .init(file: f))
-    
+
     // The visible given should be the top-level `w2`.
     guard givens.count == 1, case .user(let given) = givens[0] else {
       return XCTFail("expected exactly one user-defined given, got \(givens)")
     }
 
     let w2 = try XCTUnwrap(
-      p.select(from: m, .and(.tag(ConformanceDeclaration.self), .name(.init(identifier: "w2")))).first)
+      p.select(from: m, .and(.tag(ConformanceDeclaration.self), .name(.init(identifier: "w2"))))
+        .first)
     XCTAssertEqual(given.erased, w2)
   }
 
@@ -182,7 +183,7 @@ final class ProgramTests: XCTestCase {
     await p.assignScopes(m)
 
     let ds = Array(p.topLevelDeclarations(in: id))
-    
+
     // `ds` should contain exactly the declarations from the first source file, and not
     // ones from the second.
     XCTAssertEqual(ds.count, 2)
@@ -193,4 +194,42 @@ final class ProgramTests: XCTestCase {
     XCTAssertFalse(tags.contains(.init(EnumDeclaration.self)))
   }
 
+  func testReturnsNilDeclarationIffNameIsNotResolved() async throws {
+    var p = Program()
+    let m = p.demandModule("Main")
+    let s: SourceFile = """
+      let x = nonexistent.y
+      let z = x
+      """
+    _ = p[m].addSource(s)
+
+    await p.assignScopes(m)
+    p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
+
+    func isVariable(referringTo name: String) -> (AnySyntaxIdentity) -> Bool {
+      { (n:  AnySyntaxIdentity) -> Bool in
+        if let n = p.cast(n, to: NameExpression.self),
+          p[n].name.value.identifier == name
+        {
+          return true
+        }
+        return false
+      }
+    }
+
+    // y should not refer to anything
+    let y = try XCTUnwrap(p.select(.satisfies(isVariable(referringTo: "y"))).first)
+    guard let yn = p.cast(y, to: NameExpression.self) else {
+      return XCTFail("y is not a name expression")
+    }
+    XCTAssertEqual(p.declaration(ifReferredToBy: yn), nil)
+
+    // x usage should refer to `x` declaration
+    let x = try XCTUnwrap(p.select(.satisfies(isVariable(referringTo: "x"))).first)
+    guard let xName = p.cast(x, to: NameExpression.self) else {
+      return XCTFail("x is not a name expression")
+    }
+    let xd = try XCTUnwrap(p.select(.name("x")).first).erased
+    XCTAssertEqual(p.declaration(ifReferredToBy: xName)?.target?.erased, xd)
+  }
 }
