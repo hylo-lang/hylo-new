@@ -1302,7 +1302,7 @@ public struct Parser {
     let r = try parseExpression(in: &file)
     let n = file.insert(
       Conversion(
-        source: l, target: r, semantics: .init(o.text)!,
+        source: l, target: r, semantics: .init(Conversion.Operator(o.text)!, at: o.site),
         site: file[l].site.extended(upTo: position.index)))
     return .init(n)
   }
