@@ -3885,7 +3885,7 @@ public struct Typer {
       return (lhs, rhs)
     }
 
-    // The given can't be use to form a coercion.
+    // The given can't be used to form a coercion.
     cache.canDeriveCoercion[g, default: [:]][p] = (false, false)
     return (false, false)
   }
