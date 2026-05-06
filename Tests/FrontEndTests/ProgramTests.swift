@@ -207,7 +207,7 @@ final class ProgramTests: XCTestCase {
     p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
 
     func isVariable(referringTo name: String) -> (AnySyntaxIdentity) -> Bool {
-      { (n:  AnySyntaxIdentity) -> Bool in
+      { (n: AnySyntaxIdentity) -> Bool in
         if let n = p.cast(n, to: NameExpression.self),
           p[n].name.value.identifier == name
         {
@@ -232,4 +232,20 @@ final class ProgramTests: XCTestCase {
     let xd = try XCTUnwrap(p.select(.name("x")).first).erased
     XCTAssertEqual(p.declaration(ifReferredToBy: xName)?.target?.erased, xd)
   }
+
+  func testReturnsNilTypeIfCouldntTypeCheck() async throws {
+    let s: SourceFile = """
+      let (e, b) = ((), (), ())
+      """
+    var p = Program()
+    let m = p.demandModule("Main")
+    _ = p[m].addSource(s)
+    await p.assignScopes(m)
+    p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
+    
+    // `e` should not have a type; it's not assigned.
+    let e = try XCTUnwrap(p.select(.name("e")).first)
+    XCTAssertNil(p.type(ifAssignedTo: e))
+  }
+
 }

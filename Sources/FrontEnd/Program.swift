@@ -692,6 +692,11 @@ public struct Program: Sendable {
     self[n.module].type(assignedTo: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
+  /// Returns the type assigned to `n`, if any.
+  public func type<T: SyntaxIdentity>(ifAssignedTo n: T) -> AnyTypeIdentity? {
+    self[n.module].type(assignedTo: n)
+  }
+
   /// Returns the type assigned to `n`, assuming it is an instance of `T`.
   ///
   /// - Requires: The module containing `n` is typed.
@@ -1506,7 +1511,7 @@ extension Program {
   public func standardLibraryDeclaration(
     _ n: StandardLibraryEntity
   ) -> DeclarationIdentity {
-    standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library")
+    standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library; missing \(n)")
   }
 
   /// Returns the declaration of the given standard library assuming it is represented by `T`.
