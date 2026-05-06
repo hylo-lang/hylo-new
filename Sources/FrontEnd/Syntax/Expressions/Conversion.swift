@@ -26,7 +26,9 @@ public struct Conversion: Expression {
   public let target: ExpressionIdentity
 
   /// The semantics of the conversion.
-  public let semantics: Operator
+  ///
+  /// Parsed from the `as`/`as!`/`as*` operators.
+  public let semantics: Parsed<Operator>
 
   /// The site from which `self` was parsed.
   public let site: SourceSpan
@@ -35,7 +37,7 @@ public struct Conversion: Expression {
   public init(
     source: ExpressionIdentity,
     target: ExpressionIdentity,
-    semantics: Operator,
+    semantics: Parsed<Operator>,
     site: SourceSpan
   ) {
     self.source = source
@@ -50,7 +52,7 @@ extension Conversion: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "\(printer.show(source)) \(semantics) \(printer.show(target))"
+    "\(printer.show(source)) \(semantics.value) \(printer.show(target))"
   }
 
 }

@@ -88,25 +88,93 @@ final class SourceFileTests: XCTestCase {
 
   func testIndexAtStartOfFile() throws {
     let f = SourceFile.helloWorld
-    XCTAssertEqual(f.index(line: 1, column: 1), f.text.startIndex)
+    XCTAssertEqual(f.index(line: 1, extendedGraphemeClusterColumn: 1), f.text.startIndex)
   }
 
   func testIndexWithinFirstLine() throws {
     let f = SourceFile.helloWorld
     let comma = try XCTUnwrap(f.text.firstIndex(of: ","))
-    XCTAssertEqual(f.index(line: 1, column: 6), comma)
+    XCTAssertEqual(f.index(line: 1, extendedGraphemeClusterColumn: 6), comma)
   }
 
   func testIndexAtStartOfSecondLine() throws {
     let f = SourceFile.helloWorld
     let line2Start = f.text.index(after: try XCTUnwrap(f.text.firstIndex(where: \.isNewline)))
-    XCTAssertEqual(f.index(line: 2, column: 1), line2Start)
+    XCTAssertEqual(f.index(line: 2, extendedGraphemeClusterColumn: 1), line2Start)
   }
 
   func testIndexAtLastCharacter() throws {
     let f = SourceFile.helloWorld
     let bang = try XCTUnwrap(f.text.firstIndex(of: "!"))
-    XCTAssertEqual(f.index(line: 2, column: 6), bang)
+    XCTAssertEqual(f.index(line: 2, extendedGraphemeClusterColumn: 6), bang)
+  }
+
+  // MARK: - extendedGraphemeClusterColumn clamping
+
+  func testGraphemeClusterColumnClampsNegativeLine() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: -1, extendedGraphemeClusterColumn: 1), f.startIndex)
+    XCTAssertEqual(f.index(line: 0, extendedGraphemeClusterColumn: 1), f.startIndex)
+  }
+
+  func testGraphemeClusterColumnClampsLineOverflow() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 100, extendedGraphemeClusterColumn: 1), f.endIndex)
+  }
+
+  func testGraphemeClusterColumnClampsColumnOverflow() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 1, extendedGraphemeClusterColumn: 999), f.endIndex)
+  }
+
+  // MARK: - UTF-16 index
+
+  func testUTF16IndexAtStartOfFile() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 0, utf16Column: 0), f.text.startIndex)
+  }
+
+  func testUTF16IndexWithinFirstLine() throws {
+    let f = SourceFile.helloWorld
+    let comma = try XCTUnwrap(f.text.firstIndex(of: ","))
+    XCTAssertEqual(f.index(line: 0, utf16Column: 5), comma)
+  }
+
+  func testUTF16IndexAtStartOfSecondLine() throws {
+    let f = SourceFile.helloWorld
+    let line2Start = f.text.index(after: try XCTUnwrap(f.text.firstIndex(where: \.isNewline)))
+    XCTAssertEqual(f.index(line: 1, utf16Column: 0), line2Start)
+  }
+
+  func testUTF16IndexWithSurrogatePair() throws {
+    // "a😀b" — '😀' is U+1F600, 2 UTF-16 code units
+    let f = SourceFile(contents: "a😀b")
+    let b = try XCTUnwrap(f.text.firstIndex(of: "b"))
+    // 'a' at UTF-16 offset 0, '😀' at 1–2, 'b' at 3
+    XCTAssertEqual(f.index(line: 0, utf16Column: 3), b)
+  }
+
+  func testUTF16IndexAfterSurrogatePairOnSecondLine() throws {
+    let f = SourceFile(contents: "😀\nb")
+    let b = try XCTUnwrap(f.text.firstIndex(of: "b"))
+    XCTAssertEqual(f.index(line: 1, utf16Column: 0), b)
+  }
+
+  // MARK: - UTF-16 clamping
+
+  func testUTF16IndexClampsNegativeLine() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: -1, utf16Column: 0), f.startIndex)
+  }
+
+  func testUTF16IndexClampsLineOverflow() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 100, utf16Column: 0), f.endIndex)
+  }
+
+  func testUTF16IndexClampsColumnOverflow() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 0, utf16Column: 999), f.endIndex)
   }
 
   func testArchive() throws {
