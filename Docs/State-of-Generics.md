@@ -509,7 +509,7 @@ fun foo<T is Comparable>(x: T) -> Bool {
 }
 ```
 
-However, note that an instance of `Equatable<T>` *cannot* be susbstituted for an instance of `Comparable<T>`, neither in this example nor in general.
+However, note that an instance of `Equatable<T>` *cannot* be substituted for an instance of `Comparable<T>`, neither in this example nor in general.
 And indeed, the elaboration of `foo` reveals that the call to `equal` does not use the instance of `Comparable<T>` directly.
 Instead, we must first resolve an instance of `Equatable<T>`:
 
