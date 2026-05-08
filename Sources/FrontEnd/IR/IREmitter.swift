@@ -1724,7 +1724,8 @@ internal struct IREmitter {
   ) -> IRValue {
     let t = program.types.dealiased(storage)
     let s = IRAllocx(storage: t, witness: type, alignment: alignment, anchor: currentAnchor)
-    return insert(s)!
+    let ss: [any Instruction] = [s]
+    return insert(ss[0])!
   }
 
   /// Inserts a `apply` instruction.
