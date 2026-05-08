@@ -145,7 +145,8 @@ public struct Program: Sendable {
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
 
-        // This pass cannot fail.
+        // These passes cannot fail.
+        work[i].function.hoistStackAllocationsToEntryBlock()
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
       }
 

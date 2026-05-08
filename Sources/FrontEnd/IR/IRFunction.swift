@@ -637,6 +637,27 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Updates the operands of all instructions affected by `s`'s value substitutions.
+  internal mutating func substituteValues(_ s: IRSubstitutionTable) {
+    /// The set of instructions using any of the substituted values.
+    var usesOfOld = Set<AnyInstructionIdentity>()
+    
+    // Collect all unique instructions that use the substituted values.
+    for old in s.values.keys {
+      if let us = uses[old] {
+        for u in us {
+          usesOfOld.insert(u.user)
+        }
+      }
+    }
+
+    // Update all uses by substituting their operands.
+    for i in usesOfOld {
+      let j = at(i).substituting(s)
+      replace(i, with: j)
+    }
+  }
+
   /// Removes `i` and updates use chains.
   ///
   /// - Requires: No instruction in `b` is used outside of `b`.
