@@ -1,0 +1,14 @@
+//! stage:run stdlib:minimal
+struct A is Deinitializable {
+  public init() {}
+
+  public fun deinit() sink {
+    print(5)
+  }
+}
+
+fun main() -> Int {
+  let a = A()
+
+  return 0
+}

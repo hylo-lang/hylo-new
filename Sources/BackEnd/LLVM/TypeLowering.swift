@@ -5,37 +5,39 @@ import Utilities
 extension Program {
 
   /// Returns the LLVM type representation of frontend type `t`.
-  func llvmType<T: TypeIdentity>(from t: T, in module: inout SwiftyLLVM.Module)
+  func llvmType<T: TypeIdentity>(from t: T, in module: inout SwiftyLLVM.Module, module m: FrontEnd.Module.ID)
     -> SwiftyLLVM.AnyType.UnsafeReference {
     switch types.tag(of: t) {
     case Arrow.self:
-      return llvmType(from: types.castUnchecked(t, to: Arrow.self), in: &module)
+      return llvmType(from: types.castUnchecked(t, to: Arrow.self), in: &module, module: m)
     case Enum.self:
       unimplemented("LLVM type lowering for enum types")
     case FunctionPointer.self:
       return module.functionPointer.erased
     case MachineType.self:
-      return llvmType(fromMachineType: types.castUnchecked(t, to: MachineType.self), in: &module).erased
+      return llvmType(fromMachineType: types.castUnchecked(t, to: MachineType.self), in: &module, module: m).erased
     case RemoteType.self:
       return module.ptr.erased
     case Struct.self:
-      return llvmType(fromStruct: types.castUnchecked(t, to: Struct.self), in: &module).erased
+      return llvmType(fromStruct: types.castUnchecked(t, to: Struct.self), in: &module, module: m).erased
     case Tuple.self:
-      return llvmType(fromTuple: types.castUnchecked(t, to: Tuple.self), in: &module).erased
+      return llvmType(fromTuple: types.castUnchecked(t, to: Tuple.self), in: &module, module: m).erased
+    case TypeApplication.self:
+      return llvmType(fromTypeApplication: types.castUnchecked(t, to: TypeApplication.self), in: &module, module: m).erased
     default:
-      unimplemented("LLVM type lowering for type \(show(t))")
+      unimplemented("LLVM type lowering for type \(show(t)) with tag \(types.tag(of: t))")
     }
   }
 
   /// Returns the LLVM type representation of an Arrow type.
-  func llvmType(from arrow: Arrow.ID, in module: inout SwiftyLLVM.Module)
+  func llvmType(from arrow: Arrow.ID, in module: inout SwiftyLLVM.Module, module m: FrontEnd.Module.ID)
     -> SwiftyLLVM.StructType.UnsafeReference {
-    let environment = llvmType(from: types[arrow].environment, in: &module)
+    let environment = llvmType(from: types[arrow].environment, in: &module, module: m)
     return module.structType((module.ptr, environment))
   }
 
   /// Returns the LLVM type representation of a builtin type.
-  func llvmType(fromMachineType machineType: MachineType.ID, in module: inout SwiftyLLVM.Module)
+  func llvmType(fromMachineType machineType: MachineType.ID, in module: inout SwiftyLLVM.Module, module m: FrontEnd.Module.ID)
     -> SwiftyLLVM.AnyType.UnsafeReference {
     switch types[machineType] {
     case .i(let bitWidth):
@@ -56,20 +58,20 @@ extension Program {
   }
 
   /// Returns the LLVM type representation of a tuple using LLVM's default layout algorithm.
-  func llvmType(fromTuple tuple: Tuple.ID, in module: inout SwiftyLLVM.Module)
+  func llvmType(fromTuple tuple: Tuple.ID, in module: inout SwiftyLLVM.Module, module m: FrontEnd.Module.ID)
     -> SwiftyLLVM.StructType.UnsafeReference {
     module.structType(
-      types.members(of: tuple).types.map { llvmType(from: $0, in: &module) },
+      types.members(of: tuple).types.map { llvmType(from: $0, in: &module, module: m) },
       packed: false  // TODO: use our own layout algorithm, manually emitting padding bits.
     )
   }
 
   /// Returns the LLVM type representation of a struct using LLVM's default layout algorithm.
-  func llvmType(fromStruct structType: Struct.ID, in module: inout SwiftyLLVM.Module)
+  func llvmType(fromStruct structType: Struct.ID, in module: inout SwiftyLLVM.Module, module m: FrontEnd.Module.ID)
     -> SwiftyLLVM.StructType.UnsafeReference {
     module.structType(
       named: llvmName(of: structType.erased),
-      storedPropertyTypes(of: structType).map { llvmType(from: $0, in: &module) },
+      storedPropertyTypes(of: structType).map { llvmType(from: $0, in: &module, module: m) },
       packed: false  // TODO: use our own layout algorithm, manually emitting padding bits.
     )
   }
@@ -81,6 +83,19 @@ extension Program {
       // property's layout is determined by the projectee's type.
       (types[type(assignedTo: variable)] as! RemoteType).projectee
     }
+  }
+
+  /// Returns the LLVM type representation of a type witness.
+  func llvmType(fromTypeApplication application: TypeApplication.ID, 
+    in module: inout SwiftyLLVM.Module, module m: FrontEnd.Module.ID)
+    -> SwiftyLLVM.StructType.UnsafeReference {
+    
+    var p = self
+    let ts = p.withTyper(typing: m, { typer in
+      typer.storage(of: application.erased)
+    })!
+
+    return module.structType(ts.map { llvmType(from: $0, in: &module, module: m) })
   }
 
 }

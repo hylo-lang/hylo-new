@@ -14,7 +14,7 @@ typealias Host = Utilities.Host
 final class CompilerTests: XCTestCase {
 
   /// Iff true, intermediate compilation artifacts are saved even if test cases pass.
-  let alwaysSaveArtifacts = false
+  let alwaysSaveArtifacts = true
 
   /// The input of a compiler test.
   struct TestDescription {
@@ -139,6 +139,7 @@ final class CompilerTests: XCTestCase {
         try test.saveTestCaseLevelObservation(llvmIR, tag: "ll")
       }
       if let executable {
+        try? FileManager.default.removeItem(at: test.executableDestination())
         try FileManager.default.copyItem(at: executable, to: test.executableDestination())
       }
     }

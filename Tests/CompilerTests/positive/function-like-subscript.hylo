@@ -1,0 +1,16 @@
+//! stage:run stdlib:minimal
+
+subscript a() -> Int { 
+  yield 6
+}
+
+fun b() -> Int {
+  return 3
+}
+
+fun main() -> Int {
+  print(a[])
+  print(b())
+
+  return 0
+}
