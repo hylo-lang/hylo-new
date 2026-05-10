@@ -88,25 +88,36 @@ jobs:
           addToPkgConfigPath: true
           addToPath: true
 
+      - name: Point SDKROOT at the Windows experimental SDK
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # The Swift Build driver (which became the SwiftPM default in
+          # 2026 snapshots) auto-injects `-sdk $SDKROOT` after every
+          # `-Xswiftc -sdk`, so flag-level overrides are clobbered. We
+          # instead repoint SDKROOT itself at the experimental SDK that
+          # ships the static stdlib archives; both the auto-injected and
+          # any user-passed `-sdk` then agree.
+          $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
+          "SDKROOT=$ExperimentalSDK" >> $env:GITHUB_ENV
+
       - name: Compute Swift build arguments
         id: swift-args
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           # Common arguments used by both `swift build` and `swift build --show-bin-path`.
-          # On Windows we add the experimental SDK so that -static-stdlib actually
-          # links the Swift runtime statically; elsewhere --static-swift-stdlib is
-          # sufficient.
+          # On Windows -static-stdlib needs the experimental SDK (selected
+          # via the SDKROOT env var set in the previous step). Elsewhere
+          # --static-swift-stdlib is sufficient.
           $buildArgs = @('-c', 'release', '--product', 'hc', '-Xswiftc', '-DUSE_BUNDLED_STANDARD_LIBRARY')
           if ($env:RUNNER_OS -eq 'Windows') {
             # An explicit --triple is required for SwiftPM to locate the
             # per-arch static runtime libraries inside the experimental SDK
             # (otherwise lld-link can't find swiftCore.lib etc.).
-            $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
             $buildArgs += @(
               '--triple', '${{ matrix.triple }}',
               '-debug-info-format', 'none',
-              '-Xswiftc', '-sdk', '-Xswiftc', $ExperimentalSDK,
               '-Xswiftc', '-static-stdlib'
             )
           } else {
