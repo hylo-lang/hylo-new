@@ -116,7 +116,20 @@ jobs:
           #   - The MSVC runtime DLLs (MSVCP140, VCRUNTIME140, VCRUNTIME140_1)
           #     since the VC++ Redistributable is not guaranteed on a fresh Windows 11.
           if ($env:RUNNER_OS -eq 'Windows') {
-            $swiftBin = Split-Path -Parent (Get-Command swiftc).Source
+            # The Swift runtime DLLs are not co-located with swiftc.exe; on the
+            # GitHub-hosted toolchain swiftc lives under Toolchains\...\usr\bin
+            # while the DLLs live under Runtimes\<ver>\usr\bin. Both directories
+            # are added to PATH by setup-swift, so we resolve each DLL by
+            # scanning PATH.
+            $pathDirs = $env:PATH -split [IO.Path]::PathSeparator | Where-Object { $_ }
+            function Resolve-DllOnPath([string]$name, [string[]]$dirs) {
+              foreach ($d in $dirs) {
+                $candidate = Join-Path $d $name
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+              }
+              return $null
+            }
+
             $swiftDlls = @(
               'swiftCore.dll',
               'swift_Concurrency.dll',
@@ -127,9 +140,9 @@ jobs:
               'FoundationInternationalization.dll'
             )
             foreach ($dll in $swiftDlls) {
-              $src = Join-Path $swiftBin $dll
-              if (-not (Test-Path $src)) {
-                throw "Required Swift runtime DLL not found: $src"
+              $src = Resolve-DllOnPath $dll $pathDirs
+              if (-not $src) {
+                throw "Required Swift runtime DLL not found on PATH: $dll"
               }
               Copy-Item -Force $src $stageDir
             }
