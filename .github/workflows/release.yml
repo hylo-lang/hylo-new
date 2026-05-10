@@ -43,16 +43,14 @@ jobs:
             target: macos-arm64
           - os: macos-15-intel
             target: macos-x64
-          # Both Windows targets cross-compile from the x64 runner using the
-          # experimental SDK that ships in recent Swift toolchains; this lets
-          # us statically link the Swift runtime and produce a self-contained
-          # hc.exe with no DLL dependencies outside the Windows base system.
+          # Windows targets build on native runners so that the host LLVM
+          # from hylo-lang/get-llvm matches the executable's architecture.
+          # The Swift runtime is statically linked via the experimental SDK
+          # that ships with recent Swift toolchains.
           - os: windows-2025
             target: windows-x64
-            swift_triple: x86_64-unknown-windows-msvc
-          - os: windows-2025
+          - os: windows-11-arm
             target: windows-arm64
-            swift_triple: aarch64-unknown-windows-msvc
 
     runs-on: ${{ matrix.os }}
 
@@ -85,51 +83,38 @@ jobs:
           addToPkgConfigPath: true
           addToPath: true
 
-      - name: Build distributable (POSIX)
-        if: runner.os != 'Windows'
-        run: swift build -c release --verbose --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY
-        shell: bash
-
-      - name: Build distributable (Windows, statically linked)
-        if: runner.os == 'Windows'
-        env:
-          SWIFT_TRIPLE: ${{ matrix.swift_triple }}
+      - name: Compute Swift build arguments
+        id: swift-args
+        shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
-          swift build `
-            --triple $env:SWIFT_TRIPLE `
-            -c release `
-            -debug-info-format none `
-            --product hc `
-            -Xswiftc -sdk -Xswiftc $ExperimentalSDK `
-            -Xswiftc -static-stdlib `
-            -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY
+          # Common arguments used by both `swift build` and `swift build --show-bin-path`.
+          # On Windows we add the experimental SDK so that -static-stdlib actually
+          # links the Swift runtime statically; elsewhere --static-swift-stdlib is
+          # sufficient.
+          $buildArgs = @('-c', 'release', '--product', 'hc', '-Xswiftc', '-DUSE_BUNDLED_STANDARD_LIBRARY')
+          if ($env:RUNNER_OS -eq 'Windows') {
+            $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
+            $buildArgs += @('-Xswiftc', '-sdk', '-Xswiftc', $ExperimentalSDK, '-Xswiftc', '-static-stdlib')
+          } else {
+            $buildArgs += @('--static-swift-stdlib')
+          }
+          "build_args=$($buildArgs -join ' ')" >> $env:GITHUB_OUTPUT
+
+      - name: Build distributable
         shell: pwsh
+        run: swift build --verbose ${{ steps.swift-args.outputs.build_args }}
 
       - name: Stage distributable
         id: stage
         env:
           TAG: ${{ github.ref_name }}
           TARGET: ${{ matrix.target }}
-          SWIFT_TRIPLE: ${{ matrix.swift_triple }}
+        shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:RUNNER_OS -eq 'Windows') {
-            $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
-            $binPath = (swift build `
-              --triple $env:SWIFT_TRIPLE `
-              -c release `
-              --product hc `
-              -Xswiftc -sdk -Xswiftc $ExperimentalSDK `
-              -Xswiftc -static-stdlib `
-              -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY `
-              --show-bin-path).Trim()
-            $binaryName = 'hc.exe'
-          } else {
-            $binPath = (swift build -c release --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY --show-bin-path).Trim()
-            $binaryName = 'hc'
-          }
+          $binPath = (swift build ${{ steps.swift-args.outputs.build_args }} --show-bin-path).Trim()
+          $binaryName = if ($env:RUNNER_OS -eq 'Windows') { 'hc.exe' } else { 'hc' }
 
           $binaryPath    = Join-Path $binPath $binaryName
           $assetBaseName = "hylo-$env:TAG-$env:TARGET"
@@ -143,7 +128,6 @@ jobs:
           "stage_dir=$stageDir"            >> $env:GITHUB_OUTPUT
           "archive_path=$archivePath"      >> $env:GITHUB_OUTPUT
           "asset_base_name=$assetBaseName" >> $env:GITHUB_OUTPUT
-        shell: pwsh
 
       - name: Archive distributable
         run: |
@@ -177,9 +161,6 @@ jobs:
             target: macos-arm64
           - os: macos-15-intel
             target: macos-x64
-          # Verify on actual target hardware; the arm64 Windows archive is
-          # produced via cross-compilation, so running it on windows-11-arm
-          # confirms the binary genuinely works on that architecture.
           - os: windows-2025
             target: windows-x64
           - os: windows-11-arm
