@@ -43,10 +43,16 @@ jobs:
             target: macos-arm64
           - os: macos-15-intel
             target: macos-x64
+          # Both Windows targets cross-compile from the x64 runner using the
+          # experimental SDK that ships in recent Swift toolchains; this lets
+          # us statically link the Swift runtime and produce a self-contained
+          # hc.exe with no DLL dependencies outside the Windows base system.
           - os: windows-2025
             target: windows-x64
-          - os: windows-11-arm
+            swift_triple: x86_64-unknown-windows-msvc
+          - os: windows-2025
             target: windows-arm64
+            swift_triple: aarch64-unknown-windows-msvc
 
     runs-on: ${{ matrix.os }}
 
@@ -55,10 +61,19 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Set up Swift
+      - name: Set up Swift (POSIX)
+        if: runner.os != 'Windows'
         uses: SwiftyLab/setup-swift@latest
         with:
-          swift-version: "6.2.4"
+          swift-version: "6.3.1"
+
+      - name: Set up Swift (Windows, with experimental SDK)
+        if: runner.os == 'Windows'
+        uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: swift-6.3.1-release
+          swift-build: 6.3.1-RELEASE
+          update-sdk-modules: true
 
       - name: Set up LLVM
         uses: hylo-lang/get-llvm@v0.3.0
@@ -70,18 +85,26 @@ jobs:
           addToPkgConfigPath: true
           addToPath: true
 
-      - name: Download Recent Visual Studio and Windows SDK
-        if: runner.os == 'Windows'
-        uses: compnerd/gha-setup-vsdevenv@main
-        with:
-          winsdk: "10.0.26100.0"
-          # Note: The GitHub windows-2025 runner has only a very old version of the Windows SDK available by default.
-          #       Swift is said to require version 10.0.22621.0: https://forums.swift.org/t/swiftpm-plugin-doesnt-work-with-the-latest-visual-studio-version/78183/14
-          #       That no longer works, so we had to upgrade to 10.0.26100.0.
-          #       See also: https://github.com/swiftlang/swift/issues/88237
-
-      - name: Build distributable
+      - name: Build distributable (POSIX)
+        if: runner.os != 'Windows'
         run: swift build -c release --verbose --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY
+        shell: bash
+
+      - name: Build distributable (Windows, statically linked)
+        if: runner.os == 'Windows'
+        env:
+          SWIFT_TRIPLE: ${{ matrix.swift_triple }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
+          swift build `
+            --triple $env:SWIFT_TRIPLE `
+            -c release `
+            -debug-info-format none `
+            --product hc `
+            -Xswiftc -sdk -Xswiftc $ExperimentalSDK `
+            -Xswiftc -static-stdlib `
+            -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY
         shell: pwsh
 
       - name: Stage distributable
@@ -89,92 +112,36 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
           TARGET: ${{ matrix.target }}
-          WINDOWS_ARCH: ${{ matrix.windows_arch }}
+          SWIFT_TRIPLE: ${{ matrix.swift_triple }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $binPath = (swift build -c release --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY --show-bin-path).Trim()
-          $binaryName = if ($env:RUNNER_OS -eq 'Windows') { 'hc.exe' } else { 'hc' }
-          $binaryPath = Join-Path $binPath $binaryName
+          if ($env:RUNNER_OS -eq 'Windows') {
+            $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
+            $binPath = (swift build `
+              --triple $env:SWIFT_TRIPLE `
+              -c release `
+              --product hc `
+              -Xswiftc -sdk -Xswiftc $ExperimentalSDK `
+              -Xswiftc -static-stdlib `
+              -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY `
+              --show-bin-path).Trim()
+            $binaryName = 'hc.exe'
+          } else {
+            $binPath = (swift build -c release --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY --show-bin-path).Trim()
+            $binaryName = 'hc'
+          }
+
+          $binaryPath    = Join-Path $binPath $binaryName
           $assetBaseName = "hylo-$env:TAG-$env:TARGET"
-          $stageDir = Join-Path $env:RUNNER_TEMP "stage-$env:TARGET"
-          $archivePath = Join-Path $env:RUNNER_TEMP "$assetBaseName.tar.zst"
+          $stageDir      = Join-Path $env:RUNNER_TEMP "stage-$env:TARGET"
+          $archivePath   = Join-Path $env:RUNNER_TEMP "$assetBaseName.tar.zst"
 
           if (Test-Path $stageDir) { Remove-Item -Recurse -Force $stageDir }
           New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
-
-          # Copy the primary binary.
           Copy-Item -Force $binaryPath $stageDir
 
-          # On Windows, bundle the non-system runtime DLLs that aren't part of a
-          # fresh Windows 11 install. We deliberately omit:
-          #   - Core Windows DLLs: KERNEL32, ntdll, ole32, SHELL32, ADVAPI32
-          #   - Universal CRT shims (api-ms-win-crt-*), which ship with Windows 10+
-          # We do bundle:
-          #   - The Swift runtime DLLs the executable links against
-          #   - The MSVC runtime DLLs (MSVCP140, VCRUNTIME140, VCRUNTIME140_1)
-          #     since the VC++ Redistributable is not guaranteed on a fresh Windows 11.
-          if ($env:RUNNER_OS -eq 'Windows') {
-            # Ask the Windows loader where each DLL would be resolved from,
-            # using the same search order the OS uses at run time. This avoids
-            # any assumption about toolchain layout or PATH placement.
-            $loaderCs = @(
-              '[System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode, SetLastError=true)]',
-              'public static extern System.IntPtr LoadLibraryExW(string lpLibFileName, System.IntPtr hFile, uint dwFlags);',
-              '[System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode, SetLastError=true)]',
-              'public static extern uint GetModuleFileNameW(System.IntPtr hModule, System.Text.StringBuilder lpFilename, uint nSize);',
-              '[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true)]',
-              'public static extern bool FreeLibrary(System.IntPtr hModule);'
-            ) -join "`n"
-            Add-Type -Namespace Win32 -Name Loader -MemberDefinition $loaderCs
-
-            function Resolve-DllPath([string]$name) {
-              $LOAD_LIBRARY_AS_DATAFILE = 0x2
-              $h = [Win32.Loader]::LoadLibraryExW($name, [System.IntPtr]::Zero, $LOAD_LIBRARY_AS_DATAFILE)
-              if ($h -eq [System.IntPtr]::Zero) {
-                $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                throw "LoadLibraryExW failed for '$name' (Win32 error $err)"
-              }
-              try {
-                $sb = New-Object System.Text.StringBuilder 32768
-                $n = [Win32.Loader]::GetModuleFileNameW($h, $sb, [uint32]$sb.Capacity)
-                if ($n -eq 0) {
-                  $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                  throw "GetModuleFileNameW failed for '$name' (Win32 error $err)"
-                }
-                return $sb.ToString()
-              } finally {
-                [void][Win32.Loader]::FreeLibrary($h)
-              }
-            }
-
-            # DLLs the executable depends on that are NOT guaranteed to be
-            # present on a fresh Windows 11 install. Core Windows DLLs
-            # (KERNEL32, ntdll, ole32, SHELL32, ADVAPI32) are intentionally
-            # excluded because they are Known DLLs and would always load from
-            # System32; Universal CRT shims (api-ms-win-crt-*) are excluded
-            # because they ship with Windows 10+.
-            $bundledDlls = @(
-              'swiftCore.dll',
-              'swift_Concurrency.dll',
-              'swiftCRT.dll',
-              'swiftWinSDK.dll',
-              'Foundation.dll',
-              'FoundationEssentials.dll',
-              'FoundationInternationalization.dll',
-              'MSVCP140.dll',
-              'VCRUNTIME140.dll',
-              'VCRUNTIME140_1.dll'
-            )
-
-            foreach ($dll in $bundledDlls) {
-              $src = Resolve-DllPath $dll
-              Write-Host "Bundling $dll <- $src"
-              Copy-Item -Force -LiteralPath $src -Destination (Join-Path $stageDir $dll)
-            }
-          }
-
-          "stage_dir=$stageDir"     >> $env:GITHUB_OUTPUT
-          "archive_path=$archivePath" >> $env:GITHUB_OUTPUT
+          "stage_dir=$stageDir"            >> $env:GITHUB_OUTPUT
+          "archive_path=$archivePath"      >> $env:GITHUB_OUTPUT
           "asset_base_name=$assetBaseName" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
@@ -210,6 +177,9 @@ jobs:
             target: macos-arm64
           - os: macos-15-intel
             target: macos-x64
+          # Verify on actual target hardware; the arm64 Windows archive is
+          # produced via cross-compilation, so running it on windows-11-arm
+          # confirms the binary genuinely works on that architecture.
           - os: windows-2025
             target: windows-x64
           - os: windows-11-arm
@@ -224,12 +194,12 @@ jobs:
           name: hylo-${{ github.ref_name }}-${{ matrix.target }}
           path: ${{ runner.temp }}/dist
 
-      - name: Verify no Swift toolchain leaks into verification (POSIX)
+      - name: Verify distributable on a Swift-free environment (POSIX)
         if: runner.os != 'Windows'
         run: |
           set -euo pipefail
-          # Sanitize PATH to a minimal set so that any pre-installed Swift on the
-          # runner cannot satisfy the binary's dynamic dependencies.
+          # Sanitize PATH so any pre-installed Swift on the runner cannot
+          # satisfy dynamic dependencies of the extracted binary.
           MINIMAL_PATH="/usr/bin:/bin:/usr/sbin:/sbin"
           export PATH="$MINIMAL_PATH"
           if command -v swift >/dev/null 2>&1; then
@@ -244,18 +214,14 @@ jobs:
           PATH="$MINIMAL_PATH" "$EXTRACT_DIR/hc" --help > /dev/null
         shell: bash
 
-      - name: Verify no Swift toolchain leaks into verification (Windows)
+      - name: Verify distributable on a Swift-free environment (Windows)
         if: runner.os == 'Windows'
         run: |
           $ErrorActionPreference = 'Stop'
-          # Sanitize PATH to system directories only; this prevents any
-          # pre-installed Swift toolchain on the runner from satisfying the
-          # executable's dynamic dependencies. Bundled DLLs sit next to hc.exe
-          # and Windows' DLL search order finds them via the executable's
-          # directory before consulting PATH.
-          $minimalPath = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
-          $env:PATH = $minimalPath
-
+          # Sanitize PATH to system directories only. With a fully static
+          # build there should be no Swift DLL dependencies to satisfy, so
+          # this is mainly a guard against regressions.
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
           $swift = Get-Command swift -ErrorAction SilentlyContinue
           if ($swift) {
             Write-Error "'swift' is still on PATH after sanitization: $($swift.Source)"
