@@ -43,14 +43,14 @@ jobs:
             target: macos-arm64
           - os: macos-15-intel
             target: macos-x64
-          # Windows targets build on native runners so that the host LLVM
-          # from hylo-lang/get-llvm matches the executable's architecture.
-          # The Swift runtime is statically linked via the experimental SDK
-          # that ships with recent Swift toolchains.
+          # The Swift runtime is statically linked on Windows via the
+          # experimental SDK that ships with recent Swift toolchains.
+          # windows-arm64 is intentionally not built: the 6.3.1-RELEASE
+          # toolchain crashes on first run on windows-11-arm runners, and
+          # cross-compiling from x64 would require a parallel arm64 LLVM
+          # install that hylo-lang/get-llvm doesn't currently express.
           - os: windows-2025
             target: windows-x64
-          - os: windows-11-arm
-            target: windows-arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -94,8 +94,16 @@ jobs:
           # sufficient.
           $buildArgs = @('-c', 'release', '--product', 'hc', '-Xswiftc', '-DUSE_BUNDLED_STANDARD_LIBRARY')
           if ($env:RUNNER_OS -eq 'Windows') {
+            # An explicit --triple is required for SwiftPM to locate the
+            # per-arch static runtime libraries inside the experimental SDK
+            # (otherwise lld-link can't find swiftCore.lib etc.).
             $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
-            $buildArgs += @('-Xswiftc', '-sdk', '-Xswiftc', $ExperimentalSDK, '-Xswiftc', '-static-stdlib')
+            $buildArgs += @(
+              '--triple', 'x86_64-unknown-windows-msvc',
+              '-debug-info-format', 'none',
+              '-Xswiftc', '-sdk', '-Xswiftc', $ExperimentalSDK,
+              '-Xswiftc', '-static-stdlib'
+            )
           } else {
             $buildArgs += @('--static-swift-stdlib')
           }
@@ -163,8 +171,6 @@ jobs:
             target: macos-x64
           - os: windows-2025
             target: windows-x64
-          - os: windows-11-arm
-            target: windows-arm64
 
     runs-on: ${{ matrix.os }}
 
