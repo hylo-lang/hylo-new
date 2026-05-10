@@ -192,20 +192,30 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           set -euo pipefail
-          # Sanitize PATH so any pre-installed Swift on the runner cannot
-          # satisfy dynamic dependencies of the extracted binary.
-          MINIMAL_PATH="/usr/bin:/bin:/usr/sbin:/sbin"
-          export PATH="$MINIMAL_PATH"
-          if command -v swift >/dev/null 2>&1; then
-            echo "ERROR: 'swift' is still on PATH after sanitization: $(command -v swift)"
-            exit 1
-          fi
           ARCHIVE="${{ runner.temp }}/dist/hylo-${{ github.ref_name }}-${{ matrix.target }}.tar.zst"
           EXTRACT_DIR="${{ runner.temp }}/extracted"
           mkdir -p "$EXTRACT_DIR"
           tar --zstd -xf "$ARCHIVE" -C "$EXTRACT_DIR"
           ls -la "$EXTRACT_DIR"
-          PATH="$MINIMAL_PATH" "$EXTRACT_DIR/hc" --help > /dev/null
+
+          # Verify the binary has no Swift runtime dynamic dependencies. We
+          # inspect the binary itself rather than scrubbing PATH because on
+          # macOS /usr/bin/swift is an Xcode stub that always exists but
+          # doesn't itself supply Swift runtime libraries.
+          if [ "$(uname -s)" = "Darwin" ]; then
+            deps=$(otool -L "$EXTRACT_DIR/hc")
+          else
+            deps=$(ldd "$EXTRACT_DIR/hc" || true)
+          fi
+          echo "$deps"
+          if echo "$deps" | grep -Ei 'libswift|swiftCore|swift_Concurrency|swiftFoundation' >/dev/null; then
+            echo "ERROR: distributable still depends on Swift runtime libraries"
+            exit 1
+          fi
+
+          # Sanity-run the binary with a sanitized PATH so any environment
+          # leakage of Swift tooling can't paper over a broken artifact.
+          PATH="/usr/bin:/bin:/usr/sbin:/sbin" "$EXTRACT_DIR/hc" --help > /dev/null
         shell: bash
 
       - name: Verify distributable on a Swift-free environment (Windows)
