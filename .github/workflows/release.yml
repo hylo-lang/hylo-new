@@ -45,10 +45,8 @@ jobs:
             target: macos-x64
           - os: windows-2025
             target: windows-x64
-            windows_arch: x64
           - os: windows-11-arm
             target: windows-arm64
-            windows_arch: arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -116,53 +114,62 @@ jobs:
           #   - The MSVC runtime DLLs (MSVCP140, VCRUNTIME140, VCRUNTIME140_1)
           #     since the VC++ Redistributable is not guaranteed on a fresh Windows 11.
           if ($env:RUNNER_OS -eq 'Windows') {
-            # The Swift runtime DLLs are not co-located with swiftc.exe; on the
-            # GitHub-hosted toolchain swiftc lives under Toolchains\...\usr\bin
-            # while the DLLs live under Runtimes\<ver>\usr\bin. Both directories
-            # are added to PATH by setup-swift, so we resolve each DLL by
-            # scanning PATH.
-            $pathDirs = $env:PATH -split [IO.Path]::PathSeparator | Where-Object { $_ }
-            function Resolve-DllOnPath([string]$name, [string[]]$dirs) {
-              foreach ($d in $dirs) {
-                $candidate = Join-Path $d $name
-                if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+            # Ask the Windows loader where each DLL would be resolved from,
+            # using the same search order the OS uses at run time. This avoids
+            # any assumption about toolchain layout or PATH placement.
+            $loaderCs = @(
+              '[System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode, SetLastError=true)]',
+              'public static extern System.IntPtr LoadLibraryExW(string lpLibFileName, System.IntPtr hFile, uint dwFlags);',
+              '[System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode, SetLastError=true)]',
+              'public static extern uint GetModuleFileNameW(System.IntPtr hModule, System.Text.StringBuilder lpFilename, uint nSize);',
+              '[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError=true)]',
+              'public static extern bool FreeLibrary(System.IntPtr hModule);'
+            ) -join "`n"
+            Add-Type -Namespace Win32 -Name Loader -MemberDefinition $loaderCs
+
+            function Resolve-DllPath([string]$name) {
+              $LOAD_LIBRARY_AS_DATAFILE = 0x2
+              $h = [Win32.Loader]::LoadLibraryExW($name, [System.IntPtr]::Zero, $LOAD_LIBRARY_AS_DATAFILE)
+              if ($h -eq [System.IntPtr]::Zero) {
+                $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                throw "LoadLibraryExW failed for '$name' (Win32 error $err)"
               }
-              return $null
+              try {
+                $sb = New-Object System.Text.StringBuilder 32768
+                $n = [Win32.Loader]::GetModuleFileNameW($h, $sb, [uint32]$sb.Capacity)
+                if ($n -eq 0) {
+                  $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                  throw "GetModuleFileNameW failed for '$name' (Win32 error $err)"
+                }
+                return $sb.ToString()
+              } finally {
+                [void][Win32.Loader]::FreeLibrary($h)
+              }
             }
 
-            $swiftDlls = @(
+            # DLLs the executable depends on that are NOT guaranteed to be
+            # present on a fresh Windows 11 install. Core Windows DLLs
+            # (KERNEL32, ntdll, ole32, SHELL32, ADVAPI32) are intentionally
+            # excluded because they are Known DLLs and would always load from
+            # System32; Universal CRT shims (api-ms-win-crt-*) are excluded
+            # because they ship with Windows 10+.
+            $bundledDlls = @(
               'swiftCore.dll',
               'swift_Concurrency.dll',
               'swiftCRT.dll',
               'swiftWinSDK.dll',
               'Foundation.dll',
               'FoundationEssentials.dll',
-              'FoundationInternationalization.dll'
+              'FoundationInternationalization.dll',
+              'MSVCP140.dll',
+              'VCRUNTIME140.dll',
+              'VCRUNTIME140_1.dll'
             )
-            foreach ($dll in $swiftDlls) {
-              $src = Resolve-DllOnPath $dll $pathDirs
-              if (-not $src) {
-                throw "Required Swift runtime DLL not found on PATH: $dll"
-              }
-              Copy-Item -Force $src $stageDir
-            }
 
-            $arch = $env:WINDOWS_ARCH
-            $vcRedistRoot = $env:VCToolsRedistDir
-            if (-not $vcRedistRoot) {
-              throw "VCToolsRedistDir is not set; gha-setup-vsdevenv must run before this step."
-            }
-            $vcCrtDir = Get-ChildItem -Path (Join-Path $vcRedistRoot $arch) -Filter 'Microsoft.VC*.CRT' -Directory | Select-Object -First 1
-            if (-not $vcCrtDir) {
-              throw "Could not locate Microsoft.VC*.CRT directory under $vcRedistRoot/$arch"
-            }
-            $vcDlls = @('MSVCP140.dll', 'VCRUNTIME140.dll', 'VCRUNTIME140_1.dll')
-            foreach ($dll in $vcDlls) {
-              $src = Join-Path $vcCrtDir.FullName $dll
-              if (-not (Test-Path $src)) {
-                throw "Required VC runtime DLL not found: $src"
-              }
-              Copy-Item -Force $src $stageDir
+            foreach ($dll in $bundledDlls) {
+              $src = Resolve-DllPath $dll
+              Write-Host "Bundling $dll <- $src"
+              Copy-Item -Force -LiteralPath $src -Destination (Join-Path $stageDir $dll)
             }
           }
 
