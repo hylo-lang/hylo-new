@@ -37,20 +37,24 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: linux-x64
+            triple: x86_64-unknown-linux-gnu
           - os: ubuntu-24.04-arm
             target: linux-arm64
+            triple: aarch64-unknown-linux-gnu
           - os: macos-15
             target: macos-arm64
+            triple: arm64-apple-macosx
           - os: macos-15-intel
             target: macos-x64
-          # The Swift runtime is statically linked on Windows via the
-          # experimental SDK that ships with recent Swift toolchains.
-          # windows-arm64 is intentionally not built: the 6.3.1-RELEASE
-          # toolchain crashes on first run on windows-11-arm runners, and
-          # cross-compiling from x64 would require a parallel arm64 LLVM
-          # install that hylo-lang/get-llvm doesn't currently express.
+            triple: x86_64-apple-macosx
           - os: windows-2025
             target: windows-x64
+            triple: x86_64-unknown-windows-msvc
+            build_arch: amd64
+          - os: windows-11-arm
+            target: windows-arm64
+            triple: aarch64-unknown-windows-msvc
+            build_arch: arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -59,26 +63,20 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Set up Swift (POSIX)
-        if: runner.os != 'Windows'
-        uses: SwiftyLab/setup-swift@latest
-        with:
-          swift-version: "6.3.1"
-
-      - name: Set up Swift (Windows, with experimental SDK)
-        if: runner.os == 'Windows'
+      # Single, uniform Swift setup across all platforms. We use a
+      # development snapshot rather than 6.3.1-RELEASE because static-stdlib
+      # on Windows requires the WindowsExperimental.sdk static archives,
+      # which are populated only in dev snapshots, and because earlier
+      # snapshots crash in DebugInfoVerifier (MoveOnlyChecker on
+      # SwiftyLLVM.MemoryBuffer.deinit). Keeping every platform on the same
+      # toolchain avoids surprise behavioral differences between OSes.
+      - name: Set up Swift
         uses: compnerd/gha-setup-swift@main
         with:
-          # Static-stdlib on Windows currently requires the experimental SDK
-          # populated only in development snapshots; the 6.3.1 stable release
-          # ships the SDK directory but not the static runtime archives, so
-          # lld-link cannot find swiftCore.lib etc. We use the 2025-12-01
-          # snapshot rather than the older one pinned by SwiftFormat because
-          # earlier snapshots crash in DebugInfoVerifier when MoveOnlyChecker
-          # runs on SwiftyLLVM.MemoryBuffer.deinit. Bump as needed.
           swift-version: development
-          swift-build: DEVELOPMENT-SNAPSHOT-2025-12-01-a
-          update-sdk-modules: true
+          swift-build: DEVELOPMENT-SNAPSHOT-2026-04-30-a
+          build_arch: ${{ matrix.build_arch }}
+          update-sdk-modules: ${{ runner.os == 'Windows' }}
 
       - name: Set up LLVM
         uses: hylo-lang/get-llvm@v0.3.0
@@ -106,7 +104,7 @@ jobs:
             # (otherwise lld-link can't find swiftCore.lib etc.).
             $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
             $buildArgs += @(
-              '--triple', 'x86_64-unknown-windows-msvc',
+              '--triple', '${{ matrix.triple }}',
               '-debug-info-format', 'none',
               '-Xswiftc', '-sdk', '-Xswiftc', $ExperimentalSDK,
               '-Xswiftc', '-static-stdlib'
@@ -178,6 +176,8 @@ jobs:
             target: macos-x64
           - os: windows-2025
             target: windows-x64
+          - os: windows-11-arm
+            target: windows-arm64
 
     runs-on: ${{ matrix.os }}
 
