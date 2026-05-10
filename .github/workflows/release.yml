@@ -175,8 +175,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  verify-distributable:
-    name: Verify distributable for ${{ matrix.target }}
+  verify-and-publish-distributable:
+    name: Verify and publish distributable for ${{ matrix.target }}
     needs: build-distributable
     strategy:
       fail-fast: false
@@ -250,27 +250,6 @@ jobs:
 
           & "$extractDir\hc.exe" --help | Out-Null
         shell: pwsh
-
-  publish-distributable:
-    name: Publish distributable for ${{ matrix.target }}
-    needs: verify-distributable
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - linux-x64
-          - linux-arm64
-          - macos-arm64
-          - macos-x64
-          - windows-x64
-          - windows-arm64
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download distributable artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: hylo-${{ github.ref_name }}-${{ matrix.target }}
-          path: ${{ runner.temp }}/dist
 
       - name: Upload distributable to draft release
         env:
