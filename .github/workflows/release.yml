@@ -69,8 +69,13 @@ jobs:
         if: runner.os == 'Windows'
         uses: compnerd/gha-setup-swift@main
         with:
-          swift-version: swift-6.3.1-release
-          swift-build: 6.3.1-RELEASE
+          # Static-stdlib on Windows currently requires the experimental SDK
+          # populated only in development snapshots; the 6.3.1 stable release
+          # ships the SDK directory but not the static runtime archives, so
+          # lld-link cannot find swiftCore.lib etc. The snapshot below is the
+          # one verified by nicklockwood/SwiftFormat. Bump as needed.
+          swift-version: development
+          swift-build: DEVELOPMENT-SNAPSHOT-2025-08-27-a
           update-sdk-modules: true
 
       - name: Set up LLVM
