@@ -198,18 +198,27 @@ jobs:
           tar --zstd -xf "$ARCHIVE" -C "$EXTRACT_DIR"
           ls -la "$EXTRACT_DIR"
 
-          # Verify the binary has no Swift runtime dynamic dependencies. We
-          # inspect the binary itself rather than scrubbing PATH because on
-          # macOS /usr/bin/swift is an Xcode stub that always exists but
-          # doesn't itself supply Swift runtime libraries.
+          # Verify the binary doesn't depend on a *user-installed* Swift
+          # runtime. On macOS the Swift runtime ships with the OS at
+          # /usr/lib/swift/ since Catalina (10.15), so dependencies there
+          # are guaranteed by the system and are allowed; only Swift libs
+          # under developer-only paths (CommandLineTools, Xcode) would
+          # indicate a non-portable artifact. On Linux any libswift*
+          # dependency is a regression because nothing ships Swift by
+          # default.
           if [ "$(uname -s)" = "Darwin" ]; then
             deps=$(otool -L "$EXTRACT_DIR/hc")
+            echo "$deps"
+            offenders=$(echo "$deps" | grep -E 'libswift|swiftCore|swift_Concurrency|swiftFoundation' \
+              | grep -vE '^\s+/usr/lib/swift/' || true)
           else
             deps=$(ldd "$EXTRACT_DIR/hc" || true)
+            echo "$deps"
+            offenders=$(echo "$deps" | grep -Ei 'libswift|swiftCore|swift_Concurrency|swiftFoundation' || true)
           fi
-          echo "$deps"
-          if echo "$deps" | grep -Ei 'libswift|swiftCore|swift_Concurrency|swiftFoundation' >/dev/null; then
-            echo "ERROR: distributable still depends on Swift runtime libraries"
+          if [ -n "$offenders" ]; then
+            echo "ERROR: distributable depends on non-OS Swift runtime libraries:"
+            echo "$offenders"
             exit 1
           fi
 
