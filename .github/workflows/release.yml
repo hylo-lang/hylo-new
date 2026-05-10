@@ -45,8 +45,10 @@ jobs:
             target: macos-x64
           - os: windows-2025
             target: windows-x64
+            windows_arch: x64
           - os: windows-11-arm
             target: windows-arm64
+            windows_arch: arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -71,6 +73,7 @@ jobs:
           addToPath: true
 
       - name: Download Recent Visual Studio and Windows SDK
+        if: runner.os == 'Windows'
         uses: compnerd/gha-setup-vsdevenv@main
         with:
           winsdk: "10.0.26100.0"
@@ -83,48 +86,200 @@ jobs:
         run: swift build -c release --verbose --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY
         shell: pwsh
 
-      - name: Locate distributable
-        id: locate-distributable
+      - name: Stage distributable
+        id: stage
         env:
           TAG: ${{ github.ref_name }}
           TARGET: ${{ matrix.target }}
+          WINDOWS_ARCH: ${{ matrix.windows_arch }}
         run: |
           $ErrorActionPreference = 'Stop'
           $binPath = (swift build -c release --product hc --static-swift-stdlib -Xswiftc -DUSE_BUNDLED_STANDARD_LIBRARY --show-bin-path).Trim()
           $binaryName = if ($env:RUNNER_OS -eq 'Windows') { 'hc.exe' } else { 'hc' }
           $binaryPath = Join-Path $binPath $binaryName
           $assetBaseName = "hylo-$env:TAG-$env:TARGET"
+          $stageDir = Join-Path $env:RUNNER_TEMP "stage-$env:TARGET"
           $archivePath = Join-Path $env:RUNNER_TEMP "$assetBaseName.tar.zst"
-          "bin_path=$binPath" >> $env:GITHUB_OUTPUT
-          "binary_path=$binaryPath" >> $env:GITHUB_OUTPUT
-          "archive_path=$archivePath" >> $env:GITHUB_OUTPUT
-        shell: pwsh
 
-      - name: Verify distributable
-        run: |
-          $ErrorActionPreference = 'Stop'
-          & "${{ steps.locate-distributable.outputs.binary_path }}" --help | Out-Null
+          if (Test-Path $stageDir) { Remove-Item -Recurse -Force $stageDir }
+          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+          # Copy the primary binary.
+          Copy-Item -Force $binaryPath $stageDir
+
+          # On Windows, bundle the non-system runtime DLLs that aren't part of a
+          # fresh Windows 11 install. We deliberately omit:
+          #   - Core Windows DLLs: KERNEL32, ntdll, ole32, SHELL32, ADVAPI32
+          #   - Universal CRT shims (api-ms-win-crt-*), which ship with Windows 10+
+          # We do bundle:
+          #   - The Swift runtime DLLs the executable links against
+          #   - The MSVC runtime DLLs (MSVCP140, VCRUNTIME140, VCRUNTIME140_1)
+          #     since the VC++ Redistributable is not guaranteed on a fresh Windows 11.
+          if ($env:RUNNER_OS -eq 'Windows') {
+            $swiftBin = Split-Path -Parent (Get-Command swiftc).Source
+            $swiftDlls = @(
+              'swiftCore.dll',
+              'swift_Concurrency.dll',
+              'swiftCRT.dll',
+              'swiftWinSDK.dll',
+              'Foundation.dll',
+              'FoundationEssentials.dll',
+              'FoundationInternationalization.dll'
+            )
+            foreach ($dll in $swiftDlls) {
+              $src = Join-Path $swiftBin $dll
+              if (-not (Test-Path $src)) {
+                throw "Required Swift runtime DLL not found: $src"
+              }
+              Copy-Item -Force $src $stageDir
+            }
+
+            $arch = $env:WINDOWS_ARCH
+            $vcRedistRoot = $env:VCToolsRedistDir
+            if (-not $vcRedistRoot) {
+              throw "VCToolsRedistDir is not set; gha-setup-vsdevenv must run before this step."
+            }
+            $vcCrtDir = Get-ChildItem -Path (Join-Path $vcRedistRoot $arch) -Filter 'Microsoft.VC*.CRT' -Directory | Select-Object -First 1
+            if (-not $vcCrtDir) {
+              throw "Could not locate Microsoft.VC*.CRT directory under $vcRedistRoot/$arch"
+            }
+            $vcDlls = @('MSVCP140.dll', 'VCRUNTIME140.dll', 'VCRUNTIME140_1.dll')
+            foreach ($dll in $vcDlls) {
+              $src = Join-Path $vcCrtDir.FullName $dll
+              if (-not (Test-Path $src)) {
+                throw "Required VC runtime DLL not found: $src"
+              }
+              Copy-Item -Force $src $stageDir
+            }
+          }
+
+          "stage_dir=$stageDir"     >> $env:GITHUB_OUTPUT
+          "archive_path=$archivePath" >> $env:GITHUB_OUTPUT
+          "asset_base_name=$assetBaseName" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
       - name: Archive distributable
         run: |
           $ErrorActionPreference = 'Stop'
-          $archivePath = "${{ steps.locate-distributable.outputs.archive_path }}"
-          $binPath = "${{ steps.locate-distributable.outputs.bin_path }}"
-          if (Test-Path $archivePath) {
-            Remove-Item -Force $archivePath
-          }
-          tar --zstd -cf $archivePath -C $binPath .
+          $archivePath = "${{ steps.stage.outputs.archive_path }}"
+          $stageDir    = "${{ steps.stage.outputs.stage_dir }}"
+          if (Test-Path $archivePath) { Remove-Item -Force $archivePath }
+          tar --zstd -cf $archivePath -C $stageDir .
         shell: pwsh
+
+      - name: Upload distributable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.stage.outputs.asset_base_name }}
+          path: ${{ steps.stage.outputs.archive_path }}
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-distributable:
+    name: Verify distributable for ${{ matrix.target }}
+    needs: build-distributable
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+          - os: macos-15
+            target: macos-arm64
+          - os: macos-15-intel
+            target: macos-x64
+          - os: windows-2025
+            target: windows-x64
+          - os: windows-11-arm
+            target: windows-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Download distributable artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hylo-${{ github.ref_name }}-${{ matrix.target }}
+          path: ${{ runner.temp }}/dist
+
+      - name: Verify no Swift toolchain leaks into verification (POSIX)
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          # Sanitize PATH to a minimal set so that any pre-installed Swift on the
+          # runner cannot satisfy the binary's dynamic dependencies.
+          MINIMAL_PATH="/usr/bin:/bin:/usr/sbin:/sbin"
+          export PATH="$MINIMAL_PATH"
+          if command -v swift >/dev/null 2>&1; then
+            echo "ERROR: 'swift' is still on PATH after sanitization: $(command -v swift)"
+            exit 1
+          fi
+          ARCHIVE="${{ runner.temp }}/dist/hylo-${{ github.ref_name }}-${{ matrix.target }}.tar.zst"
+          EXTRACT_DIR="${{ runner.temp }}/extracted"
+          mkdir -p "$EXTRACT_DIR"
+          tar --zstd -xf "$ARCHIVE" -C "$EXTRACT_DIR"
+          ls -la "$EXTRACT_DIR"
+          PATH="$MINIMAL_PATH" "$EXTRACT_DIR/hc" --help > /dev/null
+        shell: bash
+
+      - name: Verify no Swift toolchain leaks into verification (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Sanitize PATH to system directories only; this prevents any
+          # pre-installed Swift toolchain on the runner from satisfying the
+          # executable's dynamic dependencies. Bundled DLLs sit next to hc.exe
+          # and Windows' DLL search order finds them via the executable's
+          # directory before consulting PATH.
+          $minimalPath = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          $env:PATH = $minimalPath
+
+          $swift = Get-Command swift -ErrorAction SilentlyContinue
+          if ($swift) {
+            Write-Error "'swift' is still on PATH after sanitization: $($swift.Source)"
+            exit 1
+          }
+
+          $archive = "${{ runner.temp }}/dist/hylo-${{ github.ref_name }}-${{ matrix.target }}.tar.zst"
+          $extractDir = "${{ runner.temp }}/extracted"
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+          tar --zstd -xf $archive -C $extractDir
+          Get-ChildItem $extractDir | Format-Table -AutoSize
+
+          & "$extractDir\hc.exe" --help | Out-Null
+        shell: pwsh
+
+  publish-distributable:
+    name: Publish distributable for ${{ matrix.target }}
+    needs: verify-distributable
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - linux-x64
+          - linux-arm64
+          - macos-arm64
+          - macos-x64
+          - windows-x64
+          - windows-arm64
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download distributable artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hylo-${{ github.ref_name }}-${{ matrix.target }}
+          path: ${{ runner.temp }}/dist
 
       - name: Upload distributable to draft release
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          gh release upload $env:TAG "${{ steps.locate-distributable.outputs.archive_path }}" --repo $env:REPOSITORY --clobber
-        shell: pwsh
-
-
+          set -euo pipefail
+          archive="$RUNNER_TEMP/dist/hylo-$TAG-$TARGET.tar.zst"
+          gh release upload "$TAG" "$archive" --repo "$REPOSITORY" --clobber
+        shell: bash
