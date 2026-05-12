@@ -89,21 +89,20 @@ jobs:
           "binary_path=$(Join-Path $binPath $binaryName)" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
-      - name: Bundle Windows DLL dependencies
-        if: runner.os == 'Windows'
-        uses: hylo-lang/swift-windows-dll-bundler@c16562d38c058b71f62b2c3b92d5bf0aa47f4768 # v1.0.0
+      - name: Assemble portable bundle
+        uses: hylo-lang/swift-portable-tool-bundler@v1.0.0
         with:
-          executable: ${{ steps.locate-distributable.outputs.binary_path }}
+          products: hc
+          output-directory: ${{ runner.temp }}/bundle
 
       - name: Archive distributable
         run: |
           $ErrorActionPreference = 'Stop'
           $archivePath = Join-Path $env:RUNNER_TEMP "$env:ARTIFACT_NAME.tar.zst"
-          $binPath = "${{ steps.locate-distributable.outputs.bin_path }}"
           if (Test-Path $archivePath) {
             Remove-Item -Force $archivePath
           }
-          tar --zstd -cf $archivePath -C $binPath .
+          tar --zstd -cf $archivePath -C "${{ runner.temp }}/bundle" .
         shell: pwsh
 
       - name: Upload distributable artifact
