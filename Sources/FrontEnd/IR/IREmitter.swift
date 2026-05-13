@@ -868,8 +868,8 @@ internal struct IREmitter {
       if let parent = program.extensionContaining(m) {
         let target = loweredCallee(referringTo: m, boundTo: receiver, output: result)
         return lowering(at: anchor.site, in: anchor.scope) { (me) in
-          /// References to members in extensions are expressed using a witness representing the
-          /// type and term arguments passed to parameters declared on the extension itself.
+          // References to members in extensions are expressed using a witness representing the
+          // type and term arguments passed to parameters declared on the extension itself.
           let (e, ts, xs) = me._emit(decompose: w)
           assert(e.value == .reference(.init(parent)))
 
