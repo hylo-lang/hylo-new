@@ -3857,8 +3857,8 @@ public struct Typer {
     return false
   }
 
-  /// Returns `(lhs, rhs)` where `lhs` (respectively `rhs`) is `true` iff a `g` might be used to
-  /// prove a coercion from  from `a` to `x` (respectively `x` to `b`) for some type `x`.
+  /// Returns `(lhs, rhs)` where `lhs` (respectively `rhs`) is `true` iff `g` might be used to
+  /// prove a coercion from from `a` to `x` (respectively `x` to `b`) for some type `x`.
   private mutating func canDeriveCoercion(
     _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, applying g: Given
   ) -> (Bool, Bool) {
