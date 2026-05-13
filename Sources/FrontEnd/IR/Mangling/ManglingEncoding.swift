@@ -521,9 +521,9 @@ struct ManglingEncoding: Sendable {
       // Note: assumes all files in a module have a different base name.
       output.add(operator: .sourceFile)
       output.add(string: u.deletingPathExtension().lastPathComponent)
-    case .virtual(let i):
+    case .virtual(let u):
       output.add(operator: .virtualSourceFile)
-      output.add(integer: Int(i))
+      output.add(string: u.absoluteString)
     }
   }
 
@@ -538,7 +538,7 @@ struct ManglingEncoding: Sendable {
   private static func takeVirtualSourceFile(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    source.takeInt().map({ (s) in .virtualSourceFile(s) }) ?? .error
+    source.takeString().map({ (s) in .virtualSourceFile(s) }) ?? .error
   }
 
   /// Writes the mangled representation of `s` defined in `m`, to `output`.

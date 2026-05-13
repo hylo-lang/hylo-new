@@ -96,7 +96,7 @@ indirect enum DemangledEntity: Hashable, Sendable {
   case sourceFile(String)
 
   /// A virtual translation unit.
-  case virtualSourceFile(Int)
+  case virtualSourceFile(String)
 
   /// A scope.
   case scope(String)
@@ -162,8 +162,8 @@ extension DemangledEntity: CustomStringConvertible {
       return name
     case .sourceFile(let name):
       return name
-    case .virtualSourceFile:
-      // Don't report the ID; useful for testing with exact match.
+    case .virtualSourceFile(_):
+      // Don't report the URL; useful for testing with exact match.
       return "#"
     case .scope(let name):
       return name
