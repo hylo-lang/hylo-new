@@ -428,17 +428,9 @@ public struct Typer {
             to: program.castUnchecked(r, to: ConformanceDeclaration.self))
         }
 
-      case FunctionDeclaration.self:
+      case FunctionDeclaration.self, VariantDeclaration.self:
         if let i = namedImplementation(of: r) {
           implementations.assign(i, to: r)
-        }
-
-      case FunctionBundleDeclaration.self:
-        let b = program.castUnchecked(r, to: FunctionBundleDeclaration.self)
-        for v in program[b].variants {
-          if let i = namedImplementation(of: .init(v)) {
-            implementations.assign(i, to: r)
-          }
         }
 
       default:

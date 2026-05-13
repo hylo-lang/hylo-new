@@ -731,9 +731,15 @@ public struct Program: Sendable {
     var ts: [AssociatedTypeDeclaration.ID] = []
     var ms: [DeclarationIdentity] = .init(minimumCapacity: self[concept].members.count)
     for m in self[concept].members {
-      if let a = cast(m, to: AssociatedTypeDeclaration.self) {
-        ts.append(a)
-      } else {
+      switch tag(of: m) {
+      case AssociatedTypeDeclaration.self:
+        ts.append(castUnchecked(m))
+
+      case FunctionBundleDeclaration.self:
+        let b = castUnchecked(m, to: FunctionBundleDeclaration.self)
+        ms.append(contentsOf: self[b].variants.map(DeclarationIdentity.init(_:)))
+
+      default:
         ms.append(m)
       }
     }
