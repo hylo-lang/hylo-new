@@ -196,7 +196,8 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR of the subscript that projects the witness declared by `d`.
+  /// Generates the IR of the subscript that projects the witness declared by `d`, assuming the
+  /// insertion context is configured to generate IR into the its lowered form.
   private mutating func lowerDefinition(_ d: ConformanceDeclaration.ID) {
     insertionContext.anchor = .init(site: program[d].introducer.site, scope: .init(node: d))
     let (_, w) = currentFunction.output.remote!
@@ -312,14 +313,15 @@ internal struct IREmitter {
 
   /// Generates the IR of `d`.
   private mutating func lower(_ d: FunctionDeclaration.ID) {
-    withClearContext({ (me) in me.lowerInClearContext(d) })
+    let f = demandLoweredDeclaration(functionOrConformance: .init(d))
+    defining(f) { (me) in
+      me.lowerDefinition(d)
+    }
   }
 
-  /// Generates the IR of `d` assuming the insertion context is clear.
-  private mutating func lowerInClearContext(_ d: FunctionDeclaration.ID) {
-    let f = demandLoweredDeclaration(functionOrConformance: .init(d))
-    assert(!program[module].ir[f].isDefined, "function already lowered")
-
+  /// Generates the body of `d`, assuming the insertion context is configured to generate IR into
+  /// the its lowered form.
+  private mutating func lowerDefinition(_ d: FunctionDeclaration.ID) {
     // Is there a body to lower?
     guard let body = program[d].body else {
       assert(!program.requiresDefinition(.init(d)), "ill-formed syntax")
@@ -327,10 +329,7 @@ internal struct IREmitter {
       return
     }
 
-    // Lower the function's definition.
-    insertionContext.function = program[module].ir[f]
-    insertionContext.point = .end(of: insertionContext.function!.addBlock())
-    for (i, p) in insertionContext.function!.termParameters.enumerated() {
+    for (i, p) in currentFunction.termParameters.enumerated() {
       let v = IRValue.parameter(i)
 
       // Configure the base frame with the function's parameters.
@@ -340,7 +339,7 @@ internal struct IREmitter {
 
       // Assume `p` is initialized if it's a `set` parameter other than the return register
       // accessing the storage of a trivially initializable object (e.g., an empty struct).
-      if (p.access == .set) && (v != insertionContext.function!.returnRegister) {
+      if (p.access == .set) && (v != currentFunction.returnRegister) {
         if program.isTriviallyInitializable(p.type, in: .init(node: d)) {
           lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
             me._assume_state(v, initialized: true)
@@ -366,8 +365,6 @@ internal struct IREmitter {
         me._return()
       })
     }
-
-    program[module].ir[f] = insertionContext.function.sink()
   }
 
   /// Generates the IR of the members in `d`.
