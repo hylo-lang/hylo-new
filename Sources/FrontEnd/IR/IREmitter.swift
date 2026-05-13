@@ -49,6 +49,8 @@ internal struct IREmitter {
       lower(program.castUnchecked(d, to: EnumDeclaration.self))
     case ExtensionDeclaration.self:
       lower(program.castUnchecked(d, to: ExtensionDeclaration.self))
+    case FunctionBundleDeclaration.self:
+      lower(program.castUnchecked(d, to: FunctionBundleDeclaration.self))
     case FunctionDeclaration.self:
       lower(program.castUnchecked(d, to: FunctionDeclaration.self))
     case ImportDeclaration.self:
@@ -311,19 +313,35 @@ internal struct IREmitter {
     }
   }
 
+  /// Generates the IR of variants in `d`.
+  private mutating func lower(_ d: FunctionBundleDeclaration.ID) {
+    for m in program[d].variants {
+      let f = demandLoweredDeclaration(functionOrConformance: .init(m))
+      assert(!program[module].ir[f].isDefined, "function already lowered")
+      defining(f) { (me) in
+        let s = me.program[m].effect.site
+        me.lowerDefinition(me.program[m].body, of: m, introducedAt: s)
+      }
+    }
+  }
+
   /// Generates the IR of `d`.
   private mutating func lower(_ d: FunctionDeclaration.ID) {
     let f = demandLoweredDeclaration(functionOrConformance: .init(d))
     defining(f) { (me) in
-      me.lowerDefinition(d)
+      let s = me.program[d].introducer.site
+      me.lowerDefinition(me.program[d].body, of: d, introducedAt: s)
     }
   }
 
-  /// Generates the body of `d`, assuming the insertion context is configured to generate IR into
-  /// the its lowered form.
-  private mutating func lowerDefinition(_ d: FunctionDeclaration.ID) {
+  /// Generates the definition of `d`, which is introduced at `introducerSite` and whose body is
+  /// `definition`, assuming the insertion context is configured to generate IR into the its
+  /// lowered form of `d`.
+  private mutating func lowerDefinition<T: Declaration & Scope>(
+    _ definition: [StatementIdentity]?, of d: T.ID, introducedAt introducerSite: SourceSpan
+  ) {
     // Is there a body to lower?
-    guard let body = program[d].body else {
+    guard let body = definition else {
       assert(!program.requiresDefinition(.init(d)), "ill-formed syntax")
       // TODO: FFI
       return
@@ -341,14 +359,14 @@ internal struct IREmitter {
       // accessing the storage of a trivially initializable object (e.g., an empty struct).
       if (p.access == .set) && (v != currentFunction.returnRegister) {
         if program.isTriviallyInitializable(p.type, in: .init(node: d)) {
-          lowering(at: program[d].introducer.site, in: .init(node: d)) { (me) in
+          lowering(at: introducerSite, in: .init(node: d)) { (me) in
             me._assume_state(v, initialized: true)
           }
         }
       }
     }
 
-    switch lower(body: body) {
+    switch lower(statements: body) {
     case .return(let r):
       lowering(r, { $0._return() })
 
@@ -392,18 +410,18 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR of `body`, which is the definition of an abstraction.
-  private mutating func lower(body: [StatementIdentity]) -> ControlFlow {
-    for i in body.indices {
-      switch lower(body[i]) {
+  /// Generates the IR each statement in `statements`.
+  private mutating func lower(statements: [StatementIdentity]) -> ControlFlow {
+    for i in statements.indices {
+      switch lower(statements[i]) {
       case .next:
         // Just move to the next instruction.
         continue
 
       case let c:
         // The last statement transferred control flow; we can skip the remaining statements.
-        if (i + 1) < body.count {
-          report(.warning, "code will never be executed", about: body[i + 1])
+        if (i + 1) < statements.count {
+          report(.warning, "code will never be executed", about: statements[i + 1])
         }
         return c
       }
@@ -479,7 +497,7 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Block.ID) -> ControlFlow {
-    lower(body: program[s].statements)
+    lower(statements: program[s].statements)
   }
 
   /// Generates the IR of `s`.
@@ -898,13 +916,17 @@ internal struct IREmitter {
     referringTo d: DeclarationIdentity, boundTo receiver: IRValue?, output result: IRValue
   ) -> LoweredCallee {
     switch program.tag(of: d) {
+    case EnumCaseDeclaration.self:
+      let f = demandLoweredDeclaration(
+        constructor: program.castUnchecked(d, to: EnumCaseDeclaration.self))
+      return loweredCallee(referringTo: f, boundTo: receiver, output: result)
+
     case FunctionDeclaration.self:
       let f = demandLoweredDeclaration(functionOrConformance: d)
       return loweredCallee(referringTo: f, boundTo: receiver, output: result)
 
-    case EnumCaseDeclaration.self:
-      let f = demandLoweredDeclaration(
-        constructor: program.castUnchecked(d, to: EnumCaseDeclaration.self))
+    case VariantDeclaration.self:
+      let f = demandLoweredDeclaration(functionOrConformance: d)
       return loweredCallee(referringTo: f, boundTo: receiver, output: result)
 
     default:
@@ -1259,8 +1281,7 @@ internal struct IREmitter {
     if let i = program[module].ir.functions.index(forKey: name) {
       return i
     } else {
-      let d = program.castUnchecked(requirement, to: FunctionDeclaration.self)
-      let (ps, o) = prototype(d, applying: arguments)
+      let (ps, o) = prototype(requirement, applying: arguments)
       return program[module].ir.addFunction(
         IRFunction(name: name, output: o, typeParameters: [], termParameters: ps))
     }
@@ -1327,18 +1348,41 @@ internal struct IREmitter {
   private mutating func prototype(
     _ d: DeclarationIdentity, applying substitutions: TypeArguments = .init()
   ) -> ([IRParameter], IRFunction.Output) {
-    switch program.tag(of: d) {
-    case ConformanceDeclaration.self:
-      let n = program.castUnchecked(d, to: ConformanceDeclaration.self)
-      return prototype(n, applying: substitutions)
-
-    case FunctionDeclaration.self:
-      let n = program.castUnchecked(d, to: FunctionDeclaration.self)
-      return prototype(n, applying: substitutions)
-
-    default:
-      program.unexpected(d)
+    if let n = program.cast(d, to: ConformanceDeclaration.self) {
+      return prototype(conformance: n, applying: substitutions)
+    } else {
+      return prototype(functionOrVariant: d, applying: substitutions)
     }
+  }
+
+  /// Returns the term parameters and return type of `d`'s lowered representation.
+  ///
+  /// `d` declares a conformance. The result includes the usings of `d`. If `d` an an abstract
+  /// given (i.e., a given declared as a trait requirement) these usings are preceded by an
+  /// additional parameter accepting an instance of the containing trait.
+  private mutating func prototype(
+    conformance d: ConformanceDeclaration.ID, applying substitutions: TypeArguments = .init()
+  ) -> ([IRParameter], IRFunction.Output) {
+    let witness = program.types.contextAndHead(program.type(assignedTo: d))
+
+    var terms: [IRParameter] = []
+
+    // If the conformance declares an abstract given, accept a witness of conformance of the
+    // enclosing trait.
+    if let enclosure = program.traitRequiring(d) {
+      let s = program.withTyper(typing: module) { (tp) in tp.typeOfTraitSelf(in: enclosure) }
+      let t = program.types.dealiased(s)
+      let u = program.types.substitute(substitutions, in: t)
+      terms.append(IRParameter(type: u, access: .let, declaration: nil))
+    }
+
+    for p in witness.context.usings {
+      let t = program.types.dealiased(p)
+      let u = program.types.substitute(substitutions, in: t)
+      terms.append(IRParameter(type: u, access: .let, declaration: nil))
+    }
+
+    return (terms, .remote(.let, witness.head))
   }
 
   /// Returns the term parameters and return type of `d`'s lowered representation.
@@ -1347,12 +1391,12 @@ internal struct IREmitter {
   /// and captures of `d`, in that order. Type parameters are not included. Those are only lowered
   /// to term parameters in existentialized functions.
   private mutating func prototype(
-    _ d: FunctionDeclaration.ID, applying substitutions: TypeArguments = .init()
+    functionOrVariant d: DeclarationIdentity, applying substitutions: TypeArguments = .init()
   ) -> ([IRParameter], IRFunction.Output) {
+    assert(program.isInstance(d, of: FunctionDeclaration.self, VariantDeclaration.self))
+
     let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
     var terms: [IRParameter] = []
-
-    precondition(program.tag(of: d) == FunctionDeclaration.self, "TODO")
 
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {
@@ -1395,7 +1439,8 @@ internal struct IREmitter {
         let t = program.type(assignedTo: p, assuming: RemoteType.self)
         let u = program.types.dealiased(program.types[t].projectee)
         let v = program.types.substitute(substitutions, in: u)
-        terms.append(IRParameter(type: v, access: program.types[t].access, declaration: .init(p)))
+        let k = program.types[t].access.unlessAuto(program.types[abstraction].effect)
+        terms.append(IRParameter(type: v, access: k, declaration: .init(p)))
       }
     }
 
@@ -1408,36 +1453,6 @@ internal struct IREmitter {
     } else {
       return (terms, .remote(program.types[abstraction].effect, s))
     }
-  }
-
-  /// Returns the term parameters and return type of `d`'s lowered representation.
-  ///
-  /// `d` declares a conformance. The result includes the usings of `d`. If `d` an an abstract
-  /// given (i.e., a given declared as a trait requirement) these usings are preceded by an
-  /// additional parameter accepting an instance of the containing trait.
-  private mutating func prototype(
-    _ d: ConformanceDeclaration.ID, applying substitutions: TypeArguments = .init()
-  ) -> ([IRParameter], IRFunction.Output) {
-    let witness = program.types.contextAndHead(program.type(assignedTo: d))
-
-    var terms: [IRParameter] = []
-
-    // If the conformance declares an abstract given, accept a witness of conformance of the
-    // enclosing trait.
-    if let enclosure = program.traitRequiring(d) {
-      let s = program.withTyper(typing: module) { (tp) in tp.typeOfTraitSelf(in: enclosure) }
-      let t = program.types.dealiased(s)
-      let u = program.types.substitute(substitutions, in: t)
-      terms.append(IRParameter(type: u, access: .let, declaration: nil))
-    }
-
-    for p in witness.context.usings {
-      let t = program.types.dealiased(p)
-      let u = program.types.substitute(substitutions, in: t)
-      terms.append(IRParameter(type: u, access: .let, declaration: nil))
-    }
-
-    return (terms, .remote(.let, witness.head))
   }
 
   // MARK: Context
@@ -2084,6 +2099,9 @@ internal struct IREmitter {
     case .typeApplication(let f, let a):
       let x0 = _emit(witness: f)
       result = _type_apply(x0, to: a)
+    case .abstract:
+      assert(w.type == currentFunction.result(of: .parameter(0))?.type)
+      result = .parameter(0)
     default:
       fatalError()
     }

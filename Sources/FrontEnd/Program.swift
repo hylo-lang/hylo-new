@@ -261,6 +261,12 @@ public struct Program: Sendable {
     modules.values[n.module].tag(of: n)
   }
 
+  /// Returns `true` iff `n` identities an instance of one of the types in `ts`.
+  public func isInstance<T: SyntaxIdentity>(_ n: T, of ts: any Syntax.Type...) -> Bool {
+    let lhs = tag(of: n)
+    return ts.contains(where: { (rhs) in lhs == rhs })
+  }
+
   /// `true` iff `f` has gone through scoping.
   public func isScoped(_ f: SourceFile.ID) -> Bool {
     self[f].syntaxToParent.count == self[f].syntax.count
