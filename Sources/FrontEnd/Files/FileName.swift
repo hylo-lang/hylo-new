@@ -8,26 +8,44 @@ public enum FileName: Hashable, Sendable {
   case local(URL)
 
   /// A unique identifier for a file that only exists in memory.
-  case virtual(Int)
+  ///
+  /// The payload can be any URL that uniquely identifies the source file within the Program.
+  case virtual(URL)
 
-  /// Returns `true` iff `self` is ordered before `other` in a dictionary.
-  public func lexicographicallyPrecedes(_ other: Self) -> Bool {
-    switch (self, other) {
-    case (.local(let a), .local(let b)):
-      return a.standardizedFileURL.path().lexicographicallyPrecedes(b.standardizedFileURL.path())
-    case (.virtual(let a), .virtual(let b)):
-      return a < b
-    case (.virtual, _):
-      return false
-    case (.local, _):
-      return true
+  /// The associated URL.
+  public var url: URL {
+    switch self {
+    case .local(let url):
+      return url
+    case .virtual(let url):
+      return url
     }
   }
 
-  /// Returns a textual description of `self`'s path relative to `base`.
+  /// `self` with absolute URLs.
+  public var absolute: Self {
+    switch self {
+    case .local(let url):
+      return .local(url.absoluteURL)
+    case .virtual(let url):
+      return .virtual(url.absoluteURL)
+    }
+  }
+  
+  /// Returns `true` iff `self` is ordered before `other` in a dictionary.
+  public func lexicographicallyPrecedes(_ other: Self) -> Bool {
+    let s = self.url.standardizedFileURL.absoluteString
+    let o = other.url.standardizedFileURL.absoluteString
+    return s.lexicographicallyPrecedes(o)
+  }
+
+  /// Returns the `/`-separated path of `self` relative to `base`, if reachable.
   public func gnuPath(relativeTo base: URL) -> String? {
-    guard base.isFileURL, case .local(let path) = self else { return nil }
-    let source = path.standardized.pathComponents
+    let p = self.url
+    guard p.scheme == base.scheme,
+      p.windowsDriveLetter == base.windowsDriveLetter else { return nil }
+
+    let source = p.standardized.pathComponents
     let prefix = base.standardized.pathComponents
 
     // Identify the end of the common prefix.
@@ -58,15 +76,26 @@ public enum FileName: Hashable, Sendable {
 
 }
 
+extension URL {
+  
+  /// Returns the drive letter of an absolute file URL on Windows, nil otherwise.
+  fileprivate var windowsDriveLetter: Character? {
+    #if os(Windows)
+      guard isFileURL, let firstChar = path.first, firstChar.isLetter, path.dropFirst().first == ":" 
+      else { return nil }
+
+      return Character(firstChar.uppercased())
+    #else
+      return nil
+    #endif
+  }
+
+}
+
 extension FileName: CustomStringConvertible {
 
   public var description: String {
-    switch self {
-    case .local(let p):
-      return p.relativePath
-    case .virtual(let i):
-      return "virtual://\(String(UInt(bitPattern: i), radix: 36))"
-    }
+    url.isFileURL ? url.path : url.absoluteString
   }
 
 }
@@ -78,7 +107,7 @@ extension FileName: Archivable {
     case 0:
       self = try .local(.init(string: archive.read(String.self))!)
     case 1:
-      self = try .virtual(archive.read(Int.self))
+      self = try .virtual(.init(string: archive.read(String.self))!)
     default:
       throw ArchiveError.invalidInput
     }
@@ -91,7 +120,7 @@ extension FileName: Archivable {
       try archive.write(p.absoluteString)
     case .virtual(let i):
       archive.write(byte: 1)
-      try archive.write(i)
+      try archive.write(i.absoluteString)
     }
   }
 

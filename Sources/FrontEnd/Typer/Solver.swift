@@ -541,8 +541,8 @@ internal struct Solver {
   private func invalidTupleMember(_ k: TupleMemberConstraint) -> GoalOutcome {
     .failure { (ss, _, tp, ds) in
       let t = tp.program.types.reify(k.parent, applying: ss)
-      let m = tp.program.format("type '%T' has no member '\(k.member.value)'", [t])
-      ds.insert(.init(.error, m, at: k.site))
+      let n = Parsed(Name(identifier: "\(k.member.value)"), at: k.member.site)
+      ds.insert(tp.program.undefinedSymbol(n, memberOf: t))
     }
   }
 

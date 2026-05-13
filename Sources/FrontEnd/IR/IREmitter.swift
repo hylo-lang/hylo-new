@@ -257,10 +257,8 @@ internal struct IREmitter {
           me.associate(.init(d), with: .parameter(0))
 
           let o = me.currentFunction.returnRegister ?? .poison(.place(.error))
-          let f = me.loweredCallee(implementation, output: o, at: me.currentAnchor) { _ in
-            // We cannot get here because we create witness tables using unbound references.
-            unreachable()
-          }
+          let f = me.loweredCallee(
+            implementation, qualifiedBy: nil, output: o, at: me.currentAnchor)
           me._emitCallToRequirementImplementation(f)
         }
       }
@@ -779,6 +777,11 @@ internal struct IREmitter {
       .init(value: value, arguments: Array(arguments, terminatedBy: a), result: result)
     }
 
+    /// Returns `self` substituting `v` for `self.value`.
+    consuming func substituting(value v: IRValue) -> LoweredCallee {
+      .init(value: v, arguments: arguments, result: result)
+    }
+
   }
 
   /// Generates the IR for using `e`, which occurs as a callee.
@@ -816,15 +819,14 @@ internal struct IREmitter {
   ) -> LoweredCallee {
     let d = program.declaration(referredToBy: e)
     let a = Anchor(site: program[e].site, scope: program.parent(containing: e))
-    return loweredCallee(d, output: result, at: a) { [q = program[e].qualification] (me) in
-      me.lowered(lvalue: q!)
-    }
+    return loweredCallee(d, qualifiedBy: program[e].qualification, output: result, at: a)
   }
 
-  /// Generates the IR for using `d`, which occurs as a callee, optionally bound to `receiver`.
+  /// Generates the IR at `anchor` for using `d`, which occurs as a callee that is optionally
+  /// qualified by `q`.
   private mutating func loweredCallee(
-    _ d: DeclarationReference, output result: IRValue, at anchor: Anchor,
-    computingReceiverWith receiver: (inout Self) -> IRValue
+    _ d: DeclarationReference, qualifiedBy q: ExpressionIdentity?, output result: IRValue,
+    at anchor: Anchor
   ) -> LoweredCallee {
     switch d {
     case .builtin:
@@ -833,22 +835,44 @@ internal struct IREmitter {
 
     case .direct(let d):
       // The callee refers to a function directly.
-      return loweredCallee(referringTo: d, boundTo: nil, output: result)
+      let f = loweredCallee(referringTo: d, boundTo: nil, output: result)
+
+      // The qualification may define type arguments.
+      if let ts = q.flatMap({ (e) in argumentsFromStaticQualification(e) }) {
+        let g = lowering(at: anchor.site, in: anchor.scope, { $0._type_apply(f.value, to: ts) })
+        return f.substituting(value: g)
+      } else {
+        return f
+      }
 
     case .member(let d):
       // The callee refers to a bound member.
-      let q = receiver(&self)
-      return loweredCallee(referringTo: d, boundTo: q, output: result)
+      let receiver = lowered(lvalue: q!)
+      let f = loweredCallee(referringTo: d, boundTo: receiver, output: result)
+
+      // If the reference is bound to a generic type, its type arguments have to be extracted from
+      // the receiver's expression.
+      let r = currentFunction.result(of: receiver)!.type
+      if let ts = program.types.select(r, \TypeApplication.arguments) {
+        let g = lowering(at: anchor.site, in: anchor.scope, { $0._type_apply(f.value, to: ts) })
+        return f.substituting(value: g)
+      } else {
+        return f
+      }
 
     case .inherited(let w, let m, let statically):
       // The callee refers to a member declared in extension.
-      let q = statically ? nil : receiver(&self)
+      let receiver = statically ? nil : lowered(lvalue: q!)
 
       // Is the member declared in an extension?
-      if program.isExtensionMember(m) {
-        let target = loweredCallee(referringTo: m, boundTo: q, output: result)
+      if let parent = program.extensionContaining(m) {
+        let target = loweredCallee(referringTo: m, boundTo: receiver, output: result)
         return lowering(at: anchor.site, in: anchor.scope) { (me) in
-          let (ts, xs) = me._emitArguments(of: w)
+          /// References to members in extensions are expressed using a witness representing the
+          /// type and term arguments passed to parameters declared on the extension itself.
+          let (e, ts, xs) = me._emit(decompose: w)
+          assert(e.value == .reference(.init(parent)))
+
           let f = ts.isEmpty ? target.value : me._type_apply(target.value, to: ts)
           return LoweredCallee(value: f, arguments: xs + target.arguments, result: target.result)
         }
@@ -863,7 +887,7 @@ internal struct IREmitter {
         return lowering(at: anchor.site, in: anchor.scope) { (me) in
           let x0 = me._emit(witness: w)
           let x1 = me._property(m, of: x0, withType: typeOfImplementation)
-          return LoweredCallee(value: x1, arguments: Array(contentsOf: q), result: result)
+          return LoweredCallee(value: x1, arguments: Array(contentsOf: receiver), result: result)
         }
       }
 
@@ -891,11 +915,11 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for a callee referring to `function`, optionally bound to `receiver`.
+  /// Generates the IR for a callee referring to `f`, optionally bound to `receiver`.
   private mutating func loweredCallee(
-    referringTo function: IRFunction.ID, boundTo receiver: IRValue?, output result: IRValue
+    referringTo f: IRFunction.ID, boundTo receiver: IRValue?, output result: IRValue
   ) -> LoweredCallee {
-    let v = functionReference(to: function)
+    let v = functionReference(to: f)
     return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
   }
 
@@ -904,11 +928,19 @@ internal struct IREmitter {
     _ e: New.ID, output result: IRValue
   ) -> LoweredCallee {
     // When the callee is a new expression (e.g., `T.new(x)`), then `result` is passed as the first
-    // argument of the underlying initializer.
+    // argument of the underlying initializer. The return type of the initializer is a unit value.
     let r = lowering(e, { (me) in me._alloca(.void) })
     let f = loweredCallee(program[e].target, output: result)
-    return LoweredCallee(
-      value: f.value, arguments: Array(f.arguments, terminatedBy: f.result), result: r)
+
+    // The qualification may define type arguments.
+    let g = if let ts = argumentsFromStaticQualification(program[e].qualification) {
+      lowering(e, { $0._type_apply(f.value, to: ts) })
+    } else {
+      f.value
+    }
+
+    let xs = Array(f.arguments, terminatedBy: f.result)
+    return LoweredCallee(value: g, arguments: xs, result: r)
   }
 
   /// Implements `loweredCallee(_:writingTo)` for static calls.
@@ -930,7 +962,7 @@ internal struct IREmitter {
       }))
 
     let mono = lowering(e, { (me) in me._type_apply(poly.value, to: a) })
-    return LoweredCallee(value: mono, arguments: poly.arguments, result: poly.result)
+    return poly.substituting(value: mono)
   }
 
   /// Implements `loweredCallee(_:writingTo)` for synthetic expressions.
@@ -959,7 +991,7 @@ internal struct IREmitter {
     case .typeApplication(let f, let a):
       let poly = loweredCallee(f, output: result, at: site, in: scope)
       let mono = lowering(at: site, in: scope, { (me) in me._type_apply(poly.value, to: a) })
-      return LoweredCallee(value: mono, arguments: poly.arguments, result: poly.result)
+      return poly.substituting(value: mono)
 
     default:
       fatalError("not implemented")
@@ -1955,11 +1987,6 @@ internal struct IREmitter {
       unimplemented("lowering for \(program.debugName(of: d))")
     }
 
-    // Is `d` a conformance declaration?
-    else if let c = program.cast(d, to: ConformanceDeclaration.self) {
-      return _emit(referenceTo: c, applyingNullary: applyNullary)
-    }
-
     switch program.tag(of: d) {
     case ConformanceDeclaration.self:
       let e = program.castUnchecked(d, to: ConformanceDeclaration.self)
@@ -1982,12 +2009,12 @@ internal struct IREmitter {
     referenceTo d: ConformanceDeclaration.ID, applyingNullary applyNullary: Bool
   ) -> IRValue {
     let f = demandLoweredDeclaration(functionOrConformance: .init(d))
-    let v = functionReference(to: f)
+    let g = functionReference(to: f)
 
     if program[module].ir[f].termParameters.isEmpty && applyNullary {
-      return _project(v, [], afterFormingAccesses: false)
+      return _project(g, [], afterFormingAccesses: false)
     } else {
-      return v
+      return g
     }
   }
 
@@ -2047,35 +2074,79 @@ internal struct IREmitter {
     return x
   }
 
-  /// Generates the IR for computing the lvalue referred to by `witness`.
-  ///
-  /// If `applyNullary` is `true` and `witness` either refers to or is a type application of a
-  /// nullary conformance declaration, the corresponding lowered function is applied without any
-  /// argument in the result.
-  private mutating func _emit(
-    witness: WitnessExpression, applyingNullary applyNullary: Bool = true
-  ) -> IRValue {
-    switch witness.value {
+  /// Generates the IR for computing the lvalue referred to by `w`.
+  private mutating func _emit(witness w: WitnessExpression) -> IRValue {
+    let (abstraction, types, terms) = _emit(decompose: w)
+
+    var result: IRValue
+    switch abstraction.value {
     case .identity(let e):
-      return lowered(lvalue: e)
-
+      result = lowered(lvalue: e)
     case .reference(let d):
-      return _emit(referenceTo: d, applyingNullary: applyNullary)
-
-    case .termApplication(let f, let a):
-      let (abstraction, arguments) = _emit(curriedApplicationOf: f, to: a)
-      let callee = _emit(witness: abstraction, applyingNullary: false)
-      return _project(callee, arguments, afterFormingAccesses: true)
-
+      result = _emit(referenceTo: d, applyingNullary: false)
     case .typeApplication(let f, let a):
-      let x = _emit(witness: f, applyingNullary: applyNullary)
-      return _type_apply(x, to: a)
-
-    case .nested(let w):
-      return _emit(witness: w, applyingNullary: applyNullary)
-
+      let x0 = _emit(witness: f)
+      result = _type_apply(x0, to: a)
     default:
       fatalError()
+    }
+
+    // Type arguments always apply first.
+    if !types.isEmpty {
+      result = _type_apply(result, to: types)
+    }
+
+    // Witnesses referring to a nullary conformance declaration have to be applied. In this case
+    // the type of `result` should have the form `() -> P<T>`, where `P<T>` is the type of the
+    // witness we're supposed to return.
+    let expected = program.types.dealiased(w.type)
+    if !terms.isEmpty || (currentFunction.result(of: result)!.type != expected) {
+      result = _project(result, terms.reversed(), afterFormingAccesses: true)
+    }
+
+    assert(currentFunction.result(of: result)!.type == expected)
+    return result
+  }
+
+  /// If `w` is an type or term application, returns `(f, ts, xs)` where `f` is the abstraction
+  /// being applied while `ts` and `xs` contain the types and term parameters, respectively;
+  /// otherwise, returns `(w, [:], [])`.
+  ///
+  /// Term applications are represented in curried form. A call to a generic term abstraction `f`
+  /// taking two term parameters is encoded as `(f(a0))(a1)`. This method "decomposes" such an
+  /// encoding, returning term arguments in an array.
+  ///
+  /// The expression of the abstraction being applied is always returned unapplied, even if it is
+  /// a nullary conformance declaration. In this case, it should be applied to an empty argument
+  /// list before it can be used as an instance of `w.type`.
+  private mutating func _emit(
+    decompose w: WitnessExpression
+  ) -> (WitnessExpression, TypeArguments, [IRValue]) {
+    var expression = w
+    var types: TypeArguments = [:]
+    var terms: [IRValue] = []
+
+    // Starting from `w` as a root, the loop walks the expression to gather arguments until an
+    // abstraction is reached. Type arguments are not merged. If `w` is a type application of
+    // another type application (e.g., `f<a><b>`), then the latter will be returned as the first
+    // component of this function's result.
+
+    while true {
+      switch expression.value {
+      case .nested(let f):
+        expression = f
+
+      case .termApplication(let f, let x):
+        expression = f
+        terms.append(_emit(witness: x))
+
+      case .typeApplication(let f, let a) where types.isEmpty:
+        expression = f
+        types = a
+
+      default:
+        return (expression, types, terms.reversed())
+      }
     }
   }
 
@@ -2087,11 +2158,11 @@ internal struct IREmitter {
   private mutating func _emit(
     curriedApplicationOf f: WitnessExpression, to a: WitnessExpression
   ) -> (WitnessExpression, [IRValue]) {
-    var stack = [_emit(witness: a, applyingNullary: true)]
+    var stack = [_emit(witness: a)]
     var abstraction = f
     while true {
       if case .termApplication(let g, let b) = abstraction.value {
-        stack.append(_emit(witness: b, applyingNullary: true))
+        stack.append(_emit(witness: b))
         abstraction = g
       } else {
         return (abstraction, stack.reversed())
@@ -2391,6 +2462,20 @@ internal struct IREmitter {
     let s = program[module].ir[f].signature()
     let t = program.types.demand(s)
     return .function(n, t)
+  }
+
+  /// Returns the type arguments defined in the type of `q`, which occurs as qualification for a
+  /// reference to a static member, if any.
+  private mutating func argumentsFromStaticQualification(
+    _ q: ExpressionIdentity
+  ) -> TypeArguments? {
+    let t = program.type(assignedTo: q)
+    let u = program.types.dealiased(t)
+    if let v = program.types.select(u, \Metatype.inhabitant, as: TypeApplication.self) {
+      return program.types[v].arguments
+    } else {
+      return nil
+    }
   }
 
 }

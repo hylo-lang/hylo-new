@@ -79,7 +79,9 @@ import Foundation
       at: root,
       includingPropertiesForKeys: [.isRegularFileKey],
       options: [.skipsHiddenFiles, .skipsPackageDescendants])!
-    for case let u as URL in items where u.pathExtension == "observed" {
+
+    let generatedExtensions = ["observed", "exe", "executable"]
+    for case let u as URL in items where generatedExtensions.contains(u.pathExtension) {
       try FileManager.default.removeItem(at: u)
     }
   }

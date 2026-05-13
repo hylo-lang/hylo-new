@@ -370,7 +370,7 @@ public struct Typer {
 
   /// Type checks `d`.
   private mutating func check(_ d: ConformanceDeclaration.ID) {
-    let t = declaredType(of: d)
+    let typeOfWitness = declaredType(of: d)
 
     check(program[d].contextParameters)
 
@@ -387,9 +387,9 @@ public struct Typer {
     // The type of the declaration has the form `<T...> A... ==> P<B...>` where `P<B...>` is the
     // type of the declared witness and the rest forms a context. Requirements are resolved as
     // members of the type `B` where type parameters occur as skolems.
-    let witnessSansContext = program.types.contextAndHead(t).head
-    guard let witness = program.types.seenAsTraitApplication(witnessSansContext) else {
-      assert(t[.hasError])
+    let typeOfWitnessSansContext = program.types.contextAndHead(typeOfWitness).head
+    guard let witness = program.types.seenAsTraitApplication(typeOfWitnessSansContext) else {
+      assert(typeOfWitness[.hasError])
       return
     }
 
@@ -498,19 +498,18 @@ public struct Typer {
     func anonymousImplementation(of requirement: DeclarationIdentity) -> SummonResult? {
       let requiredType = expectedImplementationType(of: requirement)
 
-      var summonings = summon(requiredType, in: .init(node: d))
-      let i = summonings.stablePartition { (c) in
-        c.witness.declaration == requirement
-      }
+      // The conformance declaration is removed from the givens available to resolve the required
+      // type to avoid creating cycles through nested givens. For example, if `Q` refines `P` and
+      // `d` is declaring a conformance to `Q`, we cannot use `d` to resolve `P<Self>`.
+      declarationsOnStack.insert(.init(d))
+      defer { declarationsOnStack.remove(.init(d)) }
 
-      let s = program.spanForDiagnostic(about: d)
-      if i == 1 {
-        return summonings[0]
-      } else if i == 0 {
-        report(program.noGivenInstance(of: requiredType, at: s))
-        return nil
+      let summonings = summon(requiredType, in: .init(node: d))
+      if let pick = summonings.uniqueElement {
+        return pick
       } else {
-        report(program.multipleGivenInstances(of: requiredType, at: s))
+        let s = program.spanForDiagnostic(about: d)
+        report(program.noUniqueGivenInstance(of: requiredType, found: summonings, at: s))
         return nil
       }
     }
@@ -853,6 +852,8 @@ public struct Typer {
     case program.standardLibraryDeclaration(.deinitializable):
       return true
     case program.standardLibraryDeclaration(.equatable):
+      return true
+    case program.standardLibraryDeclaration(.copyable):
       return true
     case program.standardLibraryDeclaration(.movable):
       return true
@@ -2078,7 +2079,8 @@ public struct Typer {
     if let q = program.implicitQualification(of: callee) {
       let t =
         context.expectedType ?? context.obligations.assume(e, hasType: fresh().erased, at: site)
-      _ = context.withSubcontext(expectedType: t) { (ctx) in inferredType(of: q, in: &ctx) }
+      let u = program.types.demand(Metatype(inhabitant: t)).erased
+      _ = context.withSubcontext(expectedType: u) { (ctx) in inferredType(of: q, in: &ctx) }
     }
 
     let r = SyntaxRole(program[e].style, labels: program[e].labels)
@@ -2419,13 +2421,13 @@ public struct Typer {
       role = .unspecified
     }
 
-    let s = resolveQualification(of: e, in: &context)
-    let t = demand(Metatype(inhabitant: s)).erased
+    let q = program[e].qualification
+    let s = context.withSubcontext { (ctx) in inferredType(of: q, in: &ctx) }
     let u = fresh().erased
 
     context.obligations.assume(
       MemberConstraint(
-        member: program[e].target, role: role, qualification: t, type: u, site: site))
+        member: program[e].target, role: role, qualification: s, type: u, site: site))
     context.obligations.assume(program[e].target, hasType: u, at: site)
 
     let v = fresh().erased
@@ -2585,7 +2587,7 @@ public struct Typer {
   private mutating func inferredType(
     of e: TupleMember.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    let parent = context.withSubcontext() { (ctx) in
+    let parent = context.withSubcontext { (ctx) in
       inferredType(of: program[e].parent, in: &ctx)
     }
 
@@ -2822,7 +2824,7 @@ public struct Typer {
   /// viable candidate.
   ///
   /// If binding succeeds, `o` is extended with either a assignment mapping `n` to a declaration
-  /// reference or an overload constrain mapping `n` to one of the viable candidates. If binding
+  /// reference or an overload constraint mapping `n` to one of the viable candidates. If binding
   /// failed, `o` is left unchanged and a diagnostic is returned.
   ///
   /// - Requires: `candidates` is not empty.
@@ -3472,7 +3474,7 @@ public struct Typer {
     }
 
     // Do not memoize the result if it has been computed while givens were on stack.
-    if !t[.hasVariable] && !declarationsOnStack.contains(where: program.isImplicit) {
+    if !t[.hasVariable] && !hasImplicitOnStack() {
       cache.scopeToSummoned[scopeOfUse, default: [:]][t] = result
     }
 
@@ -3720,7 +3722,7 @@ public struct Typer {
   /// type is being computed.
   ///
   /// The result does not include built-in givens.
-  private mutating func givens(visibleFrom scopeOfUse: ScopeIdentity) -> [[Given]] {
+  internal mutating func givens(visibleFrom scopeOfUse: ScopeIdentity) -> [[Given]] {
     var gs: [[Given]] = []
 
     // Gather the givens in the current file.
@@ -3816,7 +3818,6 @@ public struct Typer {
     var threads = [formThread(matching: root, to: goal, in: .empty)]
 
     if canDeriveCoercions(root.type, goal, in: scopeOfUse, where: .empty) {
-    // if canDeriveCoercions(in: scopeOfUse, where: .empty) {
       // Either the type of the elaborated witness is unifiable with the queried type or we need to
       // assume a coercion. Implicit resolution will figure out the "cheapest" alternative.
       let (environment, coercion) = ResolutionThread.Environment.empty.assuming(
@@ -3846,7 +3847,7 @@ public struct Typer {
       let t = declaredType(of: g)
       let u = program.types.contextAndHead(t)
 
-      // Can the given can match any type (e.g., `<T> T`)?
+      // Can the given match any type (e.g., `<T> T`)?
       if u.context.parameters.contains(where: { (p) in p == u.head }) {
         return true
       }
@@ -3935,17 +3936,6 @@ public struct Typer {
     case .right(let d):
       report(d)
       return .error
-    }
-  }
-
-  /// Resolves and returns the qualification of `e`, which occurs in `context`.
-  private mutating func resolveQualification(
-    of e: New.ID, in context: inout InferenceContext
-  ) -> AnyTypeIdentity {
-    if let q = program.cast(program[e].qualification, to: ImplicitQualification.self) {
-      return inferredType(of: q, in: &context)
-    } else {
-      return evaluatePartialTypeAscription(program[e].qualification, in: &context).result
     }
   }
 
@@ -4780,6 +4770,11 @@ public struct Typer {
     default:
       return true
     }
+  }
+
+  /// Returns `true` iff there is a declaration introducing an implicit that is being typed.
+  private func hasImplicitOnStack() -> Bool {
+    declarationsOnStack.contains(where: program.isImplicit)
   }
 
 }

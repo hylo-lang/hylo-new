@@ -109,9 +109,9 @@ final class SourceSpanTests: XCTestCase {
 
   func testDescription() {
     let f: SourceFile = "Hello."
-    XCTAssertEqual(f.span.description, "virtual://1ssiyy33rbj6z:1.1-7")
+    XCTAssertEqual(f.span.description, "virtual:///1ssiyy33rbj6z:1.1-7")
     let g: SourceFile = "A\nB"
-    XCTAssertEqual(g.span.description, "virtual://3ahohnnbwwf82:1.1-2:2")
+    XCTAssertEqual(g.span.description, "virtual:///3ahohnnbwwf82:1.1-2:2")
   }
 
 }

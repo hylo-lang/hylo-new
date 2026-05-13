@@ -10,8 +10,8 @@ trait P {
 }
 
 given A is P {
-  type X = A
-  public fun x() -> X { A() }
+  type X = B
+  public fun x() -> X { B() }
 }
 
 given B is P {

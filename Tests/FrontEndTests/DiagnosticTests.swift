@@ -6,7 +6,7 @@ final class DiagnosticTests: XCTestCase {
   func testDescription() {
     let f: SourceFile = "Hello."
     let e = Diagnostic(.error, "bang", at: f.span)
-    XCTAssertEqual(e.description, "virtual://1ssiyy33rbj6z:1.1-7: error: bang")
+    XCTAssertEqual(e.description, "virtual:///1ssiyy33rbj6z:1.1-7: error: bang")
   }
 
   func testRender() {
@@ -19,7 +19,7 @@ final class DiagnosticTests: XCTestCase {
     XCTAssertEqual(
       rendered,
       """
-      virtual://1ssiyy33rbj6z:1.1-3: error: bang
+      virtual:///1ssiyy33rbj6z:1.1-3: error: bang
       Hello.
       ~~
 
@@ -41,13 +41,13 @@ final class DiagnosticTests: XCTestCase {
     XCTAssertEqual(
       rendered,
       """
-      virtual://1ssiyy33rbj6z:1.1-3: error: bang
+      virtual:///1ssiyy33rbj6z:1.1-3: error: bang
       Hello.
       ~~
-      virtual://1ssiyy33rbj6z:1.1: note: see this
+      virtual:///1ssiyy33rbj6z:1.1: note: see this
       Hello.
       ^
-      virtual://1ssiyy33rbj6z:1.2: note: and that
+      virtual:///1ssiyy33rbj6z:1.2: note: and that
       Hello.
        ^
 
@@ -64,7 +64,7 @@ final class DiagnosticTests: XCTestCase {
     XCTAssertEqual(
       rendered,
       """
-      \u{001B}[1mvirtual://1ssiyy33rbj6z:1.1-3\u{001B}[0m: \u{001B}[1m\u{001B}[31merror\u{001B}[0m: \u{001B}[1mbang\u{001B}[0m
+      \u{001B}[1mvirtual:///1ssiyy33rbj6z:1.1-3\u{001B}[0m: \u{001B}[1m\u{001B}[31merror\u{001B}[0m: \u{001B}[1mbang\u{001B}[0m
       Hello.
       ~~
 

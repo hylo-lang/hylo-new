@@ -13,19 +13,19 @@ public struct EnumDeclaration: TypeDeclaration, ModifiableDeclaration, Annotatab
   /// The introducer of this declaration.
   public let introducer: Token
 
-  /// The name of the declared struct.
+  /// The name of the declared enumeration.
   public let identifier: Parsed<String>
 
-  /// The type parameters of the struct.
+  /// The type parameters of the enumeration.
   public let parameters: [GenericParameterDeclaration.ID]
 
   /// The raw representation of the enumeration, if any.
   public let representation: ExpressionIdentity?
 
-  /// The conformances declared along with the struct.
+  /// The conformances declared along with the enumeration.
   public let conformances: [ConformanceDeclaration.ID]
 
-  /// The members of the declared struct.
+  /// The members of the declared enumeration.
   public let members: [DeclarationIdentity]
 
   /// The site from which `self` was parsed.
