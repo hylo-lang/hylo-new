@@ -261,7 +261,8 @@ internal struct IREmitter {
 
           let o = me.currentFunction.returnRegister ?? .poison(.place(.error))
           let f = me.loweredCallee(
-            implementation, qualifiedBy: nil, output: o, at: me.currentAnchor)
+            implementation, qualifiedBy: nil, markedForMutationBy: nil,
+            output: o, at: me.currentAnchor)
           me._emitCallToRequirementImplementation(f)
         }
       }
@@ -814,33 +815,49 @@ internal struct IREmitter {
   private mutating func loweredCallee(
     _ e: ExpressionIdentity, output r: IRValue
   ) -> LoweredCallee {
-    switch program.tag(of: e) {
+    var callee = e
+    var mutationMarker: Token? = nil
+    if let n = program.cast(e, to: InoutExpression.self) {
+      callee = program[n].lvalue
+      mutationMarker = program[n].marker
+    }
+
+    switch program.tag(of: callee) {
     case NameExpression.self:
-      return loweredCallee(program.castUnchecked(e, to: NameExpression.self), output: r)
+      let n = program.castUnchecked(callee, to: NameExpression.self)
+      return loweredCallee(n, output: r, markedForMutationBy: mutationMarker)
+
     case New.self:
-      return loweredCallee(program.castUnchecked(e, to: New.self), output: r)
+      return loweredCallee(program.castUnchecked(callee, to: New.self), output: r)
+
     case StaticCall.self:
-      return loweredCallee(program.castUnchecked(e, to: StaticCall.self), output: r)
+      return loweredCallee(program.castUnchecked(callee, to: StaticCall.self), output: r)
+
     case SyntheticExpression.self:
-      return loweredCallee(program.castUnchecked(e, to: SyntheticExpression.self), output: r)
+      return loweredCallee(program.castUnchecked(callee, to: SyntheticExpression.self), output: r)
+
     default:
-      program.unexpected(e)
+      program.unexpected(callee)
     }
   }
 
   /// Generates the IR for using `e`, which occurs as a callee.
   private mutating func loweredCallee(
-    _ e: NameExpression.ID, output result: IRValue
+    _ e: NameExpression.ID, output result: IRValue, markedForMutationBy mutationMarker: Token?,
   ) -> LoweredCallee {
     let d = program.declaration(referredToBy: e)
     let a = Anchor(site: program[e].site, scope: program.parent(containing: e))
-    return loweredCallee(d, qualifiedBy: program[e].qualification, output: result, at: a)
+    return loweredCallee(
+      d, qualifiedBy: program[e].qualification, markedForMutationBy: mutationMarker,
+      output: result, at: a)
   }
 
   /// Generates the IR at `anchor` for using `d`, which occurs as a callee that is optionally
   /// qualified by `q`.
   private mutating func loweredCallee(
-    _ d: DeclarationReference, qualifiedBy q: ExpressionIdentity?, output result: IRValue,
+    _ d: DeclarationReference, qualifiedBy q: ExpressionIdentity?,
+    markedForMutationBy mutationMarker: Token?,
+    output result: IRValue,
     at anchor: Anchor
   ) -> LoweredCallee {
     switch d {
@@ -850,7 +867,8 @@ internal struct IREmitter {
 
     case .direct(let d):
       // The callee refers to a function directly.
-      let f = loweredCallee(referringTo: d, boundTo: nil, output: result)
+      let f = loweredCallee(
+        referringTo: d, boundTo: nil, markedForMutationBy: mutationMarker, output: result)
 
       // The qualification may define type arguments.
       if let ts = q.flatMap({ (e) in argumentsFromStaticQualification(e) }) {
@@ -863,7 +881,8 @@ internal struct IREmitter {
     case .member(let d):
       // The callee refers to a bound member.
       let receiver = lowered(lvalue: q!)
-      let f = loweredCallee(referringTo: d, boundTo: receiver, output: result)
+      let f = loweredCallee(
+        referringTo: d, boundTo: receiver, markedForMutationBy: mutationMarker, output: result)
 
       // If the reference is bound to a generic type, its type arguments have to be extracted from
       // the receiver's expression.
@@ -881,7 +900,9 @@ internal struct IREmitter {
 
       // Is the member declared in an extension?
       if let parent = program.extensionContaining(m) {
-        let target = loweredCallee(referringTo: m, boundTo: receiver, output: result)
+        let target = loweredCallee(
+          referringTo: m, boundTo: receiver, markedForMutationBy: mutationMarker, output: result)
+
         return lowering(at: anchor.site, in: anchor.scope) { (me) in
           // References to members in extensions are expressed using a witness representing the
           // type and term arguments passed to parameters declared on the extension itself.
@@ -913,7 +934,9 @@ internal struct IREmitter {
 
   /// Generates the IR for a callee referring to `d`, optionally bound to `receiver`.
   private mutating func loweredCallee(
-    referringTo d: DeclarationIdentity, boundTo receiver: IRValue?, output result: IRValue
+    referringTo d: DeclarationIdentity, boundTo receiver: IRValue?,
+    markedForMutationBy mutationMarker: Token?,
+    output result: IRValue
   ) -> LoweredCallee {
     switch program.tag(of: d) {
     case EnumCaseDeclaration.self:
@@ -921,13 +944,14 @@ internal struct IREmitter {
         constructor: program.castUnchecked(d, to: EnumCaseDeclaration.self))
       return loweredCallee(referringTo: f, boundTo: receiver, output: result)
 
-    case FunctionDeclaration.self:
+    case FunctionDeclaration.self, VariantDeclaration.self:
       let f = demandLoweredDeclaration(functionOrConformance: d)
       return loweredCallee(referringTo: f, boundTo: receiver, output: result)
 
-    case VariantDeclaration.self:
-      let f = demandLoweredDeclaration(functionOrConformance: d)
-      return loweredCallee(referringTo: f, boundTo: receiver, output: result)
+    case FunctionBundleDeclaration.self:
+      let b = program.castUnchecked(d, to: FunctionBundleDeclaration.self)
+      return loweredCallee(
+        referringTo: b, boundTo: receiver, markedForMutationBy: mutationMarker, output: result)
 
     default:
       program.unexpected(d)
@@ -942,6 +966,34 @@ internal struct IREmitter {
     return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
   }
 
+  /// Generates the IR for using `f` as a callee, optionally bound to `receiver`.
+  private mutating func loweredCallee(
+    referringTo f: FunctionBundleDeclaration.ID, boundTo receiver: IRValue?,
+    markedForMutationBy mutationMarker: Token?,
+    output result: IRValue
+  ) -> LoweredCallee {
+    let usedMutably = mutationMarker != nil
+
+    // Is there more than one variant applicable?
+    let ks = program.effects(f).intersection(usedMutably ? .inplace : .functional)
+    if let k = ks.uniqueElement {
+      let v = program.variant(k, of: f)!
+      let f = demandLoweredDeclaration(functionOrConformance: .init(v))
+      return loweredCallee(referringTo: f, boundTo: receiver, output: result)
+    }
+
+    // Otherwise, construct a bundle reference that will be reified later.
+    else {
+      let types = accumulatedGenericParameters(visibleFrom: .init(node: f))
+      let (terms, output) = prototype(function: .init(f), usedMutably: usedMutably)
+
+      let s = IRFunction.Signature(types: types, terms: terms, output: output)
+      let t = program.types.demand(s)
+      let v = IRValue.bundle(f, t, ks)
+      return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
+    }
+  }
+
   /// Implements `loweredCallee(_:writingTo)` for new expressions.
   private mutating func loweredCallee(
     _ e: New.ID, output result: IRValue
@@ -949,7 +1001,7 @@ internal struct IREmitter {
     // When the callee is a new expression (e.g., `T.new(x)`), then `result` is passed as the first
     // argument of the underlying initializer. The return type of the initializer is a unit value.
     let r = lowering(e, { (me) in me._alloca(.void) })
-    let f = loweredCallee(program[e].target, output: result)
+    let f = loweredCallee(program[e].target, output: result, markedForMutationBy: nil)
 
     // The qualification may define type arguments.
     let g = if let ts = argumentsFromStaticQualification(program[e].qualification) {
@@ -1262,7 +1314,7 @@ internal struct IREmitter {
       tp.accumulatedGenericParameters(visibleFrom: scopeOfDeclaration)
     }
 
-    let (terms, output) = prototype(d)
+    let (terms, output) = prototype(functionOrConformance: d)
     return program[module].ir.addFunction(
       IRFunction(name: name, output: output, typeParameters: types, termParameters: terms))
   }
@@ -1281,7 +1333,7 @@ internal struct IREmitter {
     if let i = program[module].ir.functions.index(forKey: name) {
       return i
     } else {
-      let (ps, o) = prototype(requirement, applying: arguments)
+      let (ps, o) = prototype(functionOrConformance: requirement, applying: arguments)
       return program[module].ir.addFunction(
         IRFunction(name: name, output: o, typeParameters: [], termParameters: ps))
     }
@@ -1346,12 +1398,12 @@ internal struct IREmitter {
 
   /// Returns the term parameters and return type of `d`'s lowered representation.
   private mutating func prototype(
-    _ d: DeclarationIdentity, applying substitutions: TypeArguments = .init()
+    functionOrConformance d: DeclarationIdentity, applying substitutions: TypeArguments = .init()
   ) -> ([IRParameter], IRFunction.Output) {
     if let n = program.cast(d, to: ConformanceDeclaration.self) {
       return prototype(conformance: n, applying: substitutions)
     } else {
-      return prototype(functionOrVariant: d, applying: substitutions)
+      return prototype(function: d, usedMutably: false, applying: substitutions)
     }
   }
 
@@ -1391,16 +1443,16 @@ internal struct IREmitter {
   /// and captures of `d`, in that order. Type parameters are not included. Those are only lowered
   /// to term parameters in existentialized functions.
   private mutating func prototype(
-    functionOrVariant d: DeclarationIdentity, applying substitutions: TypeArguments = .init()
+    function d: DeclarationIdentity, usedMutably: Bool,
+    applying substitutions: TypeArguments = .init(),
   ) -> ([IRParameter], IRFunction.Output) {
-    assert(program.isInstance(d, of: FunctionDeclaration.self, VariantDeclaration.self))
-
-    let abstraction = program.types.seenAsTermAbstraction(program.type(assignedTo: d))!
+    let typeOfDeclaration = program.types.contextAndHead(program.type(assignedTo: d))
+    let shape = program.types.seenAsTermAbstraction(typeOfDeclaration.head)!
     var terms: [IRParameter] = []
 
     // Parameters of memberwise initializers have no explicit declarations.
     if program.isMemberwiseInitializer(d) {
-      for p in program.types[abstraction].inputs {
+      for p in program.types[shape].inputs {
         let t = program.types.dealiased(p.type)
         let u = program.types.substitute(substitutions, in: t)
         terms.append(IRParameter(type: u, access: p.access, declaration: nil))
@@ -1439,19 +1491,21 @@ internal struct IREmitter {
         let t = program.type(assignedTo: p, assuming: RemoteType.self)
         let u = program.types.dealiased(program.types[t].projectee)
         let v = program.types.substitute(substitutions, in: u)
-        let k = program.types[t].access.unlessAuto(program.types[abstraction].effect)
+        let k = program.types[t].access.unlessAuto(program.types[shape].effect)
+        assert((k != .auto) || program.tag(of: d) == FunctionBundleDeclaration.self)
         terms.append(IRParameter(type: v, access: k, declaration: .init(p)))
       }
     }
 
     // Return register comes last.
-    let r = program.types.dealiased(program.types[abstraction].output)
-    let s = program.types.substitute(substitutions, in: r)
-    if program.types[abstraction].style == .parenthesized {
-      terms.append(IRParameter(type: s, access: .set, declaration: nil))
+    let r = program.types.resultOfApplying(typeOfDeclaration.head, mutably: usedMutably)!
+    let s = program.types.dealiased(r)
+    let t = program.types.substitute(substitutions, in: s)
+    if program.types[shape].style == .parenthesized {
+      terms.append(IRParameter(type: t, access: .set, declaration: nil))
       return (terms, .indirect)
     } else {
-      return (terms, .remote(program.types[abstraction].effect, s))
+      return (terms, .remote(program.types[shape].effect, t))
     }
   }
 
@@ -1706,6 +1760,7 @@ internal struct IREmitter {
 
   /// Inserts an `access` instruction.
   internal mutating func _access(_ k: AccessEffectSet, from source: IRValue) -> IRValue {
+    assert(!k.isEmpty)
     assert(currentFunction.isPlace(source))
     return insert(IRAccess(capabilities: k, source: source, anchor: currentAnchor))!
   }
@@ -1760,10 +1815,7 @@ internal struct IREmitter {
 
     var last = result
     if formAccesses {
-      let parameters = program.types[t].inputs
-      for i in 0 ..< arguments.count {
-        arguments[i] = _access(.init(parameters[i].access), from: arguments[i])
-      }
+      _emitArgumentAccesses(&arguments, toApplyOrProject: callee, typed: t)
       last = _access([.set], from: result)
     }
 
@@ -1860,10 +1912,7 @@ internal struct IREmitter {
     assert(program.types[t].inputs.count == arguments.count)
 
     if formAccesses {
-      let parameters = program.types[t].inputs
-      for i in 0 ..< arguments.count {
-        arguments[i] = _access(.init(parameters[i].access), from: arguments[i])
-      }
+      _emitArgumentAccesses(&arguments, toApplyOrProject: callee, typed: t)
     }
 
     let s = IRProject(
@@ -2214,6 +2263,23 @@ internal struct IREmitter {
     }
   }
 
+  /// Forms an access on each of the lvalues in `arguments`, which are the arguments passed to the
+  /// function `f` that has type `t`.
+  ///
+  /// `f` may have `auto` parameters iff it refers to a bundle. In this case, the effect of the
+  /// variants that may be eventually selected during bundle reification will be used when forming
+  /// an access for an `auto` parameter.
+  private mutating func _emitArgumentAccesses(
+    _ arguments: inout [IRValue], toApplyOrProject f: IRValue, typed t: Arrow.ID
+  ) {
+    let effectsForAuto = if case .bundle(_, _, let k) = f { k } else { AccessEffectSet() }
+    let parameters = program.types[t].inputs
+    for i in 0 ..< arguments.count {
+      let k = AccessEffectSet(parameters[i].access, unlessAuto: effectsForAuto)
+      arguments[i] = _access(k, from: arguments[i])
+    }
+  }
+
   /// Generates the IR for casting `source` to a place of type `target`.
   internal mutating func _emitCast(
     _ source: IRValue, to target: AnyTypeIdentity
@@ -2493,6 +2559,15 @@ internal struct IREmitter {
     }
   }
 
+  /// Returns generic parameters captured by `s` and the scopes semantically containing `s`.
+  private mutating func accumulatedGenericParameters(
+    visibleFrom s: ScopeIdentity
+  ) -> [GenericParameter.ID] {
+    program.withTyper(typing: s.module) { (tp) in
+      tp.accumulatedGenericParameters(visibleFrom: s)
+    }
+  }
+
 }
 
 extension Program {
@@ -2516,6 +2591,8 @@ extension Program {
     of d: DeclarationIdentity
   ) -> ParametersAndCaptures {
     switch tag(of: d) {
+    case FunctionBundleDeclaration.self:
+      return parametersAndCaptures(of: castUnchecked(d, to: FunctionBundleDeclaration.self))
     case FunctionDeclaration.self:
       return parametersAndCaptures(of: castUnchecked(d, to: FunctionDeclaration.self))
     case VariantDeclaration.self:

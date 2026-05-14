@@ -1250,10 +1250,26 @@ public struct Program: Sendable {
   /// does not declare a bundle or `d` does not contain such a variant.
   public func variant(_ k: AccessEffect, of d: DeclarationIdentity) -> VariantDeclaration.ID? {
     if let b = cast(d, to: FunctionBundleDeclaration.self) {
-      return self[b].variants.first(where: { (v) in self[v].effect.value == k })
+      return variant(k, of: b)
     } else {
       return nil
     }
+  }
+
+  /// Returns the declaration of the variant with effect `k` in the bundle `d`, if any.
+  public func variant(
+    _ k: AccessEffect, of d: FunctionBundleDeclaration.ID
+  ) -> VariantDeclaration.ID? {
+    self[d].variants.first(where: { (v) in self[v].effect.value == k })
+  }
+
+  /// Returns the call effects of variants declared in `d`.
+  public func effects(_ d: FunctionBundleDeclaration.ID) -> AccessEffectSet {
+    var s = AccessEffectSet()
+    for v in self[d].variants {
+      s.insert(self[v].effect.value)
+    }
+    return s
   }
 
   /// Returns the annotations applied to `n`.

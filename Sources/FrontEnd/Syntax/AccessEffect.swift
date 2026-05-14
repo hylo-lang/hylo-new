@@ -39,10 +39,9 @@ public enum AccessEffect: UInt8, Sendable {
     (self == .inout) || (self == .set)
   }
 
-  /// Returns `self` iff `self` is not `auto`; otherwise, returns `k`, which is not `auto`.
+  /// Returns `self` iff `self` is not `auto`; otherwise, returns `k`.
   public func unlessAuto(_ k: AccessEffect) -> AccessEffect {
-    assert(k != .auto)
-    return self != .auto ? self : k
+    self != .auto ? self : k
   }
 
 }

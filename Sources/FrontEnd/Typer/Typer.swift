@@ -1269,13 +1269,12 @@ public struct Typer {
     assert(d.module == module, "dependency is not typed")
 
     initializeContext(program[d].contextParameters)
-    let variants = AccessEffectSet(program[d].variants.map({ (v) in program[v].effect.value }))
     let inputs = declaredTypes(of: program[d].parameters)
     let arrow = declaredArrowType(of: d, taking: inputs)
 
     let (context, head) = program.types.contextAndHead(arrow)
     let shape = program.types.cast(head, to: Arrow.self)!
-    let bundle = demand(Bundle(shape: shape, variants: variants)).erased
+    let bundle = demand(Bundle(shape: shape, variants: program.effects(d))).erased
     let result = program.types.introduce(context, into: bundle)
 
     program[d.module].setType(result, for: d)
