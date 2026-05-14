@@ -800,18 +800,18 @@ internal struct IREmitter {
 
   }
 
-  /// Generates the IR for using `e`, which occurs as a callee.
+  /// Generates the IR for using `e` as a callee.
   ///
   /// Let `f` be the result of this method. `f.value` is the IR function implementing the callee
   /// expressed by `e`. This function may be partially applied if `e` is a bound member and/or if
   /// it involves implicit arguments, in which case `f.arguments` contain these arguments.
   ///
-  /// If `f` is an ordinary function rather than a subscript, `r` is the place in which the result
-  /// of the call is written (i.e., the target of `lower(store:to:)`). In this case, if `e` is the
-  /// application of a new expression, then `r` is appended to `f.arguments` and `f.result` is a
-  /// new alloca. Otherwise, `f.result` is assigned to `r`.
+  /// If `e` denotes an ordinary function rather than a subscript, then `r` is the place in which
+  /// the result of the call is written (i.e., the target of `lower(store:to:)`). Moreover, if `e`
+  /// is the application of a new expression, then `r` is appended to `f.arguments` and `f.result`
+  /// is a new alloca. Otherwise, `f.result` is assigned to `r`.
   ///
-  /// If `f` is a subscript, then `r` and `f.result` are a poison values.
+  /// If `f` is a subscript, then `r` and `f.result` are poison values.
   private mutating func loweredCallee(
     _ e: ExpressionIdentity, output r: IRValue
   ) -> LoweredCallee {
@@ -841,21 +841,28 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for using `e`, which occurs as a callee.
+  /// Generates the IR for using `e` as a callee.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for name expressions. `mutationMarker` is,
+  /// is the mutation marker that prefixes the callee's expression.
   private mutating func loweredCallee(
-    _ e: NameExpression.ID, output result: IRValue, markedForMutationBy mutationMarker: Token?,
+    _ e: NameExpression.ID, output r: IRValue, markedForMutationBy mutationMarker: Token?,
   ) -> LoweredCallee {
     let d = program.declaration(referredToBy: e)
     let a = Anchor(site: program[e].site, scope: program.parent(containing: e))
     return loweredCallee(
       d, qualifiedBy: program[e].qualification, markedForMutationBy: mutationMarker,
-      output: result, at: a)
+      output: r, at: a)
   }
 
-  /// Generates the IR at `anchor` for using `d`, which occurs as a callee that is optionally
-  /// qualified by `q`.
+  /// Generates the IR using `d` as a callee that is optionally qualified by `qualification`,
+  /// achoring new instructions to `anchor`.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for a use of `d` expressed explicitly in
+  /// sources or synthesized during compilation. `mutationMarker` is, if defined, is the mutation
+  /// marker that prefixes the expression denoting the use of `d`.
   private mutating func loweredCallee(
-    _ d: DeclarationReference, qualifiedBy q: ExpressionIdentity?,
+    _ d: DeclarationReference, qualifiedBy qualification: ExpressionIdentity?,
     markedForMutationBy mutationMarker: Token?,
     output result: IRValue,
     at anchor: Anchor
@@ -871,7 +878,7 @@ internal struct IREmitter {
         referringTo: d, boundTo: nil, markedForMutationBy: mutationMarker, output: result)
 
       // The qualification may define type arguments.
-      if let ts = q.flatMap({ (e) in argumentsFromStaticQualification(e) }) {
+      if let ts = qualification.flatMap({ (e) in argumentsFromStaticQualification(e) }) {
         let g = lowering(at: anchor.site, in: anchor.scope, { $0._type_apply(f.value, to: ts) })
         return f.substituting(value: g)
       } else {
@@ -880,7 +887,7 @@ internal struct IREmitter {
 
     case .member(let d):
       // The callee refers to a bound member.
-      let receiver = lowered(lvalue: q!)
+      let receiver = lowered(lvalue: qualification!)
       let f = loweredCallee(
         referringTo: d, boundTo: receiver, markedForMutationBy: mutationMarker, output: result)
 
@@ -896,7 +903,7 @@ internal struct IREmitter {
 
     case .inherited(let w, let m, let statically):
       // The callee refers to a member declared in extension.
-      let receiver = statically ? nil : lowered(lvalue: q!)
+      let receiver = statically ? nil : lowered(lvalue: qualification!)
 
       // Is the member declared in an extension?
       if let parent = program.extensionContaining(m) {
@@ -932,7 +939,11 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for a callee referring to `d`, optionally bound to `receiver`.
+  /// Generates the IR using `d` as a callee that is optionally bound to `receiver`.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for a use of `d` expressed explicitly in
+  /// sources or synthesized during compilation. `mutationMarker` is, if defined, is the mutation
+  /// marker that prefixes the expression denoting the use of `d`.
   private mutating func loweredCallee(
     referringTo d: DeclarationIdentity, boundTo receiver: IRValue?,
     markedForMutationBy mutationMarker: Token?,
@@ -958,7 +969,10 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for a callee referring to `f`, optionally bound to `receiver`.
+  /// Generates the IR for using `f` as a callee that is optionally bound to `receiver`.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for a use of `d` expressed explicitly in
+  /// sources or synthesized during compilation.
   private mutating func loweredCallee(
     referringTo f: IRFunction.ID, boundTo receiver: IRValue?, output result: IRValue
   ) -> LoweredCallee {
@@ -966,7 +980,10 @@ internal struct IREmitter {
     return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: result)
   }
 
-  /// Generates the IR for using `f` as a callee, optionally bound to `receiver`.
+  /// Generates the IR for using `f` as a callee that is optionally bound to `receiver`.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for a use of `d` expressed explicitly in
+  /// sources or synthesized during compilation.
   private mutating func loweredCallee(
     referringTo f: FunctionBundleDeclaration.ID, boundTo receiver: IRValue?,
     markedForMutationBy mutationMarker: Token?,
@@ -994,7 +1011,9 @@ internal struct IREmitter {
     }
   }
 
-  /// Implements `loweredCallee(_:writingTo)` for new expressions.
+  /// Generates the IR for using `e` as a callee.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for new expressions.
   private mutating func loweredCallee(
     _ e: New.ID, output result: IRValue
   ) -> LoweredCallee {
@@ -1014,7 +1033,9 @@ internal struct IREmitter {
     return LoweredCallee(value: g, arguments: xs, result: r)
   }
 
-  /// Implements `loweredCallee(_:writingTo)` for static calls.
+  /// Generates the IR for using `e` as a callee.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for static calls.
   private mutating func loweredCallee(
     _ e: StaticCall.ID, output result: IRValue
   ) -> LoweredCallee {
@@ -1036,7 +1057,9 @@ internal struct IREmitter {
     return poly.substituting(value: mono)
   }
 
-  /// Implements `loweredCallee(_:writingTo)` for synthetic expressions.
+  /// Generates the IR for using `e` as a callee.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for synthetic expressions.
   private mutating func loweredCallee(
     _ e: SyntheticExpression.ID, output result: IRValue
   ) -> LoweredCallee {
@@ -1046,7 +1069,10 @@ internal struct IREmitter {
       in: program.parent(containing: e))
   }
 
-  /// Implements `loweredCallee(_:writingTo)` for witness expressions.
+  /// Generates the IR for using `e` as a callee, achoring new instructions to the anchor
+  /// represented by `site` and `scope`.
+  ///
+  /// This method implements `loweredCallee(_:output:)` for witness expressions.
   private mutating func loweredCallee(
     _ e: WitnessExpression, output result: IRValue, at site: SourceSpan, in scope: ScopeIdentity
   ) -> LoweredCallee {
