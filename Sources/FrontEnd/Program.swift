@@ -1469,7 +1469,7 @@ extension Program {
     /// `Hylo.Deinitializable`.
     case deinitializable = "Deinitializable"
 
-    /// `Hyloe.Deinitializable.deinit`.
+    /// `Hylo.Deinitializable.deinit`.
     case deinitializableDeinit = "Deinitializable.deinit(:)"
 
     /// `Hylo.Equatable`.
