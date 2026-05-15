@@ -718,7 +718,7 @@ public struct Program: Sendable {
 
   /// Returns the declaration referred to by `n`, if any.
   ///
-  /// - Requires: The module containing `n` is typed.
+  /// - Note: This may only return non-nil after type-checking.
   public func declaration(maybeReferredToBy n: NameExpression.ID) -> DeclarationReference? {
     self[n.module].declaration(referredToBy: n)
   }
