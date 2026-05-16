@@ -856,7 +856,7 @@ internal struct IREmitter {
   }
 
   /// Generates the IR using `d` as a callee that is optionally qualified by `qualification`,
-  /// achoring new instructions to `anchor`.
+  /// anchoring new instructions to `anchor`.
   ///
   /// This method implements `loweredCallee(_:output:)` for a use of `d` expressed explicitly in
   /// sources or synthesized during compilation. `mutationMarker` is, if defined, is the mutation
@@ -1069,8 +1069,7 @@ internal struct IREmitter {
       in: program.parent(containing: e))
   }
 
-  /// Generates the IR for using `e` as a callee, achoring new instructions to the anchor
-  /// represented by `site` and `scope`.
+  /// Generates the IR for using `e` as a callee, anchoring new instructions at `site` and `scope`.
   ///
   /// This method implements `loweredCallee(_:output:)` for witness expressions.
   private mutating func loweredCallee(
