@@ -82,7 +82,7 @@ public struct Arrow: TypeTree {
     by transform: (inout TypeStore, AnyTypeIdentity) -> TypeTransformAction
   ) -> Arrow {
     .init(
-      effect: effect,
+      style: style, effect: effect,
       environment: store.map(environment, transform),
       inputs: inputs.map({ (p) in p.modified(in: &store, by: transform) }),
       output: store.map(output, transform))

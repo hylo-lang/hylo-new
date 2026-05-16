@@ -518,6 +518,7 @@ public struct TypeStore: Sendable {
 
     let capture = demand(RemoteType(projectee: s.type, access: s.access)).erased
     let adapted = Arrow(
+      style: f.style,
       effect: f.effect,
       environment: capture,
       inputs: Array(f.inputs[1...]),
@@ -945,7 +946,7 @@ public struct TypeStore: Sendable {
     _ lhs: Arrow, _ rhs: Arrow, extending ss: inout SubstitutionTable,
     handlingCoercionsWith areCoercible: CoercionHandler
   ) -> Bool {
-    (lhs.effect == rhs.effect)
+    (lhs.effect == rhs.effect) && (lhs.style == rhs.style)
       && lhs.labels.elementsEqual(rhs.labels)
       && unifiable(
         lhs.environment, rhs.environment, extending: &ss, handlingCoercionsWith: areCoercible)
