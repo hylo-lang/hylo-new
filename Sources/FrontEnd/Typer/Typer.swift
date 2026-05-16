@@ -4673,15 +4673,27 @@ public struct Typer {
   /// Returns the type of values expected to be returned or projected in `s`, or `nil` if `s` is
   /// not in the body of a function or subscript.
   private mutating func expectedOutputType(in s: ScopeIdentity) -> AnyTypeIdentity? {
-    for t in program.scopes(from: s) {
-      guard let n = t.node else { break }
+    var p = s
+
+    // Look for the first function or variant declaration that encloses `s`. If we find one, then
+    // it should have an arrow type whose right-hand side is the expected output type in `s`. If
+    // we don't, then `s` is not in the body of a function or subscript.
+    while let n = p.node {
       switch program.tag(of: n) {
-      case FunctionDeclaration.self:
-        return expectedOutputType(in: program.castUnchecked(n, to: FunctionDeclaration.self))
+      case FunctionDeclaration.self, VariantDeclaration.self:
+        let d = program.castToDeclaration(n)!
+        let t = declaredType(of: d)
+        if let a = program.types[program.types.head(t)] as? Arrow {
+          return a.output
+        } else {
+          return .error
+        }
+
       default:
-        continue
+        p = program.parent(containing: n)
       }
     }
+
     return nil
   }
 
