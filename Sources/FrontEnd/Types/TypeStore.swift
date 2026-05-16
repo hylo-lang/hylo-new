@@ -606,7 +606,9 @@ public struct TypeStore: Sendable {
       self[n].output
     }
 
-    return demand(Arrow(effect: k, environment: environment, inputs: inputs, output: output))
+    let result = Arrow(
+      style: self[n].style, effect: k, environment: environment, inputs: inputs, output: output)
+    return demand(result)
   }
 
   /// Returns the value at `p` on the type identified by `n` if that type is an instance of `T`.

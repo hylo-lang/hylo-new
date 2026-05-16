@@ -1359,6 +1359,8 @@ public struct Program: Sendable {
 
     case Return.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
+    case Yield.self:
+      return spanForDiagnostic(about: castUnchecked(n, to: Yield.self))
 
     default:
       return self[n].site
@@ -1382,6 +1384,15 @@ public struct Program: Sendable {
       return spanForDiagnostic(about: e)
     } else {
       return self[n].site
+    }
+  }
+
+  /// Returns a source span suitable to emit a diagnostic related to `n` as a whole.
+  public func spanForDiagnostic(about n: Yield.ID) -> SourceSpan {
+    if let i = self[n].introducer {
+      return .empty(at: i.site.start)
+    } else {
+      return spanForDiagnostic(about: self[n].value)
     }
   }
 

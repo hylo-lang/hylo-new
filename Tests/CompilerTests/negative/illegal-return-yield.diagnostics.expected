@@ -1,0 +1,6 @@
+negative/illegal-return-yield.hylo:7.3: error: yield statement can only occur in a subscript
+  yield x
+  ^
+negative/illegal-return-yield.hylo:15.12-13: error: no coercion from 'A' to 'Void'
+    return x
+           ^
