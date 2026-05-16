@@ -4697,16 +4697,6 @@ public struct Typer {
     return nil
   }
 
-  /// Returns the type of values expected to be returned from `d`.
-  private mutating func expectedOutputType(in d: FunctionDeclaration.ID) -> AnyTypeIdentity {
-    let t = declaredType(of: d)
-    if let a = program.types[program.types.head(t)] as? Arrow {
-      return a.output
-    } else {
-      return .error
-    }
-  }
-
   /// Returns the abstraction and argument of `w` if it is a coercion. Otherwise, returns `nil`.
   private func asCoercionApplication(
     _ w: WitnessExpression
