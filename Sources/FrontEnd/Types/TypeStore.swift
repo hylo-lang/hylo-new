@@ -560,12 +560,14 @@ public struct TypeStore: Sendable {
 
   /// Returns the type of the variant `k` of a bundle of type `n`.
   ///
-  /// This method returns a copy of `n` in which occurrences of the `auto` effect are substituted
-  /// for `k` and, iff `k` is non-mutating, the return type is the original return type along with
-  /// the types of the values notionally modified by the bundle.
+  /// The result is `n` in which `k` is substituted for each top-level occurrence of `auto` effect.
+  /// Moreover, if `n` is the type of a function bundle (as opposed to a subscript bundle) and `k`
+  /// is `let` or `sink`, then the right-hand side of `n` is a tuple whose first component is the
+  /// original return type along and other components are the types of the values modified by an
+  /// application of the variant.
   ///
   /// For example, given a type `[auto A](y: auto B) auto -> C`, this method returns
-  /// - `[let A](y: let B) let -> A * B * C` with `k == .let`; and
+  /// - `[let A](y: let B) let -> {A, B, C}` with `k == .let`; and
   /// - `[set A](y: set B) set -> C` with `k == .set`.
   ///
   /// - Requires: `n` is the type of a function bundle.
@@ -579,10 +581,12 @@ public struct TypeStore: Sendable {
     var environment: AnyTypeIdentity = .void
     /// The types of the values that appear in the return type of a non-mutating variant.
     var updates: [AnyTypeIdentity] = []
+    /// `true` iff the return type of the result should include modified values.
+    let returnTypeIncludesUpdates = (self[n].style == .parenthesized) && k.isNonMutating
 
     if let t = self[self[n].environment] as? RemoteType, t.access == .auto {
       environment = demand(RemoteType(projectee: t.projectee, access: k)).erased
-      if k.isNonMutating { updates.append(t.projectee) }
+      if returnTypeIncludesUpdates { updates.append(t.projectee) }
     } else {
       environment = self[n].environment
     }
@@ -590,16 +594,16 @@ public struct TypeStore: Sendable {
     for p in self[n].inputs {
       if p.access == .auto {
         inputs.append(.init(label: p.label, access: k, type: p.type, defaultValue: p.defaultValue))
-        if k.isNonMutating { updates.append(p.type) }
+        if returnTypeIncludesUpdates { updates.append(p.type) }
       } else {
         inputs.append(p)
       }
     }
 
-    let output = if k.isMutating {
-      self[n].output
-    } else {
+    let output = if returnTypeIncludesUpdates {
       tuple(of: updates.appending(self[n].output)).erased
+    } else {
+      self[n].output
     }
 
     return demand(Arrow(effect: k, environment: environment, inputs: inputs, output: output))
