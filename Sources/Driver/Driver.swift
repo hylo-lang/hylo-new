@@ -1,7 +1,7 @@
 import Archivist
+import BackEnd
 import Foundation
 import FrontEnd
-import LLVMEmitter
 import StandardLibrary
 import SwiftyLLVM
 import Utilities
