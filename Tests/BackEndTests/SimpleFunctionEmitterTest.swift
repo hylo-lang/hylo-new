@@ -23,7 +23,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     if t.containsError { return XCTFail("Failed to apply transformation passes") }
 
     // LLVM Lowering.
-    if (try driver.lowerToLLVM(m)).containsError { return XCTFail("Failed to lower to LLVM") }
+    if (try driver.compileToLLVM(m)).containsError { return XCTFail("Failed to lower to LLVM") }
 
     XCTAssertEqual(
       driver.llvmIR(of: m),

@@ -278,7 +278,7 @@ final class CompilerTests: XCTestCase {
     if input.manifest.stage == .lowering { return done() }
 
     // LLVM Lowering.
-    if (try driver.lowerToLLVM(m)).containsError { return done() }
+    if (try driver.compileToLLVM(m)).containsError { return done() }
     artifacts.llvmIR = driver.llvmIR(of: m)!
     if input.manifest.stage == .llvmLowering { return done() }
 
