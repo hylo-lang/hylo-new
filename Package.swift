@@ -62,14 +62,24 @@ let package = Package(
     .target(
       name: "Driver",
       dependencies: [
+        .target(name: "BackEnd"),
         .target(name: "FrontEnd"),
-        .target(name: "LLVMEmitter"),
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
         .product(name: "Archivist", package: "archivist"),
         .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
       ],
       swiftSettings: commonSwiftSettings),
+
+    .target(
+      name: "BackEnd",
+      dependencies: [
+        .target(name: "FrontEnd"),
+        .target(name: "Utilities"),
+        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
+      ],
+      swiftSettings: commonSwiftSettings,
+    ),
 
     .target(
       name: "FrontEnd",
@@ -82,17 +92,6 @@ let package = Package(
         .product(name: "BigInt", package: "BigInt"),
       ],
       swiftSettings: commonSwiftSettings),
-
-    .target(
-      name: "LLVMEmitter",
-      dependencies: [
-        .target(name: "FrontEnd"),
-        .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
-        .target(name: "Utilities"),
-      ],
-      path: "Sources/BackEnd/LLVM",
-      swiftSettings: commonSwiftSettings,
-    ),
 
     .target(
       name: "StableCollections",
@@ -135,9 +134,9 @@ let package = Package(
       swiftSettings: commonSwiftSettings),
 
     .testTarget(
-      name: "LLVMEmitterTests",
+      name: "BackEndTests",
       dependencies: [
-        .target(name: "LLVMEmitter"),
+        .target(name: "BackEnd"),
         .target(name: "Driver")
       ],
       swiftSettings: commonSwiftSettings),

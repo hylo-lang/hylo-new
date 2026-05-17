@@ -1,6 +1,6 @@
+import BackEnd
 import Driver
 import FrontEnd
-import LLVMEmitter
 import XCTest
 
 final class SimpleFunctionEmitterTest: XCTestCase {
