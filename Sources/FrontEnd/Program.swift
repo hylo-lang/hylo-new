@@ -132,7 +132,8 @@ public struct Program: Sendable {
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
 
-        // This pass cannot fail.
+        // These passes cannot fail.
+        work[i].function.hoistStackAllocationsToEntryBlock()
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
       }
 
@@ -1359,7 +1360,8 @@ public struct Program: Sendable {
 
     case Return.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
-
+    case While.self:
+      return self[castUnchecked(n, to: While.self)].introducer.site
     default:
       return self[n].site
     }
