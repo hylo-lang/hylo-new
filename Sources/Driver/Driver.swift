@@ -240,7 +240,7 @@ public struct Driver {
       let m = """
         Failed to parse module archive of '\(module)' at '\(moduleCachePath, default: "nil")'.
 
-        Maybe the archive is compiled using a different version of the compiler.
+        Maybe the archive was compiled with a different version of the compiler. \
         Try erasing the module cache.
         """
       throw Error(message: m)
