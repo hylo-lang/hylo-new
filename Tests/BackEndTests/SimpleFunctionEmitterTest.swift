@@ -24,6 +24,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
 
     // LLVM Lowering.
     if (try driver.lowerToLLVM(m)).containsError { return XCTFail("Failed to lower to LLVM") }
+
     XCTAssertEqual(
       driver.llvmIR(of: m),
       """
@@ -37,15 +38,13 @@ final class SimpleFunctionEmitterTest: XCTestCase {
       """)
 
     XCTAssertTrue(try driver.assembly(of: m).contains("main:"))
-    
-    let outputDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(
-      UUID().uuidString, isDirectory: true)
-    try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: false)
 
-    let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
-    _ = try driver.generateExecutable(from: m, writingTo: executable)
+    let output = try FileManager.default.withUniqueTemporaryDirectory { (d) in
+      let executable = d.appendingPathComponent(driver.program[m].name)
+      _ = try driver.generateExecutable(from: m, writingTo: executable)
+      return try Process.executionOutput(executable)
+    }
 
-    let output = try Process.executionOutput(executable)
     XCTAssertEqual(output.trimming(while: \.isWhitespace), "")
   }
 
