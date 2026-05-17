@@ -4,7 +4,6 @@ import FrontEnd
 import StandardLibrary
 import Utilities
 import XCTest
-typealias Host = Utilities.Host
 
 /// The driver for generated compiler tests.
 ///
@@ -13,8 +12,7 @@ typealias Host = Utilities.Host
 /// manually invoking `hc-tests`.
 final class CompilerTests: XCTestCase {
 
-  /// Iff true, intermediate compilation artifacts are saved even if test cases pass.
-  let alwaysSaveArtifacts = false
+  private typealias Host = Utilities.Host
 
   /// The input of a compiler test.
   struct TestDescription {
@@ -47,8 +45,8 @@ final class CompilerTests: XCTestCase {
 
     /// Returns where to save test-case level observations with `tag`.
     ///
-    /// Package-based tests save observations at "<package-root>/<tag>.observed" while
-    /// single-file tests save observations at "<source-file>.<tag>.observed".
+    /// Package-based tests save observations at "<package-root>/<tag>.observed" while single-file
+    /// tests save observations at "<source-file>.<tag>.observed".
     ///
     /// - Requires: `tag` is a valid file name on all supported operating systems.
     func testCaseLevelObservationDestination(tag: String) throws -> URL {
@@ -61,40 +59,23 @@ final class CompilerTests: XCTestCase {
 
     /// Returns where to save the generated executable upon failure.
     func executableDestination() -> URL {
+      let suffix = Host.nativeExecutableSuffix
       if isPackage {
-        root.appending(component: ".executable\(Host.nativeExecutableSuffix)")
+        return root.appending(component: ".executable\(suffix)")
       } else {
-        root.deletingPathExtension().appendingPathExtension("executable\(Host.nativeExecutableSuffix)")
+        return root.deletingPathExtension().appendingPathExtension("executable\(suffix)")
       }
     }
 
-    /// Saves `contents` into a file at its test-case level observation destination
-    /// as specified by `testCaseLevelObservationDestination(tag:)`.
+    /// Saves `contents` into a file at its test-case level observation destination as specified by
+    /// `testCaseLevelObservationDestination(tag:)`.
     ///
     /// - Requires: `tag` is a valid file name on all supported operating systems.
     func saveTestCaseLevelObservation(_ contents: String, tag: String) throws {
-      try contents.write(to: testCaseLevelObservationDestination(tag: tag), atomically: true, encoding: .utf8)
+      let destination = try testCaseLevelObservationDestination(tag: tag)
+      try contents.write(to: destination, atomically: true, encoding: .utf8)
     }
 
-  }
-
-  /// A temporary folder for caching compilation artifacts during testing.
-  ///
-  /// An new directory is generated every time this property is initialized and removed once all
-  /// tests have run.
-  private static let moduleCachePath: (url: URL, delete: @Sendable () -> Void) = {
-    let m = FileManager.default
-    let u = try! m.url(
-      for: .itemReplacementDirectory,
-      in: .userDomainMask,
-      appropriateFor: m.currentDirectoryURL,
-      create: true)
-    return (u, { try? FileManager.default.removeItem(at: u) })
-  }()
-
-  /// Deletes cached compilation artifacts.
-  override class func tearDown() {
-    moduleCachePath.delete()
   }
 
   /// The intermediate artifacts of a module's compilation.
@@ -134,30 +115,6 @@ final class CompilerTests: XCTestCase {
 
   }
 
-  /// Whether the test case has recorded any failures or uncaught exceptions.
-  var testFailed: Bool {
-    if let testRun, testRun.totalFailureCount > 0 { true } else { false }
-  }
-
-  /// The test case currently being run.
-  private var testCase: TestDescription? = nil
-
-  /// The intermediate compilation artifacts.
-  private var artifacts: Artifacts = .init()
-
-  /// Saves any available compilation artifacts on test failure
-  /// or if `alwaysSaveArtifacts` is true to facilitate diagnosis.
-  func saveArtifactsIfNeeded() throws {
-    if testFailed || alwaysSaveArtifacts, let testCase {
-      try artifacts.save(into: testCase)
-    }
-  }
-
-  /// Run by XCTest after each test case.
-  override func tearDownWithError() throws {
-    try saveArtifactsIfNeeded()
-  }
-
   /// The result of a successful compilation.
   private struct CompilationResult {
 
@@ -170,6 +127,77 @@ final class CompilerTests: XCTestCase {
     /// The expected diagnostics for each source file.
     let expectedDiagnostics: [FileName: String]
 
+  }
+
+  /// An error thrown to signal test failure with given reason.
+  private enum TestFailure: Error {
+
+    /// The test failed because an executable could not be located.
+    case missingExecutableOutput
+
+    /// The test failed because of a compilation error.
+    case compilationError(String)
+
+    /// The test failed because its description was invalid.
+    case invalidTestDescription(String)
+
+    var localizedDescription: String {
+      switch self {
+      case .missingExecutableOutput:
+        return "missing executable output"
+      case .compilationError(let message):
+        return "Compilation failure:\n\(message)"
+      case .invalidTestDescription(let d):
+        return "Invalid test description (\(d))"
+      }
+    }
+
+  }
+
+  /// A temporary folder for caching compilation artifacts during testing.
+  ///
+  /// An new directory is generated every time this property is initialized and removed once all
+  /// tests have run.
+  private static let moduleCachePath: (url: URL, delete: @Sendable () -> Void) = {
+    let m = FileManager.default
+    let u = try! m.url(
+      for: .itemReplacementDirectory,
+      in: .userDomainMask,
+      appropriateFor: m.currentDirectoryURL,
+      create: true)
+    return (u, { try? FileManager.default.removeItem(at: u) })
+  }()
+
+  /// `true` iff intermediate compilation artifacts must be saved for successful tests.
+  private let artifactsAreSavedOnSuccess: Bool = false
+
+  /// The test case currently being run.
+  private var testCase: TestDescription? = nil
+
+  /// The intermediate compilation artifacts.
+  private var artifacts: Artifacts = .init()
+
+  /// `true` iff the test case has recorded a failure or an uncaught exception.
+  private var testFailed: Bool {
+    (testRun?.totalFailureCount ?? 0) > 0
+  }
+
+  /// Deletes cached compilation artifacts.
+  override class func tearDown() {
+    moduleCachePath.delete()
+  }
+
+  /// Run by XCTest after each test case.
+  override func tearDownWithError() throws {
+    try saveArtifactsIfNeeded()
+  }
+
+  /// Saves any available compilation artifacts on test failure or if `artifactsAreSavedOnSuccess`
+  /// is `true` to facilitate diagnosis.
+  private func saveArtifactsIfNeeded() throws {
+    if testFailed || artifactsAreSavedOnSuccess, let c = testCase {
+      try artifacts.save(into: c)
+    }
   }
 
   /// Compiles `input` expecting no compilation error.
@@ -186,7 +214,8 @@ final class CompilerTests: XCTestCase {
   func negative(_ input: TestDescription) async throws {
     do {
       let r = try await compile(input)
-      XCTAssert(r.driver.program.containsError, "program compiled but an error was expected.\nSource: \(input.root.path)\n")
+      let m = "program compiled but an error was expected.\nSource: \(input.root.path)\n"
+      XCTAssert(r.driver.program.containsError, m)
       assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
     } catch let error as TestFailure {
       XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
@@ -199,7 +228,8 @@ final class CompilerTests: XCTestCase {
   private func compile(_ input: TestDescription) async throws -> CompilationResult {
     self.testCase = input
 
-    var driver = try Driver(moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native())
+    var driver = try Driver(
+      moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native())
 
     if input.manifest.requiresStandardLibrary {
       try await driver.loadStandardLibrary()
@@ -269,26 +299,6 @@ final class CompilerTests: XCTestCase {
     }
 
     return done()
-  }
-
-  /// An error thrown to signal test failure with given reason.
-  private enum TestFailure: Error {
-
-    case missingExecutableOutput
-    case compilationError(String)
-    case invalidTestDescription(String)
-
-    var localizedDescription: String {
-      switch self {
-      case .missingExecutableOutput:
-        return "missing executable output"
-      case .compilationError(let message):
-        return "Compilation failure:\n\(message)"
-      case .invalidTestDescription(let d):
-        return "Invalid test description (\(d))"
-      }
-    }
-
   }
 
   /// Asserts that the expected `diagnostics` of each source file in `expectations` match those
