@@ -11,7 +11,7 @@ public struct WitnessExpression: Hashable, Sendable {
     /// An existing term.
     case identity(ExpressionIdentity)
 
-    /// An abstract given.
+    /// A reference to the witness being declared by a conformance.
     case abstract
 
     /// An instance of a structural conformance synthesized by the compiler.

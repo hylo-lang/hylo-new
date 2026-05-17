@@ -1,0 +1,22 @@
+//! stage:lowering
+
+struct A is Deinitializable & Movable {
+
+  public memberwise init
+
+  public fun f() auto {
+    let   { (A(), ()) }
+    inout { () }
+  }
+
+}
+
+public fun main() {
+  var a = A()
+
+  // Applies the `inout` variant.
+  _ = &a.f()
+
+  // Applies the `let` variant.
+  let (_, _) : {A, Void} = a.f()
+}

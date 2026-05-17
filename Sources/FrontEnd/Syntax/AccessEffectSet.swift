@@ -18,9 +18,18 @@ public struct AccessEffectSet: Hashable, Sendable {
     self.rawValue = rawValue
   }
 
-  /// Creates an instance containing `k`.
+  /// Creates a singleton containing `k`.
   public init(_ k: AccessEffect) {
     self.rawValue = k.rawValue
+  }
+
+  /// Creates a singleton containing `k` iff it is not `auto`; otherwise, creates a copy of `s`.
+  public init(_ k: AccessEffect, unlessAuto s: AccessEffectSet) {
+    if (k != .auto) {
+      self.init(k)
+    } else {
+      self = s
+    }
   }
 
   /// `true` iff `self` contains no effect.
