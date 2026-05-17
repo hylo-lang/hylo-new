@@ -300,7 +300,7 @@ public struct Driver {
   ///
   /// - Throws: if the parent folder of `output` doesn't exist.
   private func linkExecutable(from objectFiles: [URL], writingTo output: URL) throws {
-    var arguments = ["-fuse-ld=lld", "-o", output.path]
+    var arguments = ["-o", output.path]
     arguments += librarySearchPaths.map({ "-L\($0.path)" })
     arguments += librariesToLink.map({ "-l\($0)" })
     arguments += objectFiles.map(\.path)
