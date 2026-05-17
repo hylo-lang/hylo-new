@@ -1,0 +1,17 @@
+//! no-std
+
+struct A {}
+
+fun f(x: A) -> A {
+  // Yielding outside of a subscript is illegal.
+  yield x
+}
+
+subscript g(x: auto A) auto -> A {
+  let {
+    // Returning `Void` is allowed.
+    return
+    // Returning any other value is illegal.
+    return x
+  }
+}

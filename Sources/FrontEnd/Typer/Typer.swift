@@ -1095,13 +1095,15 @@ public struct Typer {
   }
 
   /// Type checks `s`.
+  ///
+  /// Let `s` be a return statement, `v` be the value that it returns, and `d` be the innermost
+  /// function or subscript declaration that contains `s`. The statement is well-typed iff:
+  /// - `d` is a function and `v` can be coerced to the declared return type of `d`.
+  /// - `d` is a subscript and `v` can be coerved to `Void`.
   private mutating func check(_ s: Return.ID) {
-    if let u = expectedOutputType(in: program.parent(containing: s)) {
-      check(s, requiring: u)
-    } else if let v = program[s].value {
-      check(v)
-      program[s.module].setType(.void, for: s)
-    }
+    let (convention, u) = expectedOutput(in: program.parent(containing: s))
+    let expected: AnyTypeIdentity = (convention == .parenthesized) ? u : .void
+    check(s, requiring: expected)
   }
 
   /// Type checks `s`, expecting that it returns a value of type `u`.
@@ -1119,8 +1121,13 @@ public struct Typer {
 
   /// Type checks `s`.
   private mutating func check(_ s: Yield.ID) {
-    let u = expectedOutputType(in: program.parent(containing: s)) ?? .void
-    check(program[s].value, requiring: u)
+    let (convention, u) = expectedOutput(in: program.parent(containing: s))
+    if convention == .parenthesized {
+      let l = program.spanForDiagnostic(about: s)
+      report(.init(.error, "yield statement can only occur in a subscript", at: l))
+    } else {
+      check(program[s].value, requiring: u)
+    }
   }
 
   /// Returns the declared type of `d` without type checking its contents.
@@ -4670,29 +4677,33 @@ public struct Typer {
     }
   }
 
-  /// Returns the type of values expected to be returned or projected in `s`, or `nil` if `s` is
-  /// not in the body of a function or subscript.
-  private mutating func expectedOutputType(in s: ScopeIdentity) -> AnyTypeIdentity? {
-    for t in program.scopes(from: s) {
-      guard let n = t.node else { break }
+  /// Returns the type of values expected to be returned or projected from the innermost function
+  /// or subscript enclosing `s`.
+  ///
+  /// - Requires: `s` is in the body of a function or subscript.
+  private mutating func expectedOutput(in s: ScopeIdentity) -> (Call.Style, AnyTypeIdentity) {
+    var p = s
+
+    // Look for the first function or variant declaration that encloses `s`. If we find one, then
+    // it should have an arrow type whose right-hand side is the expected output type in `s`. If
+    // we don't, then `s` is not in the body of a function or subscript.
+    while let n = p.node {
       switch program.tag(of: n) {
-      case FunctionDeclaration.self:
-        return expectedOutputType(in: program.castUnchecked(n, to: FunctionDeclaration.self))
+      case FunctionDeclaration.self, VariantDeclaration.self:
+        let d = program.castToDeclaration(n)!
+        let t = declaredType(of: d)
+        if let a = program.types[program.types.head(t)] as? Arrow {
+          return (a.style, a.output)
+        } else {
+          return (.parenthesized, .error)
+        }
+
       default:
-        continue
+        p = program.parent(containing: n)
       }
     }
-    return nil
-  }
 
-  /// Returns the type of values expected to be returned from `d`.
-  private mutating func expectedOutputType(in d: FunctionDeclaration.ID) -> AnyTypeIdentity {
-    let t = declaredType(of: d)
-    if let a = program.types[program.types.head(t)] as? Arrow {
-      return a.output
-    } else {
-      return .error
-    }
+    preconditionFailure("no expected output")
   }
 
   /// Returns the abstraction and argument of `w` if it is a coercion. Otherwise, returns `nil`.
