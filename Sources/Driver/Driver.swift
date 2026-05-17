@@ -138,7 +138,7 @@ public struct Driver {
   /// - Requires:
   ///   - `module` has been lowered and all required transformation passes have been run.
   ///   - `module` has not been lowered to LLVM IR yet.
-  public mutating func lowerToLLVM(_ module: Module.ID) throws -> PhaseResult {
+  public mutating func compileToLLVM(_ module: Module.ID) throws -> PhaseResult {
     precondition(
       llvmModules[module] == nil, "LLVM IR already generated for '\(moduleName(module))'")
 

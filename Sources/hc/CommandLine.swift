@@ -183,7 +183,7 @@ private typealias Module = FrontEnd.Module
       let a = try driver.program.archive(module: module)
       note("module archive size: \(a.count)")
 
-      try await perform("code generation", for: module, { try driver.lowerToLLVM(module) })
+      try await perform("code generation", for: module, { try driver.compileToLLVM(module) })
       if outputType == .llvm {
         try emitLLVM(module, from: driver, name: product)
         return
