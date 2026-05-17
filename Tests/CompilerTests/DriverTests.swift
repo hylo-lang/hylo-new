@@ -62,7 +62,8 @@ final class DriverTests: XCTestCase {
           XCTAssertEqual(error.message, """
             Failed to parse module archive of 'Main' at '\(cacheRoot)'.
 
-            Maybe the archive is compiled using a different version of the compiler. Try erasing the module cache.
+            Maybe the archive was compiled with a different version of the compiler. \
+            Try erasing the module cache.
             """)
 
           XCTAssertEqual("\(error)", error.message)
