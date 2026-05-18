@@ -148,6 +148,14 @@ doesn't just use its description but is interested in the specific error type.
   ```
 - Avoid listing multiple cases in a switch: `case c1, c2, c3:`.
 - Avoid conformances in extensions where the new protocol is a refinement of a previously conformed-to protocol. E.g. don't declare a conformance to `LiteralExpression` separately when the struct already conforms to `Expression`.
+- General guideline for declaration order:
+  - nested types and aliases
+  - static properties
+  - member properties
+  - initializers
+  - computed properties
+  - methods
+  - static methods
 
 ## File names
 
