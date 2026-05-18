@@ -7,7 +7,7 @@
 ///
 /// `result` is the Hylo output parameter for the `Void` return value; it is ignored.
 void hylo_print_int(const intptr_t *x, void *result) {
-    printf("%" PRId64 "\n", *x);
+    printf("%" PRIdPTR "\n", *x);
 }
 
 /// Sets `result` to zero.
@@ -344,11 +344,11 @@ void hylo_float64_infix_divide(const double* self, const double* other, double* 
 }
 
 /// Prints `x` with 4 fractional digits, followed by a newline.
-void hylo_print_float32(float* x, void* result) {
+void hylo_print_float32(const float* x, void* result) {
     printf("%.4f\n", *x);
 }
 
 /// Prints `x` with 4 fractional digits, followed by a newline.
-void hylo_print_float64(double* x, void* result) {
+void hylo_print_float64(const double* x, void* result) {
     printf("%.4f\n", *x);
 }

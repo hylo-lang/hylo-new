@@ -109,25 +109,19 @@ private struct CodeGenerationContext: ~Copyable {
 
   /// Transpiles `f` into the LLVM module.
   private mutating func incorporate(_ f: IRFunction) throws {
-    /// Don't transpile generic functions.
+    // Don't transpile generic functions.
     if f.isGeneric { return }
 
     // We don't expect to transpile projections.
     guard let _ = f.returnRegister else {
-      var p = TreePrinter(program: program)
-
-      let name = p.show(f.name)
-
       // FIXME: we need to gracefully ignore some conformance declarations until we implement the transformation to continuations.
-
-      /// Trivial deinitializable is never called.
-      if name == "SimpleInt.$<ConformanceDeclaration at builtin-function-calls:4.28>" ||
-         name == "Triple.$<ConformanceDeclaration at print-struct-elements:3.18>" {
-        return
-      }
-      print("function \(name) has no return register, probably it's a subscript that we didn't lower yet. See: \(p.show(f))")
+      let m = """
+        function \(program.show(f.name)) has no return register, probably it's a subscript that \
+        we didn't lower yet. 
+        See: \(program.show(f))
+        """
+      print(m)
       return
-      // fatalError("function \(name) has no return register, probably it's a subscript that we didn't lower yet. See: \(p.show(f))")
     }
 
     let transpiledFunction = declareFunction(transpiledFrom: f)
@@ -174,7 +168,7 @@ private struct CodeGenerationContext: ~Copyable {
     let int = program.standardLibraryType(.int)
 
     guard let r = f.returnRegister, let rt = f.result(of: r) else {
-      fatalError("Function \(f) has no return register or result.")
+      unreachable("Function \(f) has no return register or result.")
     }
 
     if rt.type == int32 {
@@ -227,7 +221,7 @@ private struct CodeGenerationContext: ~Copyable {
       _ = llvm.insertCall(transpilation, on: (s), at: p)
       llvm.insertReturn(llvm.i32.unsafe[].zero, at: p)
     } else {
-      fatalError("main() must return Int32, Int or Void. Got: \(program.show(rt.type))")
+      unreachable("main() must return Int32, Int or Void. Got: \(program.show(rt.type))")
     }
   }
 
@@ -309,7 +303,7 @@ private struct CodeGenerationContext: ~Copyable {
     /// The prologue of the transpiled function, which contains its stack allocations.
     let prologue = llvm.appendBlock(named: "prologue", to: transpiledFunction)
 
-    /// Record the registers of LLVM function parameters to the register table.
+    // Record the registers of LLVM function parameters to the register table.
     for i in f.termParameters.indices {
       let o = IRValue.parameter(i)
       register[o] = transpiledFunction.unsafe[].parameters[i].erased
@@ -353,11 +347,11 @@ private struct CodeGenerationContext: ~Copyable {
       case IRMemoryCopy.self:
         insert(memoryCopy: i)
       case IRMove.self:
-        fatalError("Unexpected IRMove instruction.")
+        unreachable("Unexpected IRMove instruction.")
       case IRProject.self:
-        fatalError("Unexpected IRProject instruction.")
+        unreachable("Unexpected IRProject instruction.")
       case IRProject.End.self:
-        fatalError("Unexpected IRProject.End instruction.")
+        unreachable("Unexpected IRProject.End instruction.")
       case IRProperty.self:
         unimplemented("LLVM lowering for IRProperty")
       case IRReturn.self:
@@ -373,7 +367,7 @@ private struct CodeGenerationContext: ~Copyable {
       case IRWitnessTable.self:
         unimplemented("LLVM lowering for IRWitnessTable")
       case IRYield.self:
-        fatalError("Unexpected IRYield instruction.")
+        unreachable("Unexpected IRYield instruction.")
       default:
         unimplemented()
       }
@@ -1176,7 +1170,7 @@ private struct CodeGenerationContext: ~Copyable {
       case .parameter(let i):
         return transpiledFunction.unsafe[].parameters[i].erased
       case .register(let i):
-        return register[.register(i)] ?? fatalError("Value not found at register \(i)")  //?? transpiledConstant(VoidConstant(), in: &context)
+        return register[.register(i)] ?? unreachable("Value not found at register \(i)")
       case .integer(let v, let t):
         let llvmType = IntegerType.UnsafeReference(
           uncheckedFrom: program.llvmType(from: t, in: &llvm))
@@ -1206,12 +1200,12 @@ private struct CodeGenerationContext: ~Copyable {
     {
       let n = program.llvmName(of: name)
 
-      // todo use mangled name or external name if present
-      // todo is there a better way to get the function?
+      // TODO: use mangled name or external name if present.
+      // TODO: is there a better way to get the function?
       // Functions from other modules may need to be declared lazily at first use.
       let t =
         program.types.cast(type, to: Arrow.self)
-        ?? fatalError("Expected type of a function to be an arrow, but got \(type)")
+        ?? unreachable("Expected type of a function to be an arrow, but got \(type)")
       return llvm.declareFunction(n, transpiledType(t))
     }
 
@@ -1280,8 +1274,9 @@ private struct CodeGenerationContext: ~Copyable {
 }
 
 extension Program {
+
   /// Returns true iff `f` is a file-scoped 0-parameter function named `main`.
-  func isModuleEntry(_ f: IRFunction) -> Bool {
+  fileprivate func isModuleEntry(_ f: IRFunction) -> Bool {
     // TODO: add checks in the frontend to make sure its return type is either Void or Int or Int32
     guard case .lowered(let d) = f.name,
       parent(containing: d).isFile
@@ -1293,13 +1288,14 @@ extension Program {
 
     return name(of: d)?.identifier == "main"
   }
+
 }
 
 /// The callee and the environment of a closure.
 private struct ArrowContents {
 
   /// A pointer to the underlying thin function.
-  let function: SwiftyLLVM.AnyValue.UnsafeReference  // todo make AnyCallable.UnsafeReference
+  let function: SwiftyLLVM.AnyValue.UnsafeReference  // TODO: make AnyCallable.UnsafeReference
 
   /// The type of `function`.
   let type: SwiftyLLVM.AnyType.UnsafeReference
@@ -1310,18 +1306,18 @@ private struct ArrowContents {
 }
 
 extension Arrow {
+
   /// Returns the list of captured types in the environment of `self`.
   func captures(in program: Program) -> [AnyTypeIdentity] {
-    // todo see if we need to dealias/resolve type application here
+    // TODO: see if we need to dealias/resolve type application here.
     guard let tuple = program.types.cast(environment, to: Tuple.self) else {
-      fatalError(
-        "Expected environment of an arrow to be a tuple type, but got \(environment). Maybe we need to dealias the type or resolve a type application?"
-      )
+      unreachable("Expected environment of an arrow to be a tuple type, but got \(environment)")
     }
     let captureTypes = program.types.members(of: tuple)
     assert(!captureTypes.isOpenEnded)
     return captureTypes.types
   }
+
 }
 
 extension Program {
