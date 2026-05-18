@@ -44,7 +44,6 @@ extension Program {
       }
     }
 
-    var p = TreePrinter(program: self) // todo
-    return "hylo_" + f.show(using: &p)
+    return "hylo_" + show(f)  // TODO: use proper mangling
   }
 }

@@ -287,6 +287,7 @@ func assertNoDiagnostics(in program: Program, file: StaticString = #filePath, li
   }
 }
 
+/// An error reported on failed compilation.
 struct CompilationError: Error {
   let diagnostics: [Diagnostic]
 }

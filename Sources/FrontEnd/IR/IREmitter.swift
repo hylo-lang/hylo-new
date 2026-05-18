@@ -226,7 +226,7 @@ internal struct IREmitter {
     let (associatedTypes, requirements) = program.requirements(of: table.concept)
     for r in requirements {
       // Declare the interface function.
-      let implementation = table.member(implementing: r)!
+      let implementation = table.member(implementing: r) ?? unreachable("Didn't find a table member implementing `\(program.show(r))` in table `\(table)`")
       let interface = demandLoweredDeclaration(
         implementationOf: r, synthesized: implementation.isSynthetic,
         for: d, table.arguments)
