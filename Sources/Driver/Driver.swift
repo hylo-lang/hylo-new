@@ -372,7 +372,7 @@ public struct Driver {
 
 extension SwiftyLLVM.Module {
 
-  /// Verifies the IR is `self` if this function has been compiled in debug mode.
+  /// Verifies the IR in `self` iff this function has been compiled in debug mode.
   fileprivate func verifyInDebugBuilds() throws {
     var isDebug = false
     assert({ isDebug = true ; return isDebug }())
