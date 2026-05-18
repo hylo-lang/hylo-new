@@ -334,6 +334,7 @@ internal struct IREmitter {
   /// Generates the IR of `d`.
   private mutating func lower(_ d: FunctionDeclaration.ID) {
     let f = demandLoweredDeclaration(functionOrConformance: .init(d))
+    guard program[d].body != nil else { return }
     defining(f, at: program.anchor(introducerOf: d)) { (me) in
       me.lowerDefinition(me.program[d].body, of: d)
     }
