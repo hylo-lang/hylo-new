@@ -31,6 +31,8 @@ or usages to infer meaning.
   - Use `<...>, if any.` for optional values where the absence reason is obvious. Otherwise:
     `<...> if <condition>, nil otherwise.`
   - Document preconditions with `- Requires:`. If multiple preconditions apply, use a markdown list below `- Requires:`.
+  - Avoid words like “describing,” “representing,” “record” (as a noun) etc, which are redundant with the fact that it is a type.
+  - Just talk about the thing, not its ID when practical.
 - Conformance implementations are exempt from documentation when nothing useful can be added beyond the protocol
   requirement itself.
 - Test cases don't need to be documented, but should have a descriptive function name.
