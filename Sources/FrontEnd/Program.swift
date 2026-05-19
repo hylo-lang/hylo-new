@@ -24,8 +24,13 @@ public struct Program: Sendable {
   /// or by `self.load(module:from:)` after the standard library has been deserialized.
   private var standardLibraryDeclarations: [StandardLibraryEntity: DeclarationIdentity] = [:]
 
+  /// The `Never` type of Hylo.
+  public let never: AnyTypeIdentity
+
   /// Creates an empty program.
-  public init() {}
+  public init() {
+    self.never = types.never().erased
+  }
 
   /// `true` if the program has errors.
   public var containsError: Bool {
@@ -132,7 +137,8 @@ public struct Program: Sendable {
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
 
-        // This pass cannot fail.
+        // These passes cannot fail.
+        work[i].function.hoistStackAllocationsToEntryBlock()
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
       }
 
@@ -1361,6 +1367,8 @@ public struct Program: Sendable {
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
     case Yield.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Yield.self))
+    case While.self:
+      return self[castUnchecked(n, to: While.self)].introducer.site
 
     default:
       return self[n].site
@@ -1479,6 +1487,9 @@ extension Program {
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
+    /// `Hylo.UInt8`.
+    case uint8 = "UInt8"
+
     /// `Hylo.Float32`.
     case float32 = "Float32"
 
@@ -1566,7 +1577,7 @@ extension Program {
         let a = identity(module: Module.standardLibraryName),
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
-      else { fatalError("missing or corrupt standard library") }
+      else { fatalError("missing or corrupt standard library; missing '\(n.rawValue)'") }
       standardLibraryDeclarations[n] = d
     }
   }

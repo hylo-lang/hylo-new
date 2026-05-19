@@ -168,6 +168,11 @@ public struct IRFunction: Sendable {
     blocks.firstAddress
   }
 
+  /// `true` iff `self` accepts generic type parameters.
+  public var isGeneric: Bool {
+    !typeParameters.isEmpty
+  }
+
   /// Returns `true` iff the last instruction of `b` is a terminator.
   public func isTerminated(_ b: IRBlock.ID) -> Bool {
     if let i = blocks[b].last {
@@ -629,6 +634,27 @@ public struct IRFunction: Sendable {
       return true
     } else {
       return false
+    }
+  }
+
+  /// Updates the operands of all instructions affected by `s`'s value substitutions.
+  internal mutating func substituteValues(_ s: IRSubstitutionTable) {
+    /// The set of instructions using any of the substituted values.
+    var usesOfOld = Set<AnyInstructionIdentity>()
+    
+    // Collect all unique instructions that use the substituted values.
+    for old in s.values.keys {
+      if let us = uses[old] {
+        for u in us {
+          usesOfOld.insert(u.user)
+        }
+      }
+    }
+
+    // Update all uses by substituting their operands.
+    for i in usesOfOld {
+      let j = at(i).substituting(s)
+      replace(i, with: j)
     }
   }
 

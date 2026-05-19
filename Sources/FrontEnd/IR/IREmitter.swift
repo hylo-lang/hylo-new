@@ -226,7 +226,7 @@ internal struct IREmitter {
     let (associatedTypes, requirements) = program.requirements(of: table.concept)
     for r in requirements {
       // Declare the interface function.
-      let implementation = table.member(implementing: r)!
+      let implementation = table.member(implementing: r) ?? unreachable("Didn't find a table member implementing `\(program.show(r))` in table `\(table)`")
       let interface = demandLoweredDeclaration(
         implementationOf: r, synthesized: implementation.isSynthetic,
         for: d, table.arguments)
@@ -329,6 +329,7 @@ internal struct IREmitter {
   /// Generates the IR of `d`.
   private mutating func lower(_ d: FunctionDeclaration.ID) {
     let f = demandLoweredDeclaration(functionOrConformance: .init(d))
+    guard program[d].body != nil else { return }
     defining(f) { (me) in
       let s = me.program[d].introducer.site
       me.lowerDefinition(me.program[d].body, of: d, introducedAt: s)
@@ -444,6 +445,8 @@ internal struct IREmitter {
       return lowerAsStatement(program.castUnchecked(s, to: If.self))
     case Return.self:
       return lower(program.castUnchecked(s, to: Return.self))
+    case While.self:
+      return lower(program.castUnchecked(s, to: While.self))
     case Yield.self:
       return lower(program.castUnchecked(s, to: Yield.self))
     default:
@@ -548,6 +551,32 @@ internal struct IREmitter {
 
     // The return instruction is emitted by the caller handling this control-flow effect.
     return .return(s)
+  }
+
+  /// Generates the IR of `s`.
+  private mutating func lower(_ s: While.ID) -> ControlFlow {
+    
+    let head = insertionContext.function!.addBlock()
+    let tail = insertionContext.function!.addBlock()
+
+    // Jump to the head of the loop.
+    lowering(s, { $0._br(head) })
+    
+    insertionContext.point = .end(of: head)
+
+    // Lower the conditions.
+    for c in program[s].conditions {
+      insertionContext.point = .end(of: 
+        lowerCondition(c, onFailure: tail))
+    }
+    
+    // Lower the body.
+    if lower(program[s].body) == .next{
+      lowering(after: program[s].body, { $0._br(head) })
+    }
+
+    insertionContext.point = .end(of: tail)    
+    return .next
   }
 
   /// Generates the IR of `s`.
@@ -1297,6 +1326,8 @@ internal struct IREmitter {
       return .integer(value, program.types.demand(MachineType.i(32)))
     case program.standardLibraryType(.int64):
       return .integer(value, program.types.demand(MachineType.i(64)))
+    case program.standardLibraryType(.uint8):
+      return .integer(value, program.types.demand(MachineType.i(8)))
     default:
       program.unexpected(target)
     }
@@ -1820,7 +1851,8 @@ internal struct IREmitter {
   ) -> IRValue {
     let t = program.types.dealiased(storage)
     let s = IRAllocx(storage: t, witness: type, alignment: alignment, anchor: currentAnchor)
-    return insert(s)!
+    let ss: [any Instruction] = [s]
+    return insert(ss[0])!
   }
 
   /// Inserts a `apply` instruction.

@@ -1,0 +1,8 @@
+/// A type whose instances can be expressed by a floating point literal.
+@_symbol("ExpressibleByFloatingPointLiteral")
+public trait ExpressibleByFloatingPointLiteral {
+
+  @_symbol("ExpressibleByFloatingPointLiteral.init(floating_point_literal:)")
+  init(floating_point_literal literal: Builtin.FloatingPointLiteral)
+
+}

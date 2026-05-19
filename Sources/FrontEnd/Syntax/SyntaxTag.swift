@@ -81,6 +81,7 @@ public struct SyntaxTag: Sendable {
     Block.self,
     Discard.self,
     Return.self,
+    While.self,
     Yield.self,
   ]
 

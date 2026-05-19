@@ -1,0 +1,5 @@
+//! stage:run assert-exit-code:42 stdlib:minimal
+
+public fun main() -> Int32 {
+  42
+}
