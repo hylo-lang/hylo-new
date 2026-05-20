@@ -107,7 +107,7 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Demangles a (possibly qualified) entity from `source`.
-  internal static private func takeEntity(
+  private static func takeEntity(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     var qualifiedEntity: DemangledEntity? = nil
@@ -683,7 +683,7 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Demangles a type from `source`.
-  internal static private func takeType(from source: inout DemanglingContext) -> DemangledType {
+  private static func takeType(from source: inout DemanglingContext) -> DemangledType {
     guard let o = source.takeOperator() else { return .error }
     let demangled: DemangledType
 

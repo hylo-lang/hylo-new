@@ -64,8 +64,8 @@ extension Base64VarUInt: TextOutputStreamable {
       var m = rawValue - 4209
       assert(m > 0)
       while m > 0 {
-        digits.append(Base64Digit(m >> 6)!)
-        m &= 63
+        digits.append(Base64Digit(m & 63)!)
+        m >>= 6
       }
 
       output.write(Base64Digit(52 + digits.count)!.description)
