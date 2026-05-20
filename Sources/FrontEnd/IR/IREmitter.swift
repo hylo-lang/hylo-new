@@ -360,6 +360,18 @@ internal struct IREmitter {
       }
     }
 
+    // If we're defining a default implementation in a trait, update the local bindings of the
+    // function to map each abstract given to a property access. Unused givens will be removed by
+    // dead code elimination.
+    if let t = program.traitRequiring(d) {
+      let ms = program.declarations(of: ConformanceDeclaration.self, lexicallyIn: .init(node: t))
+      for m in ms {
+        let w = program.type(assignedTo: m)
+        let v = _property(.init(m), of: .parameter(0), withType: w)
+        insertionContext.function!.associate(.init(m), with: v)
+      }
+    }
+
     switch lower(statements: body) {
     case .return(let r):
       lowering(r, { $0._return() })
