@@ -35,26 +35,26 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Writes to `output` the mangled representation of `s`.
-  mutating func mangled(decl s: DeclarationIdentity, to output: inout ManglingContext) {
+  internal mutating func mangled(decl s: DeclarationIdentity, to output: inout ManglingContext) {
     append(decl: s, to: &output)
   }
 
   /// Writes to `output` the mangled representation of `s` from module `m`.
-  mutating func mangled(
+  internal mutating func mangled(
     function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
   ) {
     append(function: s, of: m, to: &output)
   }
 
   /// Writes to `output` the mangled representation of `s`.
-  mutating func mangled(table s: IRWitnessTable, to output: inout ManglingContext) {
+  internal mutating func mangled(table s: IRWitnessTable, to output: inout ManglingContext) {
     append(table: s, to: &output)
   }
 
   /// Returns the demangled symbol from `source`.
   ///
   /// An error is returned if `source` is not fully consumed when this function returns.
-  static func demangle(from source: inout DemanglingContext) -> DemangledSymbol {
+  internal static func demangle(from source: inout DemanglingContext) -> DemangledSymbol {
     guard let o = source.peekOperator() else { return .error(nil, remaining: source.remaining) }
     let r: DemangledSymbol
     if o.isEntityOperator {
@@ -107,7 +107,7 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Demangles a (possibly qualified) entity from `source`.
-  static private func takeEntity(
+  internal static private func takeEntity(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     var qualifiedEntity: DemangledEntity? = nil
@@ -683,7 +683,7 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Demangles a type from `source`.
-  static private func takeType(from source: inout DemanglingContext) -> DemangledType {
+  internal static private func takeType(from source: inout DemanglingContext) -> DemangledType {
     guard let o = source.takeOperator() else { return .error }
     let demangled: DemangledType
 
@@ -1242,10 +1242,6 @@ extension ScopeIdentity {
 
   /// The mangling symbol corresponding to `self`.
   fileprivate var asSymbol: MangledSymbol {
-    if isFile {
-      .fileScope(self)
-    } else {
-      .node(node!)
-    }
+    isFile ? .fileScope(self) : .node(node!)
   }
 }
