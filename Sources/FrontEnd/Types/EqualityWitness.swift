@@ -7,6 +7,12 @@ public struct EqualityWitness: TypeTree {
   /// The right-hand side of the equality.
   public let rhs: AnyTypeIdentity
 
+  /// Creates a witness that `lhs` and `rhs` are equal.
+  public init(lhs: AnyTypeIdentity, rhs: AnyTypeIdentity) {
+    self.lhs = lhs
+    self.rhs = rhs
+  }
+
   /// Properties about `self`.
   public var properties: TypeProperties {
     lhs.properties | rhs.properties
