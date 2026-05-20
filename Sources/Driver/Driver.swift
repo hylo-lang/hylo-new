@@ -1,7 +1,7 @@
 import Archivist
+import BackEnd
 import Foundation
 import FrontEnd
-import LLVMEmitter
 import StandardLibrary
 import SwiftyLLVM
 import Utilities
@@ -45,9 +45,7 @@ public struct Driver {
   /// The program being compiled by the driver.
   public var program: Program
 
-  /// The corresponding LLVM module for each Hylo module.
-  ///
-  /// Populated by `lowerToLLVM(_:)`.
+  /// A map from a Hylo module to its corresponding LLVM module, populated by `lowerToLLVM(_:)`.
   private var llvmModules: [Module.ID: LLVMModuleBox] = [:]
 
   /// Creates an instance with the given properties.
@@ -140,32 +138,25 @@ public struct Driver {
   /// - Requires:
   ///   - `module` has been lowered and all required transformation passes have been run.
   ///   - `module` has not been lowered to LLVM IR yet.
-  public mutating func lowerToLLVM(_ module: Module.ID) throws -> PhaseResult {
-    precondition(llvmModules[module] == nil,
-      "LLVM code is already generated for module \(moduleName(module))")
+  public mutating func compileToLLVM(_ module: Module.ID) throws -> PhaseResult {
+    precondition(
+      llvmModules[module] == nil, "LLVM IR already generated for '\(moduleName(module))'")
 
     let elapsed = try ContinuousClock().measure {
-      var m = try program.compileToLLVM(
-        module,
-        target: TargetMachine(
-          target: target, optimization: optimization, relocation: relocation, codeModel: codeModel))
+      let t = TargetMachine(
+        target: target, optimization: optimization, relocation: relocation, codeModel: codeModel)
+      var m = try program.compileToLLVM(module, target: t)
 
-      #if DEBUG
-        try m.verify()
-      #endif
-
+      try m.verifyInDebugBuilds()
       m.runDefaultModulePasses()
-
-      #if DEBUG
-        try m.verify()
-      #endif
+      try m.verifyInDebugBuilds()
 
       llvmModules[module] = LLVMModuleBox(consume m)
     }
     return .init(elapsed: elapsed, containsError: program[module].containsError)
   }
 
-  /// Generates executable from `module`, linking the standard library unless `noStandardLibrary` is true.
+  /// Generates an executable from `module` and its dependencies.
   ///
   /// - Requires: `module` has been lowered to LLVM.
   /// - Throws: if the parent folder of `output` doesn't exist.
@@ -182,8 +173,8 @@ public struct Driver {
         // modulesToLink.append(program.modules[.standardLibrary]!.identity)
       }
 
-      try FileManager.default.withUniqueTemporaryDirectory { objectDirectory in
-        let objects = try writeObjectFiles(for: modulesToLink, into: objectDirectory)
+      try FileManager.default.withUniqueTemporaryDirectory { (d) in
+        let objects = try writeObjectFiles(for: modulesToLink, into: d)
         try linkExecutable(from: objects, writingTo: output)
       }
     }
@@ -211,12 +202,11 @@ public struct Driver {
   public func writeObjectFiles(
     for modules: [Module.ID], into destinationDirectory: URL
   ) throws -> [URL] {
-    let objectFiles = try modules.map { (module) in
-      let object = destinationDirectory.appendingPathComponent(moduleName(module) + ".o", isDirectory: false)
-      try llvmModules[module]!.module.write(.objectFile, to: object.path)
-      return object
+    try modules.map { (m) in
+      let o = destinationDirectory.appendingPathComponent(moduleName(m) + ".o", isDirectory: false)
+      try llvmModules[m]!.module.write(.objectFile, to: o.path)
+      return o
     }
-    return objectFiles
   }
 
   /// Loads `module`, whose sources are in `root`, into `program`.
@@ -250,7 +240,8 @@ public struct Driver {
       let m = """
         Failed to parse module archive of '\(module)' at '\(moduleCachePath, default: "nil")'.
 
-        Maybe the archive is compiled using a different version of the compiler. Try erasing the module cache.
+        Maybe the archive was compiled with a different version of the compiler. \
+        Try erasing the module cache.
         """
       throw Error(message: m)
     }
@@ -276,8 +267,8 @@ public struct Driver {
 
   /// Loads the standard library with `load(_:withSourcesAt:)`.
   /// 
-  /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the 
-  /// bundled or local standard library is used. Defaults to local.
+  /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
+  /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
     let sourceRoot: URL
     #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
@@ -309,19 +300,20 @@ public struct Driver {
   ///
   /// - Throws: if the parent folder of `output` doesn't exist.
   private func linkExecutable(from objectFiles: [URL], writingTo output: URL) throws {
-    var arguments = ["-fuse-ld=lld", "-o", output.path]
+    var arguments = ["-o", output.path]
     arguments += librarySearchPaths.map({ "-L\($0.path)" })
     arguments += librariesToLink.map({ "-l\($0)" })
     arguments += objectFiles.map(\.path)
 
     #if os(macOS)
-    let sdk = try Process.executionOutput(
-      try Host.findNativeExecutable(invokedAs: "xcrun"), arguments: ["--sdk", "macosx", "--show-sdk-path"])
+    let xcrun = try Host.findNativeExecutable(invokedAs: "xcrun")
+    let sdk = try Process.executionOutput(xcrun, arguments: ["--sdk", "macosx", "--show-sdk-path"])
       .trimmingCharacters(in: .whitespacesAndNewlines)
     arguments += ["-isysroot", sdk, "-lSystem"]
     #endif
 
-    _ = try Process.executionOutput(try Host.findNativeExecutable(invokedAs: "clang"), arguments: arguments)
+    let clang = try Host.findNativeExecutable(invokedAs: "clang")
+    _ = try Process.executionOutput(clang, arguments: arguments)
   }
 
   /// The name of `module`.
@@ -374,6 +366,17 @@ public struct Driver {
       self.containsError = containsError
     }
 
+  }
+
+}
+
+extension SwiftyLLVM.Module {
+
+  /// Verifies the IR in `self` iff this function has been compiled in debug mode.
+  fileprivate func verifyInDebugBuilds() throws {
+    var isDebug = false
+    assert({ isDebug = true ; return isDebug }())
+    if isDebug { try self.verify() }
   }
 
 }

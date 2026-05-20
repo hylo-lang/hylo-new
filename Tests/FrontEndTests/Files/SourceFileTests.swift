@@ -36,27 +36,85 @@ final class SourceFileTests: XCTestCase {
   func testLineIndex() throws {
     let f = SourceFile.helloWorld
     try XCTSkipIf(f.lineCount != 2)
-    XCTAssertEqual(f.line(1).text.dropLast(), "Hello,")  // Handles newlines on Windows.
-    XCTAssertEqual(f.line(2).text, "World!")
+    XCTAssertEqual(f.line(0).text.dropLast(), "Hello,")  // Handles newlines on Windows.
+    XCTAssertEqual(f.line(1).text, "World!")
   }
 
   func testLineContaining() throws {
     let f = SourceFile.helloWorld
     let i1 = try XCTUnwrap(f.text.firstIndex(of: ","))
-    XCTAssertEqual(f.line(containing: i1).number, 1)
+    XCTAssertEqual(f.line(containing: i1).index, 0)
     let i2 = try XCTUnwrap(f.text.firstIndex(of: "!"))
-    XCTAssertEqual(f.line(containing: i2).number, 2)
+    XCTAssertEqual(f.line(containing: i2).index, 1)
   }
 
-  func testLineAndColumnNumbers() {
+  func testLineAndOffsetNumbers() {
     let f = SourceFile.helloWorld
     let p1 = SourcePosition(f.startIndex, in: f)
-    XCTAssertEqual(p1.lineAndColumn.line, 1)
-    XCTAssertEqual(p1.lineAndColumn.column, 1)
+    XCTAssertEqual(p1.lineAndOffset.line, 0)
+    XCTAssertEqual(p1.lineAndOffset.offset, 0)
 
     let p2 = SourcePosition(f.endIndex, in: f)
-    XCTAssertEqual(p2.lineAndColumn.line, 2)
-    XCTAssertEqual(p2.lineAndColumn.column, 7)
+    XCTAssertEqual(p2.lineAndOffset.line, 1)
+    XCTAssertEqual(p2.lineAndOffset.offset, 6)
+  }
+
+  func testLineAndOffsetCountsSurrogatePairAsOneUnit() throws {
+    // '😀' is U+1F600, a single grapheme cluster despite being 2 UTF-16 code units.
+    // Grapheme-cluster offset of 'b' should be 2, not 3 as it would be for UTF-16.
+    let f = SourceFile(contents: "a😀b")
+    let b = try XCTUnwrap(f.text.firstIndex(of: "b"))
+    let p = SourcePosition(b, in: f)
+    XCTAssertEqual(p.lineAndOffset.line, 0)
+    XCTAssertEqual(p.lineAndOffset.offset, 2)
+  }
+
+  func testLineAndUTF16OffsetAtStartOfFile() {
+    let f = SourceFile.helloWorld
+    let p = SourcePosition(f.startIndex, in: f)
+    XCTAssertEqual(p.lineAndUTF16Offset.line, 0)
+    XCTAssertEqual(p.lineAndUTF16Offset.offset, 0)
+  }
+
+  func testLineAndUTF16OffsetOfASCIICharacterOnFirstLine() throws {
+    let f = SourceFile.helloWorld
+    let comma = try XCTUnwrap(f.text.firstIndex(of: ","))
+    let p = SourcePosition(comma, in: f)
+    XCTAssertEqual(p.lineAndUTF16Offset.line, 0)
+    XCTAssertEqual(p.lineAndUTF16Offset.offset, 5)
+  }
+
+  func testLineAndUTF16OffsetAtStartOfSecondLine() throws {
+    let f = SourceFile.helloWorld
+    let w = try XCTUnwrap(f.text.firstIndex(of: "W"))
+    let p = SourcePosition(w, in: f)
+    XCTAssertEqual(p.lineAndUTF16Offset.line, 1)
+    XCTAssertEqual(p.lineAndUTF16Offset.offset, 0)
+  }
+
+  func testLineAndUTF16OffsetAtEndOfFile() {
+    let f = SourceFile.helloWorld
+    let p = SourcePosition(f.endIndex, in: f)
+    XCTAssertEqual(p.lineAndUTF16Offset.line, 1)
+    XCTAssertEqual(p.lineAndUTF16Offset.offset, 6)
+  }
+
+  func testLineAndUTF16OffsetCountsSurrogatePairAsTwoUnits() throws {
+    // '😀' is U+1F600, encoded as a surrogate pair (2 UTF-16 code units).
+    // UTF-16 offset of 'b' should be 3, not 2 as it would be for grapheme clusters.
+    let f = SourceFile(contents: "a😀b")
+    let b = try XCTUnwrap(f.text.firstIndex(of: "b"))
+    let p = SourcePosition(b, in: f)
+    XCTAssertEqual(p.lineAndUTF16Offset.line, 0)
+    XCTAssertEqual(p.lineAndUTF16Offset.offset, 3)
+  }
+
+  func testLineAndUTF16OffsetAfterSurrogatePairOnSecondLine() throws {
+    let f = SourceFile(contents: "😀\nb")
+    let b = try XCTUnwrap(f.text.firstIndex(of: "b"))
+    let p = SourcePosition(b, in: f)
+    XCTAssertEqual(p.lineAndUTF16Offset.line, 1)
+    XCTAssertEqual(p.lineAndUTF16Offset.offset, 0)
   }
 
   func testLineDescription() {
@@ -88,25 +146,92 @@ final class SourceFileTests: XCTestCase {
 
   func testIndexAtStartOfFile() throws {
     let f = SourceFile.helloWorld
-    XCTAssertEqual(f.index(line: 1, column: 1), f.text.startIndex)
+    XCTAssertEqual(f.index(line: 0, extendedGraphemeClusterOffset: 0), f.text.startIndex)
   }
 
   func testIndexWithinFirstLine() throws {
     let f = SourceFile.helloWorld
     let comma = try XCTUnwrap(f.text.firstIndex(of: ","))
-    XCTAssertEqual(f.index(line: 1, column: 6), comma)
+    XCTAssertEqual(f.index(line: 0, extendedGraphemeClusterOffset: 5), comma)
   }
 
   func testIndexAtStartOfSecondLine() throws {
     let f = SourceFile.helloWorld
     let line2Start = f.text.index(after: try XCTUnwrap(f.text.firstIndex(where: \.isNewline)))
-    XCTAssertEqual(f.index(line: 2, column: 1), line2Start)
+    XCTAssertEqual(f.index(line: 1, extendedGraphemeClusterOffset: 0), line2Start)
   }
 
   func testIndexAtLastCharacter() throws {
     let f = SourceFile.helloWorld
     let bang = try XCTUnwrap(f.text.firstIndex(of: "!"))
-    XCTAssertEqual(f.index(line: 2, column: 6), bang)
+    XCTAssertEqual(f.index(line: 1, extendedGraphemeClusterOffset: 5), bang)
+  }
+
+  // MARK: - extendedGraphemeClusterOffset clamping
+
+  func testGraphemeClusterColumnClampsNegativeLine() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: -1, extendedGraphemeClusterOffset: 0), f.startIndex)
+  }
+
+  func testGraphemeClusterColumnClampsLineOverflow() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 100, extendedGraphemeClusterOffset: 0), f.endIndex)
+  }
+
+  func testGraphemeClusterColumnClampsOffsetOverflow() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 0, extendedGraphemeClusterOffset: 999), f.endIndex)
+  }
+
+  // MARK: - UTF-16 index
+
+  func testUTF16IndexAtStartOfFile() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 0, utf16Offset: 0), f.text.startIndex)
+  }
+
+  func testUTF16IndexWithinFirstLine() throws {
+    let f = SourceFile.helloWorld
+    let comma = try XCTUnwrap(f.text.firstIndex(of: ","))
+    XCTAssertEqual(f.index(line: 0, utf16Offset: 5), comma)
+  }
+
+  func testUTF16IndexAtStartOfSecondLine() throws {
+    let f = SourceFile.helloWorld
+    let line2Start = f.text.index(after: try XCTUnwrap(f.text.firstIndex(where: \.isNewline)))
+    XCTAssertEqual(f.index(line: 1, utf16Offset: 0), line2Start)
+  }
+
+  func testUTF16IndexWithSurrogatePair() throws {
+    // "a😀b" — '😀' is U+1F600, 2 UTF-16 code units
+    let f = SourceFile(contents: "a😀b")
+    let b = try XCTUnwrap(f.text.firstIndex(of: "b"))
+    // 'a' at UTF-16 offset 0, '😀' at 1–2, 'b' at 3
+    XCTAssertEqual(f.index(line: 0, utf16Offset: 3), b)
+  }
+
+  func testUTF16IndexAfterSurrogatePairOnSecondLine() throws {
+    let f = SourceFile(contents: "😀\nb")
+    let b = try XCTUnwrap(f.text.firstIndex(of: "b"))
+    XCTAssertEqual(f.index(line: 1, utf16Offset: 0), b)
+  }
+
+  // MARK: - UTF-16 clamping
+
+  func testUTF16IndexClampsNegativeLine() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: -1, utf16Offset: 0), f.startIndex)
+  }
+
+  func testUTF16IndexClampsLineOverflow() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 100, utf16Offset: 0), f.endIndex)
+  }
+
+  func testUTF16IndexClampsOffsetOverflow() {
+    let f = SourceFile.helloWorld
+    XCTAssertEqual(f.index(line: 0, utf16Offset: 999), f.endIndex)
   }
 
   func testArchive() throws {

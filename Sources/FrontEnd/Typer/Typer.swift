@@ -57,6 +57,9 @@ public struct Typer {
     /// A table mapping identifiers to declarations.
     fileprivate typealias LookupTable = OrderedDictionary<String, [DeclarationIdentity]>
 
+    /// A pair of types.
+    fileprivate typealias TypePair = Pair<AnyTypeIdentity, AnyTypeIdentity>
+
     /// The cache of `Typer.lookup(_:atTopLevelOf:)`.
     fileprivate var moduleToIdentifierToDeclaration: [LookupTable?]
 
@@ -99,6 +102,9 @@ public struct Typer {
     /// The cache of `Typer.declaredType(of:)` for predefined givens.
     fileprivate var predefinedGivens: [Given: AnyTypeIdentity]
 
+    /// The cache of `Typer.canDeriveCoercion(_:_:applying:)`.
+    fileprivate var canDeriveCoercion: [Given: [TypePair: (Bool, Bool)]]
+
     /// Creates an instance for typing `m`, which is a module in `p`.
     fileprivate init(typing m: Module.ID, in p: Program) {
       self.moduleToIdentifierToDeclaration = .init(repeating: nil, count: p.modules.count)
@@ -115,6 +121,7 @@ public struct Typer {
       self.witnessToAliases = [:]
       self.declarationToTentativeType = [:]
       self.predefinedGivens = [:]
+      self.canDeriveCoercion = [:]
     }
 
   }
@@ -428,17 +435,9 @@ public struct Typer {
             to: program.castUnchecked(r, to: ConformanceDeclaration.self))
         }
 
-      case FunctionDeclaration.self:
+      case FunctionDeclaration.self, VariantDeclaration.self:
         if let i = namedImplementation(of: r) {
           implementations.assign(i, to: r)
-        }
-
-      case FunctionBundleDeclaration.self:
-        let b = program.castUnchecked(r, to: FunctionBundleDeclaration.self)
-        for v in program[b].variants {
-          if let i = namedImplementation(of: .init(v)) {
-            implementations.assign(i, to: r)
-          }
         }
 
       default:
@@ -1103,13 +1102,15 @@ public struct Typer {
   }
 
   /// Type checks `s`.
+  ///
+  /// Let `s` be a return statement, `v` be the value that it returns, and `d` be the innermost
+  /// function or subscript declaration that contains `s`. The statement is well-typed iff:
+  /// - `d` is a function and `v` can be coerced to the declared return type of `d`.
+  /// - `d` is a subscript and `v` can be coerved to `Void`.
   private mutating func check(_ s: Return.ID) {
-    if let u = expectedOutputType(in: program.parent(containing: s)) {
-      check(s, requiring: u)
-    } else if let v = program[s].value {
-      check(v)
-      program[s.module].setType(.void, for: s)
-    }
+    let (convention, u) = expectedOutput(in: program.parent(containing: s))
+    let expected: AnyTypeIdentity = (convention == .parenthesized) ? u : .void
+    check(s, requiring: expected)
   }
 
   /// Type checks `s`, expecting that it returns a value of type `u`.
@@ -1127,8 +1128,13 @@ public struct Typer {
 
   /// Type checks `s`.
   private mutating func check(_ s: Yield.ID) {
-    let u = expectedOutputType(in: program.parent(containing: s)) ?? .void
-    check(program[s].value, requiring: u)
+    let (convention, u) = expectedOutput(in: program.parent(containing: s))
+    if convention == .parenthesized {
+      let l = program.spanForDiagnostic(about: s)
+      report(.init(.error, "yield statement can only occur in a subscript", at: l))
+    } else {
+      check(program[s].value, requiring: u)
+    }
   }
 
   /// Returns the declared type of `d` without type checking its contents.
@@ -1277,13 +1283,12 @@ public struct Typer {
     assert(d.module == module, "dependency is not typed")
 
     initializeContext(program[d].contextParameters)
-    let variants = AccessEffectSet(program[d].variants.map({ (v) in program[v].effect.value }))
     let inputs = declaredTypes(of: program[d].parameters)
     let arrow = declaredArrowType(of: d, taking: inputs)
 
     let (context, head) = program.types.contextAndHead(arrow)
     let shape = program.types.cast(head, to: Arrow.self)!
-    let bundle = demand(Bundle(shape: shape, variants: variants)).erased
+    let bundle = demand(Bundle(shape: shape, variants: program.effects(d))).erased
     let result = program.types.introduce(context, into: bundle)
 
     program[d.module].setType(result, for: d)
@@ -2119,7 +2124,7 @@ public struct Typer {
         inferredType(of: program[e].source, in: &ctx)
       }
 
-      switch program[e].semantics {
+      switch program[e].semantics.value {
       case .up:
         let s = program.spanForDiagnostic(about: program[e].source)
         context.obligations.assume(WideningConstraint(lhs: lhs, rhs: rhs, site: s))
@@ -3534,17 +3539,13 @@ public struct Typer {
     then tail: [ResolutionThread.ContinuationItem] = [],
     penalties: Int = 0
   ) -> ResolutionThread {
-    var witness = witness
-    var queried = queried
     var environment = environment
+    var witness = program.types.reify(
+      witness, applying: environment.substitutions, withVariables: .kept)
+    let queried = program.types.reify(
+      queried, applying: environment.substitutions, withVariables: .kept)
 
     while true {
-      // Weak-head normal forms.
-      witness = program.types.reify(
-        witness, applying: environment.substitutions, withVariables: .kept)
-      queried = program.types.reify(
-        queried, applying: environment.substitutions, withVariables: .kept)
-
       // The witness has a universal type?
       if let u = program.types[witness.type] as? UniversalType {
         let a = TypeArguments(mapping: u.parameters, to: { _ in fresh().erased })
@@ -3734,14 +3735,14 @@ public struct Typer {
     // Gather the givens in other files of the module.
     var fs: [Given] = []
     for f in program[scopeOfUse.module].sourceFileIdentities where f != scopeOfUse.file {
-      fs.append(contentsOf: givens(lexicallyIn: .init(file: f)).filter(notOnStack(_:)))
+      for g in givens(lexicallyIn: .init(file: f)) where notOnStack(g) { fs.append(g) }
     }
     if !fs.isEmpty { gs.append(fs) }
 
     // Gather the givens imported from other modules.
     var ms: [Given] = []
     for i in imports(of: scopeOfUse.file) {
-      ms.append(contentsOf: givens(atTopLevelOf: i).filter(notOnStack(_:)))
+      for g in givens(atTopLevelOf: i) where notOnStack(g) { ms.append(g) }
     }
     if !ms.isEmpty { gs.append(ms) }
 
@@ -3829,7 +3830,7 @@ public struct Typer {
     return takeSummonResults(from: threads, in: scopeOfUse)
   }
 
-  /// Returns `true` iff a coercion (i.e., a witness of a type equality) from `a` to `b` can be
+  /// Returns `true` iff a coercion (i.e., a witness of a type equality) from `a` to `b` might be
   /// derived using the givens visible from `scopeOfUse` and those assumed in `environment`.
   ///
   /// This method enumerates givens having heads of the form `T ~ U`, excluding the built-in ones,
@@ -3843,31 +3844,49 @@ public struct Typer {
     var lhs = false
     var rhs = false
 
-    for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined()) {
-      let t = declaredType(of: g)
-      let u = program.types.contextAndHead(t)
-
-      // Can the given match any type (e.g., `<T> T`)?
-      if u.context.parameters.contains(where: { (p) in p == u.head }) {
-        return true
-      }
-
-      // Is the given of the form `T ~ U`?
-      if let e = program.types.cast(u.head, to: EqualityWitness.self) {
-        let l = program.types.open(u.context.parameters, in: program.types[e].lhs)
-        let r = program.types.open(u.context.parameters, in: program.types[e].rhs)
-
-        lhs = lhs || unifiable(a, l) || unifiable(a, r)
-        rhs = rhs || unifiable(b, l) || unifiable(b, r)
-
-        if lhs && rhs {
-          return true
-        }
-      }
+    for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined())  {
+      let (x, y) = canDeriveCoercion(a, b, applying: g)
+      lhs = lhs || x
+      rhs = rhs || y
+      if lhs && rhs { return true }
     }
 
     assert(!lhs || !rhs)
     return false
+  }
+
+  /// Returns `(lhs, rhs)` where `lhs` (respectively `rhs`) is `true` iff `g` might be used to
+  /// prove a coercion from from `a` to `x` (respectively `x` to `b`) for some type `x`.
+  private mutating func canDeriveCoercion(
+    _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, applying g: Given
+  ) -> (Bool, Bool) {
+    // Make sure the cache key does not depend on the order in which `a` and `b` have been passed.
+    let p = (b.bits < a.bits) ? Pair(b, a) : Pair(a, b)
+    if let memoized = cache.canDeriveCoercion[g]?[p] { return memoized }
+
+    let t = declaredType(of: g)
+    let u = program.types.contextAndHead(t)
+
+    // Can the given match any type (e.g., `<T> T`)?
+    if u.context.parameters.contains(where: { (p) in p == u.head }) {
+      cache.canDeriveCoercion[g, default: [:]][p] = (true, true)
+      return (true, true)
+    }
+
+    // Is the given of the form `T ~ U`?
+    if let e = program.types.cast(u.head, to: EqualityWitness.self) {
+      let l = program.types.open(u.context.parameters, in: program.types[e].lhs)
+      let r = program.types.open(u.context.parameters, in: program.types[e].rhs)
+
+      let lhs = unifiable(a, l) || unifiable(a, r)
+      let rhs = unifiable(b, l) || unifiable(b, r)
+      cache.canDeriveCoercion[g, default: [:]][p] = (lhs, rhs)
+      return (lhs, rhs)
+    }
+
+    // The given can't be used to form a coercion.
+    cache.canDeriveCoercion[g, default: [:]][p] = (false, false)
+    return (false, false)
   }
 
   // MARK: Name resolution
@@ -4679,29 +4698,33 @@ public struct Typer {
     }
   }
 
-  /// Returns the type of values expected to be returned or projected in `s`, or `nil` if `s` is
-  /// not in the body of a function or subscript.
-  private mutating func expectedOutputType(in s: ScopeIdentity) -> AnyTypeIdentity? {
-    for t in program.scopes(from: s) {
-      guard let n = t.node else { break }
+  /// Returns the type of values expected to be returned or projected from the innermost function
+  /// or subscript enclosing `s`.
+  ///
+  /// - Requires: `s` is in the body of a function or subscript.
+  private mutating func expectedOutput(in s: ScopeIdentity) -> (Call.Style, AnyTypeIdentity) {
+    var p = s
+
+    // Look for the first function or variant declaration that encloses `s`. If we find one, then
+    // it should have an arrow type whose right-hand side is the expected output type in `s`. If
+    // we don't, then `s` is not in the body of a function or subscript.
+    while let n = p.node {
       switch program.tag(of: n) {
-      case FunctionDeclaration.self:
-        return expectedOutputType(in: program.castUnchecked(n, to: FunctionDeclaration.self))
+      case FunctionDeclaration.self, VariantDeclaration.self:
+        let d = program.castToDeclaration(n)!
+        let t = declaredType(of: d)
+        if let a = program.types[program.types.head(t)] as? Arrow {
+          return (a.style, a.output)
+        } else {
+          return (.parenthesized, .error)
+        }
+
       default:
-        continue
+        p = program.parent(containing: n)
       }
     }
-    return nil
-  }
 
-  /// Returns the type of values expected to be returned from `d`.
-  private mutating func expectedOutputType(in d: FunctionDeclaration.ID) -> AnyTypeIdentity {
-    let t = declaredType(of: d)
-    if let a = program.types[program.types.head(t)] as? Arrow {
-      return a.output
-    } else {
-      return .error
-    }
+    preconditionFailure("no expected output")
   }
 
   /// Returns the abstraction and argument of `w` if it is a coercion. Otherwise, returns `nil`.

@@ -701,6 +701,11 @@ public struct Program: Sendable {
     self[n.module].type(assignedTo: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
+  /// Returns the type assigned to `n`, if any.
+  public func type<T: SyntaxIdentity>(maybeAssignedTo n: T) -> AnyTypeIdentity? {
+    self[n.module].type(assignedTo: n)
+  }
+
   /// Returns the type assigned to `n`, assuming it is an instance of `T`.
   ///
   /// - Requires: The module containing `n` is typed.
@@ -718,6 +723,13 @@ public struct Program: Sendable {
   /// - Requires: The module containing `n` is typed.
   public func declaration(referredToBy n: NameExpression.ID) -> DeclarationReference {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
+  }
+
+  /// Returns the declaration referred to by `n`, if any.
+  ///
+  /// - Note: This may only return non-nil after type-checking.
+  public func declaration(maybeReferredToBy n: NameExpression.ID) -> DeclarationReference? {
+    self[n.module].declaration(referredToBy: n)
   }
 
   /// Returns `true` iff `n` contains a reference to `d`.
@@ -742,9 +754,15 @@ public struct Program: Sendable {
     var ts: [AssociatedTypeDeclaration.ID] = []
     var ms: [DeclarationIdentity] = .init(minimumCapacity: self[concept].members.count)
     for m in self[concept].members {
-      if let a = cast(m, to: AssociatedTypeDeclaration.self) {
-        ts.append(a)
-      } else {
+      switch tag(of: m) {
+      case AssociatedTypeDeclaration.self:
+        ts.append(castUnchecked(m))
+
+      case FunctionBundleDeclaration.self:
+        let b = castUnchecked(m, to: FunctionBundleDeclaration.self)
+        ms.append(contentsOf: self[b].variants.map(DeclarationIdentity.init(_:)))
+
+      default:
         ms.append(m)
       }
     }
@@ -961,8 +979,8 @@ public struct Program: Sendable {
       return n.description
     } else {
       let s = self[d].site
-      let (l, c) = s.start.lineAndColumn
-      return "$<\(tag(of: d)) at \(s.source.baseName):\(l).\(c)>"
+      let (l, o) = s.start.lineAndOffset
+      return "$<\(tag(of: d)) at \(s.source.baseName):\(l + 1).\(o + 1)>"
     }
   }
 
@@ -1249,10 +1267,26 @@ public struct Program: Sendable {
   /// does not declare a bundle or `d` does not contain such a variant.
   public func variant(_ k: AccessEffect, of d: DeclarationIdentity) -> VariantDeclaration.ID? {
     if let b = cast(d, to: FunctionBundleDeclaration.self) {
-      return self[b].variants.first(where: { (v) in self[v].effect.value == k })
+      return variant(k, of: b)
     } else {
       return nil
     }
+  }
+
+  /// Returns the declaration of the variant with effect `k` in the bundle `d`, if any.
+  public func variant(
+    _ k: AccessEffect, of d: FunctionBundleDeclaration.ID
+  ) -> VariantDeclaration.ID? {
+    self[d].variants.first(where: { (v) in self[v].effect.value == k })
+  }
+
+  /// Returns the call effects of variants declared in `d`.
+  public func effects(_ d: FunctionBundleDeclaration.ID) -> AccessEffectSet {
+    var s = AccessEffectSet()
+    for v in self[d].variants {
+      s.insert(self[v].effect.value)
+    }
+    return s
   }
 
   /// Returns the annotations applied to `n`.
@@ -1334,6 +1368,8 @@ public struct Program: Sendable {
 
     case Return.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
+    case Yield.self:
+      return spanForDiagnostic(about: castUnchecked(n, to: Yield.self))
 
     default:
       return self[n].site
@@ -1357,6 +1393,15 @@ public struct Program: Sendable {
       return spanForDiagnostic(about: e)
     } else {
       return self[n].site
+    }
+  }
+
+  /// Returns a source span suitable to emit a diagnostic related to `n` as a whole.
+  public func spanForDiagnostic(about n: Yield.ID) -> SourceSpan {
+    if let i = self[n].introducer {
+      return .empty(at: i.site.start)
+    } else {
+      return spanForDiagnostic(about: self[n].value)
     }
   }
 
@@ -1452,7 +1497,7 @@ extension Program {
     /// `Hylo.Deinitializable`.
     case deinitializable = "Deinitializable"
 
-    /// `Hyloe.Deinitializable.deinit`.
+    /// `Hylo.Deinitializable.deinit`.
     case deinitializableDeinit = "Deinitializable.deinit(:)"
 
     /// `Hylo.Equatable`.
@@ -1508,7 +1553,7 @@ extension Program {
   public func standardLibraryDeclaration(
     _ n: StandardLibraryEntity
   ) -> DeclarationIdentity {
-    standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library")
+    standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library; missing \(n)")
   }
 
   /// Returns the declaration of the given standard library assuming it is represented by `T`.

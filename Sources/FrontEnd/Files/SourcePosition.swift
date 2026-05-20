@@ -13,10 +13,18 @@ public struct SourcePosition: Hashable {
     self.index = index
   }
 
-  /// The line and column number of this position.
-  public var lineAndColumn: (line: Int, column: Int) {
-    let r = source.lineAndColumn(index)
-    return (r.line, r.column)
+  /// The 0-based line and offset of this position.
+  /// 
+  /// Offsets are counted in Unicode extended grapheme clusters from line start.
+  public var lineAndOffset: (line: Int, offset: Int) {
+    let r = source.lineAndOffset(index)
+    return (r.line, r.offset)
+  }
+
+  /// The 0-based line and 0-based UTF-16 offset of this position.
+  public var lineAndUTF16Offset: (line: Int, offset: Int) {
+    let r = source.lineAndUTF16Offset(index)
+    return (r.line, r.offset)
   }
 
 }
@@ -33,8 +41,8 @@ extension SourcePosition: Comparable {
 extension SourcePosition: CustomStringConvertible {
 
   public var description: String {
-    let (line, column) = lineAndColumn
-    return "\(source.name):\(line):\(column)"
+    let (line, offset) = lineAndOffset
+    return "\(source.name):\(line + 1):\(offset + 1)"
   }
 
 }

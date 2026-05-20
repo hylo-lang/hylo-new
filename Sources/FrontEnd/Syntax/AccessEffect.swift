@@ -39,6 +39,11 @@ public enum AccessEffect: UInt8, Sendable {
     (self == .inout) || (self == .set)
   }
 
+  /// Returns `self` iff `self` is not `auto`; otherwise, returns `k`.
+  public func unlessAuto(_ k: AccessEffect) -> AccessEffect {
+    self != .auto ? self : k
+  }
+
 }
 
 extension AccessEffect: Comparable {

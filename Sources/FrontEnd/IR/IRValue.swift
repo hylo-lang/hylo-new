@@ -21,6 +21,9 @@ public enum IRValue: Hashable, Sendable {
   /// A reference to a lowered function.
   indirect case function(IRFunction.Name, AnyTypeIdentity)
 
+  /// A reference to a function or subscript bundle not yet reified.
+  indirect case bundle(FunctionBundleDeclaration.ID, AnyTypeIdentity, AccessEffectSet)
+
   /// A type witness.
   indirect case type(AnyTypeIdentity, TypeWitness.ID)
 
@@ -81,6 +84,8 @@ extension IRValue: Showable {
       return "\(printer.show(t)) \(n)"
     case .function(let n, _):
       return printer.show(n)
+    case .bundle(let n, _, let k):
+      return "\(printer.program.debugName(of: .init(n)))@{\(list: k)}"
     case .type(let t, _):
       return printer.show(t)
     case .poison:

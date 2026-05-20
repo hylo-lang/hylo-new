@@ -83,6 +83,20 @@ public struct IRFunction: Sendable {
     /// The types of the term parameters and return value.
     public let head: Arrow
 
+    /// Creates the signature of a function accepting the given parameters and returning results
+    /// as described by `output`.
+    public init(types: [GenericParameter.ID], terms: [IRParameter], output: Output) {
+      self.context = types
+
+      let ps = terms.map({ (p) in Parameter(access: p.access, type: p.type) })
+      switch output {
+      case .indirect:
+        self.head = Arrow(style: .parenthesized, inputs: ps.dropLast(), output: ps.last!.type)
+      case .remote(let k, let o):
+        self.head = Arrow(style: .bracketed, effect: k, inputs: ps, output: o.erased)
+      }
+    }
+
   }
 
   /// The name of the function.
@@ -228,17 +242,7 @@ public struct IRFunction: Sendable {
 
   /// Returns the type of `self`, computing it using `p`.
   public func signature() -> Signature {
-    let ps = termParameters.map({ (p) in Parameter(access: p.access, type: p.type) })
-
-    var a: Arrow
-    switch output {
-    case .indirect:
-      a = Arrow(style: .parenthesized, inputs: Array(ps.dropLast()), output: ps.last!.type)
-    case .remote(let k, let o):
-      a = Arrow(style: .bracketed, effect: k, inputs: ps, output: o.erased)
-    }
-
-    return .init(context: typeParameters, head: a)
+    .init(types: typeParameters, terms: termParameters, output: output)
   }
 
   /// Returns the tag of `i`.
@@ -379,6 +383,8 @@ public struct IRFunction: Sendable {
     case .floatingPoint(_, let t):
       return (t.erased, false)
     case .function(_, let t):
+      return (t, true)
+    case .bundle(_, let t, _):
       return (t, true)
     case .type(_, let t):
       return (t.erased, false)

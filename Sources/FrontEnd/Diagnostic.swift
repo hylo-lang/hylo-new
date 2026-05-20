@@ -95,11 +95,12 @@ extension Program {
       types.seenAsTermAbstraction(types.head(f)) != nil
     else { return cannotCall(f, s, at: self[e].site) }
 
+    let x = self[n].name
     switch s {
     case .parenthesized:
-      return .init(.error, "cannot call '\(show(n))' as a function", at: self[e].site)
+      return .init(.error, "cannot call '\(x.value)' as a function", at: x.site)
     case .bracketed:
-      return .init(.error, "cannot call '\(show(n))' as a subscript", at: self[e].site)
+      return .init(.error, "cannot call '\(x.value)' as a subscript", at: x.site)
     }
   }
 
