@@ -26,9 +26,9 @@ public struct Program: Sendable {
 
   /// `true` iff the program is allowed to have an only partially loaded standard library.
   ///
-  /// We use this to signal that the program is being used in a context where the standard library
-  /// may not be fully available, such as during testing with minimal standard library. In this
-  /// case, the absence of some standard library declarations won't be treated as an error.
+  /// If set, this flag signals that the program is being used in a context where the standard
+  // library may not be fully available, such as during testing with minimal standard library. In
+  // this case, the absence of some standard library declarations won't be treated as an error.
   private var allowPartialStandardLibrary: Bool = false
 
   /// Creates an empty program.

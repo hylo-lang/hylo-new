@@ -1,5 +1,5 @@
 /// Short identifier specifying how to interpret the next fragment of mangled data.
-enum ManglingOperator: String, CaseIterable, Sendable {
+internal enum ManglingOperator: String, CaseIterable, Sendable {
 
   // Convention: operator strings are matching regex "[a-z]*[A-Z]"
 
@@ -137,6 +137,7 @@ enum ManglingOperator: String, CaseIterable, Sendable {
 
   /// Starts an opaque environment type.
   case opaqueEnvironmentType = "oeT"
+
   /// Starts a remote type.
   case remoteType = "rT"
 
@@ -176,8 +177,8 @@ enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a witness table symbol.
   case witnessTable = "wW"
 
-  /// An instance containing the operator that prefixes `s`, if any.
-  init?(prefixing s: Substring) {
+  /// Creates an instance containing the operator that prefixes `s`, if any.
+  internal init?(prefixing s: Substring) {
     if s.isEmpty { return nil }
 
     var i = s.startIndex
@@ -194,7 +195,7 @@ enum ManglingOperator: String, CaseIterable, Sendable {
   }
 
   /// `true` iff `self` starts an entity declaration.
-  var isEntityOperator: Bool {
+  internal var isEntityOperator: Bool {
     switch self {
     case .lookup, .lookupRelative, .reserved, .associatedTypeDeclaration, .enumCaseDeclaration,
       .enumDeclaration, .bindingDeclaration, .conformanceDeclaration, .extensionDeclaration,
@@ -211,7 +212,7 @@ enum ManglingOperator: String, CaseIterable, Sendable {
   }
 
   /// `true` iff `self` is an operator that starts a type.
-  var isTypeOperator: Bool {
+  internal var isTypeOperator: Bool {
     switch self {
     case .lookupType, .reservedType, .arrowType, .associatedType, .bundleType, .enumType,
       .equalityWitnessType,
@@ -230,7 +231,7 @@ enum ManglingOperator: String, CaseIterable, Sendable {
 
 extension ManglingOperator: TextOutputStreamable {
 
-  func write<T: TextOutputStream>(to output: inout T) {
+  internal func write<T: TextOutputStream>(to output: inout T) {
     output.write(rawValue)
   }
 

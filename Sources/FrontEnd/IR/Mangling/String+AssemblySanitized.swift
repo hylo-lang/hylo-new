@@ -1,6 +1,6 @@
 extension String {
 
-  /// Given a string returned by `assemblySanitized`, creates an instance decoding its contents.
+  /// Creates an instance decoding `sanitized` iff it is the result of `String.assemblySanitized`.
   public init?(assemblySanitized sanitized: String) {
     guard var i = sanitized.lastIndex(of: "$") else {
       self = sanitized

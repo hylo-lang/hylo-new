@@ -1,5 +1,5 @@
 /// An unambiguous textual description of a type, scope, or declaration known to the compiler.
-enum ReservedSymbol: UInt8 {
+internal enum ReservedSymbol: UInt8 {
 
   /// The `Hylo` module.
   case hylo
@@ -23,7 +23,7 @@ enum ReservedSymbol: UInt8 {
 
 extension ReservedSymbol: TextOutputStreamable {
 
-  func write<T: TextOutputStream>(to output: inout T) {
+  internal func write<T: TextOutputStream>(to output: inout T) {
     output.write(Base64Digit(rawValue: rawValue)!.description)
   }
 
