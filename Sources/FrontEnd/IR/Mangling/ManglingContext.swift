@@ -2,7 +2,7 @@
 ///
 /// It maintains the state of the mangling process, including the output being built, as well as
 /// the lookup tables and current qualification.
-struct ManglingContext {
+internal struct ManglingContext {
 
   // Functions named `addIf` return `true` if the condition is met; otherwise, they return `false`
   // without modifying `self`.
@@ -23,7 +23,7 @@ struct ManglingContext {
   private var reserved: [MangledSymbol: ReservedSymbol] = [:]
 
   /// Creates an instance for mangling symbols in `program`.
-  init(_ program: Program) {
+  internal init(_ program: Program) {
     output = ""
     initializeReservedSymbols(program: program)
   }
@@ -55,7 +55,7 @@ struct ManglingContext {
   }
 
   /// Writes `string` to `output`, prefixed by its length encoded as a variable-length integer.
-  mutating func add<T: StringProtocol>(string: T) {
+  internal mutating func add<T: StringProtocol>(string: T) {
     let s = String(string)
 
     if s.isEmpty {
@@ -71,38 +71,38 @@ struct ManglingContext {
   }
 
   /// Writes `v` encoded as a variable-length integer to `output`.
-  mutating func add(integer v: Int) {
+  internal mutating func add(integer v: Int) {
     Base64VarUInt(UInt(bitPattern: v)).write(to: &output)
   }
 
   /// Writes `v` encoded as a variable-length integer to `output`.
-  mutating func add(integer v: UInt32) {
+  internal mutating func add(integer v: UInt32) {
     Base64VarUInt(UInt64(v)).write(to: &output)
   }
 
   /// Writes `v` encoded as a variable-length integer to `output`.
-  mutating func add(integer v: UInt64) {
+  internal mutating func add(integer v: UInt64) {
     Base64VarUInt(v).write(to: &output)
   }
 
   /// Writes the raw value of `v` encoded as a base 64 digit to `output`.
-  mutating func add<T: RawRepresentable<UInt8>>(base64Digit v: T) {
+  internal mutating func add<T: RawRepresentable<UInt8>>(base64Digit v: T) {
     add(base64Digit: v.rawValue)
   }
 
   /// Writes `v` encoded as a base 64 digit to `output`.
-  mutating func add(base64Digit v: UInt8) {
+  internal mutating func add(base64Digit v: UInt8) {
     add(Base64Digit(rawValue: v)!.description)
   }
 
   /// Writes `o` to `output`.
-  mutating func add(operator o: ManglingOperator) {
+  internal mutating func add(operator o: ManglingOperator) {
     o.write(to: &output)
   }
 
   /// Writes the mangled representation of `items` to `output`, calling `addItem` to mangle each
   /// individual element.
-  mutating func add<T: Collection>(
+  internal mutating func add<T: Collection>(
     items: T,
     appendingEachWith addItem: (inout Self, T.Element) -> Void
   ) {
@@ -113,13 +113,13 @@ struct ManglingContext {
   }
 
   /// Records `s` in the symbol lookup table if it is not reserved or already recorded.
-  mutating func record(symbol s: MangledSymbol, in program: Program) {
+  internal mutating func record(symbol s: MangledSymbol, in program: Program) {
     if symbolPosition.keys.contains(s) || reserved.keys.contains(s) { return }
     symbolPosition[s] = symbolPosition.count
   }
 
   /// Records `q` as the innermost scope being mangled, and returns the previous recorded value.
-  mutating func record(qualification q: ScopeIdentity?) -> ScopeIdentity? {
+  internal mutating func record(qualification q: ScopeIdentity?) -> ScopeIdentity? {
     let previous = qualification
     qualification = q
     return previous
@@ -127,7 +127,7 @@ struct ManglingContext {
 
   /// Writes a lookup reference to `s` iff `s` is reserved or has already been inserted in the
   /// symbol lookup table.
-  mutating func addIf(reservedOrRecorded s: MangledSymbol, in program: Program) -> Bool {
+  internal mutating func addIf(reservedOrRecorded s: MangledSymbol, in program: Program) -> Bool {
     addIf(reserved: s) || addIf(recorded: s, in: program)
   }
 
@@ -162,7 +162,7 @@ struct ManglingContext {
   }
 
   /// If `q` is the qualification accumulated so far, writes a lookup reference to it.
-  mutating func addIf(qualification q: ScopeIdentity) -> Bool {
+  internal mutating func addIf(qualification q: ScopeIdentity) -> Bool {
     if q == qualification {
       add(operator: .lookupRelative)
       return true

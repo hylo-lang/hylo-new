@@ -55,8 +55,8 @@ extension Base64VarUInt: TextOutputStreamable {
     } else if rawValue < 4210 {
       let m = rawValue - 114
       output.write(Base64Digit(52)!.description)
-      output.write(Base64Digit(m / 64)!.description)
-      output.write(Base64Digit(m % 64)!.description)
+      output.write(Base64Digit(m >> 6)!.description)
+      output.write(Base64Digit(m & 63)!.description)
     } else {
       var digits: [Base64Digit] = []
       digits.reserveCapacity(11)
@@ -64,8 +64,8 @@ extension Base64VarUInt: TextOutputStreamable {
       var m = rawValue - 4209
       assert(m > 0)
       while m > 0 {
-        digits.append(Base64Digit(m % 64)!)
-        m /= 64
+        digits.append(Base64Digit(m >> 6)!)
+        m &= 63
       }
 
       output.write(Base64Digit(52 + digits.count)!.description)
@@ -79,7 +79,7 @@ extension Base64VarUInt: TextOutputStreamable {
 
 extension Base64VarUInt: LosslessStringConvertible {
 
-  /// Creates a new instance by parsing its base-64 representation.
+  /// Creates a instance from its base-64 representation.
   public init?(_ description: String) {
     guard
       let (d, i) = Self.decode(from: description),
@@ -100,10 +100,11 @@ extension Base64VarUInt: LosslessStringConvertible {
   public static func decode<S: StringProtocol>(
     from input: S
   ) -> (decoded: Base64VarUInt, indexAfter: S.Index)? {
-    guard let (d, c) = decode(from: input.utf8) else {
+    if let (d, c) = decode(from: input.utf8) {
+      return (decoded: d, indexAfter: input.index(input.startIndex, offsetBy: c))
+    } else {
       return nil
     }
-    return (decoded: d, indexAfter: input.index(input.startIndex, offsetBy: c))
   }
 
   /// Parses an instance at the beginning of the given byte sequence, returning its value and the

@@ -1,10 +1,10 @@
 /// The demangled description of an entity.
-indirect enum DemangledSymbol: Hashable, Sendable {
+internal indirect enum DemangledSymbol: Hashable, Sendable {
 
   /// Creates an instance decoding the symbol mangled in `s`.
   ///
   /// `self` is assigned to an error if `s` is malformed.
-  init(_ s: String) {
+  internal init(_ s: String) {
     if let x = String(assemblySanitized: s) {
       var source = DemanglingContext(stream: x[...])
       self = ManglingEncoding.demangle(from: &source)
@@ -29,7 +29,7 @@ indirect enum DemangledSymbol: Hashable, Sendable {
   case error(DemangledSymbol?, remaining: String)
 
   /// An instance decoding a reserved symbol identifier.
-  init(reserved: ReservedSymbol) {
+  internal init(reserved: ReservedSymbol) {
     switch reserved {
     case .hylo:
       self = .entity(.hylo)
@@ -47,7 +47,7 @@ indirect enum DemangledSymbol: Hashable, Sendable {
   }
 
   /// A textual description of the kind of symbol represented by `self`, without any details.
-  var tag: String {
+  internal var tag: String {
     switch self {
     case .entity:
       return "entity"
@@ -64,7 +64,7 @@ indirect enum DemangledSymbol: Hashable, Sendable {
 
 extension DemangledSymbol: CustomStringConvertible {
 
-  public var description: String {
+  internal var description: String {
     switch self {
     case .entity(let e):
       return e.description
@@ -84,7 +84,7 @@ extension DemangledSymbol: CustomStringConvertible {
 }
 
 /// The payload of a `DemangledSymbol.entity`.
-indirect enum DemangledEntity: Hashable, Sendable {
+internal indirect enum DemangledEntity: Hashable, Sendable {
 
   /// A reference to the innermost enclosing entity.
   case relative
@@ -154,7 +154,7 @@ indirect enum DemangledEntity: Hashable, Sendable {
 
 extension DemangledEntity: CustomStringConvertible {
 
-  public var description: String {
+  internal var description: String {
     switch self {
     case .relative:
       return ".."
@@ -203,7 +203,7 @@ extension DemangledEntity: CustomStringConvertible {
 }
 
 /// The payload of a `DemangledSymbol.type`.
-indirect enum DemangledType: Hashable, Sendable {
+internal indirect enum DemangledType: Hashable, Sendable {
 
   /// An error encountered during demangling of a type.
   case error
@@ -292,24 +292,24 @@ indirect enum DemangledType: Hashable, Sendable {
   case universalType(parameters: [DemangledType], head: DemangledType)
 
   /// A type application argument.
-  struct TypeApplicationArgument: Hashable, Sendable {
+  internal struct TypeApplicationArgument: Hashable, Sendable {
 
     /// The formal parameter.
-    let formal: DemangledType
+    internal let formal: DemangledType
 
     /// The value of the type.
-    let argument: DemangledType
+    internal let argument: DemangledType
 
   }
 
   /// A parameter of a callable symbol.
-  struct Parameter: Hashable, Sendable {
+  internal struct Parameter: Hashable, Sendable {
 
     /// The parameter label, if any.
-    let label: String?
+    internal let label: String?
 
     /// The type of the parameter.
-    let type: DemangledType
+    internal let type: DemangledType
 
   }
 
@@ -395,6 +395,7 @@ extension DemangledType: CustomStringConvertible {
     case .typeApplication(let abstraction, let arguments):
       let args = arguments.map({ (a) in "[\(a.formal): \(a.argument)]" }).joined(separator: ", ")
       return "\(abstraction)<\(args)>"
+
     case .universalType(let parameters, let head):
       return "<\(list: parameters)> \(head)"
     }

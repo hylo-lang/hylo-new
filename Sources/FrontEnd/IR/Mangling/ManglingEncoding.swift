@@ -1,7 +1,7 @@
 import Utilities
 
 /// Hylo's mangling algorithm.
-struct ManglingEncoding: Sendable {
+internal struct ManglingEncoding: Sendable {
 
   // Mangling conventions:
   //
@@ -25,12 +25,12 @@ struct ManglingEncoding: Sendable {
   private let program: Program
 
   /// Creates an instance mangling symbols defined in `program`.
-  init(_ program: Program) {
+  internal init(_ program: Program) {
     self.program = program
   }
 
   /// Writes to `output` the mangled representation of `s`.
-  mutating func mangled(type s: AnyTypeIdentity, to output: inout ManglingContext) {
+  internal mutating func mangled(type s: AnyTypeIdentity, to output: inout ManglingContext) {
     append(type: s, to: &output)
   }
 
