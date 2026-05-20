@@ -223,8 +223,8 @@ internal struct IREmitter {
     let concept = program.types[table.concept].declaration
     var members: [IRValue] = []
 
-    let (associatedTypes, requirements) = program.requirements(of: table.concept)
-    for r in requirements {
+    let requirements = program.requirements(of: table.concept)
+    for r in requirements.members {
       // Declare the interface function.
       let implementation = table.member(implementing: r)!
       let interface = demandLoweredDeclaration(
@@ -265,7 +265,7 @@ internal struct IREmitter {
       }
     }
 
-    precondition(associatedTypes.isEmpty, "not implemented")
+    precondition(requirements.types.isEmpty, "not implemented")
 
     let x0 = _alloca(w.erased)
     let x1 = _witnesstable(type: w.erased, members: members)

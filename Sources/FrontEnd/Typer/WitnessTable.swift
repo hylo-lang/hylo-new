@@ -45,22 +45,22 @@ public struct WitnessTable: Hashable, Sendable {
     !members.isEmpty && members.allSatisfy(\.value.isTransitivelySynthetic)
   }
 
-  /// Assigns `i` to `r`, which is a base trait requirement.
+  /// Assigns `i` to the associated conformance requirement `r`.
   internal mutating func assign(_ i: WitnessExpression, to r: ConformanceDeclaration.ID) {
     bases[r.offset] = i
   }
 
-  /// Assigns `i` to `r`, which is an associated type requirement.
+  /// Assigns `i` to the associated type requirement `r`.
   internal mutating func assign(_ i: AnyTypeIdentity, to r: AssociatedTypeDeclaration.ID) {
     associatedTypes[r.offset] = i
   }
 
-  /// Assigns `i` to `r`, which is a member requirement.
+  /// Assigns `i` to the function or subscript requirement `r`.
   internal mutating func assign(_ i: DeclarationReference, to r: DeclarationIdentity) {
     members[r.offset] = i
   }
 
-  /// Returns the member implementing `r`, which is a requirement of `concept`.
+  /// Returns the member implementing the function or subscript requirement `r`.
   internal func member(implementing r: DeclarationIdentity) -> DeclarationReference? {
     members[r.offset]
   }
