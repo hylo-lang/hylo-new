@@ -3104,7 +3104,19 @@ public struct Typer {
     demand(GenericParameter.conformer(d, .proper))
   }
 
-  /// Returns the type of `P.self` in `d`, which declares a trait `P`.
+  /// Returns the type of `P.Self` in `d`, which declares a trait `P`.
+  ///
+  /// In the declaration of a trait `P`, the expression `P.Self` denotes to the implicit `Self`
+  /// parameter of `P`, which is useful in declarations that also introduce `Self` as an alias,
+  /// such as associated conformance requirements. For example:
+  ///
+  ///     trait P {
+  ///       given P.Self is Movable
+  ///     }
+  ///
+  /// Since a conformance declaration introduces a `Self` parameter, an associated conformance
+  /// requirement of the form `given Self is Movable` would not denote a constrain on types
+  /// conforming to `P`. Instead, it would result in a circular definition.
   internal mutating func typeOfTraitSelf(in d: TraitDeclaration.ID) -> AnyTypeIdentity {
     if let memoized = cache.traitToTypeOfTraitSelf[d] { return memoized }
 
