@@ -221,12 +221,21 @@ internal struct IREmitter {
 
     let table = program.implementations(definedBy: d)
     let concept = program.types[table.concept].declaration
-    var members: [IRValue] = []
-
     let requirements = program.requirements(of: table.concept)
+
+    var members: [IRValue] = .init(minimumCapacity: requirements.all.count)
+    let incompleteTable: () -> Never = { [s = program.spanForDiagnostic(about: d)] in
+      fatalError("incomplete witness table at \(s)")
+    }
+
+    for r in requirements.conformances {
+      let implementation = table.conformance(implementing: r) ?? incompleteTable()
+      members.append(_emit(witness: implementation))
+    }
+
     for r in requirements.members {
       // Declare the interface function.
-      let implementation = table.member(implementing: r)!
+      let implementation = table.member(implementing: r) ?? incompleteTable()
       let interface = demandLoweredDeclaration(
         implementationOf: r, synthesized: implementation.isSynthetic,
         for: d, table.arguments)
@@ -2081,8 +2090,8 @@ internal struct IREmitter {
 
     switch program.tag(of: d) {
     case ConformanceDeclaration.self:
-      let e = program.castUnchecked(d, to: ConformanceDeclaration.self)
-      return _emit(referenceTo: e, applyingNullary: applyNullary)
+      let c = program.castUnchecked(d, to: ConformanceDeclaration.self)
+      return _emit(referenceTo: c, applyingNullary: applyNullary)
 
     case VariableDeclaration.self:
       // Since `d` wasn't in the local symbol table, we can assume it's a global symbol.
