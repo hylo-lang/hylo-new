@@ -402,7 +402,7 @@ final class ManglingTests: XCTestCase {
       type: program.types.demand(
         TypeApplication(abstraction: providerType, arguments: [providerSelf: providerSelf.erased])
       ).erased)
-    let output = program.requirements(of: providerRequirement).associatedTypes.first!
+    let output = program.requirements(of: providerRequirement).types.first!
 
     assertManglingOf(
       type: program.types.demand(
