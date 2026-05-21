@@ -340,7 +340,7 @@ internal struct IREmitter {
   }
 
   /// Generates the definition of `d`, whose body is `definition`, assuming the insertion context
-  /// is configured to generate IR into the its lowered form of `d`.
+  /// is configured to generate IR into the lowered form of `d`.
   private mutating func lowerDefinition<T: Declaration & Scope>(
     _ definition: [StatementIdentity]?, of d: T.ID
   ) {
