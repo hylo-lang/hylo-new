@@ -47,7 +47,7 @@ public struct WitnessTable: Hashable, Sendable {
     members[r.offset] = i
   }
 
-  /// Returns the conformance implementating the requirement `r`.
+  /// Returns the conformance implementing the requirement `r`.
   internal func conformance(implementing r: ConformanceDeclaration.ID) -> WitnessExpression? {
     associatedConformances[r.offset]
   }
