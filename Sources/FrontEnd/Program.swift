@@ -747,26 +747,29 @@ public struct Program: Sendable {
   }
 
   /// Returns the associated type and member requirements of `t`.
-  public func requirements(
-    of t: Trait.ID
-  ) -> (associatedTypes: [AssociatedTypeDeclaration.ID], members: [DeclarationIdentity]) {
+  public func requirements(of t: Trait.ID) -> TraitRequirements {
     let concept = types[t].declaration
     var ts: [AssociatedTypeDeclaration.ID] = []
+    var cs: [ConformanceDeclaration.ID] = []
     var ms: [DeclarationIdentity] = .init(minimumCapacity: self[concept].members.count)
+
     for m in self[concept].members {
       switch tag(of: m) {
       case AssociatedTypeDeclaration.self:
         ts.append(castUnchecked(m))
-
+      case ConformanceDeclaration.self:
+        cs.append(castUnchecked(m))
+      case FunctionDeclaration.self:
+        ms.append(m)
       case FunctionBundleDeclaration.self:
         let b = castUnchecked(m, to: FunctionBundleDeclaration.self)
         ms.append(contentsOf: self[b].variants.map(DeclarationIdentity.init(_:)))
-
       default:
-        ms.append(m)
+        unexpected(m)
       }
     }
-    return (ts, ms)
+
+    return .init(types: ts, conformances: cs, members: ms)
   }
 
   /// Returns the witness table defined by `d`.

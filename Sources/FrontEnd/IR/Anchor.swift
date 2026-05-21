@@ -11,3 +11,27 @@ public struct Anchor: Hashable, Sendable {
   public let scope: ScopeIdentity
 
 }
+
+extension Program {
+
+  /// Creates an anchor attached to `d`'s introducer.
+  public func anchor(introducerOf d: BindingDeclaration.ID) -> Anchor {
+    .init(site: self[self[d].pattern].introducer.site, scope: parent(containing: d))
+  }
+
+  /// Creates an anchor attached to `d`'s introducer.
+  public func anchor(introducerOf d: ConformanceDeclaration.ID) -> Anchor {
+    .init(site: self[d].introducer.site, scope: .init(node: d))
+  }
+
+  /// Creates an anchor attached to `d`'s introducer.
+  public func anchor(introducerOf d: FunctionDeclaration.ID) -> Anchor {
+    .init(site: self[d].introducer.site, scope: .init(node: d))
+  }
+
+  /// Creates an anchor attached to `d`'s introducer.
+  public func anchor(introducerOf d: VariantDeclaration.ID) -> Anchor {
+    .init(site: self[d].effect.site, scope: .init(node: d))
+  }
+
+}

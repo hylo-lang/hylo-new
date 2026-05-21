@@ -409,10 +409,10 @@ public struct Typer {
       uniqueKeysWithValues: witness.arguments.elements.map({ (k, v) in (k.erased, v) }))
 
     var implementations = WitnessTable(concept: witness.concept, arguments: witness.arguments)
-    let (associatedTypes, requirements) = program.requirements(of: witness.concept)
+    let requirements = program.requirements(of: witness.concept)
 
     // Find the implementations of associated types in the conformance declaration itself.
-    for r in associatedTypes {
+    for r in requirements.types {
       let i = self.implementation(of: r, in: d).map({ (i) in declaredType(of: i) }) ?? .error
 
       if let m = program.types[i] as? Metatype {
@@ -425,23 +425,19 @@ public struct Typer {
       }
     }
 
-    // Check that other requirements may be satisfied.
-    for r in requirements {
-      switch program.tag(of: r) {
-      case ConformanceDeclaration.self:
-        if let i = anonymousImplementation(of: r) {
-          implementations.assign(
-            i.witness,
-            to: program.castUnchecked(r, to: ConformanceDeclaration.self))
-        }
+    // Check that associated conformance requirements are satisfied.
+    for r in requirements.conformances {
+      if let i = anonymousImplementation(of: r) {
+        implementations.assign(
+          i.witness,
+          to: program.castUnchecked(r, to: ConformanceDeclaration.self))
+      }
+    }
 
-      case FunctionDeclaration.self, VariantDeclaration.self:
-        if let i = namedImplementation(of: r) {
-          implementations.assign(i, to: r)
-        }
-
-      default:
-        program.unexpected(r)
+    // Check that other requirements are satisfied.
+    for r in requirements.members {
+      if let i = namedImplementation(of: r) {
+        implementations.assign(i, to: r)
       }
     }
 
@@ -494,8 +490,8 @@ public struct Typer {
     }
 
     /// Returns the declarations implementing `requirement`.
-    func anonymousImplementation(of requirement: DeclarationIdentity) -> SummonResult? {
-      let requiredType = expectedImplementationType(of: requirement)
+    func anonymousImplementation(of requirement: ConformanceDeclaration.ID) -> SummonResult? {
+      let requiredType = expectedImplementationType(of: .init(requirement))
 
       // The conformance declaration is removed from the givens available to resolve the required
       // type to avoid creating cycles through nested givens. For example, if `Q` refines `P` and
@@ -3104,7 +3100,19 @@ public struct Typer {
     demand(GenericParameter.conformer(d, .proper))
   }
 
-  /// Returns the type of `P.self` in `d`, which declares a trait `P`.
+  /// Returns the type of `P.Self` in `d`, which declares a trait `P`.
+  ///
+  /// In the declaration of a trait `P`, the expression `P.Self` denotes to the implicit `Self`
+  /// parameter of `P`, which is useful in declarations that also introduce `Self` as an alias,
+  /// such as associated conformance requirements. For example:
+  ///
+  ///     trait P {
+  ///       given P.Self is Movable
+  ///     }
+  ///
+  /// Since a conformance declaration introduces a `Self` parameter, an associated conformance
+  /// requirement of the form `given Self is Movable` would not denote a constrain on types
+  /// conforming to `P`. Instead, it would result in a circular definition.
   internal mutating func typeOfTraitSelf(in d: TraitDeclaration.ID) -> AnyTypeIdentity {
     if let memoized = cache.traitToTypeOfTraitSelf[d] { return memoized }
 

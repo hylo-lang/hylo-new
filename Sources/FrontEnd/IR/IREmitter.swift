@@ -131,7 +131,7 @@ internal struct IREmitter {
       // Emit the definition of the global's initializer.
       let global = demandLoweredDeclaration(variable: d)
       let lhs = program[program[d].pattern].pattern
-      defining(global.initializer) { (me) in
+      defining(global.initializer, at: program.anchor(introducerOf: d)) { (me) in
         me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
         me.lowering(rhs, { $0._return() })
       }
@@ -193,13 +193,13 @@ internal struct IREmitter {
     }
 
     let conformance = demandLoweredDeclaration(functionOrConformance: .init(d))
-    defining(conformance) { (me) in
+    defining(conformance, at: program.anchor(introducerOf: d)) { (me) in
       me.lowerDefinition(d)
     }
   }
 
   /// Generates the IR of the subscript that projects the witness declared by `d`, assuming the
-  /// insertion context is configured to generate IR into the its lowered form.
+  /// insertion context is configured to generate IR into its lowered form.
   private mutating func lowerDefinition(_ d: ConformanceDeclaration.ID) {
     insertionContext.anchor = .init(site: program[d].introducer.site, scope: .init(node: d))
     let (_, w) = currentFunction.output.remote!
@@ -221,12 +221,21 @@ internal struct IREmitter {
 
     let table = program.implementations(definedBy: d)
     let concept = program.types[table.concept].declaration
-    var members: [IRValue] = []
+    let requirements = program.requirements(of: table.concept)
 
-    let (associatedTypes, requirements) = program.requirements(of: table.concept)
-    for r in requirements {
+    var members: [IRValue] = .init(minimumCapacity: requirements.all.count)
+    let incompleteTable: () -> Never = { [s = program.spanForDiagnostic(about: d)] in
+      fatalError("incomplete witness table at \(s)")
+    }
+
+    for r in requirements.conformances {
+      let implementation = table.conformance(implementing: r) ?? incompleteTable()
+      members.append(_emit(witness: implementation))
+    }
+
+    for r in requirements.members {
       // Declare the interface function.
-      let implementation = table.member(implementing: r)!
+      let implementation = table.member(implementing: r) ?? incompleteTable()
       let interface = demandLoweredDeclaration(
         implementationOf: r, synthesized: implementation.isSynthetic,
         for: d, table.arguments)
@@ -240,9 +249,7 @@ internal struct IREmitter {
 
       case .inherited(_, let m, true) where program.traitRequiring(m) == concept:
         // The implementation is defined in the trait itself.
-        defining(interface) { (me) in
-          me.insertionContext.anchor = .init(site: me.program[d].site, scope: .init(node: d))
-
+        defining(interface, at: program.anchor(introducerOf: d)) { (me) in
           let defaultImplementation = me.demandLoweredDeclaration(functionOrConformance: m)
           let x0 = me.functionReference(to: defaultImplementation)
           let x1 = me._type_apply(x0, to: table.arguments)
@@ -255,8 +262,7 @@ internal struct IREmitter {
 
       default:
         // The implementations is defined outside the trait.
-        defining(interface) { (me) in
-          me.insertionContext.anchor = .init(site: me.program[d].site, scope: .init(node: d))
+        defining(interface, at: program.anchor(introducerOf: d)) { (me) in
           me.associate(.init(d), with: .parameter(0))
 
           let o = me.currentFunction.returnRegister ?? .poison(.place(.error))
@@ -268,7 +274,7 @@ internal struct IREmitter {
       }
     }
 
-    precondition(associatedTypes.isEmpty, "not implemented")
+    precondition(requirements.types.isEmpty, "not implemented")
 
     let x0 = _alloca(w.erased)
     let x1 = _witnesstable(type: w.erased, members: members)
@@ -319,9 +325,8 @@ internal struct IREmitter {
     for m in program[d].variants {
       let f = demandLoweredDeclaration(functionOrConformance: .init(m))
       assert(!program[module].ir[f].isDefined, "function already lowered")
-      defining(f) { (me) in
-        let s = me.program[m].effect.site
-        me.lowerDefinition(me.program[m].body, of: m, introducedAt: s)
+      defining(f, at: program.anchor(introducerOf: m)) { (me) in
+        me.lowerDefinition(me.program[m].body, of: m)
       }
     }
   }
@@ -329,17 +334,15 @@ internal struct IREmitter {
   /// Generates the IR of `d`.
   private mutating func lower(_ d: FunctionDeclaration.ID) {
     let f = demandLoweredDeclaration(functionOrConformance: .init(d))
-    defining(f) { (me) in
-      let s = me.program[d].introducer.site
-      me.lowerDefinition(me.program[d].body, of: d, introducedAt: s)
+    defining(f, at: program.anchor(introducerOf: d)) { (me) in
+      me.lowerDefinition(me.program[d].body, of: d)
     }
   }
 
-  /// Generates the definition of `d`, which is introduced at `introducerSite` and whose body is
-  /// `definition`, assuming the insertion context is configured to generate IR into the its
-  /// lowered form of `d`.
+  /// Generates the definition of `d`, whose body is `definition`, assuming the insertion context
+  /// is configured to generate IR into the lowered form of `d`.
   private mutating func lowerDefinition<T: Declaration & Scope>(
-    _ definition: [StatementIdentity]?, of d: T.ID, introducedAt introducerSite: SourceSpan
+    _ definition: [StatementIdentity]?, of d: T.ID
   ) {
     // Is there a body to lower?
     guard let body = definition else {
@@ -348,10 +351,11 @@ internal struct IREmitter {
       return
     }
 
+    // Setup the function's parameters.
     for (i, p) in currentFunction.termParameters.enumerated() {
       let v = IRValue.parameter(i)
 
-      // Configure the base frame with the function's parameters.
+      // Update the local bindings of the function.
       if let local = p.declaration {
         insertionContext.function!.associate(local, with: v)
       }
@@ -360,10 +364,20 @@ internal struct IREmitter {
       // accessing the storage of a trivially initializable object (e.g., an empty struct).
       if (p.access == .set) && (v != currentFunction.returnRegister) {
         if program.isTriviallyInitializable(p.type, in: .init(node: d)) {
-          lowering(at: introducerSite, in: .init(node: d)) { (me) in
-            me._assume_state(v, initialized: true)
-          }
+          _assume_state(v, initialized: true)
         }
+      }
+    }
+
+    // If we're defining a default implementation in a trait, update the local bindings of the
+    // function to map each abstract given to a property access. Unused givens will be removed by
+    // dead code elimination.
+    if let t = program.traitRequiring(d) {
+      let ms = program.declarations(of: ConformanceDeclaration.self, lexicallyIn: .init(node: t))
+      for m in ms {
+        let w = program.type(assignedTo: m)
+        let v = _property(.init(m), of: .parameter(0), withType: w)
+        insertionContext.function!.associate(.init(m), with: v)
       }
     }
 
@@ -1650,9 +1664,9 @@ internal struct IREmitter {
   }
 
   /// Returns the result of calling `action` on `self` with the insertion context configured to
-  /// emit new instructions in the entry of `f`, which is not yet defined.
+  /// emit new instructions at `anchor` in the entry of `f`, which is not yet defined.
   private mutating func defining<R>(
-    _ f: IRFunction.ID, _ action: (inout Self) -> R
+    _ f: IRFunction.ID, at anchor: Anchor, _ action: (inout Self) -> R
   ) -> R {
     let function = program[module].ir[f].move()
     assert(!function.isDefined, "function is already defined")
@@ -1660,6 +1674,7 @@ internal struct IREmitter {
     return withClearContext { (me) in
       me.insertionContext.function = consume function
       me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
+      me.insertionContext.anchor = anchor
 
       defer {
         // Once `action` returns, the insertion context contains the function that was originally
@@ -2075,8 +2090,8 @@ internal struct IREmitter {
 
     switch program.tag(of: d) {
     case ConformanceDeclaration.self:
-      let e = program.castUnchecked(d, to: ConformanceDeclaration.self)
-      return _emit(referenceTo: e, applyingNullary: applyNullary)
+      let c = program.castUnchecked(d, to: ConformanceDeclaration.self)
+      return _emit(referenceTo: c, applyingNullary: applyNullary)
 
     case VariableDeclaration.self:
       // Since `d` wasn't in the local symbol table, we can assume it's a global symbol.
