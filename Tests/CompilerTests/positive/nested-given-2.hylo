@@ -1,0 +1,21 @@
+//! stage:lowering
+
+trait P {
+  fun f()
+}
+
+trait Q refines P {
+  fun g() { self.f() }
+}
+
+given foo : Void is P {
+  fun f() {}
+}
+
+given bar : Void is Q {
+  // Use the default implementation of `g`.
+}
+
+fun main() {
+  ().f()
+}

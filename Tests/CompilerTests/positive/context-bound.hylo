@@ -1,4 +1,4 @@
-//! stage:typing no-std
+//! stage:lowering
 
 trait P { fun f() }
 
