@@ -1,0 +1,19 @@
+//! stage:typing
+
+fun f() -> Int {
+  if true {
+     return 1
+  } else {
+     return 0
+  }
+}
+
+fun g() -> Int {
+  if true {
+    let a = 20
+    return a + 0
+  } else {
+    let b = 40
+    return b + 1
+  }
+}
