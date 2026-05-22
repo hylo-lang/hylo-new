@@ -41,7 +41,8 @@ or usages to infer meaning.
 
 ## Contracts
 
-- Create the strictest contracts possible, so long as the client can reason about the preconditions locally.
+- Create the strictest contracts possible.
+- A precondition must be something that is practically possible and efficient for a client to ensure, and that ensuring it often ends up being by construction. If the API author can reasonably predict that a check will be needed every time, well, it's not just a problem of preconditions; they have likely designed the wrong API.
 - Preconditions and postconditions are relationships between components - think in terms of what the caller must provide
   and what the callee guarantees in return.
 - Contract evolution: you may safely weaken preconditions and strengthen postconditions. The reverse breaks clients, so
