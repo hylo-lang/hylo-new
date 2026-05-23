@@ -1,0 +1,17 @@
+//! stage:lowering
+
+struct X is Deinitializable & Movable {
+  public init() {}
+}
+
+struct Y is Deinitializable {
+  let a: { X, X }
+  init() {
+    &self.a = (X(), X())
+  }
+}
+
+fun x() {
+  let y = Y()
+  // IR shouldn't contain a call to deinit, as `y` is trivially deinitializable. 
+}
