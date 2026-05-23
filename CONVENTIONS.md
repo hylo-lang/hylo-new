@@ -24,7 +24,7 @@ or usages to infer meaning.
 - Test cases need not be documented, but should have a descriptive function name.
 
 - Phrasing conventions:
-  - Omit needless words: don't repeat the receiver's type, don't write `the`, `given`, `of self`,
+  - Omit needless words: don't repeat the receiver's type, don't write `the`, `given`, `representing`, `of self`,
     `of the current object` when context makes these obvious.
   - Use `iff` instead of `if` where applicable.
   - Use `` `true` iff ...`` rather than `Whether ...`
