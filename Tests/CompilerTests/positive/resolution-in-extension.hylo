@@ -1,0 +1,7 @@
+//! stage:typing no-std
+
+trait P {}
+
+extension <T is P> T {
+  fun f() { self.f() }
+}
