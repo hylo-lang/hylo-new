@@ -1141,12 +1141,23 @@ public struct Program: Sendable {
     return .init(identifier: n.identifier, labels: n.labels, introducer: self[d].effect.value)
   }
 
+  /// Returns the name of `d` after compilation iff it has an external implementation.
+  public func externName(of d: DeclarationIdentity) -> String? {
+    annotation("extern", appliedTo: d).flatMap { (a) in
+      if case .some(.string(let n)) = a.arguments.first?.value {
+        return n
+      } else {
+        return nil
+      }
+    }
+  }
+
   /// Returns the symbol associated with `n`, if any.
   ///
   /// A syntax tree has an associated symbol if it is annotated with `@_symbol(s)` in sources,
   /// where `s` is a string argument.
   public func symbol<T: SyntaxIdentity>(annotating n: T) -> String? {
-    annotations(n).first(where: { (a) in a.identifier.value == "_symbol" })
+    annotation("_symbol", appliedTo: n)
       .flatMap({ (e) in e.arguments.uniqueElement })
       .flatMap({ (e) in e.value.string })
   }
@@ -1337,6 +1348,11 @@ public struct Program: Sendable {
     } else {
       return []
     }
+  }
+
+  /// Returns the annotation named `k` that is applied to `n`, if any.
+  public func annotation<T: SyntaxIdentity>(_ k: String, appliedTo n: T) -> Annotation? {
+    annotations(n).first(where: { (a) in a.identifier.value == k })
   }
 
   /// Returns the modifiers applied to `d`.
