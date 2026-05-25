@@ -1151,17 +1151,6 @@ public struct Program: Sendable {
       .flatMap({ (e) in e.value.string })
   }
 
-  /// If `n` is a function or subscript call, returns its callee. Otherwise, returns `nil`.
-  public func callee(_ n: ExpressionIdentity) -> ExpressionIdentity? {
-    switch tag(of: n) {
-    case Call.self:
-      return self[castUnchecked(n, to: Call.self)].callee
-    //case SubscriptCall.self:
-    default:
-      return nil
-    }
-  }
-
   /// Returns the left-most tree in the qualification of `e` iff `e` is a name or new expression.
   public func rootQualification(of e: ExpressionIdentity) -> ExpressionIdentity? {
     var root: ExpressionIdentity
