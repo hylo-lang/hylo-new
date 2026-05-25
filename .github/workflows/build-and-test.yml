@@ -60,7 +60,7 @@ jobs:
         id: get-llvm
         with:
           llvmVersion: "20.1.6"
-          llvmBuildRelease: "20260309-221030"
+          llvmBuildRelease: "20260521-114955"
           llvmBuildConfig: ${{ matrix.llvm-build-type }}
           addToPkgConfigPath: true
           addToPath: true
