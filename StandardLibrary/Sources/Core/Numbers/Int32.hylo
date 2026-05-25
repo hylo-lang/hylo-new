@@ -16,3 +16,5 @@ public struct Int32 is Deinitializable {
 }
 
 public given Int32 is ExpressibleByIntegerLiteral { /* built-in */ }
+
+public given Int32 is Movable {}
