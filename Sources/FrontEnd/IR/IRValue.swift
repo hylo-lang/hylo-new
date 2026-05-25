@@ -19,7 +19,10 @@ public enum IRValue: Hashable, Sendable {
   indirect case floatingPoint(literal: String, MachineType.ID)
 
   /// A reference to a lowered function.
-  indirect case function(IRFunction.Name, AnyTypeIdentity)
+  ///
+  /// The payload is a triple `(f, m, t)` where `f` is the identity of a function declared (but
+  /// not necessarily defined) in the module `m`, and `t` is the type of that function.
+  indirect case function(IRFunction.ID, Module.ID, AnyTypeIdentity)
 
   /// A reference to a function or subscript bundle not yet reified.
   indirect case bundle(FunctionBundleDeclaration.ID, AnyTypeIdentity, AccessEffectSet)
@@ -82,8 +85,8 @@ extension IRValue: Showable {
       return "\(printer.show(t)) \(n)"
     case .floatingPoint(let n, let t):
       return "\(printer.show(t)) \(n)"
-    case .function(let n, _):
-      return printer.show(n)
+    case .function(let n, let m, _):
+      return printer.show(printer.program[m].ir[n].name)
     case .bundle(let n, _, let k):
       return "\(printer.program.debugName(of: .init(n)))@{\(list: k)}"
     case .type(let t, _):

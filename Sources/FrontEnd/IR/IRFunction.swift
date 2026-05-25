@@ -382,7 +382,7 @@ public struct IRFunction: Sendable {
       return (t.erased, false)
     case .floatingPoint(_, let t):
       return (t.erased, false)
-    case .function(_, let t):
+    case .function(_, _, let t):
       return (t, true)
     case .bundle(_, let t, _):
       return (t, true)
