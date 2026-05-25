@@ -11,7 +11,10 @@ public struct Program: Sendable {
   public private(set) var modules = OrderedDictionary<Module.Name, Module>()
 
   /// The types in the program.
-  public internal(set) var types = TypeStore()
+  ///
+  /// Updates to this property **must** be monotonic, lest identities of types stored in other
+  /// parts of the program might be invalidated.
+  public var types = TypeStore()
 
   /// The memoization caches of type inference and name resolution.
   ///

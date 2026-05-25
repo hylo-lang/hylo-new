@@ -162,10 +162,10 @@ public struct Module: Sendable {
   public struct IR: Sendable {
 
     /// A mapping from a function name to its declaration (and possibly definition).
-    internal private(set) var functions: OrderedDictionary<IRFunction.Name, IRFunction>
+    public private(set) var functions: OrderedDictionary<IRFunction.Name, IRFunction>
 
     /// The global variables allocated in the static memory of the module.
-    internal private(set) var variables: OrderedDictionary<IRGlobal.Name, IRGlobal>
+    public private(set) var variables: OrderedDictionary<IRGlobal.Name, IRGlobal>
 
     /// Creates an empty instance.
     internal init() {
@@ -174,7 +174,7 @@ public struct Module: Sendable {
     }
 
     /// Projects the function identified by `f`.
-    internal subscript(f: IRFunction.ID) -> IRFunction {
+    public internal(set) subscript(f: IRFunction.ID) -> IRFunction {
       get { functions.values[f] }
       _modify { yield &functions.values[f] }
     }
