@@ -31,9 +31,13 @@ public struct Program: Sendable {
   // this case, the absence of some standard library declarations won't be treated as an error.
   private var allowPartialStandardLibrary: Bool = false
 
+  /// Conditions for selecting conditional compilation branches.
+  public let compilationConditions: ConditionalCompilationFactors
+
   /// Creates an empty program.
-  public init(allowPartialStandardLibrary: Bool = false) {
+  public init(allowPartialStandardLibrary: Bool = false, compilationConditions: ConditionalCompilationFactors = .init()) {
     self.allowPartialStandardLibrary = allowPartialStandardLibrary
+    self.compilationConditions = compilationConditions
   }
 
   /// `true` if the program has errors.
@@ -66,7 +70,7 @@ public struct Program: Sendable {
       return m
     } else {
       let m = modules.count
-      modules[name] = Module(name: name, identity: m)
+      modules[name] = Module(name: name, identity: m, compilationConditions: compilationConditions)
       return m
     }
   }
@@ -1598,7 +1602,7 @@ extension Program {
     // Configure the serialization context.
     let c = Module.SerializationContext(
       identities: .init(uniqueKeysWithValues: modules.values.map({ (m) in (m.name, m.identity) })),
-      types: types)
+      types: types, compilationConditions: compilationConditions)
 
     // Serialize the module.
     var ctx: Any = c
@@ -1625,7 +1629,8 @@ extension Program {
 
     // Reserve an identity for the new module.
     let m = modules.count
-    var c = Module.SerializationContext(identities: [name: m], types: .init())
+    var c = Module.SerializationContext(identities: [name: m], types: .init(),
+      compilationConditions: compilationConditions)
     types.reserveCapacity(max(types.underestimatedCount << 1, 10000))
 
     // Configure the serialization context.

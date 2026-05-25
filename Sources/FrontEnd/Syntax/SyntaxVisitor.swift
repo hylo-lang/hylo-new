@@ -138,6 +138,8 @@ extension Program {
       traverse(castUnchecked(n, to: Assignment.self), calling: &v)
     case Block.self:
       traverse(castUnchecked(n, to: Block.self), calling: &v)
+    case ConditionalCompilation.self:
+      traverse(castUnchecked(n, to: ConditionalCompilation.self), calling: &v)
     case Discard.self:
       traverse(castUnchecked(n, to: Discard.self), calling: &v)
     case Return.self:
@@ -388,6 +390,11 @@ extension Program {
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
   public func traverse<T: SyntaxVisitor>(_ n: Block.ID, calling v: inout T) {
     visit(self[n].statements, calling: &v)
+  }
+
+  /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.
+  public func traverse<T: SyntaxVisitor>(_ n: ConditionalCompilation.ID, calling v: inout T) {
+    visit(self[n].expansion(for: compilationConditions), calling: &v)
   }
 
   /// Visits the children of `n` in pre-order, calling back `v` when a node is entered or left.

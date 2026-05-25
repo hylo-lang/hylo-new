@@ -52,6 +52,10 @@ public struct Token: Hashable, Sendable {
 
     // Pound keywords and literals
     case poundLiteral
+    case poundElse
+    case poundElseif
+    case poundEndif
+    case poundIf
 
     // Operators
     case ampersand

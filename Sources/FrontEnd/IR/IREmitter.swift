@@ -452,6 +452,8 @@ internal struct IREmitter {
       return lower(program.castUnchecked(s, to: Assignment.self))
     case Block.self:
       return lower(program.castUnchecked(s, to: Block.self))
+    case ConditionalCompilation.self:
+      return lower(program.castUnchecked(s, to: ConditionalCompilation.self))
     case Discard.self:
       return lower(program.castUnchecked(s, to: Discard.self))
     case If.self:
@@ -513,6 +515,11 @@ internal struct IREmitter {
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Block.ID) -> ControlFlow {
     lower(statements: program[s].statements)
+  }
+
+  /// Generates the IR of `s`.
+  private mutating func lower(_ s: ConditionalCompilation.ID) -> ControlFlow {
+    lower(statements: program[s].expansion(for: program.compilationConditions))
   }
 
   /// Generates the IR of `s`.
