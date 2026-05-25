@@ -445,6 +445,40 @@ public struct Program: Sendable {
     self[n].annotations.contains(where: { (a) in a.identifier.value == "extern" })
   }
 
+  /// Returns `true` iff `n` is the "main" function of an executable module.
+  ///
+  /// The entry of a module is the first user-function being applied when that module is executed.
+  /// It must be a top-level public function named `main` accepting no argument and returning
+  /// either `Void` or `Int32`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public mutating func isModuleEntry(_ n: FunctionDeclaration.ID) -> Bool {
+    if parent(containing: n).isFile && (name(of: n)?.identifier == "main") {
+      let t = type(assignedTo: n)
+      if let a = types[t] as? Arrow, a.inputs.isEmpty {
+        let o = types.dealiased(a.output)
+        return o == .void || o == standardLibraryType(.int32)
+      }
+    }
+    return false
+  }
+
+  /// Returns `true` iff `m` is an executable module whose "main" function is `f`.
+  ///
+  /// The entry of a module is the first user-function being applied when that module is executed.
+  /// It must be a top-level public function named `main` accepting no argument and returning
+  /// either `Void` or `Int32`.
+  ///
+  /// - Requires: `m` is typed.
+  public mutating func isEntry(_ f: IRFunction.ID, of m: Module.ID) -> Bool {
+    let n = self[m].ir.functions.keys[f]
+    if case .lowered(let d) = n, let m = cast(d, to: FunctionDeclaration.self) {
+      return isModuleEntry(m)
+    } else {
+      return false
+    }
+  }
+
   /// Returns `true` iff `n` denotes an expression.
   public func isExpression<T: SyntaxIdentity>(_ n: T) -> Bool {
     tag(of: n).value is any Expression.Type
@@ -699,12 +733,21 @@ public struct Program: Sendable {
 
   /// Returns the type assigned to `n`.
   ///
+  /// You cannot make strong assumptions about the exact shape of the returned type in general, as
+  /// it may be and/or contain aliases. You may use `type(assignedTo:assuming:)` if you need to
+  /// obtain the type assigned to a node assuming it must have a specific shape.
+  ///
   /// - Requires: The module containing `n` is typed.
   public func type<T: SyntaxIdentity>(assignedTo n: T) -> AnyTypeIdentity {
     self[n.module].type(assignedTo: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
   /// Returns the type assigned to `n`, if any.
+  ///
+  /// You cannot make strong assumptions about the exact shape of the returned type in general, as
+  /// it may be and/or contain aliases. You may use `type(assignedTo:assuming:)` if you need to
+  /// obtain the type assigned to a node assuming it must have a specific shape.
+  ///
   public func type<T: SyntaxIdentity>(maybeAssignedTo n: T) -> AnyTypeIdentity? {
     self[n.module].type(assignedTo: n)
   }
@@ -712,12 +755,15 @@ public struct Program: Sendable {
   /// Returns the type assigned to `n`, assuming it is an instance of `T`.
   ///
   /// - Requires: The module containing `n` is typed.
-  public func type<T: SyntaxIdentity, U: TypeTree>(assignedTo n: T, assuming: U.Type) -> U.ID {
+  public mutating func type<T: SyntaxIdentity, U: TypeTree>(
+    assignedTo n: T, assuming: U.Type
+  ) -> U.ID {
     let t = type(assignedTo: n)
-    if let u = types.cast(t, to: U.self) {
-      return u
+    let u = types.dealiased(t)
+    if let v = types.cast(u, to: U.self) {
+      return v
     } else {
-      unreachable("expected node of type '\(U.self)'; found '\(types.tag(of: t))'")
+      unreachable("expected node of type '\(U.self)'; found '\(types.tag(of: u))'")
     }
   }
 
@@ -1546,7 +1592,7 @@ extension Program {
   /// Returns the type of the given standard library entity.
   ///
   /// The module containing the standard library must have been loaded and type checked.
-  public func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
+  public mutating func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
     let d = standardLibraryDeclaration(n)
     let t = type(assignedTo: d, assuming: Metatype.self)
     return types[t].inhabitant
@@ -1559,7 +1605,7 @@ extension Program {
   public func standardLibraryDeclaration(
     _ n: StandardLibraryEntity
   ) -> DeclarationIdentity {
-    standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library; missing \(n)")
+    standardLibraryDeclarations[n] ?? fatalError("corrupt standard library: '\(n)' is missing")
   }
 
   /// Returns the declaration of the given standard library assuming it is represented by `T`.
