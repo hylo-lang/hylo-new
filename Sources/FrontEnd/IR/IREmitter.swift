@@ -2579,10 +2579,10 @@ internal struct IREmitter {
 
   /// Returns a reference to the given lowered function.
   internal mutating func functionReference(to f: IRFunction.ID) -> IRValue {
-    let n = program[module].ir[f].name
+    // let n = program[module].ir[f].name
     let s = program[module].ir[f].signature()
     let t = program.types.demand(s)
-    return .function(n, t)
+    return .function(f, module, t)
   }
 
   /// Returns the type arguments defined in the type of `q`, which occurs as qualification for a
