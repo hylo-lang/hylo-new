@@ -12,7 +12,7 @@ internal struct ConcreteLayout {
   /// A map from the index of a property to the index of its corresponding field, or `-1` if that
   /// property's representation is erased.
   ///
-  /// - Invariant: the lenght of `propertyToField` is greater than or equal to that of `fields`.
+  /// - Invariant: the length of `propertyToField` is greater than or equal to that of `fields`.
   internal let propertyToField: [Int]
 
   /// The size of an instance, in bytes.
