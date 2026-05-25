@@ -41,7 +41,7 @@ extension IREmitter {
     // Otherwise, replace the type application's arguments with type witnesses. The way in which
     // this substitution is done depends on the way the type application is used.
     switch f.at(i).callee {
-    case .function(let c, _):
+    case .function(let c, _, _):
       depolymorphize(c, operandOf: i, in: &f, reusing: &witnesses)
 
     default:
@@ -52,14 +52,14 @@ extension IREmitter {
   /// Replaces uses of `i`, which is a type application of the polymorphic function `c`, with their
   /// existentialized forms.
   private mutating func depolymorphize(
-    _ c: IRFunction.Name, operandOf i: IRTypeApply.ID, in f: inout IRFunction,
+    _ c: IRFunction.ID, operandOf i: IRTypeApply.ID, in f: inout IRFunction,
     reusing witnesses: inout [AnyTypeIdentity: IRValue]
   ) {
     let application = f.at(i)
 
     // Demand the declaration of the existentialized version of the callee. Note that the
     // definition of this function may not live in the same module as `f`.
-    let poly = program[module].ir.functions[c]!
+    let poly = program[module].ir[c]
     let mono = demandExistentialized(poly)
 
     // Get the types of the parameters of the original poloymorphic function.
