@@ -6,8 +6,8 @@ extension Program {
   }
 
   /// Returns the mangled representation of `t`.
-  public func mangled(_ t: AnyTypeIdentity) -> String {
-    mangled(t, applying: { (s, m, o) in m.mangled(type: s, to: &o) })
+  public func mangled<T: TypeIdentity>(_ t: T) -> String {
+    mangled(t.erased, applying: { (s, m, o) in m.mangled(type: s, to: &o) })
   }
 
   /// Returns the mangled representation of `w`.
