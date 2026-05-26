@@ -79,8 +79,14 @@ extension Program {
           incorporate(ir.castUnchecked(i, to: IRAccess.self), in: &subcontext)
         case IRAccess.End.self:
           break
+        case IRAlloca.self:
+          incorporate(ir.castUnchecked(i, to: IRAlloca.self), in: &subcontext)
+        case IRApply.self:
+          incorporate(ir.castUnchecked(i, to: IRApply.self), in: &subcontext)
         case IRAssumeState.self:
           break
+        case IRMemoryCopy.self:
+          incorporate(ir.castUnchecked(i, to: IRMemoryCopy.self), in: &subcontext)
         case IRReturn.self:
           incorporate(ir.castUnchecked(i, to: IRReturn.self), in: &subcontext)
         case IRStore.self:
@@ -127,6 +133,11 @@ extension Program {
       let t = (j >= 0) ? context.result.inputs[j].type : context.result.output.type
       let x = context.module.llvm.insertAlloca(t.llvm, at: context.insertionPoint!)
       context.module.llvm.setAlignment(t.layout.alignment, for: x)
+      if j >= 0 {
+        context.module.llvm.insertStore(
+          context.llvm.unsafe[].parameters[j].erased, to: x, at: context.insertionPoint!)
+        // TODO: Alignment
+      }
       context.value[v] = x.erased
 
     case .byReference(let j):
@@ -142,6 +153,91 @@ extension Program {
     let s = context.ir.at(i)
     let v = FrontEnd.IRValue.register(i.erased)
     context.value[v] = context.value[s.source]
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  private mutating func incorporate(
+    _ i: IRAlloca.ID, in context: inout FunctionGenerationContext
+  ) {
+    let s = context.ir.at(i)
+    let t = metadata(of: s.storage, in: &context.module)
+    let x = context.module.llvm.insertAlloca(t.llvm, atEntryOf: context.llvm)
+    context.module.llvm.setAlignment(t.layout.alignment, for: x)
+
+    let v = IRValue.register(i.erased)
+    context.value[v] = x.erased
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  private mutating func incorporate(
+    _ i: IRApply.ID, in context: inout FunctionGenerationContext
+  ) {
+    let s = context.ir.at(i)
+
+    switch s.callee {
+    case .function(let n, _, _):
+      let callee = demandFunction(n, in: &context.module)
+
+      var arguments: [SwiftyLLVM.AnyValue.UnsafeReference] = []
+      for (p, a) in zip(callee.inputs, s.arguments) {
+        let l = codegen(a, in: &context)
+
+        switch p.convention {
+        case .erased:
+          continue
+        case .byValue:
+          let x = context.module.llvm.insertLoad(p.type.llvm, from: l, at: context.insertionPoint!)
+          // TODO: alignment
+          arguments.append(x.erased)
+        case .byReference:
+          arguments.append(l)
+        }
+      }
+
+      switch callee.output.convention {
+      case .erased:
+        _ = context.module.llvm.insertCall(
+          callee.llvm, on: arguments, at: context.insertionPoint!)
+
+      case .byValue:
+        let x = context.module.llvm.insertCall(
+          callee.llvm, on: arguments, at: context.insertionPoint!)
+        let o = codegen(s.result, in: &context)
+        context.module.llvm.insertStore(x, to: o, at: context.insertionPoint!)
+        // TODO: Alignment
+
+      case .byReference:
+        let o = codegen(s.result, in: &context)
+        arguments.append(o)
+        _ = context.module.llvm.insertCall(
+          callee.llvm, on: arguments, at: context.insertionPoint!)
+      }
+
+    default:
+      // TODO: Obtain function metadata from other values.
+      fatalError()
+    }
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  private mutating func incorporate(
+    _ i: IRMemoryCopy.ID, in context: inout FunctionGenerationContext
+  ) {
+    let s = context.ir.at(i)
+    let t = metadata(of: context.ir.result(of: s.source)!.type, in: &context.module)
+
+    let ptr = context.module.llvm.ptr
+    let i32 = context.module.llvm.i32
+    let memcpy = context.module.llvm.intrinsic(
+      named: IntrinsicFunction.llvm.memcpy, for: [ptr.erased, ptr.erased, i32.erased])!
+
+    let x0 = codegen(s.target, in: &context)
+    let x1 = codegen(s.source, in: &context)
+    let x2 = i32.unsafe[].constant(t.layout.size)
+    let x3 = context.module.llvm.i1.unsafe[].constant(0)
+    _ = context.module.llvm.insertCall(
+      memcpy, on: [x0.erased, x1.erased, x2.erased, x3.erased],
+      at: context.insertionPoint!)
   }
 
   /// Generates the LLVM IR code corresponding to `i`.
@@ -171,7 +267,7 @@ extension Program {
     _ i: IRStore.ID, in context: inout FunctionGenerationContext
   ) {
     let s = context.ir.at(i)
-    let x = codegen(s.value, in: &context.module)
+    let x = codegen(s.value, in: &context)
     let y = context.value[s.target]!
     // TODO: alignment
     context.module.llvm.insertStore(x, to: y, at: context.insertionPoint!)
@@ -327,13 +423,15 @@ extension Program {
     }
   }
 
-  /// Returns a LLVM IR constant equivalent to `v`.
+  /// Returns the representation of `v` in LLVM IR.
   private mutating func codegen(
-    _ v: FrontEnd.IRValue, in context: inout ModuleGenerationContext
+    _ v: FrontEnd.IRValue, in context: inout FunctionGenerationContext
   ) -> SwiftyLLVM.AnyValue.UnsafeReference {
     switch v {
     case .integer(let n, let t):
-      return codegen(integer: n, instanceOf: t, in: &context)
+      return codegen(integer: n, instanceOf: t, in: &context.module)
+    case .register:
+      return context.value[v]!
     default:
       fatalError("no LLVM representation of type '\(show(v))'")
     }
