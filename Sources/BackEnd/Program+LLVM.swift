@@ -182,16 +182,21 @@ extension Program {
     _ i: IRSubfield.ID, in context: inout FunctionGenerationContext
   ) {
     let s = context.ir.at(i)
-    let t = metadata(of: context.ir.result(of: s.base)!.type, in: &context.module)
+    let t = context.ir.result(of: s.base)!.type
 
     let i32 = context.module.llvm.i32
-    let indices = Array(
-      i32.unsafe[].constant(0).erased,
-      prependedTo: s.path.map({ (p) in i32.unsafe[].constant(t.layout.propertyToField[p]).erased }))
+    var indices = [i32.unsafe[].constant(0).erased]
+    var u = t
+    for p in s.path {
+      let m = metadata(of: u, in: &context.module)
+      indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).erased)
+      u = storage(of: u, visibleFrom: context.module.hylo)![p]
+    }
 
     let b = context.value[s.base]!
+    let m = metadata(of: t, in: &context.module)
     let x = context.module.llvm.insertGetElementPointerInBounds(
-      of: b, typed: t.llvm, indices: indices, at: context.insertionPoint!)
+      of: b, typed: m.llvm, indices: indices, at: context.insertionPoint!)
 
     let v = IRValue.register(i.erased)
     context.value[v] = x.erased
@@ -408,12 +413,9 @@ extension Program {
     of t: Struct.ID, in context: inout ModuleGenerationContext
   ) -> TypeMetadata {
     metadata(of: t, in: &context) { (program, ctx, t, n) in
-      // TODO: Deal with non-inlineable types
-      var properties: [AnyTypeIdentity] = []
-      program.forEachStoredProperty(of: program.types[t].declaration) { (d, _) in
-        let t = program.type(assignedTo: d, assuming: RemoteType.self)
-        properties.append(program.types[t].projectee)
-      }
+      // TODO: Resilience
+      let m = program.types[t].declaration.module
+      let properties = program.storage(of: t.erased, visibleFrom: m)!
       return program.metadata(record: n, rows: properties, in: &ctx)
     }
   }
