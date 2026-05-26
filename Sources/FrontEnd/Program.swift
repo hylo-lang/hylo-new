@@ -995,6 +995,14 @@ public struct Program: Sendable {
     return self[d.file].variableToBinding[d.offset]
   }
 
+  /// Returns the types of stored parts of `t` visible from `module`.
+  public mutating func storage(
+    of t: AnyTypeIdentity, visibleFrom module: Module.ID
+  ) -> [AnyTypeIdentity]? {
+    // TODO: Resilience
+    withTyper(typing: module, { (typer) in typer.storage(of: t) })
+  }
+
   /// Returns the names introduced by `d`.
   public func names(introducedBy d: BindingDeclaration.ID) -> [Name] {
     var result: [Name] = []
