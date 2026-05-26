@@ -1,0 +1,18 @@
+//! stage:lowering
+
+fun twenty_either_way(c0: Bool, c1: Bool) -> Int {
+  if c0 {
+    sink let x = 20
+    return x
+  } else if c1 {
+    sink let y = 20
+    return y
+  } else {
+    sink let z = 20
+    return z
+  }
+
+  if true { return 0 }
+}
+
+public fun main() {}

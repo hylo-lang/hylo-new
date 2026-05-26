@@ -526,26 +526,32 @@ internal struct IREmitter {
   @discardableResult
   private mutating func lowerAsStatement(_ s: If.ID) -> ControlFlow {
     let onFailure = insertionContext.function!.addBlock()
-    let tail = insertionContext.function!.addBlock()
+    let after = insertionContext.function!.addBlock()
 
     // Lower the conditions and the success branch.
     for c in program[s].conditions {
       insertionContext.point = .end(of: lowerCondition(c, onFailure: onFailure))
     }
 
-    if lower(program[s].success) == .next {
-      lowering(after: program[s].success, { $0._br(tail) })
+    switch lower(program[s].success) {
+    case .next:
+      lowering(after: program[s].success, { $0._br(after) })
+    case .return(let r):
+      lowering(r, { $0._return() })
     }
 
     // Lower the failure branch.
     insertionContext.point = .end(of: onFailure)
-    if lower(StatementIdentity(uncheckedFrom: program[s].failure.erased)) == .next {
-      lowering(after: program[s].failure, { $0._br(tail) })
+    switch lower(StatementIdentity(uncheckedFrom: program[s].failure.erased)) {
+    case .next:
+      lowering(after: program[s].failure, { $0._br(after) })
+    case .return(let r):
+      lowering(r, { $0._return() })
     }
 
-    // If neither branch returns control-flow (e.g., both branches return), then the tail won't
-    // have any predecessor and will be removed during dead code elimination.
-    insertionContext.point = .end(of: tail)
+    // If neither branch returns control-flow (e.g., both branches return), then the "after" block
+    // won't have any predecessor and will be removed during dead code elimination.
+    insertionContext.point = .end(of: after)
     return .next
   }
 
