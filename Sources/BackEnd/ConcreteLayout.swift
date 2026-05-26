@@ -1,6 +1,6 @@
 import SwiftyLLVM
 
-/// A description of the layout of a Hylo for a particular host.
+/// A description of the layout of a Hylo type for a particular target.
 internal struct ConcreteLayout {
 
   /// The LLVM types of the fields constituting the parts of an instance, if any.
