@@ -11,6 +11,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  ACTIONS_RUNNER_DISABLE_NODE_MAGLEV: 1
+
 jobs:
   prepare-draft-release:
     name: Prepare draft release
