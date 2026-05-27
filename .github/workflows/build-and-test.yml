@@ -6,6 +6,8 @@ on:
       - "LICENSE"
       - ".gitignore"
       - ".editorconfig"
+env:
+  ACTIONS_RUNNER_DISABLE_NODE_MAGLEV: 1
 
 jobs:
   test:
