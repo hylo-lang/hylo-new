@@ -1179,8 +1179,8 @@ private struct CodeGenerationContext: ~Copyable {
         let llvmType = FloatingPointType.UnsafeReference(
           uncheckedFrom: program.llvmType(from: t, in: &llvm))
         return llvmType.unsafe[].constant(parsing: v).erased
-      case .function(let name, let t):
-        return llvmFunction(named: name, type: t).erased
+      case .function(let f, let m, let t):
+        return llvmFunction(named: program[m].functions[f].name, type: t).erased
       case .type(let t, let w):
         return lowerWitness(type: t, witness: w)
       case .poison(let t):
@@ -1211,8 +1211,8 @@ private struct CodeGenerationContext: ~Copyable {
 
     /// Returns the callee of `s`.
     func unpackCallee(of s: FrontEnd.IRValue) -> ArrowContents {
-      if case .function(let name, let t) = s {
-        let f = llvmFunction(named: name, type: t)
+      if case .function(let f, let m, let t) = s {
+        let f = llvmFunction(named: program[m].functions[f].name, type: t)
 
         return .init(function: f.erased, type: f.unsafe[].valueType, environment: [])
       }
