@@ -19,17 +19,35 @@ extension IRFunction {
   internal mutating func removeUnreachableBlocks() {
     // Nothing to do if the function has no definition.
     guard let e = entry else { return }
+
+    /// Returns `true` iff `b` is unreachable from the function's entry.
     func isUnreachable(_ b: IRBlock.ID, in cfg: ControlFlowGraph) -> Bool {
       (b != e) && cfg.predecessors(of: b).isEmpty
     }
 
     var cfg = controlFlow()
     var work = blocks.addresses.filter({ (b) in isUnreachable(b, in: cfg) })
-    while let a = work.popLast() {
-      for b in successors(of: a) {
-        cfg.remove(a, fromPredecessorsOf: b)
-        if isUnreachable(b, in: cfg) {
-          work.append(b)
+
+    // `work` acts as a stack containing the basic blocks that should be eventually removed. At
+    // each iteration, we can either remove a block or grow the stack with successors that have
+    // to be removed first. The algorithm terminates because the stack can only grow after having
+    // removed relations from the control flow graph; otherwise it is popped.
+    while let a = work.last {
+      // `a` can be remove if it has no outgoing edges. Note that we may get here after `a` has
+      // already been visited once.
+      if cfg.successors(of: a).isEmpty {
+        removeBlock(a)
+        work.removeLast()
+      }
+
+      // If `a` has successors `b`, then `a` can be removed if all these these successors have at
+      // least one other predecessors. In this case, `a` is not a dominator and therefore it cannot
+      // contain definitions used elsewhere. Otherwise, all successors dominated that are dominated
+      // by `a` must be removed first.
+      else {
+        for b in successors(of: a) {
+          cfg.remove(a, fromPredecessorsOf: b)
+          if isUnreachable(b, in: cfg) { work.append(b) }
         }
       }
     }
