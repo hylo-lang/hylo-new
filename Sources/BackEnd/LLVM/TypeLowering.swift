@@ -13,15 +13,15 @@ extension Program {
     case Enum.self:
       unimplemented("LLVM type lowering for enum types")
     case FunctionPointer.self:
-      return module.functionPointer.erased
+      return module.functionPointer.asAnyType
     case MachineType.self:
-      return llvmType(fromMachineType: types.castUnchecked(t, to: MachineType.self), in: &module).erased
+      return llvmType(fromMachineType: types.castUnchecked(t, to: MachineType.self), in: &module).asAnyType
     case RemoteType.self:
-      return module.ptr.erased
+      return module.ptr.asAnyType
     case Struct.self:
-      return llvmType(fromStruct: types.castUnchecked(t, to: Struct.self), in: &module).erased
+      return llvmType(fromStruct: types.castUnchecked(t, to: Struct.self), in: &module).asAnyType
     case Tuple.self:
-      return llvmType(fromTuple: types.castUnchecked(t, to: Tuple.self), in: &module).erased
+      return llvmType(fromTuple: types.castUnchecked(t, to: Tuple.self), in: &module).asAnyType
     default:
       unimplemented("LLVM type lowering for type \(show(t))")
     }
@@ -39,19 +39,19 @@ extension Program {
     -> SwiftyLLVM.AnyType.UnsafeReference {
     switch types[machineType] {
     case .i(let bitWidth):
-      return module.integerType(Int(bitWidth)).erased
+      return module.integerType(Int(bitWidth)).asAnyType
     case .word:
-      return module.layout.pointerSizedIntegerType.erased
+      return module.iptr.asAnyType
     case .float16:
-      return module.half.erased
+      return module.half.asAnyType
     case .float32:
-      return module.float.erased
+      return module.float.asAnyType
     case .float64:
-      return module.double.erased
+      return module.double.asAnyType
     case .float128:
-      return module.fp128.erased
+      return module.fp128.asAnyType
     case .ptr:
-      return module.ptr.erased
+      return module.ptr.asAnyType
     }
   }
 

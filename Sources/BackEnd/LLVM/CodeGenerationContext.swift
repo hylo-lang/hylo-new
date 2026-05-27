@@ -78,8 +78,8 @@ private struct CodeGenerationContext: ~Copyable {
   private init(
     transpiling module: FrontEnd.Module.ID, in program: Program,
     compilingFor targetMachine: consuming SwiftyLLVM.TargetMachine
-  ) throws {
-    self.llvm = try SwiftyLLVM.Module(
+  ) {
+    self.llvm = SwiftyLLVM.Module(
       program.modules.elements[module].key, targetMachine: targetMachine)
     self.program = program
     self.module = module
@@ -90,7 +90,7 @@ private struct CodeGenerationContext: ~Copyable {
     _ module: FrontEnd.Module.ID, in program: Program,
     compilingFor targetMachine: consuming SwiftyLLVM.TargetMachine
   ) throws -> Self {
-    var context = try Self(transpiling: module, in: program, compilingFor: targetMachine)
+    var context = Self(transpiling: module, in: program, compilingFor: targetMachine)
     for f in context.source.functions {
       try context.incorporate(f)
     }
@@ -138,7 +138,7 @@ private struct CodeGenerationContext: ~Copyable {
     transpiledFrom f: IRFunction
   ) -> SwiftyLLVM.Function.UnsafeReference {
     // Parameters and return values are passed by reference.
-    let parameters = Array(repeating: llvm.ptr.erased, count: f.termParameters.count)
+    let parameters = Array(repeating: llvm.ptr.asAnyType, count: f.termParameters.count)
     let name = program.llvmName(of: f)
     let transpiledFunction = llvm.declareFunction(name, llvm.functionType(from: parameters))
 
@@ -185,7 +185,7 @@ private struct CodeGenerationContext: ~Copyable {
       let s = llvm.insertAlloca(t, at: p)
       _ = llvm.insertCall(transpilation, on: (s), at: p)
 
-      let word = llvm.layout.pointerSizedIntegerType
+      let word = llvm.iptr
       let wordBitWidth = word.unsafe[].bitWidth
       let statusPointer = llvm.insertGetStructElementPointer(of: s, typed: t, index: 0, at: p)
       let status = llvm.insertLoad(word, from: statusPointer, at: p)
@@ -306,7 +306,7 @@ private struct CodeGenerationContext: ~Copyable {
     // Record the registers of LLVM function parameters to the register table.
     for i in f.termParameters.indices {
       let o = IRValue.parameter(i)
-      register[o] = transpiledFunction.unsafe[].parameters[i].erased
+      register[o] = transpiledFunction.unsafe[].parameters[i].asAnyValue
     }
 
     // Append all blocks of the function.
@@ -378,9 +378,9 @@ private struct CodeGenerationContext: ~Copyable {
       let s = f.at(i) as! IRAlloca
       let t = program.llvmType(from: s.storage, in: &llvm)
       if llvm.layout.storageSize(of: t) == 0 {
-        register[.register(i)] = llvm.ptr.unsafe[].null.erased
+        register[.register(i)] = llvm.ptr.unsafe[].null.asAnyValue
       } else {
-        register[.register(i)] = llvm.insertAlloca(t, atEntryOf: transpiledFunction).erased
+        register[.register(i)] = llvm.insertAlloca(t, atEntryOf: transpiledFunction).asAnyValue
       }
     }
 
@@ -427,13 +427,13 @@ private struct CodeGenerationContext: ~Copyable {
       let base = llvmOperand(s.base)
       let baseType = program.llvmType(from: f.result(of: s.base)!.type, in: &llvm)
       let indices =
-        [llvm.i32.unsafe[].constant(0).erased]
-          + s.path.map { (p) in llvm.i32.unsafe[].constant(UInt64(p)).erased }
+        [llvm.i32.unsafe[].constant(0).asAnyValue]
+          + s.path.map { (p) in llvm.i32.unsafe[].constant(UInt64(p)).asAnyValue }
 
       let v = llvm.insertGetElementPointerInBounds(
         of: base, typed: baseType, indices: indices, at: insertionPoint)
 
-      register[.register(i)] = v.erased
+      register[.register(i)] = v.asAnyValue
     }
 
     /// Inserts the transpilation of `i` at `insertionPoint`.
@@ -443,17 +443,17 @@ private struct CodeGenerationContext: ~Copyable {
       case .add(let p, _):
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertAdd(overflow: .init(p), l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertAdd(overflow: .init(p), l, r, at: insertionPoint).asAnyValue
 
       case .sub(let p, _):
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertSub(overflow: .init(p), l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertSub(overflow: .init(p), l, r, at: insertionPoint).asAnyValue
 
       case .mul(let p, _):
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertMul(overflow: .init(p), l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertMul(overflow: .init(p), l, r, at: insertionPoint).asAnyValue
 
       // case .shl:
       //   let l = llvmOperand(s.operands[0])
@@ -496,7 +496,7 @@ private struct CodeGenerationContext: ~Copyable {
         let x = llvm.intrinsic(
           named: IntrinsicFunction.llvm.sadd.with.overflow,
           for: [program.llvmType(from: t, in: &llvm)])!
-        register[.register(i)] = llvm.insertCall(x, on: [l, r], at: insertionPoint).erased
+        register[.register(i)] = llvm.insertCall(x, on: [l, r], at: insertionPoint).asAnyValue
 
       case .unsignedAdditionWithOverflow(let t):
         let l = llvmOperand(s.operands[0])
@@ -504,7 +504,7 @@ private struct CodeGenerationContext: ~Copyable {
         let x = llvm.intrinsic(
           named: IntrinsicFunction.llvm.uadd.with.overflow,
           for: (program.llvmType(from: t, in: &llvm)))!
-        register[.register(i)] = llvm.insertCall(x, on: (l, r), at: insertionPoint).erased
+        register[.register(i)] = llvm.insertCall(x, on: (l, r), at: insertionPoint).asAnyValue
 
       case .signedSubtractionWithOverflow(let t):
         let l = llvmOperand(s.operands[0])
@@ -512,7 +512,7 @@ private struct CodeGenerationContext: ~Copyable {
         let x = llvm.intrinsic(
           named: IntrinsicFunction.llvm.ssub.with.overflow,
           for: (program.llvmType(from: t, in: &llvm)))!
-        register[.register(i)] = llvm.insertCall(x, on: (l, r), at: insertionPoint).erased
+        register[.register(i)] = llvm.insertCall(x, on: (l, r), at: insertionPoint).asAnyValue
 
       case .unsignedSubtractionWithOverflow(let t):
         let l = llvmOperand(s.operands[0])
@@ -520,7 +520,7 @@ private struct CodeGenerationContext: ~Copyable {
         let x = llvm.intrinsic(
           named: IntrinsicFunction.llvm.usub.with.overflow,
           for: (program.llvmType(from: t, in: &llvm)))!
-        register[.register(i)] = llvm.insertCall(x, on: (l, r), at: insertionPoint).erased
+        register[.register(i)] = llvm.insertCall(x, on: (l, r), at: insertionPoint).asAnyValue
 
       case .signedMultiplicationWithOverflow(let t):
         let l = llvmOperand(s.operands[0])
@@ -528,7 +528,7 @@ private struct CodeGenerationContext: ~Copyable {
         let x = llvm.intrinsic(
           named: IntrinsicFunction.llvm.smul.with.overflow,
           for: [program.llvmType(from: t, in: &llvm)])!
-        register[.register(i)] = llvm.insertCall(x, on: [l, r], at: insertionPoint).erased
+        register[.register(i)] = llvm.insertCall(x, on: [l, r], at: insertionPoint).asAnyValue
 
       case .unsignedMultiplicationWithOverflow(let t):
         let l = llvmOperand(s.operands[0])
@@ -536,28 +536,28 @@ private struct CodeGenerationContext: ~Copyable {
         let x = llvm.intrinsic(
           named: IntrinsicFunction.llvm.umul.with.overflow,
           for: (program.llvmType(from: t, in: &llvm)))!
-        register[.register(i)] = llvm.insertCall(x, on: (l, r), at: insertionPoint).erased
+        register[.register(i)] = llvm.insertCall(x, on: (l, r), at: insertionPoint).asAnyValue
 
       case .icmp(let p, _):
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
         register[.register(i)] =
-          llvm.insertIntegerComparison(.init(p), l, r, at: insertionPoint).erased
+          llvm.insertIntegerComparison(.init(p), l, r, at: insertionPoint).asAnyValue
 
       case .and(_):
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertBitwiseAnd(l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertBitwiseAnd(l, r, at: insertionPoint).asAnyValue
 
       case .or(_):
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertBitwiseOr(l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertBitwiseOr(l, r, at: insertionPoint).asAnyValue
 
       case .xor(_):
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertBitwiseXor(l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertBitwiseXor(l, r, at: insertionPoint).asAnyValue
 
       // case .trunc(_, let t):
       //   let target = program.llvmType(from: t, in: &llvm)
@@ -586,38 +586,38 @@ private struct CodeGenerationContext: ~Copyable {
       case .fadd:
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertFAdd(l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertFAdd(l, r, at: insertionPoint).asAnyValue
 
       case .fsub:
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertFSub(l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertFSub(l, r, at: insertionPoint).asAnyValue
 
       case .fmul:
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertFMul(l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertFMul(l, r, at: insertionPoint).asAnyValue
 
       case .fdiv:
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertFDiv(l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertFDiv(l, r, at: insertionPoint).asAnyValue
 
       case .frem:
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
-        register[.register(i)] = llvm.insertFRem(l, r, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertFRem(l, r, at: insertionPoint).asAnyValue
 
       case .fcmp(_, let p, _):
         let l = llvmOperand(s.operands[0])
         let r = llvmOperand(s.operands[1])
         register[.register(i)] =
-          llvm.insertFloatingPointComparison(.init(p), l, r, at: insertionPoint).erased
+          llvm.insertFloatingPointComparison(.init(p), l, r, at: insertionPoint).asAnyValue
 
       case .fptrunc(_, let t):
         let target = program.llvmType(from: t, in: &llvm)
         let source = llvmOperand(s.operands[0])
-        register[.register(i)] = llvm.insertFPTrunc(source, to: target, at: insertionPoint).erased
+        register[.register(i)] = llvm.insertFPTrunc(source, to: target, at: insertionPoint).asAnyValue
 
       // case .ctpop(let t):
       //   let source = llvm(s.operands[0])
@@ -644,7 +644,7 @@ private struct CodeGenerationContext: ~Copyable {
       //     insertCall(x, on: (source, i1.unsafe[].zero), at: insertionPoint).erased
 
       case .zeroinitializer(let t):
-        register[.register(i)] = program.llvmType(from: t, in: &llvm).unsafe[].null.erased
+        register[.register(i)] = program.llvmType(from: t, in: &llvm).unsafe[].null.asAnyValue
 
       // case .advancedByBytes:
       //   let base = llvm(s.operands[0])
@@ -1116,7 +1116,7 @@ private struct CodeGenerationContext: ~Copyable {
       let s = f.at(i) as! IRLoad
       let t = program.llvmType(from: f.result(of: IRValue.register(i))!.type, in: &llvm)
       let source = llvmOperand(s.source)
-      register[.register(i)] = llvm.insertLoad(t, from: source, at: insertionPoint).erased
+      register[.register(i)] = llvm.insertLoad(t, from: source, at: insertionPoint).asAnyValue
     }
 
     /// Inserts the transpilation of `i` at `insertionPoint`.
@@ -1168,23 +1168,23 @@ private struct CodeGenerationContext: ~Copyable {
     func llvmOperand(_ o: FrontEnd.IRValue) -> AnyValue.UnsafeReference {
       switch o {
       case .parameter(let i):
-        return transpiledFunction.unsafe[].parameters[i].erased
+        return transpiledFunction.unsafe[].parameters[i].asAnyValue
       case .register(let i):
         return register[.register(i)] ?? unreachable("Value not found at register \(i)")
       case .integer(let v, let t):
         let llvmType = IntegerType.UnsafeReference(
           uncheckedFrom: program.llvmType(from: t, in: &llvm))
-        return llvmType.unsafe[].constant(v).erased
+        return llvmType.unsafe[].constant(v).asAnyValue
       case .floatingPoint(let v, let t):
         let llvmType = FloatingPointType.UnsafeReference(
           uncheckedFrom: program.llvmType(from: t, in: &llvm))
-        return llvmType.unsafe[].constant(parsing: v).erased
+        return llvmType.unsafe[].constant(parsing: v).asAnyValue
       case .function(let f, let m, let t):
-        return llvmFunction(named: program[m].functions[f].name, type: t).erased
+        return llvmFunction(named: program[m].functions[f].name, type: t).asAnyValue
       case .type(let t, let w):
         return lowerWitness(type: t, witness: w)
       case .poison(let t):
-        return llvm.poisonValue(of: program.llvmType(from: f.resolved(t)!.type, in: &llvm)).erased
+        return llvm.poisonValue(of: program.llvmType(from: f.resolved(t)!.type, in: &llvm)).asAnyValue
       case .bundle(_, _, _):
         unreachable("bundle is not expected as an operand")
       }
@@ -1214,7 +1214,7 @@ private struct CodeGenerationContext: ~Copyable {
       if case .function(let f, let m, let t) = s {
         let f = llvmFunction(named: program[m].functions[f].name, type: t)
 
-        return .init(function: f.erased, type: f.unsafe[].valueType, environment: [])
+        return .init(function: f.asAnyValue, type: f.unsafe[].valueType, environment: [])
       }
 
       // `s` is an arrow.
@@ -1225,7 +1225,7 @@ private struct CodeGenerationContext: ~Copyable {
       // The first element of the representation is the function pointer.
       var f = llvm.insertGetStructElementPointer(
         of: lambda, typed: llvmType, index: 0, at: insertionPoint)
-      f = llvm.insertLoad(llvm.ptr, from: f, at: insertionPoint)
+      f = llvm.insertLoad(llvm.ptr, from: f, at: insertionPoint).asAnyInstruction
 
       let e = llvm.insertGetStructElementPointer(
         of: lambda, typed: llvmType, index: 1, at: insertionPoint)
@@ -1241,14 +1241,14 @@ private struct CodeGenerationContext: ~Copyable {
         // Remote captures are passed dereferenced.
         if program.types.cast(c, to: RemoteType.self) != nil {
           // TODO see if this is still necessary after we have desugared projections.
-          x = llvm.insertLoad(llvm.ptr, from: x, at: insertionPoint)
+          x = llvm.insertLoad(llvm.ptr, from: x, at: insertionPoint).asAnyInstruction
         }
 
-        environment.append(x.erased)
+        environment.append(x.asAnyValue)
       }
 
       let t = transpiledType(hyloType)
-      return .init(function: f.erased, type: t.erased, environment: environment)
+      return .init(function: f.asAnyValue, type: t.asAnyType, environment: environment)
     }
 
     /// Returns the type of a transpiled function type corresponding to the given Arrow type in Hylo IR.
@@ -1267,7 +1267,7 @@ private struct CodeGenerationContext: ~Copyable {
       }
 
       return llvm.functionType(
-        from: Array(repeating: llvm.ptr.erased, count: parameters), to: llvm.void)
+        from: Array(repeating: llvm.ptr.asAnyType, count: parameters), to: llvm.void)
     }
   }
 
