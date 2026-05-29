@@ -517,11 +517,15 @@ public struct IRFunction: Sendable {
     _ instruction: T, to b: IRBlock.ID
   ) -> AnyInstructionIdentity {
     assert(!isTerminated(b), "insertion after terminator")
-    return insert(instruction) { (me, i) in
-      let a = me.slots.append(.init(instruction: i, parent: b))
-      let s = AnyInstructionIdentity(address: a)
-      me.blocks[b].setLast(s)
-      return s
+    if let i = blocks[b].last {
+      return insert(instruction, after: i)
+    } else {
+      return insert(instruction) { (me, i) in
+        let a = me.slots.append(.init(instruction: i, parent: b))
+        let s = AnyInstructionIdentity(address: a)
+        me.blocks[b].setLast(s)
+        return s
+      }
     }
   }
 
@@ -530,11 +534,15 @@ public struct IRFunction: Sendable {
   public mutating func prepend<T: Instruction>(
     _ instruction: T, to b: IRBlock.ID
   ) -> AnyInstructionIdentity {
-    insert(instruction) { (me, i) in
-      let a = me.slots.prepend(.init(instruction: i, parent: b))
-      let s = AnyInstructionIdentity(address: a)
-      me.blocks[b].setFirst(s)
-      return s
+    if let i = blocks[b].first {
+      return insert(instruction, before: i)
+    } else {
+      return insert(instruction) { (me, i) in
+        let a = me.slots.prepend(.init(instruction: i, parent: b))
+        let s = AnyInstructionIdentity(address: a)
+        me.blocks[b].setFirst(s)
+        return s
+      }
     }
   }
 
