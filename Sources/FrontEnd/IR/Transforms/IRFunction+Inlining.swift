@@ -13,7 +13,7 @@ extension IRFunction {
         var j = instruction(after: i)!
 
         if let s = at(i) as? IRApply, case .function(let f, _, _) = s.callee {
-          // Should the callee be inliend?
+          // Should the callee be inlined?
           let callee = typer.program[m].ir[f]
           if !callee.isDefined || !typer.program.shouldInline(callee.name, in: m) { break }
 
