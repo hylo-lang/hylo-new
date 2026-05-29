@@ -1301,6 +1301,11 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns the annotation named `k` that is applied to `n`, if any.
+  public func annotation<T: SyntaxIdentity>(_ k: String, appliedTo n: T) -> Annotation? {
+    annotations(n).first(where: { (a) in a.identifier.value == k })
+  }
+
   /// Returns the modifiers applied to `d`.
   public func modifiers(_ d: DeclarationIdentity) -> [Parsed<DeclarationModifier>] {
     if let m = self[d] as? any ModifiableDeclaration {
