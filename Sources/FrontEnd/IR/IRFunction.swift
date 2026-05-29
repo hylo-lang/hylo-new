@@ -57,7 +57,7 @@ public struct IRFunction: Sendable {
     fileprivate private(set) var tag: InstructionTag
 
     /// The basic block containing `instruction`.
-    fileprivate let parent: IRBlock.ID
+    fileprivate var parent: IRBlock.ID
 
     /// Create an instance wrapping `instruction`, which is in `parent`.
     fileprivate init<T: Instruction>(instruction: T, parent: IRBlock.ID) {
@@ -438,6 +438,31 @@ public struct IRFunction: Sendable {
   /// Appends a basic block to this function and returns its identity.
   public mutating func addBlock() -> IRBlock.ID {
     blocks.append(.init())
+  }
+
+  /// Adds a new basic block, moves the instructions before `i` in that block, preserving relative
+  /// order, and returns the new block's identity.
+  ///
+  /// After calling this method, `i` is the first instruction of the new block and all instructions
+  /// preceding `i` are left in their current block, in the same order.
+  public mutating func split(before i: AnyInstructionIdentity) -> IRBlock.ID {
+    let a = block(defining: i)
+    let b = addBlock()
+
+    // Set `i` as the first instruction of the new block.
+    blocks[b].setFirst(i)
+    blocks[b].setLast(blocks[a].last!)
+
+    // Set the instruction before `i` as the last instruction of the block that got split.
+    if let j = instruction(before: i) {
+      blocks[a].setLast(j)
+    } else {
+      blocks[a].clear()
+    }
+
+    // Update the parent block of all instructions after `b`
+    for i in instructions(in: b) { slots[i.address].parent = b }
+    return b
   }
 
   /// Returns the instruction that follows `i`.
