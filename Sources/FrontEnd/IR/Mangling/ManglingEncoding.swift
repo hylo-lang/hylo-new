@@ -571,6 +571,16 @@ internal struct ManglingEncoding: Sendable {
     case .existentialized(let s):
       output.add(operator: .existentializedDeclaration)
       append(function: s, of: m, to: &output)
+    case .ramp(let s):
+      output.add(operator: .rampDeclaration)
+      append(function: s, of: m, to: &output)
+    case .slide(let s):
+      output.add(operator: .slideDeclaration)
+      append(function: s, of: m, to: &output)
+    case .plateau(let s, let i):
+      output.add(operator: .plateauDeclaration)
+      append(function: s, of: m, to: &output)
+      output.add(integer: i)
     }
   }
 
@@ -611,6 +621,32 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     .existentialized(takeEntity(from: &source))
+  }
+
+  /// Demangles a ramp declaration from `source`.
+  private static func takeRampDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    .ramp(takeEntity(from: &source))
+  }
+
+  /// Demangles a slide declaration from `source`.
+  private static func takeSlideDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    .slide(takeEntity(from: &source))
+  }
+
+  /// Demangles a plateau declaration from `source`.
+  private static func takePlateauDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    let e = takeEntity(from: &source)
+    if let i = source.takeInt() {
+      return .plateau(e, i)
+    } else {
+      return .error
+    }
   }
 
   /// Writes the mangled representation of `s` to `output`.

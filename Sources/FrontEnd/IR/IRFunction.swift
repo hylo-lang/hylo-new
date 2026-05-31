@@ -25,6 +25,15 @@ public struct IRFunction: Sendable {
     /// The identity of the existentialiezd form of a polymorphic function.
     indirect case existentialized(IRFunction.Name)
 
+    /// The identity of the ramp of a projection.
+    indirect case ramp(IRFunction.Name)
+
+    /// The identity of the slide of a projection.
+    indirect case slide(IRFunction.Name)
+
+    /// The identity of the plateau of a projection caller.
+    indirect case plateau(IRFunction.Name, Int)
+
   }
 
   /// The way in which an IR function returns its result.
@@ -796,6 +805,15 @@ extension IRFunction.Name: Showable {
 
     case .existentialized(let n):
       return "\(printer.show(n))$existentialized"
+
+    case .ramp(let n):
+      return "\(printer.show(n))$ramp"
+
+    case .slide(let n):
+      return "\(printer.show(n))$slide"
+
+    case .plateau(let n, let i):
+      return "\(printer.show(n))$plateau\(i)"
     }
   }
 

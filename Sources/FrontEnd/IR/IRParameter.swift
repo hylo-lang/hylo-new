@@ -11,7 +11,9 @@ public struct IRParameter: Sendable {
   public let declaration: DeclarationIdentity?
 
   /// Creates an instance with the given properties.
-  public init(type: AnyTypeIdentity, access: AccessEffect, declaration: DeclarationIdentity?) {
+  public init(
+    type: AnyTypeIdentity, access: AccessEffect, declaration: DeclarationIdentity? = nil
+  ) {
     assert(!type[.hasAliases])
     self.type = type
     self.access = access
