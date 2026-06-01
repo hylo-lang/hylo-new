@@ -37,6 +37,8 @@ private enum InstructionResult {
 /// call.
 private struct StackFrame {
 
+  // TODO: add local variables and parameters, need to introduce `Memory` for the same.
+
   /// The results of instructions.
   public var registers: [AnyInstructionIdentity: Value] = [:]
 
@@ -54,6 +56,7 @@ private struct Stack {
 
   /// Adds a new frame on top with the given `returnAddress` and `parameters`.
   public mutating func push(returnAddress: CodePointer) {
+    // TODO: support parameters.
     let f = StackFrame(returnAddress: returnAddress)
     frames.append(f)
   }
