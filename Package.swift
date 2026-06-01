@@ -114,6 +114,14 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings),
 
+    .target(
+      name: "Interpreter",
+      dependencies: [
+        "FrontEnd",
+        .product(name: "Collections", package: "swift-collections"),
+      ],
+      swiftSettings: commonSwiftSettings),
+
     .testTarget(
       name: "CompilerTests",
       dependencies: [
