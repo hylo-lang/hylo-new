@@ -1,10 +1,10 @@
 //! stage:lowering
 
 @inline
-fun two() -> Int32 {
-  if true { 2 } else { 3 }
+fun two(c: Bool) -> Int32 {
+  if c { 2 } else { 3 }
 }
 
 public fun main() -> Int32 {
-  two()
+  two(true)
 }
