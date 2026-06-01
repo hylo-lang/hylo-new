@@ -730,7 +730,7 @@ internal struct IREmitter {
   private mutating func lower(store e: IntegerLiteral.ID, to target: IRValue) {
     unreachable()
   }
-  
+
   /// Implements `lower(store:to:)` for integer literals.
   private mutating func lower(store e: FloatingPointLiteral.ID, to target: IRValue) {
     unreachable()
