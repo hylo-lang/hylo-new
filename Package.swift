@@ -163,6 +163,13 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings),
 
+    .testTarget(
+      name: "InterpreterTests",
+      dependencies: [
+        "Interpreter", "FrontEnd",
+      ],
+      swiftSettings: commonSwiftSettings),
+
     .plugin(
       name: "CompilerTestsPlugin",
       capability: .buildTool(),

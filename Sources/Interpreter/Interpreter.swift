@@ -162,12 +162,13 @@ public struct Interpreter {
 
   /// Executes a single instruction without recording its result.
   private mutating func stepResult() throws -> InstructionResult? {
-    print(currentInstruction)
     switch currentInstruction {
-    case let x as IRAccess:
-      _ = x
-    case let x as IRRegionEnd<IRAccess>:
-      _ = x
+    case is IRAccess:
+      // TODO: fake implementation to make empty program work.
+      return nil
+    case is IRRegionEnd<IRAccess>:
+      // TODO: fake implementation to make empty program work.
+      return nil
     case let x as IRAlloca:
       _ = x
     case let x as IRAllocx:
@@ -176,8 +177,9 @@ public struct Interpreter {
       _ = x
     case let x as IRApplyBuiltin:
       _ = x
-    case let x as IRAssumeState:
-      _ = x
+    case is IRAssumeState:
+      // TODO: fake implementation to make empty program work.
+      return nil
     case let x as IRBranch:
       _ = x
     case let x as IRConditionalBranch:
@@ -234,7 +236,7 @@ public struct Interpreter {
   }
 
   /// Moves the program counter to the next instruction.
-  mutating func advanceProgramCounter() throws {
+  private mutating func advanceProgramCounter() throws {
     guard
       let i = program[programCounter.module]
         .functions[programCounter.functionInModule]
