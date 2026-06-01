@@ -176,6 +176,16 @@ public struct Program: Sendable {
         // New functions are those that are stored after the end of the current window.
         window = typer.program[m].ir.functions.values.indices[window.endIndex...]
       }
+
+      // Apply mandatory inlining.
+      for i in typer.program[m].ir.functions.values.indices {
+        // Nothing to do if the function has no definition.
+        if !typer.program[m].ir[i].isDefined { continue }
+
+        var f = typer.program[m].ir[i].move()
+        f.inlineSimpleCallees(emittingInto: m, using: &typer)
+        typer.program[m].ir[i].take(definition: f)
+      }
     }
   }
 
@@ -1299,6 +1309,11 @@ public struct Program: Sendable {
     } else {
       return []
     }
+  }
+
+  /// Returns the annotation named `k` that is applied to `n`, if any.
+  public func annotation<T: SyntaxIdentity>(_ k: String, appliedTo n: T) -> Annotation? {
+    annotations(n).first(where: { (a) in a.identifier.value == k })
   }
 
   /// Returns the modifiers applied to `d`.
