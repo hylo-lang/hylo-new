@@ -24,10 +24,10 @@ public struct IRAllocx: Instruction {
     self.alignment = alignment
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.witness]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.witness]]
+    self.anchor = properties.anchor(other)
     self.storage = other.storage
     self.alignment = other.alignment
   }

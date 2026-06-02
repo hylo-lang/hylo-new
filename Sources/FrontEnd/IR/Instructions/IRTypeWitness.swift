@@ -24,10 +24,10 @@ public struct IRTypeWitness: Instruction {
     self.typeOfApplication = typeOfApplication
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = other.operands.map({ (o) in ss[o] })
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in properties[o] })
+    self.anchor = properties.anchor(other)
     self.constructor = other.constructor
     self.typeOfApplication = other.typeOfApplication
   }

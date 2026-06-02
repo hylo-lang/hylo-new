@@ -2058,16 +2058,14 @@ internal struct IREmitter {
   }
 
   /// Inserts the contents of `source` before `boundary`, which is in `target`, substituting the
-  /// operands of copied instructions with `operands` and calling `computeAnchors` to determine
-  /// their anchors.
+  /// properties of copied instructions using `properties`
   internal mutating func insert(
     contentsOf source: IRFunction,
     before boundary: AnyInstructionIdentity, in target: inout IRFunction,
-    substitutingOperandsWith operands: consuming IRSubstitutionTable,
-    computingAnchorsWith computeAnchor: (IRFunction, AnyInstructionIdentity) -> Anchor
+    substitutingOperandsWith properties: consuming IRSubstitutionTable
   ) {
     // Define the block in which the source's entry will be emitted.
-    operands[source.entry!] = target.block(defining: boundary)
+    properties[source.entry!] = target.block(defining: boundary)
 
     // Where control flow will jump on return.
     let after: IRBlock.ID? =
@@ -2084,66 +2082,42 @@ internal struct IREmitter {
     // Create a new basic block in the target for each basic block in the source, except the entry.
     // Instructions in the latter are inserted after `boundary`.
     for b in source.blocks.addresses where b != source.entry {
-      operands[b] = insertionContext.function!.addBlock()
+      properties[b] = insertionContext.function!.addBlock()
     }
 
     // Use the dominance relationship to ensure definitions are visited before their uses.
     let cfg = source.controlFlow()
     let dominance = DominatorTree(function: source, controlFlow: cfg)
     for b in dominance.bfs {
-      // Place the insertion point at the end of the basic block corresponding to the one about to
-      // be visited.
-      insertionContext.point = .end(of: operands.blocks[b]!)
-
-      // Insert the contents of the block.
-      _insert(
-        contentsOf: b, in: source,
-        directingReturnsTo: after,
-        substitutingOperandsWith: &operands,
-        computingAnchorsWith: computeAnchor)
+      insertionContext.point = .end(of: properties.blocks[b]!)
+      for i in source.instructions(in: b) {
+        // If next instruction returns, then jump to the "after" block if it's been defined or
+        // simply ignore the instruction otherwise.
+        if source.tag(of: i) == IRReturn.self {
+          if let a = after {
+            insertionContext.anchor = properties.anchor(source.at(i))
+            _br(a)
+          }
+        } else {
+          _clone(i, from: source, substitutingOperandsWith: &properties)
+        }
+      }
     }
   }
 
-  /// Inserts the contents of `b`, which is in `source`, at the current insertion point.
+  /// Inserts a copy of `i`, which is in `source`, at the current insertion point, substituting the
+  /// properties of the copy using `properties`.
   ///
-  /// The operands of copied instructions are substituted with `operands`, which is extended with
-  /// mappings for each copied instruction defining a register. Return instructions are replaced
-  /// with an unconditional branch to `onReturn` iff the argument is defined. Otherwise, they are
-  /// simply ignored.
-  private mutating func _insert(
-    contentsOf b: IRBlock.ID, in source: IRFunction,
-    directingReturnsTo onReturn: IRBlock.ID?,
-    substitutingOperandsWith operands: inout IRSubstitutionTable,
-    computingAnchorsWith computeAnchor: (IRFunction, AnyInstructionIdentity) -> Anchor,
+  /// If `i` defines a register, `properties[i]` is equal to the register defined by `i`'s copy
+  /// after the call. Otherwise, `properties` is not modified.
+  private mutating func _clone(
+    _ i: AnyInstructionIdentity, from source: IRFunction,
+    substitutingOperandsWith properties: inout IRSubstitutionTable
   ) {
-    for i in source.instructions(in: b) {
-      insertionContext.anchor = computeAnchor(source, i)
-      let r = IRValue.register(i)
-
-      switch source.tag(of: i) {
-      case IRAccess.self:
-        operands[r] = insert(IRAccess(source.at(i), substituting: operands)!)!
-      case IRAccess.End.self:
-        insert(IRAccess.End(source.at(i), substituting: operands)!)
-      case IRAlloca.self:
-        operands[r] = insert(IRAlloca(source.at(i), substituting: operands)!)!
-      case IRAssumeState.self:
-        insert(IRAssumeState(source.at(i), substituting: operands)!)
-      case IRBranch.self:
-        insert(IRBranch(source.at(i), substituting: operands)!)
-      case IRConditionalBranch.self:
-        insert(IRConditionalBranch(source.at(i), substituting: operands)!)
-      case IRLoad.self:
-        operands[r] = insert(IRLoad(source.at(i), substituting: operands)!)!
-      case IRReturn.self:
-        if let b = onReturn { _br(b) }
-      case IRStore.self:
-        insert(IRStore(source.at(i), substituting: operands)!)
-      case IRSubfield.self:
-        operands[r] = insert(IRSubfield(source.at(i), substituting: operands)!)!
-      case let t:
-        fatalError("unexpected instruction \(t)")
-      }
+    let original = source.at(i)
+    let clone = type(of: original).init(original, substituting: properties)!
+    if let r = insert(clone) {
+      properties[.register(i)] = r
     }
   }
 

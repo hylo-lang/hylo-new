@@ -19,11 +19,11 @@ public struct IRConditionalBranch: Terminator {
     self.successors = [onSuccess, onFailure]
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = other.operands.map({ (o) in ss[o] })
-    self.anchor = other.anchor
-    self.successors = [ss[other.onSuccess], ss[other.onFailure]]
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in properties[o] })
+    self.anchor = properties.anchor(other)
+    self.successors = [properties[other.onSuccess], properties[other.onFailure]]
   }
 
   /// A Boolean condition determining where control flow will be transferred.

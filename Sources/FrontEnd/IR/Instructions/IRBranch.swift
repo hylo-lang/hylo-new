@@ -15,10 +15,10 @@ public struct IRBranch: Terminator {
     self.successors = [target]
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.anchor = other.anchor
-    self.successors = [ss[other.target]]
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.anchor = properties.anchor(other)
+    self.successors = [properties[other.target]]
   }
 
   /// The target of the branch.
