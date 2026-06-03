@@ -42,6 +42,9 @@ public struct Driver {
   /// `true` iff the standard library and its shim should be excluded from compilation and linking.
   public var noStandardLibrary: Bool = false
 
+  /// The standard library to use during compilation.
+  public var standardLibrary: StandardLibraryRoot
+
   /// The program being compiled by the driver.
   public var program: Program
 
@@ -54,7 +57,8 @@ public struct Driver {
     optimization: OptimizationLevel = .none,
     relocation: RelocationModel = .default,
     codeModel: CodeModel = .default,
-    librarySearchPaths: [URL] = [], librariesToLink: [String] = []
+    librarySearchPaths: [URL] = [], librariesToLink: [String] = [],
+    standardLibrary: StandardLibraryRoot = .full()
   ) {
     self.moduleCachePath = moduleCachePath
     self.target = targetSpecification
@@ -63,6 +67,8 @@ public struct Driver {
     self.codeModel = codeModel
     self.librarySearchPaths = librarySearchPaths
     self.librariesToLink = librariesToLink
+    self.standardLibrary = standardLibrary
+
     self.program = .init()
   }
 
@@ -202,11 +208,20 @@ public struct Driver {
   public func writeObjectFiles(
     for modules: [Module.ID], into destinationDirectory: URL
   ) throws -> [URL] {
-    try modules.map { (m) in
+    var objectFiles = try modules.map { (m) in
       let o = destinationDirectory.appendingPathComponent(moduleName(m) + ".o", isDirectory: false)
       try llvmModules[m]!.module.write(.objectFile, to: o.path)
       return o
     }
+
+    if !noStandardLibrary {
+      let shimsObject = destinationDirectory.appendingPathComponent("stdlib_shims.o", isDirectory: false)
+      _ = try Process.executionOutput(
+        try Host.findNativeExecutable(invokedAs: "clang"),
+        arguments: ["-c", standardLibrary.shim.path, "-o", shimsObject.path])
+      objectFiles.append(shimsObject)
+    }
+    return objectFiles
   }
 
   /// Loads `module`, whose sources are in `root`, into `program`.
@@ -265,18 +280,9 @@ public struct Driver {
     }
   }
 
-  /// Loads the standard library with `load(_:withSourcesAt:)`.
-  /// 
-  /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
-  /// standard library is used. Defaults to local.
+  /// Loads the standard library according to `self.standardLibrary`.
   public mutating func loadStandardLibrary() async throws {
-    let sourceRoot: URL
-    #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
-    sourceRoot = bundledStandardLibrarySources
-    #else
-    sourceRoot = localStandardLibrarySources
-    #endif
-    try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
+    try await load(Module.standardLibraryName, withSourcesAt: standardLibrary.root)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.

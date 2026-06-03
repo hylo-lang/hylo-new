@@ -1,0 +1,346 @@
+@extern("exposed")
+fun exposed() -> Void
+
+//type Float32 = Int
+
+/// A three-dimensional vector of floating-point numbers.
+struct Vector3 is Deinitializable {
+
+  var x: Float32
+  var y: Float32
+  var z: Float32
+
+  /// Creates an instance with the given components.
+  public init(x: Float32, y: Float32, z: Float32) {
+    &self.x = x + 0.0 as Float32
+    &self.y = y + 0.0 as Float32
+    &self.z = z + 0.0 as Float32
+  }
+  
+  /// Creates an instance with each component set to 0.
+  public init() {
+    &self.x = 0.0 as Float32
+    &self.y = 0.0 as Float32
+    &self.z = 0.0 as Float32
+  }
+
+  /// Returns `self + other`.
+  public fun infix+(other: Vector3) -> Vector3 {
+    return Vector3(self.x + other.x, self.y + other.y, self.z + other.z)
+  }
+
+  /// Returns `self - other`.
+  public fun infix-(other: Vector3) -> Vector3 {
+    return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
+  }
+
+  /// Returns a self with each component multiplied by `scale`.
+  public fun infix*(scale: Float32) -> Vector3 {
+    return Vector3(self.x * scale, self.y * scale, self.z * scale)
+  }
+
+  /// Returns a self with each component divided by `divisor`.
+  public fun infix/(divisor: Float32) -> Vector3 {
+    return Vector3(self.x / divisor, self.y / divisor, self.z / divisor)
+  }
+
+  /// Adds `other` to `self`.
+  public fun infix+=(other: Vector3) inout -> Void {
+    &self.x = self.x + other.x
+    &self.y = self.y + other.y
+    &self.z = self.z + other.z
+  }
+
+  /// Subtracts `other` from `self`.
+  public fun infix-=(other: Vector3) inout -> Void {
+    &self.x = self.x - other.x
+    &self.y = self.y - other.y
+    &self.z = self.z - other.z
+  }
+
+  /// Multiplies `self` by `scale`.
+  public fun infix*=(scale: Float32) inout -> Void {
+    &self.x = self.x * scale
+    &self.y = self.y * scale
+    &self.z = self.z * scale
+  }
+
+  /// Divides `self` by `divisor`.
+  public fun infix/=(divisor: Float32) inout -> Void {
+    &self.x = self.x / divisor
+    &self.y = self.y / divisor
+    &self.z = self.z / divisor
+  }
+
+  /// Returns a copy of `self`.
+  public fun copy() -> Vector3 {
+    return Vector3(
+      self.x + 0.0 as Float32, 
+      self.y + 0.0 as Float32, 
+      self.z + 0.0 as Float32)
+  }
+
+}
+
+/// A two-dimensional vector of floating-point numbers.
+public struct Vector2 is Deinitializable {
+
+  var x: Float32
+  var y: Float32
+
+  /// Creates an instance with the given components.
+  public init(x: Float32, y: Float32) {
+    &self.x = x + 0.0 as Float32
+    &self.y = y + 0.0 as Float32
+  }
+
+  /// Creates an instance with each component set to 0.
+  public init() {
+    &self.x = 0.0 as Float32
+    &self.y = 0.0 as Float32
+  }
+
+  /// Returns `self + other`.
+  public fun infix+(other: Vector2) -> Vector2 {
+    return Vector2(self.x + other.x, self.y + other.y)
+  }
+
+  /// Returns `self - other`.
+  public fun infix-(other: Vector2) -> Vector2 {
+    return Vector2(self.x - other.x, self.y - other.y)
+  }
+
+  /// Returns a self with each component multiplied by `scale`.
+  public fun infix*(scale: Float32) -> Vector2 {
+    return Vector2(self.x * scale, self.y * scale)
+  }
+
+  /// Returns a self with each component divided by `divisor`.
+  public fun infix/(divisor: Float32) -> Vector2 {
+    return Vector2(self.x / divisor, self.y / divisor)
+  }
+
+  /// Adds `other` to `self`.
+  public fun infix+=(other: Vector2) inout -> Void {
+    &self.x = self.x + other.x
+    &self.y = self.y + other.y
+  }
+
+  /// Subtracts `other` from `self`.
+  public fun infix-=(other: Vector2) inout -> Void {
+    &self.x = self.x - other.x
+    &self.y = self.y - other.y
+  }
+
+  /// Multiplies `self` by `scale`.
+  public fun infix*=(scale: Float32) inout -> Void {
+    &self.x = self.x * scale
+    &self.y = self.y * scale
+  }
+
+  /// Divides `self` by `divisor`.
+  public fun infix/=(divisor: Float32) inout -> Void {
+    &self.x = self.x / divisor
+    &self.y = self.y / divisor
+  }
+
+  /// Returns a copy of `self`.
+  public fun copy() -> Vector2 {
+    return Vector2(
+      self.x + 0.0 as Float32, 
+      self.y + 0.0 as Float32)
+  }
+}
+
+public struct Color is Deinitializable {
+  public var r: UInt8
+  public var g: UInt8
+  public var b: UInt8
+  public var a: UInt8
+
+  public init(r: UInt8, g: UInt8, b: UInt8, a: UInt8) {
+    &self.r = r + 0 as UInt8
+    &self.g = g + 0 as UInt8
+    &self.b = b + 0 as UInt8
+    &self.a = a + 0 as UInt8
+  }
+
+  public static fun white() -> Color {
+    Color(255 as UInt8, 255 as UInt8, 255 as UInt8, 255 as UInt8)
+  }
+
+  public static fun black() -> Color {
+    Color(0 as UInt8, 0 as UInt8, 0 as UInt8, 255 as UInt8)
+  }
+
+  public static fun red() -> Color {
+    Color(255 as UInt8, 0 as UInt8, 0 as UInt8, 255 as UInt8)
+  }
+
+  public static fun green() -> Color {
+    Color(0 as UInt8, 255 as UInt8, 0 as UInt8, 255 as UInt8)
+  }
+
+  public static fun blue() -> Color {
+    Color(0 as UInt8, 0 as UInt8, 255 as UInt8, 255 as UInt8)
+  }
+
+  public static fun cyan() -> Color {
+    Color(0 as UInt8, 255 as UInt8, 255 as UInt8, 255 as UInt8)
+  }
+}
+
+/// Initializes the window with the given screen dimensions.
+@extern("raylib_init_window")
+fun init_window(_ width: Int, _ height: Int) -> Void
+
+@extern("raylib_window_should_close")
+fun window_should_close() -> Bool
+
+@extern("raylib_begin_drawing")
+fun begin_drawing() -> Void
+
+@extern("raylib_end_drawing")
+fun end_drawing() -> Void
+
+@extern("raylib_clear_background")
+fun background(color: Color) -> Void
+
+extension Float32 {
+
+  @extern("float_to_intptr")
+  fun to_int() -> Int
+
+}
+
+@extern("raylib_push_matrix")
+fun push_matrix() -> Void
+
+@extern("raylib_pop_matrix")
+fun pop_matrix() -> Void
+
+fun init_window(size v: Vector2) {
+  init_window(width: v.x.to_int(), height: v.y.to_int())
+}
+
+@extern("raylib_mouse_x")
+fun mouse_x() -> Int
+
+@extern("raylib_mouse_y")
+fun mouse_y() -> Int
+
+@extern("raylib_rotate")
+fun rotate(_ degrees: Float32, _ axis: Vector3) -> Void
+
+fun rotate(angle: Angle, axis: Axis) -> Void {
+  let d = axis.direction()
+  rotate(degrees: angle.degrees(), axis: d)
+}
+
+@extern("raylib_rectangle")
+fun rectangle(_ x: Float32, _ y: Float32, _ width: Float32, _ height: Float32, color: Color) -> Void
+
+fun pi() -> Float32 {
+  3.14159265 as Float32
+}
+
+
+struct Angle {
+  public var radians: Float32
+
+  public init(_ radians: Float32) {
+    &self.radians = radians + 0.0 as Float32
+  }
+
+  public init(_ degrees: Float32) {
+    &self.radians = degrees * (3.14159 as Float32) / (180.0 as Float32) 
+  }
+
+  public fun degrees() -> Float32 {
+    self.radians * (180.0 as Float32) / (3.14159 as Float32)
+  }
+
+  public fun prefix-() -> Angle {
+    Angle(radians: (0.0 as Float32) - self.radians)
+  }
+}
+
+extension Float32 {
+  fun copy() -> Float32 {
+    self + (0.0 as Float32)
+  }
+}
+
+struct Axis {
+  public var dir_x: Float32
+  public var dir_y: Float32
+  public var dir_z: Float32
+
+  public init(_ direction: Vector3) {
+    &self.dir_x = direction.x.copy()
+    &self.dir_y = direction.y.copy()
+    &self.dir_z = direction.z.copy()
+  }
+
+  public static fun x() -> Axis {
+    Axis(direction: Vector3(1.0 as Float32, 0.0 as Float32, 0.0 as Float32))
+  }
+  
+  public static fun y() -> Axis {
+    Axis(direction: Vector3(0.0 as Float32, 1.0 as Float32, 0.0 as Float32))
+  }
+  
+  public static fun z() -> Axis {
+    Axis(direction: Vector3(0.0 as Float32, 0.0 as Float32, 1.0 as Float32))
+  }
+
+  public fun direction() -> Vector3 {
+    Vector3(self.dir_x.copy(), self.dir_y.copy(), self.dir_z.copy())
+  }
+
+}
+
+extension Int {
+  @extern("int_to_float")
+  fun to_float() -> Float32
+
+}
+
+
+@extern("raylib_translate")
+fun translate(_ x: Float32, _ y: Float32) -> Void
+
+public fun main() {
+  let screen_size = Vector2(800.0 as Float32, 600.0 as Float32)
+
+  init_window(size: screen_size)
+
+
+  print((3.1 as Float32).to_int())
+
+  while !window_should_close() {
+    begin_drawing()
+    push_matrix()
+
+    // let x = 0.0 as Float32
+    let m = mouse_x().to_float()
+    let angle = Angle(degrees: m)
+
+    translate(x: 400.0 as Float32, y: 300.0 as Float32)
+    // let alpha = Angle(degrees: mouse_x().to_float() - screen_size.x / (2.0 as Float32))
+    rotate(angle, Axis(direction: Vector3(0.0 as Float32, 0.0 as Float32, 1.0 as Float32)))
+    
+    background(Color.black())
+
+    rectangle(x: -25.0 as Float32, y: -25.0 as Float32, 
+              width: 50.0 as Float32, height: 50.0 as Float32, 
+              Color.green())
+
+    rectangle(x: -25.0 as Float32, y: 100.0 as Float32, 
+              width: 50.0 as Float32, height: 50.0 as Float32, 
+              Color.cyan())
+
+    pop_matrix()
+    end_drawing()
+  }
+}

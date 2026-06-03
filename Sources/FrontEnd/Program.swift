@@ -31,9 +31,13 @@ public struct Program: Sendable {
   // this case, the absence of some standard library declarations won't be treated as an error.
   private var allowPartialStandardLibrary: Bool = false
 
+  /// The `Never` type of Hylo.
+  public let never: AnyTypeIdentity
+
   /// Creates an empty program.
   public init(allowPartialStandardLibrary: Bool = false) {
     self.allowPartialStandardLibrary = allowPartialStandardLibrary
+    self.never = types.never().erased
   }
 
   /// `true` if the program has errors.
@@ -141,7 +145,8 @@ public struct Program: Sendable {
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
 
-        // This pass cannot fail.
+        // These passes cannot fail.
+        work[i].function.hoistStackAllocationsToEntryBlock()
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
       }
 
@@ -1388,6 +1393,8 @@ public struct Program: Sendable {
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
     case Yield.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Yield.self))
+    case While.self:
+      return self[castUnchecked(n, to: While.self)].introducer.site
 
     default:
       return self[n].site
@@ -1506,6 +1513,9 @@ extension Program {
     /// `Hylo.Int64`.
     case int64 = "Int64"
 
+    /// `Hylo.UInt8`.
+    case uint8 = "UInt8"
+
     /// `Hylo.Float32`.
     case float32 = "Float32"
 
@@ -1594,7 +1604,7 @@ extension Program {
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
       else {
-         precondition(allowPartialStandardLibrary, "missing or corrupt standard library")
+         precondition(allowPartialStandardLibrary, "missing or corrupt standard library; missing '\(n.rawValue)'")
          continue
       }
       standardLibraryDeclarations[n] = d
