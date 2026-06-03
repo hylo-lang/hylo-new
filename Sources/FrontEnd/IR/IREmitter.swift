@@ -1793,10 +1793,6 @@ internal struct IREmitter {
       let i: AnyInstructionIdentity = switch p {
       case .before(let i):
         f.insert(instruction, before: i)
-      case .after(let i):
-        f.insert(instruction, after: i)
-      case .start(let b):
-        f.prepend(instruction, to: b)
       case .end(let b):
         f.append(instruction, to: b)
       }
@@ -2571,7 +2567,7 @@ internal struct IREmitter {
     }
 
     // Instructions for allocating/initializing the witness are emitted in the entry.
-    var p: InsertionPoint? = .some(.start(of: currentFunction.entry!))
+    var p: InsertionPoint? = .some(.start(of: currentFunction.entry!, in: currentFunction))
     swap(&insertionContext.point, &p)
 
     let ps = program.types.parameters(freeIn: t)

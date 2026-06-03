@@ -311,9 +311,9 @@ public struct IRFunction: Sendable {
   /// Returns the basic block in which `point` falls.
   internal func block(containing point: InsertionPoint) -> IRBlock.ID {
     switch point {
-    case .before(let i), .after(let i):
+    case .before(let i):
       return block(defining: i)
-    case .end(let b), .start(let b):
+    case .end(let b):
       return b
     }
   }
