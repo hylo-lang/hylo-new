@@ -1823,7 +1823,7 @@ internal struct IREmitter {
     _ storage: AnyTypeIdentity, alignment: IRAlignment = .preferred, inEntry: Bool = false
   ) -> IRValue {
     let t = program.types.dealiased(storage)
-    let s = IRAlloca(storage: t, alignment: alignment, anchor: currentAnchor)
+    let s = IRAlloca(staticallySized: t, alignment: alignment, anchor: currentAnchor)
 
     if inEntry {
       return modify(&insertionContext.function!) { (f) in
