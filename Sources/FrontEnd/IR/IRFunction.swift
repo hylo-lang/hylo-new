@@ -357,11 +357,11 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `true` iff `v` is an `alloca`, an `allocx`, or a `sink` parameter.
+  /// Returns `true` iff `v` is an `alloca` or a `sink` parameter.
   public func owns(_ v: IRValue) -> Bool {
     switch v {
     case .register(let i):
-      return (tag(of: i) == IRAlloca.self) || (tag(of: i) == IRAllocx.self)
+      return tag(of: i) == IRAlloca.self
     case .parameter(let i):
       return termParameters[i].access == .sink
     default:

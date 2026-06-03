@@ -1811,7 +1811,7 @@ internal struct IREmitter {
     return insert(IRAccess(capabilities: k, source: source, anchor: currentAnchor))!
   }
 
-  /// Inserts an `alloca` instruction.
+  /// Inserts an `alloca` instruction for allocating storage of a type known at compile-time.
   ///
   /// - Parameters:
   ///   - storage: The type of the values for which the storage is allocated.
@@ -1823,7 +1823,9 @@ internal struct IREmitter {
     _ storage: AnyTypeIdentity, alignment: IRAlignment = .preferred, inEntry: Bool = false
   ) -> IRValue {
     let t = program.types.dealiased(storage)
-    let s = IRAlloca(staticallySized: t, alignment: alignment, anchor: currentAnchor)
+    let s = IRAlloca(
+      staticallySized: t, alignment: alignment,
+      anchor: currentAnchor)
 
     if inEntry {
       return modify(&insertionContext.function!) { (f) in
@@ -1835,12 +1837,21 @@ internal struct IREmitter {
     }
   }
 
-  /// Inserts an `allocx` instruction.
-  internal mutating func _allocx(
-    _ type: IRValue, as storage: AnyTypeIdentity, alignment: IRAlignment = .preferred
+  /// Inserts an `alloca` instruction for allocating storage of a type known at run-time.
+  ///
+  /// - Parameters:
+  ///   - storage: The type of the values for which the storage is allocated.
+  ///   - alignment: The alignment of the allocated storage, which defaults to the preferred
+  ///     alignment of `storage` on the compilation target.
+  ///   - inEntry: `true` iff the instruction should be inserted at the start of the current
+  ///     functions' entry rather than at the current insertion point.
+  internal mutating func _alloca(
+    _ witness: IRValue, as storage: AnyTypeIdentity, alignment: IRAlignment = .preferred
   ) -> IRValue {
     let t = program.types.dealiased(storage)
-    let s = IRAllocx(storage: t, witness: type, alignment: alignment, anchor: currentAnchor)
+    let s = IRAlloca(
+      dynamicallySized: t, witness: witness, alignment: alignment,
+      anchor: currentAnchor)
     return insert(s)!
   }
 

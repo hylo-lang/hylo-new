@@ -1,15 +1,12 @@
-/// Allocates memory on the stack for storing instances of a type known at compile-time.
+/// Allocates memory on the stack.
 ///
-/// The result of the instruction is the address of stack-allocated storage capable of holding one
-/// instance of `storage`. The storage is uninitialized and deallocated automatically when the
-/// function returns, at which point it must be deinitialized.
+/// The instruction defines a place capable of storing an instance of `storage`, allocated on the
+/// stack. The place is uninitialized after its creation and it must be deinitialized before its
+/// deallocation, which occurs automatically when the function returns.
 ///
 /// Unlike LLVM's alloca, this instruction cannot be used to allocate dynamically sized buffers. It
 /// is nonetheless possible to allocate storage for a fixed number of contiguous instances using a
 /// tuple (e.g., `Int[8]` in surface syntax).
-///
-/// Stack allocations should generally be emitted in the entry block of the function. `alloca`s
-/// occurring in loops are illegal.
 public struct IRAlloca: Instruction {
 
   /// The operands of the instruction.
@@ -24,10 +21,10 @@ public struct IRAlloca: Instruction {
   /// The alignment of the allocated storage.
   public let alignment: IRAlignment
 
-  /// Creates an instance denoting the allocation of storage of a size known at compile-time.
+  /// Creates an instance denoting stack-allocated storage of a size known at compile-time.
   public init(
-    staticallySized storage: AnyTypeIdentity,
-    alignment: IRAlignment, anchor: Anchor
+    staticallySized storage: AnyTypeIdentity, alignment: IRAlignment,
+    anchor: Anchor
   ) {
     self.operands = []
     self.anchor = anchor
@@ -35,10 +32,10 @@ public struct IRAlloca: Instruction {
     self.alignment = alignment
   }
 
-  /// Creates an instance denoting the allocation of storage of a size known at run-time.
+  /// Creates an instance denoting stack-allocated storage of a size known at run-time.
   public init(
-    dynamicallySized storage: AnyTypeIdentity, witness: IRValue,
-    alignment: IRAlignment, anchor: Anchor
+    dynamicallySized storage: AnyTypeIdentity, witness: IRValue, alignment: IRAlignment,
+    anchor: Anchor
   ) {
     self.operands = [witness]
     self.anchor = anchor
