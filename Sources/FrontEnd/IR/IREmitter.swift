@@ -572,8 +572,12 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Yield.ID) -> ControlFlow {
+    let (k, _) = currentFunction.output.remote!
     let v = lowered(lvalue: program[s].value)
-    lowering(s, { $0._yield(v) })
+    lowering(s) { (me) in
+      let x = me._access([k], from: v)
+      me._yield(x)
+    }
     return .next
   }
 
