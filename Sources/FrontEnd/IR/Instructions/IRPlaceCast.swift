@@ -44,7 +44,7 @@ extension IRPlaceCast: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "place_cast \(printer.show(source)) to \(printer.show(target))"
+    "place_cast \(printer.show(source)) as \(printer.show(target))"
   }
 
 }
