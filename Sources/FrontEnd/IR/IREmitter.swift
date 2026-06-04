@@ -1674,25 +1674,37 @@ internal struct IREmitter {
   }
 
   /// Returns the result of calling `action` on `self` with the insertion context configured to
-  /// emit new instructions at `anchor` in the entry of `f`, which is not yet defined.
-  private mutating func defining<R>(
-    _ f: IRFunction.ID, at anchor: Anchor, _ action: (inout Self) -> R
+  /// emit new instructions in `f`.
+  ///
+  /// The insertion context in which `action` is called only defines the function in which new
+  /// instructions are emitted. An insertion point and an anchor have to be configured before
+  /// methods prefixed by an underscore can be called.
+  private mutating func lowering<R>(
+    into f: IRFunction.ID, _ action: (inout Self) -> R
   ) -> R {
     let function = program[module].ir[f].move()
-    assert(!function.isDefined, "function is already defined")
 
     return withClearContext { (me) in
       me.insertionContext.function = consume function
-      me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
-      me.insertionContext.anchor = anchor
-
       defer {
         // Once `action` returns, the insertion context contains the function that was originally
         // moved out of the program. We have to put it back.
         let defined = me.insertionContext.function.sink()
         me.program[me.module].ir[f].take(definition: defined)
       }
+      return action(&me)
+    }
+  }
 
+  /// Returns the result of calling `action` on `self` with the insertion context configured to
+  /// emit new instructions at `anchor` in the entry of `f`, which is not yet defined.
+  private mutating func defining<R>(
+    _ f: IRFunction.ID, at anchor: Anchor, _ action: (inout Self) -> R
+  ) -> R {
+    lowering(into: f) { (me) in
+      assert(!me.insertionContext.function!.isDefined, "function is already defined")
+      me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
+      me.insertionContext.anchor = anchor
       return action(&me)
     }
   }
