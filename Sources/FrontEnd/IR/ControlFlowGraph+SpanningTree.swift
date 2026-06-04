@@ -4,7 +4,7 @@ extension ControlFlowGraph {
   internal struct SpanningTree {
 
     /// A map from node to its parent.
-    private(set) var parents: [IRBlock.ID: IRBlock.ID?]
+    internal private(set) var parents: [IRBlock.ID: IRBlock.ID?]
 
     /// Creates a spanning tree of `g`.
     internal init(of g: ControlFlowGraph, rootedAt root: IRBlock.ID) {

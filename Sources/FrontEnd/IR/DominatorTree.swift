@@ -50,19 +50,24 @@ internal struct DominatorTree: Sendable {
 
   /// A collection containing the blocks in this tree in breadth-first order.
   internal var bfs: [IRBlock.ID] {
-    let children: [IRBlock.ID: [IRBlock.ID]] = immediateDominators.reduce(into: [:]) { (cs, kv) in
-      if case .some(let parent) = kv.value {
-        cs[parent, default: []].append(kv.key)
-      }
-    }
+    let cs = children()
 
     var result = [root]
     var i = 0
     while i < result.count {
-      if let nodes = children[result[i]] { result.append(contentsOf: nodes) }
+      if let nodes = cs[result[i]] { result.append(contentsOf: nodes) }
       i += 1
     }
     return result
+  }
+
+  /// Returns a mapping from a node to its children.
+  internal func children() -> [IRBlock.ID: SortedSet<IRBlock.ID>] {
+    immediateDominators.reduce(into: [:]) { (cs, kv) in
+      if case .some(let parent) = kv.value {
+        cs[parent, default: []].insert(kv.key)
+      }
+    }
   }
 
   /// Returns the immediate dominator of `b`, if any.
