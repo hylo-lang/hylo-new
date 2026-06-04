@@ -315,6 +315,23 @@ public struct TypeStore: Sendable {
     }
   }
 
+  /// Returns the canonical representation of a tuple of `count` instances of `element`.
+  ///
+  /// The result of `buffer(t, count: n)` is the same as the result of calling `tuple(of:)` with a
+  /// sequence `n` identical types. The result is `.void` if `count` is equal to 0. Otherwise, it
+  /// is an instance of `Tuple`.
+  public mutating func buffer(_ element: AnyTypeIdentity, count: Int) -> AnyTypeIdentity {
+    if count == 0 {
+      return .void
+    } else {
+      var result = demand(Tuple.empty)
+      for _ in 0 ..< count {
+        result = demand(Tuple.cons(head: element, tail: result.erased))
+      }
+      return result.erased
+    }
+  }
+
   /// Returns `(types, isOpenEnded)` where `types` contains the members of `t` and `isOpenEnded` is
   /// `true` iff `t` is open-ended.
   ///

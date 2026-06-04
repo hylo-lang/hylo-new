@@ -155,7 +155,7 @@ public struct Program: Sendable {
         }
       }
 
-      // New functions may ave been introduced during the previous passes. Those that have been
+      // New functions may have been introduced during the previous passes. Those that have been
       // declared during depolymorphization must be defined in the current module unless they are
       // behind a resilience boundary. Since this process may result in further new declarations,
       // we must compute a fixed point on the number of functions.

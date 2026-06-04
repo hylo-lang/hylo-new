@@ -227,7 +227,7 @@ extension IREmitter {
               properties[.register(i)] = me.insert(s)!
             } else {
               let w = me._emitTypeWitness(of: s.storage, reusing: &witnesses)
-              properties[.register(i)] = me._allocx(w, as: s.storage, alignment: s.alignment)
+              properties[.register(i)] = me._alloca(w, as: s.storage, alignment: s.alignment)
             }
           }
 
