@@ -19,12 +19,13 @@ internal struct DominatorTree: Sendable {
   /// The immediate dominators of each basic block.
   private var immediateDominators: [IRBlock.ID: IRBlock.ID?]
 
-  /// Creates the dominator tree of `f` using its control-flow graph `g`.
-  internal init(function f: IRFunction, controlFlow g: ControlFlowGraph) {
+  /// Creates the dominator tree of `g`, which is a subgraph of the control-flow graph of `f`
+  /// rooted at `r`.
+  internal init(function f: IRFunction, controlFlow g: ControlFlowGraph, rootedAt r: IRBlock.ID) {
     // The following is an implementation of Cooper et al.'s fast dominance iterative algorithm
-    // (see "A Simple, Fast Dominance Algorithm", 2001). First, build any spanning tree rooted at
-    // the function's entry.
-    var t = g.spanningTree(rootedAt: f.entry!)
+    // (see "A Simple, Fast Dominance Algorithm", 2001). First, build any spanning tree from the
+    // given root (typically the function's entry).
+    var t = g.spanningTree(rootedAt: r)
 
     // Then, until a fixed point is reached, for each block `v` that has a predecessor `u` that
     // isn't `v`'s parent in the tree, assign `v`'s parent to the least common ancestor of `u` and
@@ -44,8 +45,13 @@ internal struct DominatorTree: Sendable {
     }
 
     // The resulting tree encodes the immediate dominators.
-    root = f.entry!
+    root = r
     immediateDominators = t.parents
+  }
+
+  /// Creates the dominator tree of `g`, which is the control-flow graph of `f`.
+  internal init(function f: IRFunction, controlFlow g: ControlFlowGraph) {
+    self.init(function: f, controlFlow: g, rootedAt: f.entry!)
   }
 
   /// A collection containing the blocks in this tree in breadth-first order.

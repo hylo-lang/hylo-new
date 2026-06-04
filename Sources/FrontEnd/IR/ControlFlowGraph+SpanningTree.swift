@@ -6,7 +6,7 @@ extension ControlFlowGraph {
     /// A map from node to its parent.
     internal private(set) var parents: [IRBlock.ID: IRBlock.ID?]
 
-    /// Creates a spanning tree of `g`.
+    /// Creates a spanning tree of the subgraph of `g` rooted at `root`.
     internal init(of g: ControlFlowGraph, rootedAt root: IRBlock.ID) {
       parents = [:]
       var work: [(vertex: IRBlock.ID, parent: IRBlock.ID??)] = [(root, .some(nil))]
