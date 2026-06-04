@@ -2046,7 +2046,7 @@ public struct Typer {
       switch integerConstant(a.value) {
       case .some(let i) where i >= 0:
         let x = program.types[t].inhabitant
-        let y = program.types.tuple(of: Array(repeating: x, count: i))
+        let y = program.types.buffer(x, count: i)
         let z = demand(Metatype(inhabitant: y)).erased
         return context.obligations.assume(e, hasType: z, at: program[e].site)
       case .some:
