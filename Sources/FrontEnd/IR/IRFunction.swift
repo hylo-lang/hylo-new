@@ -308,16 +308,6 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns the basic block in which `point` falls.
-  internal func block(containing point: InsertionPoint) -> IRBlock.ID {
-    switch point {
-    case .before(let i):
-      return block(defining: i)
-    case .end(let b):
-      return b
-    }
-  }
-
   /// Returns `true` iff `i` and `j` are in the same block and `i` is ordered before `j`.
   public func precedes(_ i: AnyInstructionIdentity, _ j: AnyInstructionIdentity) -> Bool {
     // Relation is irreflexive.
