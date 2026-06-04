@@ -60,6 +60,12 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts an existentialized function declaration symbol.
   case existentializedDeclaration = "eF"
 
+  /// Starts a ramp function declaration symbol.
+  case rampDeclaration = "rF"
+
+  /// Starts a slide function declaration symbol.
+  case slideDeclaration = "lF"
+
   /// Starts a generic parameter declaration symbol.
   case genericParameterDeclaration = "G"
 
@@ -202,6 +208,7 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
       .importDeclaration, .functionDeclaration, .staticFunctionDeclaration,
       .functionBundleDeclaration, .initializerDeclaration,
       .synthesizedFunctionDeclaration, .implementationDeclaration, .existentializedDeclaration,
+      .rampDeclaration, .slideDeclaration,
       .genericParameterDeclaration, .parameterDeclaration,
       .structDeclaration, .typeAliasDeclaration, .traitDeclaration, .variableDeclaration,
       .variantDeclaration, .anonymousScope, .module, .sourceFile, .virtualSourceFile:

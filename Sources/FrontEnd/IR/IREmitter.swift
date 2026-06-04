@@ -1963,9 +1963,20 @@ internal struct IREmitter {
   }
 
   /// Inserts a `place_cast` instruction.
-  internal mutating func _place_cast<T: TypeIdentity>(_ source: IRValue, as target: T) -> IRValue {
+  internal mutating func _place_cast<T: TypeIdentity>(
+    _ source: IRValue, as target: T
+  ) -> IRValue {
     let t = program.types.dealiased(target.erased)
     let s = IRPlaceCast(source: source, target: t, anchor: currentAnchor)
+    return insert(s)!
+  }
+
+  /// Inserts a `pointer_cast` instruction.
+  internal mutating func _pointer_cast<T: TypeIdentity>(
+    _ source: IRValue, as target: T
+  ) -> IRValue {
+    let t = program.types.dealiased(target.erased)
+    let s = IRPointerCast(source: source, target: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2133,14 +2144,27 @@ internal struct IREmitter {
   ///
   /// If `i` defines a register, `properties[i]` is equal to the register defined by `i`'s copy
   /// after the call. Otherwise, `properties` is not modified.
-  private mutating func _clone(
+  @discardableResult
+  internal mutating func _clone(
     _ i: AnyInstructionIdentity, from source: IRFunction,
     substitutingOperandsWith properties: inout IRSubstitutionTable
-  ) {
+  ) -> IRValue? {
     let original = source.at(i)
     let clone = type(of: original).init(original, substituting: properties)!
     if let r = insert(clone) {
       properties[.register(i)] = r
+      return r
+    } else {
+      return nil
+    }
+  }
+
+  internal mutating func copy<T: Sequence<AnyInstructionIdentity>>(
+    contentsOf xs: T, from source: IRFunction, into target: inout IRFunction,
+    substitutingOperandsWith properties: consuming IRSubstitutionTable
+  ) {
+    for i in xs {
+      _clone(i, from: source, substitutingOperandsWith: &properties)
     }
   }
 

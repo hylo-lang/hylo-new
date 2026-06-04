@@ -134,6 +134,12 @@ internal indirect enum DemangledEntity: Hashable, Sendable {
   /// An IRFunction with `name == .existentialized`.
   case existentialized(DemangledEntity)
 
+  /// An IRFunction with `name == .ramp`.
+  case ramp(DemangledEntity)
+
+  /// An IRFunction with `name == .slide`.
+  case slide(DemangledEntity, Int)
+
   /// A qualified entity with `head` as the innermost component and `previous` as the qualification.
   case qualified(head: DemangledEntity, previous: DemangledEntity)
 
@@ -193,6 +199,10 @@ extension DemangledEntity: CustomStringConvertible {
       return "\(e) implements \(c)<\(args)>"
     case .existentialized(let e):
       return "some \(e)"
+    case .ramp(let e):
+       return "ramp \(e)"
+     case .slide(let e, let n):
+       return "slide \(e) \(n)"
     case .qualified(let head, let previous):
       return "\(previous).\(head)"
     case .error:

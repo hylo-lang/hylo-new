@@ -25,12 +25,18 @@ public struct IRFunction: Sendable {
     /// The identity of the existentialiezd form of a polymorphic function.
     indirect case existentialized(IRFunction.Name)
 
+    /// The identity of a ramp resulting from subscript decomposition.
+    indirect case ramp(IRFunction.Name)
+
+    /// The identity of a slide resulting from subscript decomposition.
+    indirect case slide(IRFunction.Name, Int)
+
   }
 
   /// The way in which an IR function returns its result.
   public enum Output: Hashable, Sendable {
 
-    /// The result is written to an output parameter.
+    /// The result is written to the function's return register.
     case indirect
 
     /// The result is projected.
@@ -819,6 +825,12 @@ extension IRFunction.Name: Showable {
 
     case .existentialized(let n):
       return "\(printer.show(n))$existentialized"
+
+    case .ramp(let n):
+      return "\(printer.show(n))$ramp"
+
+    case .slide(let n, let b):
+      return "\(printer.show(n))$slide_\(b)"
     }
   }
 
@@ -849,6 +861,11 @@ extension IRBlock {
       self.slots = slots
       self.current = current?.address
       self.last = last?.address
+    }
+
+    /// Returns the next instruction, if any, without advancing `self`.
+    public var head: AnyInstructionIdentity? {
+      current.map(AnyInstructionIdentity.init(address:))
     }
 
     public mutating func next() -> AnyInstructionIdentity? {

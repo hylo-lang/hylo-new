@@ -186,6 +186,16 @@ public struct Program: Sendable {
         f.inlineSimpleCallees(emittingInto: m, using: &typer)
         typer.program[m].ir[i].take(definition: f)
       }
+
+      for i in typer.program[m].ir.functions.values.indices {
+        // Nothing to do if the function has no definition or isn't a subscript.
+        if !typer.program[m].ir[i].isDefined { continue }
+        if !typer.program[m].ir[i].isSubscript { continue }
+
+        var f = typer.program[m].ir[i].move()
+        f.decompose(emittingInto: m, using: &typer)
+        typer.program[m].ir[i].take(definition: f)
+      }
     }
   }
 

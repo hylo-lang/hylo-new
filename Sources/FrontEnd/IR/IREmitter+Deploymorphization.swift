@@ -160,7 +160,7 @@ extension IREmitter {
   private mutating func demandExistentialized(_ poly: IRFunction) -> IRFunction.ID {
     assert(!poly.isMonomorphic)
 
-    // Has the function been existentialized already?
+    // Has the existentialization been demanded already?
     let n = IRFunction.Name.existentialized(poly.name)
     if let i = program[module].ir.functions.index(forKey: n) {
       return i

@@ -71,8 +71,59 @@ public struct ControlFlowGraph: Sendable {
     }
   }
 
-  /// A collection where the vertex at index `i + 1` is predecessor of the vertex at index `i`.
-  internal typealias PredecessorPath = [IRBlock.ID]
+  /// Returns a sequence containing all the basic-blocks reachable from `root`.
+  internal func reachable(from root: IRBlock.ID) -> ReachableIterator {
+    .init(from: root, in: self)
+  }
+
+  /// Returns the subgraph of `self` that is rooted at `root`.
+  internal func subgraph(rootedAt root: IRBlock.ID) -> ControlFlowGraph {
+    var result = ControlFlowGraph()
+    var work = [root]
+    var done = IRBlockSet()
+    while let a = work.popLast() {
+      done.insert(a)
+      for b in successors(of: a) {
+        result.define(a, predecessorOf: b)
+        if !done.contains(b) { work.append(b) }
+      }
+    }
+    return result
+  }
+
+}
+
+extension ControlFlowGraph {
+
+  public struct ReachableIterator: IteratorProtocol, Sequence {
+
+    public typealias Element = IRBlock.ID
+
+    private let graph: ControlFlowGraph
+
+    private var work: [IRBlock.ID]
+
+    private var done: IRBlockSet
+
+    public init(from root: IRBlock.ID, in graph: ControlFlowGraph) {
+      self.graph = graph
+      self.work = [root]
+      self.done = .init()
+    }
+
+    public mutating func next() -> IRBlock.ID? {
+      if let a = work.popLast() {
+        done.insert(a)
+        for b in graph.successors(of: a) {
+          if !done.contains(b) { work.append(b) }
+        }
+        return a
+      } else {
+        return nil
+      }
+    }
+
+  }
 
 }
 

@@ -148,6 +148,10 @@ internal struct ManglingEncoding: Sendable {
         demangled = takeImplementationDeclaration(from: &source)
       case .existentializedDeclaration:
         demangled = takeExistentializedDeclaration(from: &source)
+      case .rampDeclaration:
+        demangled = takeRampDeclaration(from: &source)
+      case .slideDeclaration:
+        demangled = takeSlideDeclaration(from: &source)
       case .genericParameterDeclaration:
         demangled = takeUnqualifiedEntity(from: &source)
       case .importDeclaration:
@@ -571,6 +575,13 @@ internal struct ManglingEncoding: Sendable {
     case .existentialized(let s):
       output.add(operator: .existentializedDeclaration)
       append(function: s, of: m, to: &output)
+    case .ramp(let s):
+      output.add(operator: .rampDeclaration)
+      append(function: s, of: m, to: &output)
+    case .slide(let s, let n):
+      output.add(operator: .slideDeclaration)
+      append(function: s, of: m, to: &output)
+      output.add(integer: n)
     }
   }
 
@@ -612,6 +623,25 @@ internal struct ManglingEncoding: Sendable {
   ) -> DemangledEntity {
     .existentialized(takeEntity(from: &source))
   }
+
+  /// Demangles a ramp declaration from `source`.
+   private static func takeRampDeclaration(
+     from source: inout DemanglingContext
+   ) -> DemangledEntity {
+     .ramp(takeEntity(from: &source))
+   }
+
+  /// Demangles a slide declaration from `source`.
+   private static func takeSlideDeclaration(
+     from source: inout DemanglingContext
+   ) -> DemangledEntity {
+     let e = takeEntity(from: &source)
+     if let i = source.takeInt() {
+       return .slide(e, i)
+     } else {
+       return .error
+     }
+   }
 
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(table s: IRWitnessTable, to output: inout ManglingContext) {
