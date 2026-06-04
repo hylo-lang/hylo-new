@@ -37,6 +37,7 @@ public struct InstructionTag: Sendable {
     IRStore.self,
     IRMemoryCopy.self,
     IRMove.self,
+    IRPlaceCast.self,
     IRProject.self,
     IRProject.End.self,
     IRProperty.self,

@@ -24,10 +24,10 @@ public struct IRProperty: Instruction {
     self.propertyType = propertyType
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.receiver]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.receiver]]
+    self.anchor = properties.anchor(other)
     self.property = other.property
     self.propertyType = other.propertyType
   }

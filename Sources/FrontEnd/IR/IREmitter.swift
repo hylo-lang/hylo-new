@@ -572,8 +572,12 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Yield.ID) -> ControlFlow {
+    let (k, _) = currentFunction.output.remote!
     let v = lowered(lvalue: program[s].value)
-    lowering(s, { $0._yield(v) })
+    lowering(s) { (me) in
+      let x = me._access([k], from: v)
+      me._yield(x)
+    }
     return .next
   }
 
@@ -1670,25 +1674,37 @@ internal struct IREmitter {
   }
 
   /// Returns the result of calling `action` on `self` with the insertion context configured to
-  /// emit new instructions at `anchor` in the entry of `f`, which is not yet defined.
-  private mutating func defining<R>(
-    _ f: IRFunction.ID, at anchor: Anchor, _ action: (inout Self) -> R
+  /// emit new instructions in `f`.
+  ///
+  /// The insertion context in which `action` is called only defines the function in which new
+  /// instructions are emitted. An insertion point and an anchor have to be configured before
+  /// methods prefixed by an underscore can be called.
+  private mutating func lowering<R>(
+    into f: IRFunction.ID, _ action: (inout Self) -> R
   ) -> R {
     let function = program[module].ir[f].move()
-    assert(!function.isDefined, "function is already defined")
 
     return withClearContext { (me) in
       me.insertionContext.function = consume function
-      me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
-      me.insertionContext.anchor = anchor
-
       defer {
         // Once `action` returns, the insertion context contains the function that was originally
         // moved out of the program. We have to put it back.
         let defined = me.insertionContext.function.sink()
         me.program[me.module].ir[f].take(definition: defined)
       }
+      return action(&me)
+    }
+  }
 
+  /// Returns the result of calling `action` on `self` with the insertion context configured to
+  /// emit new instructions at `anchor` in the entry of `f`, which is not yet defined.
+  private mutating func defining<R>(
+    _ f: IRFunction.ID, at anchor: Anchor, _ action: (inout Self) -> R
+  ) -> R {
+    lowering(into: f) { (me) in
+      assert(!me.insertionContext.function!.isDefined, "function is already defined")
+      me.insertionContext.point = .end(of: me.insertionContext.function!.addBlock())
+      me.insertionContext.anchor = anchor
       return action(&me)
     }
   }
@@ -1793,10 +1809,6 @@ internal struct IREmitter {
       let i: AnyInstructionIdentity = switch p {
       case .before(let i):
         f.insert(instruction, before: i)
-      case .after(let i):
-        f.insert(instruction, after: i)
-      case .start(let b):
-        f.prepend(instruction, to: b)
       case .end(let b):
         f.append(instruction, to: b)
       }
@@ -1811,7 +1823,7 @@ internal struct IREmitter {
     return insert(IRAccess(capabilities: k, source: source, anchor: currentAnchor))!
   }
 
-  /// Inserts an `alloca` instruction.
+  /// Inserts an `alloca` instruction for allocating storage of a type known at compile-time.
   ///
   /// - Parameters:
   ///   - storage: The type of the values for which the storage is allocated.
@@ -1823,7 +1835,9 @@ internal struct IREmitter {
     _ storage: AnyTypeIdentity, alignment: IRAlignment = .preferred, inEntry: Bool = false
   ) -> IRValue {
     let t = program.types.dealiased(storage)
-    let s = IRAlloca(storage: t, alignment: alignment, anchor: currentAnchor)
+    let s = IRAlloca(
+      staticallySized: t, alignment: alignment,
+      anchor: currentAnchor)
 
     if inEntry {
       return modify(&insertionContext.function!) { (f) in
@@ -1835,12 +1849,21 @@ internal struct IREmitter {
     }
   }
 
-  /// Inserts an `allocx` instruction.
-  internal mutating func _allocx(
-    _ type: IRValue, as storage: AnyTypeIdentity, alignment: IRAlignment = .preferred
+  /// Inserts an `alloca` instruction for allocating storage of a type known at run-time.
+  ///
+  /// - Parameters:
+  ///   - storage: The type of the values for which the storage is allocated.
+  ///   - alignment: The alignment of the allocated storage, which defaults to the preferred
+  ///     alignment of `storage` on the compilation target.
+  ///   - inEntry: `true` iff the instruction should be inserted at the start of the current
+  ///     functions' entry rather than at the current insertion point.
+  internal mutating func _alloca(
+    _ witness: IRValue, as storage: AnyTypeIdentity, alignment: IRAlignment = .preferred
   ) -> IRValue {
     let t = program.types.dealiased(storage)
-    let s = IRAllocx(storage: t, witness: type, alignment: alignment, anchor: currentAnchor)
+    let s = IRAlloca(
+      dynamicallySized: t, witness: witness, alignment: alignment,
+      anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2058,16 +2081,14 @@ internal struct IREmitter {
   }
 
   /// Inserts the contents of `source` before `boundary`, which is in `target`, substituting the
-  /// operands of copied instructions with `operands` and calling `computeAnchors` to determine
-  /// their anchors.
+  /// properties of copied instructions using `properties`
   internal mutating func insert(
     contentsOf source: IRFunction,
     before boundary: AnyInstructionIdentity, in target: inout IRFunction,
-    substitutingOperandsWith operands: consuming IRSubstitutionTable,
-    computingAnchorsWith computeAnchor: (IRFunction, AnyInstructionIdentity) -> Anchor
+    substitutingOperandsWith properties: consuming IRSubstitutionTable
   ) {
     // Define the block in which the source's entry will be emitted.
-    operands[source.entry!] = target.block(defining: boundary)
+    properties[source.entry!] = target.block(defining: boundary)
 
     // Where control flow will jump on return.
     let after: IRBlock.ID? =
@@ -2084,66 +2105,42 @@ internal struct IREmitter {
     // Create a new basic block in the target for each basic block in the source, except the entry.
     // Instructions in the latter are inserted after `boundary`.
     for b in source.blocks.addresses where b != source.entry {
-      operands[b] = insertionContext.function!.addBlock()
+      properties[b] = insertionContext.function!.addBlock()
     }
 
     // Use the dominance relationship to ensure definitions are visited before their uses.
     let cfg = source.controlFlow()
     let dominance = DominatorTree(function: source, controlFlow: cfg)
     for b in dominance.bfs {
-      // Place the insertion point at the end of the basic block corresponding to the one about to
-      // be visited.
-      insertionContext.point = .end(of: operands.blocks[b]!)
-
-      // Insert the contents of the block.
-      _insert(
-        contentsOf: b, in: source,
-        directingReturnsTo: after,
-        substitutingOperandsWith: &operands,
-        computingAnchorsWith: computeAnchor)
+      insertionContext.point = .end(of: properties.blocks[b]!)
+      for i in source.instructions(in: b) {
+        // If next instruction returns, then jump to the "after" block if it's been defined or
+        // simply ignore the instruction otherwise.
+        if source.tag(of: i) == IRReturn.self {
+          if let a = after {
+            insertionContext.anchor = properties.anchor(source.at(i))
+            _br(a)
+          }
+        } else {
+          _clone(i, from: source, substitutingOperandsWith: &properties)
+        }
+      }
     }
   }
 
-  /// Inserts the contents of `b`, which is in `source`, at the current insertion point.
+  /// Inserts a copy of `i`, which is in `source`, at the current insertion point, substituting the
+  /// properties of the copy using `properties`.
   ///
-  /// The operands of copied instructions are substituted with `operands`, which is extended with
-  /// mappings for each copied instruction defining a register. Return instructions are replaced
-  /// with an unconditional branch to `onReturn` iff the argument is defined. Otherwise, they are
-  /// simply ignored.
-  private mutating func _insert(
-    contentsOf b: IRBlock.ID, in source: IRFunction,
-    directingReturnsTo onReturn: IRBlock.ID?,
-    substitutingOperandsWith operands: inout IRSubstitutionTable,
-    computingAnchorsWith computeAnchor: (IRFunction, AnyInstructionIdentity) -> Anchor,
+  /// If `i` defines a register, `properties[i]` is equal to the register defined by `i`'s copy
+  /// after the call. Otherwise, `properties` is not modified.
+  private mutating func _clone(
+    _ i: AnyInstructionIdentity, from source: IRFunction,
+    substitutingOperandsWith properties: inout IRSubstitutionTable
   ) {
-    for i in source.instructions(in: b) {
-      insertionContext.anchor = computeAnchor(source, i)
-      let r = IRValue.register(i)
-
-      switch source.tag(of: i) {
-      case IRAccess.self:
-        operands[r] = insert(IRAccess(source.at(i), substituting: operands)!)!
-      case IRAccess.End.self:
-        insert(IRAccess.End(source.at(i), substituting: operands)!)
-      case IRAlloca.self:
-        operands[r] = insert(IRAlloca(source.at(i), substituting: operands)!)!
-      case IRAssumeState.self:
-        insert(IRAssumeState(source.at(i), substituting: operands)!)
-      case IRBranch.self:
-        insert(IRBranch(source.at(i), substituting: operands)!)
-      case IRConditionalBranch.self:
-        insert(IRConditionalBranch(source.at(i), substituting: operands)!)
-      case IRLoad.self:
-        operands[r] = insert(IRLoad(source.at(i), substituting: operands)!)!
-      case IRReturn.self:
-        if let b = onReturn { _br(b) }
-      case IRStore.self:
-        insert(IRStore(source.at(i), substituting: operands)!)
-      case IRSubfield.self:
-        operands[r] = insert(IRSubfield(source.at(i), substituting: operands)!)!
-      case let t:
-        fatalError("unexpected instruction \(t)")
-      }
+    let original = source.at(i)
+    let clone = type(of: original).init(original, substituting: properties)!
+    if let r = insert(clone) {
+      properties[.register(i)] = r
     }
   }
 
@@ -2586,7 +2583,7 @@ internal struct IREmitter {
     }
 
     // Instructions for allocating/initializing the witness are emitted in the entry.
-    var p: InsertionPoint? = .some(.start(of: currentFunction.entry!))
+    var p: InsertionPoint? = .some(.start(of: currentFunction.entry!, in: currentFunction))
     swap(&insertionContext.point, &p)
 
     let ps = program.types.parameters(freeIn: t)

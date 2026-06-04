@@ -10,10 +10,14 @@ public struct IRSubstitutionTable: Sendable {
   /// A table from basic block to its substitution, if defined.
   public private(set) var blocks: [IRBlock.ID: IRBlock.ID]
 
+  /// A function accepting an instruction and returning the anchor of its substitution.
+  public var anchor: @Sendable (any Instruction) -> Anchor
+
   /// Creates an empty instance.
   public init() {
     self.values = [:]
     self.blocks = [:]
+    self.anchor = \Instruction.anchor
   }
 
   /// Accesses the substitution for `o` iff it is defined, or else `o`.

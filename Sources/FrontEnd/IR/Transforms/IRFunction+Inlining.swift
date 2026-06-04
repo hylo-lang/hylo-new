@@ -29,8 +29,7 @@ extension IRFunction {
           typer.program.withEmitter(insertingIn: m) { (emitter) in
             emitter.insert(
               contentsOf: callee, before: j, in: &self,
-              substitutingOperandsWith: table,
-              computingAnchorsWith: { (f, k) in f.at(k).anchor })
+              substitutingOperandsWith: table)
           }
         }
 

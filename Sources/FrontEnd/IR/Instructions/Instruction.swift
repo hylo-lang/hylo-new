@@ -13,8 +13,8 @@ public protocol Instruction: Hashable, Showable, Sendable {
   /// `true` iff `self` extends the lifetime of its operands.
   var isExtendingOperandLifetimes: Bool { get }
 
-  /// Creates a copy of `other`, substituting its properties with `operands`.
-  init(_ other: Self, substituting operands: borrowing IRSubstitutionTable)
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  init(_ other: Self, substituting properties: borrowing IRSubstitutionTable)
 
   /// Asserts that the well-formedness conditions of the instruction hold.
   func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool
@@ -26,11 +26,11 @@ extension Instruction {
   /// The identity of an instance of `Self`.
   public typealias ID = ConcreteInstructionIdentity<Self>
 
-  /// Creates a copy of `other`, substituting its properties with `operands`, iff `other` is an
+  /// Creates a copy of `other`, substituting its properties with `properties`, iff `other` is an
   /// instance of `Self`.
-  public init?(_ other: any Instruction, substituting operands: borrowing IRSubstitutionTable) {
+  public init?(_ other: any Instruction, substituting properties: borrowing IRSubstitutionTable) {
     if let o = other as? Self {
-      self.init(o, substituting: operands)
+      self.init(o, substituting: properties)
     } else {
       return nil
     }

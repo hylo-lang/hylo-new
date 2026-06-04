@@ -20,10 +20,10 @@ public struct IRPlaceCast: Instruction {
     self.target = target
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.source]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.source]]
+    self.anchor = properties.anchor(other)
     self.target = other.target
   }
 
@@ -44,7 +44,7 @@ extension IRPlaceCast: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "place_cast \(printer.show(source)) to \(printer.show(target))"
+    "place_cast \(printer.show(source)) as \(printer.show(target))"
   }
 
 }

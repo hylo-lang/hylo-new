@@ -308,16 +308,6 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns the basic block in which `point` falls.
-  internal func block(containing point: InsertionPoint) -> IRBlock.ID {
-    switch point {
-    case .before(let i), .after(let i):
-      return block(defining: i)
-    case .end(let b), .start(let b):
-      return b
-    }
-  }
-
   /// Returns `true` iff `i` and `j` are in the same block and `i` is ordered before `j`.
   public func precedes(_ i: AnyInstructionIdentity, _ j: AnyInstructionIdentity) -> Bool {
     // Relation is irreflexive.
@@ -357,11 +347,11 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `true` iff `v` is an `alloca`, an `allocx`, or a `sink` parameter.
+  /// Returns `true` iff `v` is an `alloca` or a `sink` parameter.
   public func owns(_ v: IRValue) -> Bool {
     switch v {
     case .register(let i):
-      return (tag(of: i) == IRAlloca.self) || (tag(of: i) == IRAllocx.self)
+      return tag(of: i) == IRAlloca.self
     case .parameter(let i):
       return termParameters[i].access == .sink
     default:
