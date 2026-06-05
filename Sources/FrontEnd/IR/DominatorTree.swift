@@ -11,17 +11,17 @@ import Utilities
 ///
 /// A dominator tree encodes the dominance relation of a control graph as a tree where a node is
 /// a basic blocks and its children are those it immediately dominates.
-internal struct DominatorTree: Sendable {
+public struct DominatorTree: Sendable {
 
   /// The root of the tree.
-  internal let root: IRBlock.ID
+  public let root: IRBlock.ID
 
   /// The immediate dominators of each basic block.
   private var immediateDominators: [IRBlock.ID: IRBlock.ID?]
 
   /// Creates the dominator tree of `g`, which is a subgraph of the control-flow graph of `f`
   /// rooted at `r`.
-  internal init(function f: IRFunction, controlFlow g: ControlFlowGraph, rootedAt r: IRBlock.ID) {
+  public init(function f: IRFunction, controlFlow g: ControlFlowGraph, rootedAt r: IRBlock.ID) {
     // The following is an implementation of Cooper et al.'s fast dominance iterative algorithm
     // (see "A Simple, Fast Dominance Algorithm", 2001). First, build any spanning tree from the
     // given root (typically the function's entry).
@@ -50,12 +50,12 @@ internal struct DominatorTree: Sendable {
   }
 
   /// Creates the dominator tree of `g`, which is the control-flow graph of `f`.
-  internal init(function f: IRFunction, controlFlow g: ControlFlowGraph) {
+  public init(function f: IRFunction, controlFlow g: ControlFlowGraph) {
     self.init(function: f, controlFlow: g, rootedAt: f.entry!)
   }
 
   /// A collection containing the blocks in this tree in breadth-first order.
-  internal var bfs: [IRBlock.ID] {
+  public var bfs: [IRBlock.ID] {
     let cs = children()
 
     var result = [root]
@@ -67,8 +67,8 @@ internal struct DominatorTree: Sendable {
     return result
   }
 
-  /// Returns a mapping from a node to its children.
-  internal func children() -> [IRBlock.ID: SortedSet<IRBlock.ID>] {
+  /// Returns a mapping from a node to the blocks that it immediately dominates.
+  public func children() -> [IRBlock.ID: SortedSet<IRBlock.ID>] {
     immediateDominators.reduce(into: [:]) { (cs, kv) in
       if case .some(let parent) = kv.value {
         cs[parent, default: []].insert(kv.key)
@@ -77,7 +77,7 @@ internal struct DominatorTree: Sendable {
   }
 
   /// Returns the immediate dominator of `b`, if any.
-  internal func immediateDominator(of b: IRBlock.ID) -> IRBlock.ID? {
+  public func immediateDominator(of b: IRBlock.ID) -> IRBlock.ID? {
     if case .some(.some(let d)) = immediateDominators[b] {
       return d
     } else {
@@ -86,7 +86,7 @@ internal struct DominatorTree: Sendable {
   }
 
   /// Returns a collection containing the strict dominators of `b`.
-  internal func strictDominators(of b: IRBlock.ID) -> [IRBlock.ID] {
+  public func strictDominators(of b: IRBlock.ID) -> [IRBlock.ID] {
     var result: [IRBlock.ID] = []
     var a = b
     while let d = immediateDominator(of: a) {
@@ -97,7 +97,7 @@ internal struct DominatorTree: Sendable {
   }
 
   /// Returns `true` if `a` dominates `b`.
-  internal func dominates(_ a: IRBlock.ID, _ b: IRBlock.ID) -> Bool {
+  public func dominates(_ a: IRBlock.ID, _ b: IRBlock.ID) -> Bool {
     // By definition, a node dominates itself.
     if a == b { return true }
 
@@ -112,7 +112,7 @@ internal struct DominatorTree: Sendable {
 
   /// Returns `true` if the instruction identified by `definition` dominates `use` in `self`, which
   /// is the dominator tree of `f`.
-  internal func dominates(definition: AnyInstructionIdentity, use: Use, in f: IRFunction) -> Bool {
+  public func dominates(definition: AnyInstructionIdentity, use: Use, in f: IRFunction) -> Bool {
     let a = f.block(defining: definition)
     let b = f.block(defining: use.user)
 
@@ -130,7 +130,7 @@ internal struct DominatorTree: Sendable {
 extension DominatorTree: CustomStringConvertible {
 
   /// The Graphviz (dot) representation of the tree.
-  internal var description: String {
+  public var description: String {
     var result = "strict digraph D {\n\n"
     for (a, d) in immediateDominators {
       if let b = d {
