@@ -223,6 +223,7 @@ public struct Lexer: IteratorProtocol, Sequence {
     case "=": tag = .assign
     case "->": tag = .arrow
     case "==": tag = .equal
+    case "=>": tag = .fatarrow
     default: tag = .operator
     }
     return .init(tag: tag, site: span(start ..< position))
