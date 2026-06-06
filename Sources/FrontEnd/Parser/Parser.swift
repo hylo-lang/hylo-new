@@ -439,6 +439,9 @@ public struct Parser {
 
     // Parse the context parameters and conformer of a conformance declaration.
     let parameters = try parseOptionalContextClause(in: &file)
+    if !parameters.isEmpty {
+      _ = try take(.fatarrow) ?? expected("'=>'")
+    }
     let lhs = try parseExpression(in: &file)
 
     // If the next token is `=`, we're parsing a given binding declaration whose `let` introducer
