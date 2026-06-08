@@ -24,4 +24,4 @@ extension T : Movable {
 public given Void is Movable {}
 
 /// A witness that a tuple is `Movable` when its elements are too.
-public given <T is Movable, U is Movable> {T, ...U} is Movable {}
+public given <T is Movable, U is Movable> => {T, ...U} is Movable {}
