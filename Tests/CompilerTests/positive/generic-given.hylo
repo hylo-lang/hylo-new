@@ -7,15 +7,15 @@ struct B<T> {}
 struct C<T> {}
 
 // Requirement implemented in primary declaration.
-given <T> A<T> is P {}
+given <T> => A<T> is P {}
 
 // Requirement implemented in the conformance declaration.
-given <T> B<T> is P {
+given <T> => B<T> is P {
   fun g() {}
 }
 
 // Requirement implemented in extension.
-given <T> C<T> is P {}
+given <T> => C<T> is P {}
 extension <T> C<T> {
   fun g() {}
 }

@@ -12,4 +12,4 @@ public trait Copyable refines Movable {
 public given Void is Copyable {}
 
 /// A witness that a tuple is `Copyable` when its elements are too.
-public given <T is Copyable, U is Copyable> {T, ...U} is Copyable {}
+public given <T is Copyable, U is Copyable> => {T, ...U} is Copyable {}

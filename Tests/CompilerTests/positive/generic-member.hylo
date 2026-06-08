@@ -16,7 +16,7 @@ trait P<T> {
   static fun sh(x: T)
 }
 
-given <T> A<T> is P<T> {
+given <T> => A<T> is P<T> {
   public fun h(x: T) {}
   public static fun sh(x: T) {}
 }

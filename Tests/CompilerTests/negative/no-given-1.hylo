@@ -10,12 +10,12 @@ fun f<where A is Q>() {}
 
 fun g() {
   given B is P {}
-  given <where A is P> A is Q {}
+  given <where A is P> => A is Q {}
   f()
 }
 
 fun h() {
-  given <T where T is P> T is Q {}
+  given <T where T is P> => T is Q {}
   f()
 }
 

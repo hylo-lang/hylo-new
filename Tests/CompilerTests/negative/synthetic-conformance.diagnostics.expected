@@ -1,5 +1,5 @@
 negative/synthetic-conformance.hylo:20.1-6: error: no implementation of 'deinit'
-given <X> Box<X> is Deinitializable {}
+given <X> => Box<X> is Deinitializable {}
 ~~~~~
 negative/synthetic-conformance.hylo:23.42-57: error: no implementation of 'deinit'
 struct NotStructurallyDeinitializable is Deinitializable {
