@@ -25,15 +25,15 @@ struct A<T> {}
 struct B<T> {}
 struct C<T> {}
 
-given <T> A<T> is Base {
+given <T> => A<T> is Base {
   fun f() {}
 }
 
 // This one is OK.
-given <T> A<T> is Derived {}
+given <T> => A<T> is Derived {}
 
 // This one is missing an instance of `Base<B<T>>`.
-given <T> B<T> is Derived {}
+given <T> => B<T> is Derived {}
 
 // This one is missing an instance of `Derived<C<T>>`
-given <T> C<T> is FurtherDerived {}
+given <T> => C<T> is FurtherDerived {}
