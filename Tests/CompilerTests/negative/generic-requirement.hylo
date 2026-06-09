@@ -10,7 +10,7 @@ given Void is P {
 }
 
 struct S<T> {}
-given<T> S<T> is P {
+given <T> => S<T> is P {
   // This one isn't.
   public fun f(_ x: T) {}
 }

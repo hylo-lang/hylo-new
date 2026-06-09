@@ -224,6 +224,7 @@ public struct Lexer: IteratorProtocol, Sequence {
     case "&": tag = .ampersand
     case "=": tag = .assign
     case "->": tag = .arrow
+    case "=>": tag = .fatarrow
     case "==": tag = .equal
     default: tag = .operator
     }

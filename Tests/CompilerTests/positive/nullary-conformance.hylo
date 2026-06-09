@@ -3,7 +3,7 @@
 trait P {}
 
 given a : Void is P {}
-given b : <T where T is P> Int is P {}
+given b : <T where T is P> => Int is P {}
 
 fun use<T is P>(x: T) {}
 
