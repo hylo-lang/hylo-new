@@ -4,7 +4,7 @@ import SwiftyLLVM
 internal struct FunctionMetadata {
 
   /// How arguments to a parameter in Hylo IR are passed in the corresponding LLVM IR.
-  internal enum PassingConvention {
+  internal enum PassingConvention: Equatable {
 
     /// The parameter does not appear in the signature of the LLVM function.
     case erased
@@ -37,9 +37,20 @@ internal struct FunctionMetadata {
   internal let llvm: SwiftyLLVM.Function.UnsafeReference
 
   /// A table mapping each term parameter of the Hylo function to its passing convention.
+  ///
+  /// This property describes how each parameter of an Hylo IR function are represented (or not) in
+  /// the corresponding LLVM function. It contains exactly as many elements as the number of input
+  /// parameters in the Hylo IR function. The compiled LLVM function, however, may have a different
+  /// number of parameters; as some may have been erased or added to implement Hylo's ABI.
   internal let inputs: [Parameter]
 
-  /// The passing convention of the return value.
-  internal let output: Parameter
+  /// The passing convention of the return value iff the compiled function is not a plateau;
+  /// otherwise, `nil`.
+  internal let output: Parameter?
+
+  /// `true` iff the function being compiled is a plateau encapsulating the uses of a projection.
+  internal var isPlateau: Bool {
+    output == nil
+  }
 
 }

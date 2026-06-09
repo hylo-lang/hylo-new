@@ -46,6 +46,13 @@ internal struct ManglingEncoding: Sendable {
     append(function: s, of: m, to: &output)
   }
 
+  /// Writes to `output` the mangled representation of `n`.
+  internal mutating func mangled(
+    function n: IRFunction.Name, to output: inout ManglingContext
+  ) {
+    append(function: n, to: &output)
+  }
+
   /// Writes to `output` the mangled representation of `s`.
   internal mutating func mangled(table s: IRWitnessTable, to output: inout ManglingContext) {
     append(table: s, to: &output)
@@ -545,12 +552,12 @@ internal struct ManglingEncoding: Sendable {
   private mutating func append(
     function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
   ) {
-    append(function: program[m].ir[s].name, of: m, to: &output)
+    append(function: program[m].ir[s].name, to: &output)
   }
 
-  /// Writes the mangled representation of `s` defined in `m`, to `output`.
+  /// Writes the mangled representation of `s` to `output`.
   private mutating func append(
-    function s: IRFunction.Name, of m: Module.ID, to output: inout ManglingContext
+    function s: IRFunction.Name, to output: inout ManglingContext
   ) {
     switch s {
     case .lowered(let d):
@@ -570,7 +577,15 @@ internal struct ManglingEncoding: Sendable {
       append(typeArguments: a, to: &output)
     case .existentialized(let s):
       output.add(operator: .existentializedDeclaration)
-      append(function: s, of: m, to: &output)
+      append(function: s, to: &output)
+    case .slide(let s, let n):
+      output.add(operator: .slideDeclaration)
+      append(function: s, to: &output)
+      output.add(integer: n)
+    case .plateau(let s, let n):
+      output.add(operator: .plateauDeclaration)
+      append(function: s, to: &output)
+      output.add(integer: n)
     }
   }
 
@@ -611,6 +626,30 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     .existentialized(takeEntity(from: &source))
+  }
+
+  /// Demangles a slide declaration from `source`.
+  private static func slideDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    let e = takeEntity(from: &source)
+     if let i = source.takeInt() {
+       return .slide(e, i)
+     } else {
+       return .error
+     }
+  }
+
+  /// Demangles a plateau declaration from `source`.
+  private static func plateauDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    let e = takeEntity(from: &source)
+     if let i = source.takeInt() {
+       return .plateau(e, i)
+     } else {
+       return .error
+     }
   }
 
   /// Writes the mangled representation of `s` to `output`.

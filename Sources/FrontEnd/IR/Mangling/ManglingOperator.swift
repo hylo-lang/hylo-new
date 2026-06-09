@@ -60,6 +60,12 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts an existentialized function declaration symbol.
   case existentializedDeclaration = "eF"
 
+  /// Starts a slide declaration symbol.
+  case slideDeclaration = "lF"
+
+  /// Starts a plateau declaration symbol.
+  case plateauDeclaration = "lP"
+
   /// Starts a generic parameter declaration symbol.
   case genericParameterDeclaration = "G"
 
@@ -196,36 +202,80 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
 
   /// `true` iff `self` starts an entity declaration.
   internal var isEntityOperator: Bool {
-    switch self {
-    case .lookup, .lookupRelative, .reserved, .associatedTypeDeclaration, .enumCaseDeclaration,
-      .enumDeclaration, .bindingDeclaration, .conformanceDeclaration, .extensionDeclaration,
-      .importDeclaration, .functionDeclaration, .staticFunctionDeclaration,
-      .functionBundleDeclaration, .initializerDeclaration,
-      .synthesizedFunctionDeclaration, .implementationDeclaration, .existentializedDeclaration,
-      .genericParameterDeclaration, .parameterDeclaration,
-      .structDeclaration, .typeAliasDeclaration, .traitDeclaration, .variableDeclaration,
-      .variantDeclaration, .anonymousScope, .module, .sourceFile, .virtualSourceFile:
-      return true
-    default:
-      return false
-    }
+    Self.entityOperators.contains(self)
   }
 
   /// `true` iff `self` is an operator that starts a type.
   internal var isTypeOperator: Bool {
-    switch self {
-    case .lookupType, .reservedType, .arrowType, .associatedType, .bundleType, .enumType,
-      .equalityWitnessType,
-      .functionPointerType, .implicationType, .literalIntegerType, .literalFloatType,
-      .machineIntegerType, .machineFloatType, .machinePointerType, .machineWordType,
-      .genericParameterConformerType, .genericParameterUserType, .genericParameterNthType,
-      .metakindType, .metatypeType, .opaqueEnvironmentType, .remoteType, .structType, .traitType,
-      .tupleConsType, .tupleEmptyType, .typeAliasType, .typeApplicationType, .universalType:
-      return true
-    default:
-      return false
-    }
+    Self.typeOperators.contains(self)
   }
+
+  /// All entity operators.
+  internal static let entityOperators: [Self] = [
+    .lookup,
+    .lookupRelative,
+    .reserved,
+    .associatedTypeDeclaration,
+    .enumCaseDeclaration,
+    .enumDeclaration,
+    .bindingDeclaration,
+    .conformanceDeclaration,
+    .extensionDeclaration,
+    .importDeclaration,
+    .functionDeclaration,
+    .staticFunctionDeclaration,
+    .functionBundleDeclaration,
+    .initializerDeclaration,
+    .synthesizedFunctionDeclaration,
+    .implementationDeclaration,
+    .existentializedDeclaration,
+    .slideDeclaration,
+    .plateauDeclaration,
+    .genericParameterDeclaration,
+    .parameterDeclaration,
+    .structDeclaration,
+    .typeAliasDeclaration,
+    .traitDeclaration,
+    .variableDeclaration,
+    .variantDeclaration,
+    .anonymousScope,
+    .module,
+    .sourceFile,
+    .virtualSourceFile,
+  ]
+
+  /// All type operators.
+  internal static let typeOperators: [Self] = [
+    .lookupType,
+    .reservedType,
+    .arrowType,
+    .associatedType,
+    .bundleType,
+    .enumType,
+    .equalityWitnessType,
+    .functionPointerType,
+    .implicationType,
+    .literalIntegerType,
+    .literalFloatType,
+    .machineIntegerType,
+    .machineFloatType,
+    .machinePointerType,
+    .machineWordType,
+    .genericParameterConformerType,
+    .genericParameterUserType,
+    .genericParameterNthType,
+    .metakindType,
+    .metatypeType,
+    .opaqueEnvironmentType,
+    .remoteType,
+    .structType,
+    .traitType,
+    .tupleConsType,
+    .tupleEmptyType,
+    .typeAliasType,
+    .typeApplicationType,
+    .universalType,
+  ]
 
 }
 
