@@ -60,7 +60,7 @@ public struct Token: Hashable, Sendable {
     case assign
     case conversion
     case equal
-    case fatarrow
+    case thickArrow
     case star
     case `operator`
 
