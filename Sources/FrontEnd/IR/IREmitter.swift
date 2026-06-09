@@ -622,7 +622,10 @@ internal struct IREmitter {
     let v = IRValue.integer(
       program[e].value ? 1 : 0,
       program.types.demand(MachineType.i(1)))
-    lowering(e, { $0._emitInitialize(target, with: v) })
+    lowering(e) { (me) in
+      let x0 = me._subfield(target, at: [0])
+      me._emitInitialize(x0, with: v)
+    }
   }
 
   /// Implements `lower(store:to:)` for call expressions.
@@ -632,19 +635,15 @@ internal struct IREmitter {
       let scalar = loweredBuiltinScalarLiteralConversion(e, applying: f)
       return lowering(e) { (me) in
         let x0 = me._subfield(target, at: [0])
-        let x1 = me._access([.set], from: x0)
-        me._store(scalar, to: x1)
-        me._end(IRAccess.self, openedBy: x1)
+        me._emitInitialize(x0, with: scalar)
       }
     }
 
     // Are we lowering a built-in call?
     else if let f = program.asBuiltinFunction(program[e].callee) {
       return lowering(e) { (me) in
-        let x0 = me._lower(builtin: f, appliedTo: me.program[e].arguments)
-        let x1 = me._access([.set], from: target)
-        me._store(x0, to: x1)
-        me._end(IRAccess.self, openedBy: x1)
+        let result = me._lower(builtin: f, appliedTo: me.program[e].arguments)
+        me._emitInitialize(target, with: result)
       }
     }
 
