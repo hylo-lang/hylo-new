@@ -13,7 +13,7 @@ import SwiftyLLVM
 /// by the pleateau, once the value being projected is no longer used. Pointers to values defined
 /// in a ramp that are used in a slide are stored into a local array that is piped through the
 /// plateau. These values are identified conservatively by enumerating the definitions that
-/// dominate the `yield` instruction corresponding ot a specific slide.
+/// dominate the `yield` instruction corresponding of a specific slide.
 ///
 /// A similar transformation occurs at the call site to form plateaus. One complication is that
 /// subscript applications may overlap without nesting. This issue is addressed by using the set
@@ -62,7 +62,7 @@ extension FunctionGenerationContext {
   /// The result is a collection composed of the parameters of the function being compiled along
   /// with all instructions that dominate `y`. These values must be defined by the time `y` is
   /// evaluated, on any code path. The collection is ordered so that, for each element `v`, all
-  /// uses of `v` are defined by an element ocurring before `v`.
+  /// uses of `v` are defined by an element occurring before `v`.
   fileprivate mutating func prologue(dominating y: AnyInstructionIdentity) -> RegionPrologue {
     let definingBlock = ir.block(defining: y)
     var definitions: [FrontEnd.IRValue] = []
