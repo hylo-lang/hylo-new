@@ -11,7 +11,7 @@ internal struct FunctionGenerationContext: ~Copyable {
   internal let ir: FrontEnd.IRFunction
 
   /// The dominance relation of the function being compiled.
-  internal let dominance: FrontEnd.DominatorTree
+  internal let dominance: DominatorTree
 
   /// The LLVM function being built, along with information about its configuration.
   internal let result: FunctionMetadata
@@ -30,12 +30,12 @@ internal struct FunctionGenerationContext: ~Copyable {
 
   /// Creates an instance with the given properties.
   internal init(
-    compiling ir: IRFunction, within cfg: ControlFlowGraph, into result: FunctionMetadata,
+    compiling ir: IRFunction, within dominance: DominatorTree, into result: FunctionMetadata,
     in context: consuming ModuleGenerationContext
   ) {
     self.module = context
     self.ir = ir
-    self.dominance = DominatorTree(function: ir, controlFlow: cfg)
+    self.dominance = dominance
     self.result = result
     self.block = [:]
     self.value = [:]

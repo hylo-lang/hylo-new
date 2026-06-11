@@ -138,7 +138,7 @@ internal indirect enum DemangledEntity: Hashable, Sendable {
    case slide(DemangledEntity, Int)
 
   /// An IRFunction with `name == .plateau`.
-   case plateau(DemangledEntity, Int)
+  case plateau(DemangledEntity, Int)
 
   /// A qualified entity with `head` as the innermost component and `previous` as the qualification.
   case qualified(head: DemangledEntity, previous: DemangledEntity)

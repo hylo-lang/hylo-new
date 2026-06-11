@@ -314,6 +314,17 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Returns the set of basic blocks reachable from `b`, which includes `b`.
+  public func blocks(reachableFrom b: IRBlock.ID) -> IRBlockSet {
+    var work = [b]
+    var reachable = IRBlockSet()
+    while let w = work.popLast() {
+      reachable.insert(w)
+      work.append(contentsOf: successors(of: w).filter({ (s) in !reachable.contains(s) }))
+    }
+    return reachable
+  }
+
   /// Returns `true` iff `i` and `j` are in the same block and `i` is ordered before `j`.
   public func precedes(_ i: AnyInstructionIdentity, _ j: AnyInstructionIdentity) -> Bool {
     // Relation is irreflexive.
