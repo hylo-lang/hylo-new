@@ -73,8 +73,9 @@ extension Program {
     guard let sourceEntry = ir.entry else { return }
 
     // Initialize the code generation context.
+    let region = DominatorTree(function: ir, controlFlow: ir.controlFlow())
     var nested = FunctionGenerationContext(
-      compiling: ir, within: ir.controlFlow(), into: result, in: ctx)
+      compiling: ir, within: region, into: result, in: ctx)
     let e = nested.demandBasicBlock(sourceEntry)
     nested.insertionPoint = nested.module.llvm.endOf(e)
 
@@ -129,6 +130,12 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRApply.self), in: &ctx)
     case IRAssumeState.self:
       return ctx.ir.instruction(after: i)
+    case IRBranch.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRBranch.self), in: &ctx)
+    case IRConditionalBranch.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRConditionalBranch.self), in: &ctx)
+    case IRLoad.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRLoad.self), in: &ctx)
     case IRMemoryCopy.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRMemoryCopy.self), in: &ctx)
     case IRProject.self:
@@ -193,6 +200,40 @@ extension Program {
 
   /// Generates the LLVM IR code corresponding to `i`.
   internal mutating func incorporate(
+    _ i: IRBranch.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let a = ctx.demandBasicBlock(s.target)
+    ctx.module.llvm.insertBr(to: a, at: ctx.insertionPoint!)
+    return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRConditionalBranch.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let a = ctx.demandBasicBlock(s.onSuccess)
+    let b = ctx.demandBasicBlock(s.onFailure)
+    ctx.module.llvm.insertCondBr(
+      if: ctx.value[s.condition]!, then: a, else: b, at: ctx.insertionPoint!)
+    return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRLoad.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let t = metadata(of: ctx.ir.resolved(s.type)!.type, in: &ctx.module)
+    let x = ctx.module.llvm.insertLoad(t.llvm, from: ctx.value[s.source]!, at: ctx.insertionPoint!)
+    let v = IRValue.register(i.erased)
+    ctx.value[v] = x.asAnyValue
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
     _ i: IRMemoryCopy.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
@@ -228,7 +269,6 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     // Compile the plateau following the project instruction.
     let (plateau, captures, covered) = definePlateau(dominatedBy: i, in: &ctx)
-    ctx.factoredOut.formUnion(covered)
 
     let s = ctx.ir.at(i)
     switch s.callee {
@@ -242,7 +282,7 @@ extension Program {
       // control flow should be transferred. This basic block must be a successor of one of the
       // blocks having been incorporated that is not dominated by `i`.
       let after = ctx.module.llvm.insertCall(f.llvm, on: x, at: ctx.insertionPoint!)
-      let successors = covered.reduce(into: IRBlockSet()) { (s, a) in
+      let successors = ctx.ir.decode(covered).reduce(into: IRBlockSet()) { (s, a) in
         for b in ctx.ir.successors(of: a) where !covered.contains(b) { s.insert(b) }
       }
 
