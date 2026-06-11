@@ -1,0 +1,4 @@
+//! stage:run assert-exit-code:42
+fun main() -> Int32 {
+  42
+}

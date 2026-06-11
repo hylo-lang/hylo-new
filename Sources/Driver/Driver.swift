@@ -165,12 +165,12 @@ public struct Driver {
     writingTo output: URL
   ) throws -> PhaseResult {
     let elapsed = try ContinuousClock().measure {
-      let modulesToLink = [module]
+      var modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
 
       if !noStandardLibrary {
         // FIXME: Enable this after we can lower the standard library
-        // modulesToLink.append(program.modules[.standardLibrary]!.identity)
+        modulesToLink.append(program.modules[Module.standardLibraryName]!.identity)
       }
 
       try FileManager.default.withUniqueTemporaryDirectory { (d) in
