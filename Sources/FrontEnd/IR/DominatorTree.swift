@@ -86,7 +86,7 @@ public struct DominatorTree: Sendable {
   }
 
   /// Returns a sequence with the dominators of `b`, ordered such that each element is immediately
-  /// dominated by its successor and includind `b` itself iff `strict` is `true`.
+  /// dominated by its successor and including `b` itself iff `strict` is `true`.
   ///
   /// The returned sequence starts with `b` iff `strict` is `false`. Otherwise, the first element
   /// of the sequence is the immediate dominator of `b`, if any.

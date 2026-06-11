@@ -383,7 +383,7 @@ extension Program {
       on: [
         // projected value
         ctx.value[instruction.projectee]!,
-        // the plateau's environement
+        // the plateau's environment
         ctx.llvm.unsafe[].parameters[fromLast: 0].asAnyValue,
         // the slide
         slide.llvm.asAnyValue,
@@ -400,7 +400,7 @@ extension Program {
   /// Returns the LLVM function corresponding to `f`, declaring it if necessary.
   ///
   /// If `f` is a subscript, the result is the function that represents its ramp, which accepts a
-  /// caller plateau and its environement as extra parameters. Slides are declared during the code
+  /// caller plateau and its environment as extra parameters. Slides are declared during the code
   /// generation of a subscript and are typically never called directly from another context.
   private mutating func demandFunction(
     _ f: IRFunction.ID, in ctx: inout ModuleGenerationContext
@@ -525,7 +525,7 @@ extension Program {
   /// Returns the representations of `arguments`, which are passed to `callee`, in LLVM IR.
   ///
   /// The result contains a LLVM IR value for each non-erased parameter of the callee, computed
-  /// using `codegen(_:in:)`. Arguments passed by value are loaded from memory whereas no furhter
+  /// using `codegen(_:in:)`. Arguments passed by value are loaded from memory whereas no further
   /// transformation is applied on arguments passed by reference.
   private mutating func insertArguments<T: Collection<FrontEnd.IRValue>>(
     _ arguments: T, forCalling callee: FunctionMetadata, in ctx: inout FunctionGenerationContext
