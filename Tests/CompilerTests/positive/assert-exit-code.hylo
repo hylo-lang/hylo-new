@@ -1,0 +1,4 @@
+//! stage:run
+fun main() {
+  // by default, exit code is 0
+}

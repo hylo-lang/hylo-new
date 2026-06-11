@@ -1,4 +1,5 @@
 import Foundation
+import StandardLibrary
 import Utilities
 
 /// A test manifest.
@@ -22,6 +23,9 @@ struct Manifest {
     /// After the program has been linked into an executable.
     case executableLinking
 
+    /// After the program has been linked and executed.
+    case run
+
   }
 
   /// `true` iff `self` requires a standard library.
@@ -29,6 +33,12 @@ struct Manifest {
 
   /// The stage up to which the input should be compiled.
   private(set) var stage: Stage = .llvmLowering
+
+  /// The expected exit code of the compiled program and run program. Requires stage:run.
+  private(set) var assertedExitCode: Int32?
+
+  /// `true` iff the compiled program is expected to abort. Requires stage:run.
+  private(set) var assertedAbort: Bool? = nil
 
   /// Creates an instance with a default configuration.
   init() {}
@@ -65,6 +75,14 @@ struct Manifest {
     else {
       self.init()
     }
+
+    if assertedExitCode != nil && stage != .run {
+      throw ManifestError.invalidStage("assert-exit-code requires stage:run")
+    }
+
+    if assertedAbort != nil && stage != .run {
+      throw ManifestError.invalidStage("assert-abort requires stage:run")
+    }
   }
 
   /// Updates the configuration of `self` with the option parsed from `s`.
@@ -78,6 +96,19 @@ struct Manifest {
       requiresStandardLibrary = false
     case "stage":
       stage = try Stage(rawValue: v).unwrapOrThrow(ManifestError.invalidStage(v))
+    case "assert-exit-code":
+      assertedExitCode = try Int32(v).unwrapOrThrow(ManifestError.invalidExitCode(v))
+    case "assert-abort":
+      assertedAbort = switch v{
+        case "":
+          true
+        case "true":
+          true
+        case "false":
+          false
+        default:
+          throw ManifestError.invalidAbort(v)
+      }
     default:
       throw ManifestError.unknownOption
     }
@@ -118,4 +149,9 @@ enum ManifestError: Error {
   /// An invalid stage argument.
   case invalidStage(String)
 
+  /// An invalid exit code argument.
+  case invalidExitCode(String)
+
+  /// An invalid abort argument.
+  case invalidAbort(String)
 }
