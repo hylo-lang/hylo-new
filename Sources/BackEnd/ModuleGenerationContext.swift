@@ -49,6 +49,10 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// once the plateau (and subsequently the subscript having called it) returns.
   internal let plateau: SwiftyLLVM.FunctionType.UnsafeReference
 
+  /// The data structure representing an ongoing projection captured by a slide or plateau.
+  ///
+  /// When the result of a subscript has to be used in a plateau, a triple is formed with the
+  /// addresses of the projected value, the slide, and its environment.
   internal let nestedProject: SwiftyLLVM.StructType.UnsafeReference
 
   /// Creates the initial state of a compilation of `m`.
@@ -66,7 +70,7 @@ internal struct ModuleGenerationContext: ~Copyable {
     self.empty = self.llvm.structType([])
     self.slide = self.llvm.functionType(from: [ptr])
     self.plateau = self.llvm.functionType(from: [ptr, ptr, fun, ptr], to: i32)
-    self.nestedProject = self.llvm.structType([ptr, fun, fun])
+    self.nestedProject = self.llvm.structType([ptr, fun, ptr])
   }
 
   /// Returns the resources held by this instance.

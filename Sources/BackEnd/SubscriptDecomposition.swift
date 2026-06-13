@@ -135,10 +135,14 @@ extension FunctionGenerationContext {
     return captures
   }
 
-  /// Stores the arguments of the plateau being compiled that relate to the projection associated
-  /// with that plateau.
+  /// Stores to `slot` the address of a triple describing arguments of the plateau being compiled
+  /// that relate to the projection associated with that plateau.
+  ///
+  /// `slot` is a pointer to a pointer. This method assigns the pointee to the address of a triple
+  /// allocated on the stack, which is initialized with the addresses of the projected value, the
+  /// corresponding slide, and its environment.
   private mutating func saveBareProject(
-    to x: SwiftyLLVM.AnyInstruction.UnsafeReference
+    to slot: SwiftyLLVM.AnyInstruction.UnsafeReference
   ) {
     let parameters = llvm.unsafe[].parameters
     let project = module.llvm.insertAlloca(module.nestedProject, atEntryOf: llvm)
@@ -153,7 +157,7 @@ extension FunctionGenerationContext {
       of: project, typed: module.nestedProject, index: 2,
       at: insertionPoint!)
 
-    module.llvm.insertStore(project, to: x, at: insertionPoint!)
+    module.llvm.insertStore(project, to: slot, at: insertionPoint!)
     module.llvm.insertStore(parameters[0], to: x0, at: insertionPoint!)
     module.llvm.insertStore(parameters[2], to: x1, at: insertionPoint!)
     module.llvm.insertStore(parameters[3], to: x2, at: insertionPoint!)
