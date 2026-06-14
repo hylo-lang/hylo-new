@@ -1,0 +1,19 @@
+//! stage:lowering
+
+subscript id(x: inout Int32) inout -> Int32 {
+  yield &x
+}
+
+fun main() -> Int32 {
+  var a: Int32 = 0
+  var b: Int32 = 0
+  inout x = &id[&a]
+  if true {
+    inout y = &id[&b]
+    &x = 23
+    &y = 34
+  } else {
+    &x = 45
+  }
+  return a
+}
