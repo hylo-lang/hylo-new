@@ -13,12 +13,12 @@ public protocol InstructionIdentity: Comparable, Hashable, Sendable {
 
 extension InstructionIdentity {
 
-  /// Returns `true` iff `l` denotes the same node as `r`.
+  /// Returns `true` iff `l` denotes the same instruction as `r`.
   public static func == <T: InstructionIdentity>(l: Self, r: T) -> Bool {
     l.erased == r.erased
   }
 
-  /// Returns `true` iff `l` denotes the same node as `r`.
+  /// Returns `true` iff `l` denotes the same instruction as `r`.
   public static func ~= <T: InstructionIdentity>(l: Self, r: T) -> Bool {
     l.erased == r.erased
   }

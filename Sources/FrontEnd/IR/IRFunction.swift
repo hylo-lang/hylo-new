@@ -25,6 +25,12 @@ public struct IRFunction: Sendable {
     /// The identity of the existentialiezd form of a polymorphic function.
     indirect case existentialized(IRFunction.Name)
 
+    /// The identity of a slide resulting from subscript decomposition.
+    indirect case slide(IRFunction.Name, Int)
+
+    /// The identity of a plateau resulting from subscript decomposition.
+    indirect case plateau(IRFunction.Name, Int)
+
   }
 
   /// The way in which an IR function returns its result.
@@ -306,6 +312,17 @@ public struct IRFunction: Sendable {
     default:
       return nil
     }
+  }
+
+  /// Returns the set of basic blocks reachable from `b`, which includes `b`.
+  public func blocks(reachableFrom b: IRBlock.ID) -> IRBlockSet {
+    var work = [b]
+    var reachable = IRBlockSet()
+    while let w = work.popLast() {
+      reachable.insert(w)
+      work.append(contentsOf: successors(of: w).filter({ (s) in !reachable.contains(s) }))
+    }
+    return reachable
   }
 
   /// Returns `true` iff `i` and `j` are in the same block and `i` is ordered before `j`.
@@ -819,6 +836,12 @@ extension IRFunction.Name: Showable {
 
     case .existentialized(let n):
       return "\(printer.show(n))$existentialized"
+
+    case .slide(let n, let i):
+      return "\(printer.show(n))$slide_\(i)"
+
+    case .plateau(let n, let i):
+      return "\(printer.show(n))$plateau_\(i)"
     }
   }
 

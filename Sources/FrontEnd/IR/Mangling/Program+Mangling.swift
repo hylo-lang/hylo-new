@@ -6,8 +6,8 @@ extension Program {
   }
 
   /// Returns the mangled representation of `t`.
-  public func mangled(_ t: AnyTypeIdentity) -> String {
-    mangled(t, applying: { (s, m, o) in m.mangled(type: s, to: &o) })
+  public func mangled<T: TypeIdentity>(_ t: T) -> String {
+    mangled(t.erased, applying: { (s, m, o) in m.mangled(type: s, to: &o) })
   }
 
   /// Returns the mangled representation of `w`.
@@ -18,6 +18,11 @@ extension Program {
   /// Returns the mangled representation of `f` from module `m`.
   public func mangled(_ f: IRFunction.ID, of m: Module.ID) -> String {
     mangled(f, applying: { (s, me, o) in me.mangled(function: s, of: m, to: &o) })
+  }
+
+  /// Returns the mangled representation of `f` from module `m`.
+  public func mangled(_ n: IRFunction.Name, of m: Module.ID) -> String {
+    mangled(n, applying: { (s, me, o) in me.mangled(function: n, to: &o) })
   }
 
   /// Returns the mangled representation of `s`, applying `mangle` to build it.

@@ -15,10 +15,10 @@ public struct IRProperty: Instruction {
 
   /// Creates an instance with the given properties.
   public init(
-    receiver: IRValue, property: DeclarationIdentity, propertyType: AnyTypeIdentity,
+    record: IRValue, property: DeclarationIdentity, propertyType: AnyTypeIdentity,
     anchor: Anchor
   ) {
-    self.operands = [receiver]
+    self.operands = [record]
     self.anchor = anchor
     self.property = property
     self.propertyType = propertyType
@@ -26,14 +26,14 @@ public struct IRProperty: Instruction {
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
   public init(_ other: Self, substituting properties: IRSubstitutionTable) {
-    self.operands = [properties[other.receiver]]
+    self.operands = [properties[other.record]]
     self.anchor = properties.anchor(other)
     self.property = other.property
     self.propertyType = other.propertyType
   }
 
   /// The address of the record containing the property whose getter is returned.
-  public var receiver: IRValue {
+  public var record: IRValue {
     operands[0]
   }
 
@@ -53,7 +53,7 @@ extension IRProperty: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "property \"\(printer.program.nameOrTag(of: property))\" of \(printer.show(receiver))"
+    "property \"\(printer.program.nameOrTag(of: property))\" of \(printer.show(record))"
   }
 
 }

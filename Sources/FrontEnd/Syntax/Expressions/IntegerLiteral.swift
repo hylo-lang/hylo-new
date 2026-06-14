@@ -17,6 +17,10 @@ public struct IntegerLiteral: LiteralExpression {
 
   public static let literalType: LiteralType = .integer
 
+  public static let defaultType: Program.StandardLibraryEntity = .int
+
+  public static let constructorLabel: String = "integer_literal"
+
 }
 
 extension IntegerLiteral: Showable {
