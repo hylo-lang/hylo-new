@@ -2,11 +2,11 @@
 struct Float32 is Deinitializable {
   
   /// The raw value of this instance.
-  internal var value: Builtin.float32
+  module var value: Builtin.float32
 
   /// Creates an instance with its raw value.
-  internal memberwise init
-  
+  module memberwise init
+
   /// Creates an instance with value 0.
   public init() {
     &self.value = Builtin.zeroinitializer_float32()
