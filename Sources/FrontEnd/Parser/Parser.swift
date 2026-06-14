@@ -174,6 +174,11 @@ public struct Parser {
       return .init(.string(String(s.text.dropFirst().dropLast())), at: s.site)
     }
 
+    // Is it a simple identifier?
+    else if let s = take(.name) {
+      return .init(.string(String(s.text)), at: s.site)
+    }
+
     // Is it a number argument?
     else if let s = take(.integerLiteral) {
       if let n = Int(s.text) {
