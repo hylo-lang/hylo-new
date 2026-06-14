@@ -140,6 +140,7 @@ public struct Program: Sendable {
 
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
+        if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
 
         // This pass cannot fail.
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
@@ -164,8 +165,7 @@ public struct Program: Sendable {
           let module = typer.program[m]
           guard
             case .existentialized(let a) = module.ir[i].name,
-            case .some(let poly) = module.ir.functions.index(forKey: a),
-            module.ir[poly].isDefined
+            case .some(let poly) = module.ir.functions.index(forKey: a), module.ir[poly].isDefined
           else { continue }
 
           typer.program.withEmitter(insertingIn: m) { (emitter) in
@@ -444,12 +444,67 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `n` is a an interface for a function written in another language.
   public func isForeign(_ n: FunctionDeclaration.ID) -> Bool {
-    self[n].annotations.contains(where: { (a) in a.identifier.value == "foreign" })
+    annotation("foreign", appliedTo: n) != nil
   }
 
   /// Returns `true` iff `n` has an external implementation.
   public func isExtern(_ n: FunctionDeclaration.ID) -> Bool {
-    self[n].annotations.contains(where: { (a) in a.identifier.value == "extern" })
+    annotation("extern", appliedTo: n) != nil
+  }
+
+  /// Returns `true` if the contents of `d` is visible in all modules.
+  ///
+  /// The result is `true` if `d` is annotated with `@exposed` and/or `d` and all the scopes
+  /// enclosing it are public.
+  public func isExposed<T: ModifiableDeclaration>(_ d: T.ID) -> Bool {
+    // Is `d` explicitly exposed?
+    if (annotation("exposed", appliedTo: d) != nil) { return true }
+
+    // Otherwise, `d` and its enclosing scopes must be public.
+    if !self[d].is(.public) { return false }
+    var p = parent(containing: d)
+    while let a = p.node {
+      guard let b = self[a] as? (any ModifiableDeclaration), b.is(.public) else { return false }
+      p = parent(containing: a)
+    }
+    return p.isFile
+  }
+
+  /// Returns `true` iff `d` declares symbols that will not appear in the ABI of `m`.
+  public func isPrivate(_ d: DeclarationIdentity, in m: Module.ID) -> Bool {
+    switch tag(of: d) {
+    case BindingDeclaration.self:
+      return isPrivate(castUnchecked(d, to: BindingDeclaration.self), in: m)
+    case FunctionDeclaration.self:
+      return isPrivate(castUnchecked(d, to: FunctionDeclaration.self), in: m)
+    case FunctionBundleDeclaration.self:
+      return isPrivate(castUnchecked(d, to: FunctionBundleDeclaration.self), in: m)
+    case VariantDeclaration.self:
+      return isPrivate(parent(containing: d, as: FunctionBundleDeclaration.self)!, in: m)
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff `d` declares symbols that will not appear in the ABI of `m`.
+  public func isPrivate<T: ModifiableDeclaration>(_ d: T.ID, in m: Module.ID) -> Bool {
+    (d.module == m) && !isExposed(d)
+  }
+
+  /// Returns `true` iff `f` will not appear in the ABI of `m`.
+  public func isPrivate(_ f: IRFunction.Name, in m: Module.ID) -> Bool {
+    switch f {
+    case .lowered(let d):
+      return isPrivate(d, in: m)
+    case .initializer(let d):
+      return isPrivate(d, in: m)
+    case .synthesized(let d, _):
+      return isPrivate(d, in: m)
+    case .implementation(_, let d, _):
+      return isPrivate(d, in: m)
+    case .existentialized(let g):
+      return isPrivate(g, in: m)
+    }
   }
 
   /// Returns `true` iff `n` denotes an expression.

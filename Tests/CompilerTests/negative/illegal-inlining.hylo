@@ -1,0 +1,22 @@
+//! stage:lowering
+
+public fun f0() {}
+
+struct S {
+
+  @inline(always) @exposed
+  fun g0() {
+    // OK: `f0` is public to the whole module.
+    f0()
+    // OK: `m0` is explicitly exposed.
+    self.m0()
+    // Error: `m1` is not exposed because `S` is not public.
+    self.m1()
+  }
+
+  @exposed
+  public fun m0() {}
+
+  public fun m1() {}
+
+}

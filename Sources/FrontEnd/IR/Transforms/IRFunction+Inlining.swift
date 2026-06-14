@@ -1,5 +1,26 @@
 extension IRFunction {
 
+  /// If `self` is exposed and must be inlined, verifies that it only uses exposed symbols.
+  internal func upholdInliningRequirements(in m: Module.ID, using typer: inout Typer) -> Bool {
+    // Nothing to do unless inlining is mandated and the function is exposed.
+    if typer.program.inliningPolicy(of: name) != .always { return true }
+    if typer.program.isPrivate(name, in: m) { return true }
+
+    var success = true
+    for i in instructions() {
+      if let s = at(i) as? IRApply, case .function(let f, _, _) = s.callee {
+        if typer.program.isPrivate(typer.program[m].ir[f].name, in: m) {
+          let d = Diagnostic(
+            .error, "use of non-exposed function in inlined function", at: s.anchor.site)
+          typer.program[m].addDiagnostic(d)
+          success = false
+        }
+      }
+    }
+
+    return success
+  }
+
   /// Inlines the contents of the callees in `self` that have been resolved statically to a
   /// declaration annotated with `@inline(always)`.
   internal mutating func inlineSimpleCallees(emittingInto m: Module.ID, using typer: inout Typer) {
@@ -15,7 +36,7 @@ extension IRFunction {
         if let s = at(i) as? IRApply, case .function(let f, _, _) = s.callee {
           // Should the callee be inlined?
           let callee = typer.program[m].ir[f]
-          if !callee.isDefined || !typer.program.shouldInline(callee.name, in: m) { break }
+          if !callee.isDefined || !typer.program.shouldInline(callee.name) { break }
 
           // Construct a table mapping each parameter to its argument.
           var table = IRSubstitutionTable()
@@ -42,39 +63,29 @@ extension IRFunction {
 
 extension Program {
 
-  /// Returns `true` iff `f` refers to a declaration annotated with `@inline(always)`.
-  fileprivate func shouldInline(_ f: IRFunction.Name, in m: Module.ID) -> Bool {
+  /// Returns the conditions under which the body of `f` should be inlined.
+  fileprivate func inliningPolicy(of f: IRFunction.Name) -> InliningPolicy {
     switch f {
     case .lowered(let d):
-      return shouldInline(d, in: m)
+      return inliningPolicy(of: d) ?? .opportunistic
     default:
-      return false
+      return .opportunistic
     }
   }
 
-  /// Returns `true` iff `d` is a declaration annotated with `@inline(always)`.
-  fileprivate func shouldInline(_ d: DeclarationIdentity, in m: Module.ID) -> Bool {
+  /// Returns the conditions under which the body of `f` should be inlined, if defined.
+  fileprivate func inliningPolicy(of d: DeclarationIdentity) -> InliningPolicy? {
     switch tag(of: d) {
     case FunctionDeclaration.self:
-      return shouldInline(castUnchecked(d, to: FunctionDeclaration.self), in: m)
+      return .some(self[castUnchecked(d, to: FunctionDeclaration.self)].inliningPolicy)
     default:
-      return false
+      return .none
     }
   }
 
-  /// Returns `true` iff `d` is a declaration annotated with `@inline(always)`.
-  fileprivate func shouldInline(_ d: FunctionDeclaration.ID, in m: Module.ID) -> Bool {
-    switch tag(of: d) {
-    case FunctionDeclaration.self:
-      if let a = annotation("inline", appliedTo: d) {
-        return InliningPolicy(a) == .always
-      } else {
-        return false
-      }
-
-    default:
-      return false
-    }
+  /// Returns `true` iff `f` refers to a declaration annotated with `@inline(always)`.
+  fileprivate func shouldInline(_ f: IRFunction.Name) -> Bool {
+    inliningPolicy(of: f) == .always
   }
 
 }

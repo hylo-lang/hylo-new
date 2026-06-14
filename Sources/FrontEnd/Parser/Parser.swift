@@ -161,6 +161,21 @@ public struct Parser {
       arguments = []
     }
 
+    // Validate the annotation.
+    switch identifier.text {
+    case "inline":
+      if let (x, xs) = arguments.headAndTail {
+        if x.value != .string("always") && x.value != .string("never") {
+          report(expected("'always' or 'never'", at: x.site))
+        } else if let y = xs.first {
+          report(.init("'@inline' accepts at most 1 argument", at: y.site))
+        }
+      }
+
+    default:
+      break
+    }
+
     return Annotation(
       identifier: .init(identifier),
       arguments: arguments,
