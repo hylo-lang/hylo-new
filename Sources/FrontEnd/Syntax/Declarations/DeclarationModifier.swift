@@ -10,11 +10,8 @@ public enum DeclarationModifier: UInt8, Sendable {
   /// Introduces a static member.
   case `static`
 
-  /// Introduces an entity only within its enclosing scope.
-  case `private`
-
   /// Introduces an entity visible up to the module boundary.
-  case `internal`
+  case `module`
 
   /// Introduces an entity visible beyond the module boundary.
   case `public`
@@ -53,7 +50,7 @@ public enum DeclarationModifier: UInt8, Sendable {
   /// Returns `true` iff `self` is an access modifier.
   public var isAccessModifier: Bool {
     switch self {
-    case .private, .internal, .public:
+    case .module, .public:
       return true
     default:
       return false

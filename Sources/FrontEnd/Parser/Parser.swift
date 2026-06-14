@@ -2876,8 +2876,7 @@ extension DeclarationModifier: ExpressibleByTokenTag {
   fileprivate init?(tag: Token.Tag) {
     switch tag {
     case .static: self = .static
-    case .private: self = .private
-    case .internal: self = .internal
+    case .module: self = .module
     case .public: self = .public
     default: return nil
     }
