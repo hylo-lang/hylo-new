@@ -1993,12 +1993,10 @@ internal struct IREmitter {
 
   /// Inserts a `property` instruction.
   internal mutating func _property(
-    _ property: DeclarationIdentity,
-    of receiver: IRValue,
-    withType propertyType: AnyTypeIdentity
+    _ property: DeclarationIdentity, of record: IRValue, withType propertyType: AnyTypeIdentity
   ) -> IRValue {
     let s = IRProperty(
-      receiver: receiver, property: property, propertyType: propertyType,
+      record: record, property: property, propertyType: propertyType,
       anchor: currentAnchor)
     return insert(s)!
   }
