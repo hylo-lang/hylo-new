@@ -216,7 +216,7 @@ public struct Parser {
   /// Parses a declaration modifier if the next token denotes one.
   ///
   ///     declaration-modifier ::= (one of)
-  ///       static private internal public indirect inlineable
+  ///       static private internal public indirect
   ///
   private mutating func parseOptionalDeclarationModifier() -> Parsed<DeclarationModifier>? {
     // Hard keywords.
@@ -230,10 +230,6 @@ public struct Parser {
       case "indirect" where context.isTypeBody:
         _ = take()
         return .init(.indirect, at: t.site)
-
-      case "inlineable" where !context.isLocal:
-        _ = take()
-        return .init(.inlineable, at: t.site)
 
       default:
         return nil

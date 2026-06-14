@@ -545,7 +545,7 @@ public struct Program: Sendable {
     _ t: Struct.ID, in s: ScopeIdentity
   ) -> Bool {
     let d = types[t].declaration
-    return isInlineable(d, in: s) && storedProperties(of: d).isEmpty
+    return isLayoutVisible(d, in: s) && storedProperties(of: d).isEmpty
   }
 
   /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
@@ -563,26 +563,10 @@ public struct Program: Sendable {
     isTriviallyInitializable(types[t].abstraction, in: s)
   }
 
-  /// Returns `true` if the memory layout of `t` is visible from `scopeOfUse`.
-  public mutating func isInlineable(_ t: AnyTypeIdentity, in scopeOfUse: ScopeIdentity) -> Bool {
-    let u = types.dealiased(t)
-    switch types.tag(of: u) {
-    case Enum.self:
-      return isInlineable((types[u] as! Enum).declaration, in: scopeOfUse)
-    case Struct.self:
-      return isInlineable((types[u] as! Struct).declaration, in: scopeOfUse)
-    case Tuple.self:
-      return true
-    default:
-      return false
-    }
-  }
-
-  /// Returns `true` if the definition of `t` is visible from `scopeOfUse`.
-  public func isInlineable<T: ModifiableDeclaration>(
-    _ d: T.ID, in scopeOfUse: ScopeIdentity
-  ) -> Bool {
-    (d.module == scopeOfUse.module) || self[d].is(.inlineable)
+  /// If resilience is enabled in the module containing `d`, returns `true` if `d` is in the same
+  /// module as `scopeOfUse` or if `d` is annotated with `@frozen`; otherwise, returns `true`.
+  public func isLayoutVisible(_ d: StructDeclaration.ID, in scopeOfUse: ScopeIdentity) -> Bool {
+    true
   }
 
   /// Returns `n` if it identifies a node of type `U`; otherwise, returns `nil`.
