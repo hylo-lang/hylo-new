@@ -2,9 +2,9 @@ name: Spell check
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ "**" ]
 
 jobs:
   run:
