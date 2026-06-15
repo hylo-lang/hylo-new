@@ -782,7 +782,7 @@ internal struct ManglingEncoding: Sendable {
     case .typeAliasType:
       demangled = takeTypeAlias(from: &source)
     case .typeApplicationType:
-      demangled = takeApplicationType(from: &source)
+      demangled = takeTypeApplication(from: &source)
     case .universalType:
       demangled = takeUniversalType(from: &source)
     default:
@@ -1181,7 +1181,7 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Demangles an application type from `source`.
-  private static func takeApplicationType(from source: inout DemanglingContext) -> DemangledType {
+  private static func takeTypeApplication(from source: inout DemanglingContext) -> DemangledType {
     let t = takeType(from: &source)
     if let a = takeTypeArguments(from: &source) {
       return .typeApplication(abstraction: t, arguments: a)
