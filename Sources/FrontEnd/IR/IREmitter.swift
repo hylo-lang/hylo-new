@@ -1767,22 +1767,23 @@ internal struct IREmitter {
     }
   }
 
-  /// If `d` declares a stored property of in a type whose layout is visible from `scopeOfUse`,
-  /// returns that property's index. Otherwise, returns `nil`.
+  /// If `d` declares a stored property of a type whose layout is visible in `scopeOfUse`, returns
+  /// that property's index; otherwise, returns `nil`.
   ///
   /// The index of a stored property is used in instances of `IndexPath` to represent the location
   /// of a part relative to the location of a whole. For example, if `S` is a struct with two
   /// stored properties `x` and `y`, declared in that order, the index of `y` is 1.
   ///
-  /// The layout of a type if visible if its declaration is in the same module as`scopeOfUse` or
-  /// if its declaration is marked `inlineable`.
+  /// If resilience is enabled in the module containing `d`, the layout of the type declared by `d`
+  /// is visible if `d` is the same module as `scopeOfUse` or if `d` is annotated with `@frozen`.
+  /// Layouts are always visible when resilience is disabled.
   private mutating func storedPropertyIndex(
     of d: DeclarationIdentity, in scopeOfUse: ScopeIdentity
   ) -> Int? {
     guard
       let v = program.cast(d, to: VariableDeclaration.self),
       let p = program.parent(containing: v, as: StructDeclaration.self),
-      program.isInlineable(p, in: scopeOfUse)
+      program.isLayoutVisible(p, in: scopeOfUse)
     else { return nil }
 
     let properties = program.storedProperties(of: p)

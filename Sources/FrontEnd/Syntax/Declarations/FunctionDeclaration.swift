@@ -98,6 +98,15 @@ public struct FunctionDeclaration: RoutineDeclaration, Annotatable, Scope {
     introducer.value == .memberwiseinit
   }
 
+  /// The conditions under which the body of the function should be inlined.
+  public var inliningPolicy: InliningPolicy {
+    if let a = annotations.first(where: { (a) in a.identifier.value == "inline" }) {
+      return InliningPolicy(a)!
+    } else {
+      return .opportunistic
+    }
+  }
+
 }
 
 extension FunctionDeclaration: Showable {
