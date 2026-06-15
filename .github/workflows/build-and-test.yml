@@ -16,7 +16,7 @@ jobs:
       matrix:
         # Note: all combinations of the following will be run independently
         os: [macos-15, ubuntu-24.04, windows-2025]
-        swift: ["6.2.4"]
+        swift: ["6.3.2"]
         config: [release, debug]
 
         include:
