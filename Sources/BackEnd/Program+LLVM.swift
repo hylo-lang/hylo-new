@@ -446,6 +446,7 @@ extension Program {
       let t = ctx.llvm.functionType(from: parameters, to: ctx.llvm.i32.asAnyType)
       let v = ctx.llvm.declareFunction(name, t)
       let u = metadata(of: .void, in: &ctx)
+      setupAttributes(of: v, compiledFrom: f, in: &ctx)
       return FunctionMetadata(
         llvm: v, inputs: inputs, output: .init(type: u, convention: .erased))
     }
@@ -457,6 +458,7 @@ extension Program {
     if o.layout.size == 0 {
       let t = ctx.llvm.functionType(from: parameters)
       let v = ctx.llvm.declareFunction(name, t)
+      setupAttributes(of: v, compiledFrom: f, in: &ctx)
       return FunctionMetadata(
         llvm: v, inputs: inputs, output: .init(type: o, convention: .erased))
     }
@@ -465,6 +467,7 @@ extension Program {
     else if o.layout.size <= maxFootprint {
       let t = ctx.llvm.functionType(from: parameters, to: o.llvm)
       let v = ctx.llvm.declareFunction(name, t)
+      setupAttributes(of: v, compiledFrom: f, in: &ctx)
       return FunctionMetadata(
         llvm: v, inputs: inputs, output: .init(type: o, convention: .byValue(-1)))
     }
@@ -474,8 +477,20 @@ extension Program {
       let t = ctx.llvm.functionType(from: parameters + [o.llvm])
       let v = ctx.llvm.declareFunction(name, t)
       let n = parameters.count
+      setupAttributes(of: v, compiledFrom: f, in: &ctx)
       return FunctionMetadata(
         llvm: v, inputs: inputs, output: .init(type: o, convention: .byReference(n)))
+    }
+  }
+
+  /// Configures the attributes of `g`, which is the LLVM function to which `f` compiles.
+  private mutating func setupAttributes(
+    of g: Function.UnsafeReference, compiledFrom f: IRFunction.ID,
+    in ctx: inout ModuleGenerationContext
+  ) {
+    if isPrivate(self[ctx.hylo].ir[f].name, in: ctx.hylo) {
+      assert(self[ctx.hylo].ir[f].isDefined)
+      ctx.llvm.setLinkage(.private, for: g)
     }
   }
 
