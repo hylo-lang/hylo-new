@@ -4631,7 +4631,7 @@ public struct Typer {
     isStandardLibraryType(t, in: [.float32, .float64])
   }
 
-  /// Returns `true` iff `t` is one of the given standard library types.
+  /// Returns `true` iff `t` is one of the standard library types `ts`.
   private mutating func isStandardLibraryType(
     _ t: AnyTypeIdentity,
     in ts: [Program.StandardLibraryEntity]
