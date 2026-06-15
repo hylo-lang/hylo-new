@@ -57,7 +57,7 @@ public struct IRFunction: Sendable {
     fileprivate private(set) var tag: InstructionTag
 
     /// The basic block containing `instruction`.
-    fileprivate let parent: IRBlock.ID
+    fileprivate var parent: IRBlock.ID
 
     /// Create an instance wrapping `instruction`, which is in `parent`.
     fileprivate init<T: Instruction>(instruction: T, parent: IRBlock.ID) {
@@ -624,6 +624,19 @@ public struct IRFunction: Sendable {
     } else {
       return false
     }
+  }
+
+  /// Moves the instruction with identity `i` to the start of the function.
+  ///
+  /// - Requires: An entry block is present.
+  public mutating func relinkToStart(_ i: AnyInstructionIdentity) {
+    let entry = entry!
+    let origin = block(defining: i)
+
+    let setFirstTo = blocks[origin].first == i ? slots.address(after: i.address) : nil
+    let setLastTo = blocks[origin].last == i ? slots.address(before: i.address) : nil
+    slots.relinkToStart(i.address)
+    slots[i.address].parent = entry!
   }
 
   /// Updates the operands of all instructions affected by `s`'s value substitutions.
