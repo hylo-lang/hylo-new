@@ -4639,10 +4639,7 @@ public struct Typer {
     guard program.containsStandardLibrary else { return false }
 
     let u = program.types.dealiased(t)
-    for e in ts {
-      if u == standardLibraryType(e) { return true }
-    }
-    return false
+    return ts.contains { u == standardLibraryType($0) }
   }
 
   /// Returns the type of the given standard library entity.
