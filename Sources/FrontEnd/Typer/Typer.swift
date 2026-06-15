@@ -102,6 +102,9 @@ public struct Typer {
     /// The cache of `Typer.declaredType(of:)` for predefined givens.
     fileprivate var predefinedGivens: [Given: AnyTypeIdentity]
 
+    /// The cache of `Typer.standardLibraryType(_:)`.
+    fileprivate var standardLibraryEntityToType: [Program.StandardLibraryEntity: AnyTypeIdentity]
+
     /// The cache of `Typer.canDeriveCoercion(_:_:applying:)`.
     fileprivate var canDeriveCoercion: [Given: [TypePair: (Bool, Bool)]]
 
@@ -121,6 +124,7 @@ public struct Typer {
       self.witnessToAliases = [:]
       self.declarationToTentativeType = [:]
       self.predefinedGivens = [:]
+      self.standardLibraryEntityToType = [:]
       self.canDeriveCoercion = [:]
     }
 
@@ -4616,15 +4620,7 @@ public struct Typer {
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
-    guard program.containsStandardLibrary else { return false }
-    switch program.types.dealiased(t) {
-    case standardLibraryType(.int),
-        standardLibraryType(.int32),
-        standardLibraryType(.int64):
-      return true
-    default:
-      return false
-    }
+    isStandardLibraryType(t, in: [.int, .int32, .int64])
   }
 
   /// Returns `true` iff `t` is a standard library floating point type (e.g., `Hylo.Float32`).
@@ -4632,14 +4628,18 @@ public struct Typer {
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryFloatingPointType(_ t: AnyTypeIdentity) -> Bool {
+    isStandardLibraryType(t, in: [.float32, .float64])
+  }
+
+  /// Returns `true` iff `t` is one of the standard library types `ts`.
+  private mutating func isStandardLibraryType(
+    _ t: AnyTypeIdentity,
+    in ts: [Program.StandardLibraryEntity]
+  ) -> Bool {
     guard program.containsStandardLibrary else { return false }
-    switch program.types.dealiased(t) {
-    case standardLibraryType(.float32),
-        standardLibraryType(.float64):
-      return true
-    default:
-      return false
-    }
+
+    let u = program.types.dealiased(t)
+    return ts.contains(where: { (v) in standardLibraryType(v) == u })
   }
 
   /// Returns the type of the given standard library entity.
@@ -4652,6 +4652,8 @@ public struct Typer {
   private mutating func standardLibraryType(
     _ n: Program.StandardLibraryEntity
   ) -> AnyTypeIdentity {
+    if let t = cache.standardLibraryEntityToType[n] { return t }
+
     let d = program.standardLibraryDeclaration(n)
 
     let t: AnyTypeIdentity
@@ -4664,7 +4666,9 @@ public struct Typer {
     }
 
     let m = (program.types[t] as? Metatype) ?? fatalError("missing or corrupt standard library")
-    return m.inhabitant
+    let result = m.inhabitant
+    cache.standardLibraryEntityToType[n] = result
+    return result
   }
 
   // MARK: Helpers
