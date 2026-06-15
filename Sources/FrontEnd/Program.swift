@@ -509,6 +509,10 @@ public struct Program: Sendable {
       return isPrivate(d, in: m)
     case .existentialized(let g):
       return isPrivate(g, in: m)
+    case .slide:
+      return true
+    case .plateau:
+      return true
     }
   }
 
