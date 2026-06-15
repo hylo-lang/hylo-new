@@ -145,8 +145,9 @@ public struct Program: Sendable {
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
 
-        // This pass cannot fail.
+        // The following passes cannot fail.
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
+        work[i].function.existentializeIfExposed(emittingInto: m, using: &typer)
       }
 
       // Move all functions back.
@@ -168,11 +169,12 @@ public struct Program: Sendable {
           let module = typer.program[m]
           guard
             case .existentialized(let a) = module.ir[i].name,
-            case .some(let poly) = module.ir.functions.index(forKey: a), module.ir[poly].isDefined
+            case .some(let poly) = module.ir.functions.index(forKey: a),
+            module.ir[poly].isDefined && !module.ir[i].isDefined
           else { continue }
 
           typer.program.withEmitter(insertingIn: m) { (emitter) in
-            emitter.existentialize(poly, into: i)
+            emitter.existentialize(module.ir[poly], into: i)
           }
         }
 

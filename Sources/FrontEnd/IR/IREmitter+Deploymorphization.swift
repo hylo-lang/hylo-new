@@ -151,7 +151,7 @@ extension IREmitter {
       assert(t == f.resolved(s.type)!.type)
       f.replace(user, with: s)
     } else {
-      let x0 = insert(s)
+      let x0 = lowering(before: user, in: &f, { $0.insert(s) })
       f.replace(user, with: IRPlaceCast(source: x0!, target: t, anchor: old.anchor))
     }
   }
@@ -181,10 +181,22 @@ extension IREmitter {
     return program[module].ir.addFunction(mono)
   }
 
-  /// Emits the existentialized definition of `f` into `g`.
-  internal mutating func existentialize(_ f: IRFunction.ID, into g: IRFunction.ID) {
-    let poly = program[module].ir[f]
-    var mono = program[module].ir[g].move()
+  /// Emits the existentialized definition of `poly` into its existentialized form, adding the
+  /// latter to the module if necessary.
+  ///
+  /// `poly` is a polymorphic function whose implementation is defined in the current module. Its
+  /// existentialized form has not been defined yet, although it may have been declared.
+  internal mutating func existentialize(_ poly: IRFunction) {
+    let m = demandExistentialized(poly)
+    existentialize(poly, into: m)
+  }
+
+  /// Emits the existentialized definition of `poly` into `m`.
+  ///
+  /// `poly` is a polymorphic function whose implementation is defined in the current module. `m`
+  /// identifies the existentialized form of this function and has not been defined yet.
+  internal mutating func existentialize(_ poly: IRFunction, into m: IRFunction.ID) {
+    var mono = program[module].ir[m].move()
     assert(poly.isDefined && !mono.isDefined, "existentialization already completed")
 
     /// The type parameters of the function being existentialized.
@@ -243,7 +255,7 @@ extension IREmitter {
     }
 
     depolymorphize(&mono, passing: witnesses.filter({ (k, v) in v.parameter != nil }))
-    program[module].ir[g].take(definition: mono)
+    program[module].ir[m].take(definition: mono)
   }
 
 }
