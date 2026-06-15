@@ -151,7 +151,7 @@ extension IREmitter {
       assert(t == f.resolved(s.type)!.type)
       f.replace(user, with: s)
     } else {
-      let x0 = insert(s)
+      let x0 = lowering(before: user, in: &f, { $0.insert(s) })
       f.replace(user, with: IRPlaceCast(source: x0!, target: t, anchor: old.anchor))
     }
   }
