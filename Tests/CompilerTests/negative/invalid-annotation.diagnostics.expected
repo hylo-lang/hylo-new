@@ -16,3 +16,9 @@ negative/invalid-annotation.hylo:15.1-6: error: invalid annotation
 negative/invalid-annotation.hylo:17.1-6: error: invalid annotation
 @blah given Void is P {}
 ~~~~~
+negative/invalid-annotation.hylo:19.9-12: error: expected 'always' or 'never'
+@inline(foo) fun f0() {}
+        ~~~
+negative/invalid-annotation.hylo:20.16-17: error: '@inline' accepts at most 1 argument
+@inline(never, 1) fun f1() {}
+               ^

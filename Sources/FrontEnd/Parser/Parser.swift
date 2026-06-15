@@ -161,6 +161,21 @@ public struct Parser {
       arguments = []
     }
 
+    // Validate the annotation.
+    switch identifier.text {
+    case "inline":
+      if let (x, xs) = arguments.headAndTail {
+        if x.value != .string("always") && x.value != .string("never") {
+          report(expected("'always' or 'never'", at: x.site))
+        } else if let y = xs.first {
+          report(.init("'@inline' accepts at most 1 argument", at: y.site))
+        }
+      }
+
+    default:
+      break
+    }
+
     return Annotation(
       identifier: .init(identifier),
       arguments: arguments,
@@ -172,6 +187,11 @@ public struct Parser {
     // Is it a string argument?
     if let s = take(.stringLiteral) {
       return .init(.string(String(s.text.dropFirst().dropLast())), at: s.site)
+    }
+
+    // Is it a simple identifier?
+    else if let s = take(.name) {
+      return .init(.string(String(s.text)), at: s.site)
     }
 
     // Is it a number argument?
@@ -216,7 +236,7 @@ public struct Parser {
   /// Parses a declaration modifier if the next token denotes one.
   ///
   ///     declaration-modifier ::= (one of)
-  ///       static private internal public indirect inlineable
+  ///       static private internal public indirect
   ///
   private mutating func parseOptionalDeclarationModifier() -> Parsed<DeclarationModifier>? {
     // Hard keywords.
@@ -230,10 +250,6 @@ public struct Parser {
       case "indirect" where context.isTypeBody:
         _ = take()
         return .init(.indirect, at: t.site)
-
-      case "inlineable" where !context.isLocal:
-        _ = take()
-        return .init(.inlineable, at: t.site)
 
       default:
         return nil
@@ -2876,8 +2892,7 @@ extension DeclarationModifier: ExpressibleByTokenTag {
   fileprivate init?(tag: Token.Tag) {
     switch tag {
     case .static: self = .static
-    case .private: self = .private
-    case .internal: self = .internal
+    case .module: self = .module
     case .public: self = .public
     default: return nil
     }

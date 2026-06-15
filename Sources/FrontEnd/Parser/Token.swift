@@ -25,12 +25,11 @@ public struct Token: Hashable, Sendable {
     case infix
     case `init`
     case `inout`
-    case `internal`
     case `let`
     case match
+    case module
     case postfix
     case prefix
-    case `private`
     case `public`
     case `return`
     case set
@@ -131,7 +130,7 @@ public struct Token: Hashable, Sendable {
   /// `true` iff `self` is a declaration modifier.
   public var isDeclarationModifier: Bool {
     switch tag {
-    case .static, .private, .internal, .public:
+    case .static, .module, .public:
       return true
     default:
       return false
