@@ -29,7 +29,7 @@ extension StringProtocol {
     .init(filter({ (a) in a != c }))
   }
 
-  /// Returns self with unix-style line endings.
+  /// Returns `self` with unix-style line endings.
   public func normalizedLineEndings() -> String {
     replacingOccurrences(of: "\r\n", with: "\n")  // Windows
       .replacingOccurrences(of: "\r", with: "\n")  // Old Mac
