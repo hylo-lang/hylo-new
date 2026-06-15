@@ -713,6 +713,8 @@ internal struct ManglingEncoding: Sendable {
       append(typeAlias: t, to: &output)
     case let t as TypeApplication:
       append(typeApplication: t, to: &output)
+    case let t as TypeWitness:
+      append(typeWitness: t, to: &output)
     case let t as UniversalType:
       append(universal: t, to: &output)
     default:
@@ -783,6 +785,8 @@ internal struct ManglingEncoding: Sendable {
       demangled = takeTypeAlias(from: &source)
     case .typeApplicationType:
       demangled = takeTypeApplication(from: &source)
+    case .typeWitness:
+      demangled = takeTypeWitness(from: &source)
     case .universalType:
       demangled = takeUniversalType(from: &source)
     default:
@@ -1188,6 +1192,19 @@ internal struct ManglingEncoding: Sendable {
     } else {
       return .error
     }
+  }
+
+  /// Writes the mangled representation of `t` to `output`.
+  private mutating func append(
+    typeWitness t: TypeWitness,
+    to output: inout ManglingContext
+  ) {
+    output.add(operator: .typeWitness)
+  }
+
+  /// Demangles a type witness type from `source`.
+  private static func takeTypeWitness(from source: inout DemanglingContext) -> DemangledType {
+    return .typeWitness
   }
 
   /// Writes the mangled representation of `a` to `output`.

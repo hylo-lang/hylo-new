@@ -165,6 +165,9 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a type application type.
   case typeApplicationType = "pT"
 
+  /// Starts a type witness type.
+  case typeWitness = "wT"
+
   /// Starts a universal type.
   case universalType = "uT"
 

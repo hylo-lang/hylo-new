@@ -298,6 +298,9 @@ internal indirect enum DemangledType: Hashable, Sendable {
   /// A type application.
   case typeApplication(abstraction: DemangledType, arguments: [TypeApplicationArgument])
 
+  /// A type witness.
+  case typeWitness
+
   /// An universal type.
   case universalType(parameters: [DemangledType], head: DemangledType)
 
@@ -405,6 +408,9 @@ extension DemangledType: CustomStringConvertible {
     case .typeApplication(let abstraction, let arguments):
       let args = arguments.map({ (a) in "[\(a.formal): \(a.argument)]" }).joined(separator: ", ")
       return "\(abstraction)<\(args)>"
+
+    case .typeWitness:
+      return "Type"
 
     case .universalType(let parameters, let head):
       return "<\(list: parameters)> \(head)"
