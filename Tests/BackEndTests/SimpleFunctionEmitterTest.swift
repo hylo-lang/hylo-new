@@ -75,7 +75,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     await d.program.assignScopes(m0)
     try assertNoDiagnostics(in: d.program)
 
-    d.program.assignTypes(m0, loggingInferenceWhere: { _, _ in false })
+    d.program.assignTypes(m0, loggingInferenceWhere: { (_, _) in false })
     try assertNoDiagnostics(in: d.program)
 
     d.program.lower(m0)
