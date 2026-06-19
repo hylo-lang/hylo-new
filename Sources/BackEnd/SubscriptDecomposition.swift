@@ -507,7 +507,7 @@ extension IRFunction {
     switch tag(of: i) {
     case IRAlloca.self, IRProject.self:
       return .captured
-    case IRAccess.self, IRSubfield.self:
+    case IRAccess.self, IRGlobalAccess.self, IRPlaceCast.self, IRSubfield.self:
       return .redefined
     default:
       return .none

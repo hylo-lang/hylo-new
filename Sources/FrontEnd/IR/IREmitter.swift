@@ -131,7 +131,7 @@ internal struct IREmitter {
       // Emit the definition of the global's initializer.
       let global = demandLoweredDeclaration(variable: d)
       let lhs = program[program[d].pattern].pattern
-      defining(global.initializer, at: program.anchor(introducerOf: d)) { (me) in
+      defining(global.initializer.function!, at: program.anchor(introducerOf: d)) { (me) in
         me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
         me.lowering(rhs, { $0._return() })
       }
@@ -1439,7 +1439,25 @@ internal struct IREmitter {
     let f = program[module].ir.addFunction(i)
 
     // Declare the global itself.
-    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: f)
+    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: .function(f))
+    program[module].ir.addGlobal(g)
+    return g
+  }
+
+  /// Returns a IR variable assigned to the type witness of `t`, which is a closed type.
+  private mutating func demandGlobalTypeWitness(
+    _ t: AnyTypeIdentity
+  ) -> IRGlobal {
+    let u = program.types.dealiased(t)
+
+    let name = IRGlobal.Name.witness(u)
+    if let g = program[module].ir.variables[name] {
+      return g
+    }
+
+    let w = program.types.demand(TypeWitness())
+    let g = IRGlobal(
+      name: name, storageType: w.erased, alignment: .preferred, initializer: .typeWitness(u))
     program[module].ir.addGlobal(g)
     return g
   }
@@ -2588,9 +2606,8 @@ internal struct IREmitter {
 
     // If `t` has no free type parameter, then we can just use a constant value.
     if ps.isEmpty {
-      let u = program.types.demand(TypeWitness())
-      let a = _alloca(u.erased)
-      _emitInitialize(a, with: .type(t.erased, u))
+      let g = demandGlobalTypeWitness(t)
+      let a = _global_access(g)
       witnesses[t.erased] = a
 
       swap(&insertionContext.point, &p)

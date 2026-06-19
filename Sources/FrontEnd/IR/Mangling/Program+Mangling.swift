@@ -25,6 +25,11 @@ extension Program {
     mangled(n, applying: { (s, me, o) in me.mangled(function: n, to: &o) })
   }
 
+  /// Returns the mangled representation of `n`.
+  public func mangled(_ n: IRGlobal.Name) -> String {
+    mangled(n, applying: { (s, me, o) in me.mangled(global: n, to: &o) })
+  }
+
   /// Returns the mangled representation of `s`, applying `mangle` to build it.
   private func mangled<T>(
     _ s: T, applying mangle: (T, inout ManglingEncoding, inout ManglingContext) -> Void

@@ -38,6 +38,11 @@ public struct IRPlaceCast: Instruction {
     .place(target)
   }
 
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
+  }
+
 }
 
 extension IRPlaceCast: Showable {
