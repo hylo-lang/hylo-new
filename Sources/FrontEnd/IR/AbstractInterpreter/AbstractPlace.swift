@@ -45,40 +45,6 @@ internal enum AbstractPlace: Hashable, Sendable {
 
 }
 
-//extension AbstractPlace: Comparable {
-//
-//  /// Returns `true` iff `self` precedes `other` in a lexicographical order.
-//  internal static func < (l: Self, r: Self) -> Bool {
-//    switch (l, r) {
-//    case (.root(let a), .root(let b)):
-//      return areInIncreasingOrder(a, b)
-//    case (.root(let a), .subplace(let b, _)):
-//      return (a == b) || areInIncreasingOrder(a, b)
-//    case (.subplace(let a, _), .root(let b)):
-//      return areInIncreasingOrder(a, b)
-//    case (.subplace(let a, let p), .subplace(let b, let q)):
-//      return (a == b) ? p.lexicographicallyPrecedes(q) : areInIncreasingOrder(a, b)
-//    }
-//  }
-//
-//  /// Returns `true` iff `l` precedes `r` when computing whether two abstract places are in order.
-//  private static func areInIncreasingOrder(_ l: IRValue, _ r: IRValue) -> Bool {
-//    switch (l, r) {
-//    case (.parameter(let a), .parameter(let b)):
-//      return a < b
-//    case (.parameter, _):
-//      return true
-//    case (.register, .parameter):
-//      return false
-//    case (.register(let a), .register(let b)):
-//      return a < b
-//    default:
-//      fatalError()
-//    }
-//  }
-//
-//}
-
 extension AbstractPlace: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
