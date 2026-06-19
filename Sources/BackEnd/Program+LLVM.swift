@@ -26,6 +26,18 @@ extension Program {
     return context.release()
   }
 
+  /// Returns the name of the global corresponding to `g` in LLVM IR.
+  ///
+  /// The result is the mangled name of `g` unless its declaration has been annotated to specify a
+  /// particular name (e.g., `@extern`).
+  private func llvmName(global g: IRGlobal.Name) -> String {
+    if case .lowered(let d) = g, let n = externName(of: .init(d)) {
+      return n
+    } else {
+      return mangled(g)
+    }
+  }
+
   /// Returns the name of the function corresponding to `f` in LLVM IR.
   ///
   /// The result is the mangled name of `f` unless its declaration has been annotated to specify a
@@ -134,10 +146,14 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRBranch.self), in: &ctx)
     case IRConditionalBranch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRConditionalBranch.self), in: &ctx)
+    case IRGlobalAccess.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRGlobalAccess.self), in: &ctx)
     case IRLoad.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRLoad.self), in: &ctx)
     case IRMemoryCopy.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRMemoryCopy.self), in: &ctx)
+    case IRPlaceCast.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRPlaceCast.self), in: &ctx)
     case IRProject.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRProject.self), in: &ctx)
     case IRReturn.self:
@@ -222,6 +238,17 @@ extension Program {
 
   /// Generates the LLVM IR code corresponding to `i`.
   internal mutating func incorporate(
+    _ i: IRGlobalAccess.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let x = demandGlobal(s.source, in: &ctx.module)
+    let v = IRValue.register(i.erased)
+    ctx.value[v] = x.asAnyValue
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
     _ i: IRLoad.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
@@ -238,6 +265,7 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
     let t = metadata(of: ctx.ir.result(of: s.source)!.type, in: &ctx.module)
+    let n = t.layout.size.fixed ?? fatalError("unexpected dynamic size")
 
     let ptr = ctx.module.llvm.ptr
     let i32 = ctx.module.llvm.i32
@@ -246,12 +274,22 @@ extension Program {
 
     let x0 = codegen(s.target, in: &ctx).asAnyValue
     let x1 = codegen(s.source, in: &ctx).asAnyValue
-    let x2 = i32.unsafe[].constant(t.layout.size).asAnyValue
+    let x2 = i32.unsafe[].constant(n).asAnyValue
     let x3 = ctx.module.llvm.i1.unsafe[].constant(0).asAnyValue
     _ = ctx.module.llvm.insertCall(
       memcpy, on: [x0, x1, x2, x3],
       at: ctx.insertionPoint!)
 
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRPlaceCast.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let v = FrontEnd.IRValue.register(i.erased)
+    ctx.value[v] = .some(ctx.value[s.source]!)
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -464,7 +502,7 @@ extension Program {
     }
 
     // Can the result be returned by value?
-    else if o.layout.size <= maxFootprint {
+    else if let n = o.layout.size.fixed, n <= maxFootprint {
       let t = ctx.llvm.functionType(from: parameters, to: o.llvm)
       let v = ctx.llvm.declareFunction(name, t)
       setupAttributes(of: v, compiledFrom: f, in: &ctx)
@@ -535,6 +573,95 @@ extension Program {
       // The argument to `p` is passed by reference. It is already in memory.
       ctx.value[v] = ctx.llvm.unsafe[].parameters[j].asAnyValue
     }
+  }
+
+  /// Returns the global LLVM variable corresponding to `g`, declaring it if necessary.
+  private mutating func demandGlobal(
+    _ g: IRGlobal, in ctx: inout ModuleGenerationContext
+  ) -> SwiftyLLVM.GlobalVariable.UnsafeReference {
+    let name = llvmName(global: g.name)
+    if let existing = ctx.llvm.global(named: name) {
+      return existing
+    }
+
+    switch g.name {
+    case .lowered:
+      fatalError("TODO: global bindings")
+
+    case .witness(let t):
+      // TODO: type arguments/parameters
+      // TODO: witnesses of opaque types
+
+      // Declare the symbol.
+      let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
+      let symbol = ctx.llvm.declareGlobalVariable(name, storage)
+      ctx.llvm.setLinkage(.private, for: symbol)
+
+      // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
+      // the module. Otherwise, the witness is for a type whose layout is defined externally.
+      let m = metadata(of: t, in: &ctx)
+      guard let s = m.layout.size.fixed else { return symbol }
+
+      let fields: [SwiftyLLVM.AnyValue.UnsafeReference] = [
+        demandGlobalString(show(t), in: &ctx).asAnyValue,
+        ctx.llvm.i32.unsafe[].constant(s).asAnyValue,
+        ctx.llvm.i16.unsafe[].constant(m.layout.alignment).asAnyValue,
+        ctx.llvm.i16.unsafe[].zero.asAnyValue,
+      ]
+
+      let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
+      ctx.llvm.setAlignment(alignment, for: symbol)
+
+      let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
+      ctx.llvm.setInitializer(initializer, for: symbol)
+      ctx.llvm.setGlobalConstant(true, for: symbol)
+
+      return symbol
+    }
+  }
+
+  private func demandGlobalString(
+    _ s: String, in ctx: inout ModuleGenerationContext
+  ) -> SwiftyLLVM.AnyValue.UnsafeReference {
+    // Did we compute the representation already?
+    if let v = ctx.strings[s] { return v }
+
+    let iptr = ctx.llvm.iptr
+    let payloadSize = s.utf8.count
+    let pointerSize = ctx.llvm.layout.pointerSize
+
+    // Do the contents fit inline storage?
+    if (payloadSize < pointerSize) && (pointerSize <= 8) {
+      var units = UInt64(truncatingIfNeeded: payloadSize) << 2
+      for (i, u) in s.utf8.enumerated() {
+        units |= UInt64(u) << (i + 1) * 8
+      }
+      let v = iptr.unsafe[].constant(units).asAnyValue
+      ctx.strings[s] = v
+      return v
+    }
+
+    // Contents must be allocated in static memory.
+    let name = String(FNV1.hash(s.utf8, into: FNV1.u128()).state, radix: 36)
+    let payload = ctx.llvm.arrayConstant(bytes: s.utf8)
+    let storage = ctx.llvm.structType([iptr.asAnyType, iptr.asAnyType, payload.unsafe[].type])
+    let symbol = ctx.llvm.declareGlobalVariable("str_\(name)", storage)
+    ctx.llvm.setLinkage(.private, for: symbol)
+
+    // Guarantee minimum alignment of 4 so that we can reserve low bits for tagging.
+    let alignment = max(ctx.llvm.layout.preferredAlignment(of: storage), 4)
+    ctx.llvm.setAlignment(alignment, for: symbol)
+
+    let count = iptr.unsafe[].constant(payloadSize).asAnyValue
+    let initializer = ctx.llvm.structConstant(
+      of: storage, aggregating: [count, count, payload.asAnyValue])
+    ctx.llvm.setInitializer(initializer, for: symbol)
+    ctx.llvm.setGlobalConstant(true, for: symbol)
+
+    let v = ctx.llvm.constantPointerToInteger(bitPattern: symbol)
+    let w = ctx.llvm.constantAdd(v, iptr.unsafe[].constant(0b11))
+    ctx.strings[s] = w
+    return w
   }
 
   /// Returns the representations of `arguments`, which are passed to `callee`, in LLVM IR.
@@ -626,7 +753,7 @@ extension Program {
 
     // `f` returns an exit status iff its return type has a non-zero size, in which case we can
     // assume it is an instance of `Hylo.Int32`.
-    if f.output!.type.layout.size > 0 {
+    if f.output!.type.layout.size != 0 {
       let v = ctx.llvm.insertExtractValue(from: r, at: 0, at: p)
       ctx.llvm.insertReturn(v, at: p)
     } else {
@@ -644,7 +771,7 @@ extension Program {
     case .register:
       return ctx.value[v]!
     default:
-      fatalError("no LLVM representation of type '\(show(v))'")
+      fatalError("no LLVM representation of the Hylo value '\(show(v))'")
     }
   }
 
@@ -686,15 +813,29 @@ extension Program {
     of t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
     switch types.tag(of: t) {
+    case GenericParameter.self:
+      metadata(of: types.castUnchecked(t, to: GenericParameter.self), in: &ctx)
     case MachineType.self:
       metadata(of: types.castUnchecked(t, to: MachineType.self), in: &ctx)
     case Struct.self:
       metadata(of: types.castUnchecked(t, to: Struct.self), in: &ctx)
     case Tuple.self:
       metadata(of: types.castUnchecked(t, to: Tuple.self), in: &ctx)
+    case TypeWitness.self:
+      metadata(of: types.castUnchecked(t, to: TypeWitness.self), in: &ctx)
     default:
-      unimplemented("no LLVM representation of type '\(show(t))'")
+      unimplemented("no LLVM representation of the Hylo type '\(show(t))'")
     }
+  }
+
+  /// Returns the LLVM type representation of the Hylo type `t`.
+  private mutating func metadata(
+    of t: GenericParameter.ID, in ctx: inout ModuleGenerationContext
+  ) -> TypeMetadata {
+    let v = ctx.llvm.ptr.asAnyType
+    let a = ctx.llvm.layout.preferredAlignment(of: v)
+    let l = ConcreteLayout(fields: [], propertyToField: [], size: .dynamic, alignment: a)
+    return .init(llvm: v, layout: l)
   }
 
   /// Returns the LLVM type representation of the Hylo type `t`.
@@ -710,12 +851,12 @@ extension Program {
       case .ptr:
         ctx.llvm.ptr.asAnyType
       default:
-        unimplemented("no LLVM representation of type '\(program.show(t))'")
+        unimplemented("no LLVM representation of the Hylo type '\(program.show(t))'")
       }
 
       let s = ctx.llvm.layout.storageSize(of: v)
       let a = ctx.llvm.layout.preferredAlignment(of: v)
-      let l = ConcreteLayout(fields: [], propertyToField: [], size: s, alignment: a)
+      let l = ConcreteLayout(fields: [], propertyToField: [], size: .fixed(s), alignment: a)
       return TypeMetadata(llvm: v, layout: l)
     }
   }
@@ -743,6 +884,14 @@ extension Program {
     }
   }
 
+  /// Returns the LLVM type representation of the Hylo type `t`.
+  private mutating func metadata(
+    of t: TypeWitness.ID, in ctx: inout ModuleGenerationContext
+  ) -> TypeMetadata {
+    let p = types.demand(MachineType.ptr)
+    return metadata(of: p, in: &ctx)
+  }
+
   /// Returns the LLVM type representation of a record type having the given name and rows.
   private mutating func metadata(
     record name: String, rows: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
@@ -750,7 +899,7 @@ extension Program {
     let layout = record(rows: rows, in: &ctx)
     let definition = ctx.llvm.structType(named: name, layout.fields, packed: true).asAnyType
 
-    assert(ctx.llvm.layout.storageSize(of: definition) <= layout.size)
+    assert(ctx.llvm.layout.storageSize(of: definition) <= layout.size.fixed!)
     assert(ctx.llvm.layout.abiAlignment(of: definition) <= layout.alignment)
     return TypeMetadata(llvm: definition, layout: layout)
   }
@@ -770,17 +919,27 @@ extension Program {
     var rowToField = Array(repeating: -1, count: rs.count)
     var size = 0
 
-    for p in ps where rs[p].layout.size > 0 {
-      // There should be no need for padding bits.
-      assert(size.rounded(upToNearestMultipleOf: rs[p].layout.alignment) == size)
+    for p in ps {
+      let fieldSize = rs[p].layout.size.fixed ?? fatalError("unexpected dynamic size")
+      if fieldSize == 0 { continue }
+
+      // Compute the offset of the next property.
+      let next = size.rounded(upToNearestMultipleOf: rs[p].layout.alignment)
+
+      // Add padding if necessary.
+      if next != size {
+        let padding = next - size
+        fields.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).asAnyType)
+      }
 
       rowToField[p] = fields.count
       fields.append(rs[p].llvm)
-      size += rs[p].layout.size
+      size = next + fieldSize
     }
 
     let a = rs.last?.layout.alignment ?? 1
-    return ConcreteLayout(fields: fields, propertyToField: rowToField, size: size, alignment: a)
+    return ConcreteLayout(
+      fields: fields, propertyToField: rowToField, size: .fixed(size), alignment: a)
   }
 
 }

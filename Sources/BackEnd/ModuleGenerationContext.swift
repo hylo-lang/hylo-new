@@ -22,6 +22,9 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// A map from a function's name to its metadata.
   internal var functionMetadata: [IRFunction.Name: FunctionMetadata]
 
+  /// A map from a string constant to its representation in the module.
+  internal var strings: [String: SwiftyLLVM.AnyValue.UnsafeReference]
+
   /// The set of Hylo functions that have been compiled.
   internal var compiled: Set<FrontEnd.IRFunction.ID>
 
@@ -49,11 +52,26 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// once the plateau (and subsequently the subscript having called it) returns.
   internal let plateau: SwiftyLLVM.FunctionType.UnsafeReference
 
-  /// The data structure representing an ongoing projection captured by a slide or plateau.
+  /// The data structure representing ongoing projections captured by a slide or plateau.
   ///
   /// When the result of a subscript has to be used in a plateau, a triple is formed with the
   /// addresses of the projected value, the slide, and its environment.
   internal let nestedProject: SwiftyLLVM.StructType.UnsafeReference
+
+  /// The header of the structure representing information stored in all type witnesses.
+  ///
+  /// A type witness is a 4-tuple optionally followed by a buffer of pointer containing:
+  /// - A string describing the type being witnessed;
+  /// - The size of the type, as a 32-bit unsigned integer;
+  /// - The alignment of the type, as a 16-bit unsigned ingeter;
+  /// - The number of type parameters or type arguments, encoded using a 16-bit signed integer.
+  ///
+  /// Let `n` be the value of the 4-th component. If `n` is non-negative, then the witness is for a
+  /// proper type, `n` is the arity of the constructor that formed this type, and the tail buffer
+  /// contains a pointer to the witnesses the type arguments. Otherwise, the witness is for a type
+  /// constructor of arity `-n` and the tail buffer contains a pointer to a function implementing
+  /// that constructor.
+  internal let typeWitnessHeader: [SwiftyLLVM.AnyType.UnsafeReference]
 
   /// Creates the initial state of a compilation of `m`.
   internal init(compiling hylo: HyloModule.ID, into llvm: consuming LLVMModule) {
@@ -61,16 +79,20 @@ internal struct ModuleGenerationContext: ~Copyable {
     self.llvm = llvm
     self.typeMetadata = [:]
     self.functionMetadata = [:]
+    self.strings = [:]
     self.compiled = []
 
     let fun = self.llvm.functionPointer.asAnyType
     let ptr = self.llvm.ptr.asAnyType
+    let iptr = self.llvm.iptr.asAnyType
     let i32 = self.llvm.i32.asAnyType
+    let i16 = self.llvm.i16.asAnyType
 
     self.empty = self.llvm.structType([])
     self.slide = self.llvm.functionType(from: [ptr])
     self.plateau = self.llvm.functionType(from: [ptr, ptr, fun, ptr], to: i32)
     self.nestedProject = self.llvm.structType([ptr, fun, ptr])
+    self.typeWitnessHeader = [iptr, i32, i16, i16]
   }
 
   /// Returns the resources held by this instance.

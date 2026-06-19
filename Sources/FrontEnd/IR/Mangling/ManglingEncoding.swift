@@ -47,10 +47,13 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Writes to `output` the mangled representation of `n`.
-  internal mutating func mangled(
-    function n: IRFunction.Name, to output: inout ManglingContext
-  ) {
+  internal mutating func mangled(function n: IRFunction.Name, to output: inout ManglingContext) {
     append(function: n, to: &output)
+  }
+
+  /// Writes to `output` the mangled representation of `n`.
+  internal mutating func mangled(global n: IRGlobal.Name, to output: inout ManglingContext) {
+    append(global: n, to: &output)
   }
 
   /// Writes to `output` the mangled representation of `s`.
@@ -653,6 +656,17 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Writes the mangled representation of `s` to `output`.
+  private mutating func append(global s: IRGlobal.Name, to output: inout ManglingContext) {
+    // Note: no symbol needed; we assume it's a lowered global.
+    switch s {
+    case .lowered(let d):
+      append(decl: .init(d), to: &output)
+    case .witness(let t):
+      append(type: t, to: &output)
+    }
+  }
+
+  /// Writes the mangled representation of `s` to `output`.
   private mutating func append(table s: IRWitnessTable, to output: inout ManglingContext) {
     output.add(operator: .witnessTable)
     append(type: s.witnessType, to: &output)
@@ -785,7 +799,7 @@ internal struct ManglingEncoding: Sendable {
       demangled = takeTypeAlias(from: &source)
     case .typeApplicationType:
       demangled = takeTypeApplication(from: &source)
-    case .typeWitness:
+    case .typeWitnessType:
       demangled = takeTypeWitness(from: &source)
     case .universalType:
       demangled = takeUniversalType(from: &source)
@@ -1199,7 +1213,7 @@ internal struct ManglingEncoding: Sendable {
     typeWitness t: TypeWitness,
     to output: inout ManglingContext
   ) {
-    output.add(operator: .typeWitness)
+    output.add(operator: .typeWitnessType)
   }
 
   /// Demangles a type witness type from `source`.
