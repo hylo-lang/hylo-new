@@ -425,6 +425,7 @@ private struct Transfer: AbstractTransferFunction {
 
     context.memory[source] = nil
     context.locals[source] = nil
+    context.locals.removeAll(where: { (_, p) in p.place?.location.root == source })
     return f.instruction(after: i.erased)
   }
 
