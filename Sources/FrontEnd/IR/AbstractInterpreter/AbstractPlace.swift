@@ -13,6 +13,16 @@ internal enum AbstractPlace: Hashable, Sendable {
   /// Use `appending(contentsOf:)` to create instances of this case.
   indirect case subplace(root: IRValue, path: IndexPath)
 
+  /// A pair (`r`, `p`) where `p` is the path to this place, relative to the root location `r`.
+  internal var location: (root: IRValue, path: IndexPath) {
+    switch self {
+    case .root(let root):
+      return (root, .init())
+    case .subplace(let root, let path):
+      return (root, path)
+    }
+  }
+
   /// Returns a new place created by appending `suffix` to `self`.
   ///
   /// - Requires: `self` is not `.null`.

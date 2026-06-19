@@ -106,7 +106,7 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
     done.insert(entry)
 
     // Enumerate the blocks to visit according to the dominance relation.
-    work = Deque(dominance.bfs.dropFirst())
+    work = Deque(dominance.dropFirst())
 
     // Search for a fixed point.
     while let blockToProcess = work.popFirst() {
