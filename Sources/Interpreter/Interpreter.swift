@@ -2,7 +2,7 @@ import FrontEnd
 import Utilities
 
 /// The position of an instruction in the program.
-private struct CodePointer {
+private struct InstructionPointer {
   /// The module containing `self`.
   var module: Module.ID
 
@@ -14,22 +14,35 @@ private struct CodePointer {
 
 }
 
+/// A unique function in a `Program`.
+private struct GlobalFunctionID {
+
+  /// The module containing `self`.
+  public let module: Module.ID
+
+  /// The function in `module` indicated by `self`.
+  public let function: IRFunction.ID
+
+}
+
 /// A value manipulated by the IR.
 private struct Value {
   /// The underlying type-erased representation of value.
-  public var payload: Any
+  public var storage: Any
 }
 
-/// The value produced by executing an instruction.
-private enum InstructionResult {
+/// The part of one instruction's execution that follows any memory and I/O effects.
+///
+/// Each instruction ends by either initializing a constant register associated
+/// with the instruction's address and current stack frame, or transfer control
+/// to another instruction.
+private enum InstructionEpilogue {
 
-  /// Produces a value.
-  ///
-  /// Execution continues at the next instruction in sequence.
-  case value(Value)
+  /// Store
+  case initializeRegister(to: Value)
 
-  /// Transfer control to specific instruction.
-  case jump(CodePointer)
+  /// Control is transferred to the given instruction.
+  case jump(to: InstructionPointer)
 
 }
 
@@ -37,14 +50,14 @@ private enum InstructionResult {
 /// call.
 private struct StackFrame {
 
-  // TODO: add local variables and parameters, need to introduce `Memory` for the same.
+  // TODO: add local variables and parameters, which require `Memory`.
 
   /// The results of instructions.
   public var registers: [AnyInstructionIdentity: Value] = [:]
 
   /// The program counter to which execution should return when
   /// popping this frame.
-  public var returnAddress: CodePointer
+  public var returnAddress: InstructionPointer
 
 }
 
@@ -55,14 +68,14 @@ private struct Stack {
   private var frames: [StackFrame] = []
 
   /// Adds a new frame on top with the given `returnAddress` and `parameters`.
-  public mutating func push(returnAddress: CodePointer) {
+  public mutating func push(returnAddress: InstructionPointer) {
     // TODO: support parameters.
     let f = StackFrame(returnAddress: returnAddress)
     frames.append(f)
   }
 
   /// Removes the top frame and returns its `returnAddress`.
-  public mutating func pop() -> CodePointer {
+  public mutating func pop() -> InstructionPointer {
     let f = frames.last!
     defer {
       frames.removeLast()
@@ -82,7 +95,7 @@ private struct Stack {
     }
   }
 
-  /// Boolean indicating whether stack contains atleast 1 stack frame.
+  /// `true` iff there is at least 1 stack frame.
   public var isEmpty: Bool {
     frames.isEmpty
   }
@@ -96,7 +109,7 @@ public struct Interpreter {
   private let program: Program
 
   /// Identity of the next instruction to be executed.
-  private var programCounter: CodePointer
+  private var programCounter: InstructionPointer
 
   /// True iff the program is still running.
   public private(set) var isRunning: Bool = true
@@ -146,32 +159,34 @@ public struct Interpreter {
 
   /// Executes a single instruction.
   public mutating func step() throws {
-    let r = try stepResult()
+    let r = try applyCurrentInstruction()
 
-    switch r {
-    case .value(let v):
+    if case .initializeRegister(let v) = r {
       topOfStack.registers[programCounter.instructionInFunction] = v
-    case .jump(let pc):
+    }
+
+    if case .jump(let pc) = r {
       programCounter = pc
       if callStack.isEmpty {
         isRunning = false
       }
       return
-    case nil:
-      try advanceProgramCounter()
     }
 
+    try advanceProgramCounter()
   }
 
-  /// Executes a single instruction without recording its result.
-  private mutating func stepResult() throws -> InstructionResult? {
+
+  /// Applies the `Memory` and I/O effects of the current instruction and returns its epilogue.
+  private mutating func applyCurrentInstruction() throws -> InstructionEpilogue {
     switch currentInstruction {
     case is IRAccess:
-      // TODO: fake implementation to make empty program work.
-      return nil
+      // TODO: add a real implementation, validating new access in memory and
+      // storing the access into register.
+      return .initializeRegister(to: .init(storage: ()))
     case is IRRegionEnd<IRAccess>:
-      // TODO: fake implementation to make empty program work.
-      return nil
+      // TODO: add a real implementation, validating if it is safe to end the access.
+      return .initializeRegister(to: .init(storage: ()))
     case let x as IRAlloca:
       _ = x
     case let x as IRAllocx:
@@ -181,8 +196,8 @@ public struct Interpreter {
     case let x as IRApplyBuiltin:
       _ = x
     case is IRAssumeState:
-      // TODO: fake implementation to make empty program work.
-      return nil
+      // TODO: add a real implementation, updating state of composed regions.
+      return .initializeRegister(to: .init(storage: ()))
     case let x as IRBranch:
       _ = x
     case let x as IRConditionalBranch:
@@ -206,7 +221,7 @@ public struct Interpreter {
     case let x as IRProperty:
       _ = x
     case is IRReturn:
-      return .jump(popStackFrame())
+      return .jump(to: popStackFrame())
     case let x as IRStore:
       _ = x
     case let x as IRSubfield:
@@ -232,9 +247,9 @@ public struct Interpreter {
   /// previous stack frame.
   ///
   /// - Precondition: the program is running.
-  private mutating func popStackFrame() -> CodePointer {
+  private mutating func popStackFrame() -> InstructionPointer {
     // precondition(topOfStack.allocations.isEmpty,
-    //     "All local variables allocations for function must be deallocated before returning.")
+    //     "Function returns before deallocating all local variable storage")
     return callStack.pop()
   }
 
@@ -250,8 +265,8 @@ public struct Interpreter {
 }
 
 extension Program {
-  /// Entry module and entry function.
-  fileprivate var entry: (module: Module.ID, function: IRFunction.ID) {
+  /// The function whose invocation executes the whole program.
+  fileprivate var entry: GlobalFunctionID {
     let entryModule = identity(module: "Main")!
     let entryFunctionDeclaration = cast(
       select(
@@ -260,7 +275,7 @@ extension Program {
     let entryFunction = self[entryModule].functions.firstIndex {
       $0.name == IRFunction.Name.lowered(.init(entryFunctionDeclaration))
     }!
-    return (module: entryModule, function: entryFunction)
+    return .init(module: entryModule, function: entryFunction)
   }
 }
 

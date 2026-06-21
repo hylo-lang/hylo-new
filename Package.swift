@@ -168,6 +168,9 @@ let package = Package(
       dependencies: [
         "Interpreter", "FrontEnd",
       ],
+      resources: [
+        .copy("InterpreterTestPrograms")
+      ],
       swiftSettings: commonSwiftSettings),
 
     .plugin(
