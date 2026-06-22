@@ -51,7 +51,7 @@ public struct IRTypeApply: Instruction {
     true
   }
 
-  /// Asserts that the well-formedness conditions of the instruction hold.
+  /// Asserts the well-formedness conditions of the instruction.
   public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
     // The callee must be instance of a universal type.
     guard

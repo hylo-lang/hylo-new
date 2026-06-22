@@ -1,12 +1,6 @@
 import FrontEnd
 import SwiftyLLVM
 
-/// A Hylo module.
-internal typealias HyloModule = FrontEnd.Module
-
-/// A SwiftyLLVM module.
-internal typealias LLVMModule = SwiftyLLVM.Module
-
 /// The state of the compilation of a LLVM IR module from a Hylo IR module.
 internal struct ModuleGenerationContext: ~Copyable {
 
@@ -23,7 +17,7 @@ internal struct ModuleGenerationContext: ~Copyable {
   internal var functionMetadata: [IRFunction.Name: FunctionMetadata]
 
   /// A map from a string constant to its representation in the module.
-  internal var strings: [String: SwiftyLLVM.AnyValue.UnsafeReference]
+  internal var strings: [String: LLVMValue]
 
   /// The set of Hylo functions that have been compiled.
   internal var compiled: Set<FrontEnd.IRFunction.ID>
@@ -71,7 +65,7 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// contains a pointer to the witnesses the type arguments. Otherwise, the witness is for a type
   /// constructor of arity `-n` and the tail buffer contains a pointer to a function implementing
   /// that constructor.
-  internal let typeWitnessHeader: [SwiftyLLVM.AnyType.UnsafeReference]
+  internal let typeWitnessHeader: [LLVMType]
 
   /// Creates the initial state of a compilation of `m`.
   internal init(compiling hylo: HyloModule.ID, into llvm: consuming LLVMModule) {

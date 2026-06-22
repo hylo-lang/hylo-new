@@ -11,8 +11,8 @@ public struct IRWitnessTable: Instruction {
   public let witnessType: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
-  public init(witnessType: AnyTypeIdentity, members: [IRValue], anchor: Anchor) {
-    self.operands = members
+  public init(witnessType: AnyTypeIdentity, operands: [IRValue], anchor: Anchor) {
+    self.operands = operands
     self.anchor = anchor
     self.witnessType = witnessType
   }

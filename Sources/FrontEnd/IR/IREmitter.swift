@@ -202,7 +202,7 @@ internal struct IREmitter {
   /// insertion context is configured to generate IR into its lowered form.
   private mutating func lowerDefinition(_ d: ConformanceDeclaration.ID) {
     insertionContext.anchor = .init(site: program[d].introducer.site, scope: .init(node: d))
-    let (_, w) = currentFunction.output.remote!
+    let (_, w, _) = currentFunction.output.remote!
 
     // If the conformance is a nested given, we can simply extract the witness from the parameter
     // accepting a witness of a conformance to the enclosing trait.
@@ -277,7 +277,7 @@ internal struct IREmitter {
     precondition(requirements.types.isEmpty, "not implemented")
 
     let x0 = _alloca(w.erased)
-    let x1 = _witnesstable(type: w.erased, members: members)
+    let x1 = _witnesstable(type: w.erased, operands: members)
     _emitInitialize(x0, with: x1)
     let x2 = _access([.let], from: x0)
     _yield(x2)
@@ -572,7 +572,7 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Yield.ID) -> ControlFlow {
-    let (k, _) = currentFunction.output.remote!
+    let (k, _, _) = currentFunction.output.remote!
     let v = lowered(lvalue: program[s].value)
     lowering(s) { (me) in
       let x = me._access([k], from: v)
@@ -1500,7 +1500,7 @@ internal struct IREmitter {
       terms.append(IRParameter(type: u, access: .let, declaration: nil))
     }
 
-    return (terms, .remote(.let, witness.head))
+    return (terms, .remote(.let, witness.head, isAddressor: false))
   }
 
   /// Returns the term parameters and return type of `d`'s lowered representation.
@@ -1571,7 +1571,7 @@ internal struct IREmitter {
       terms.append(IRParameter(type: t, access: .set, declaration: nil))
       return (terms, .indirect)
     } else {
-      return (terms, .remote(program.types[shape].effect, t))
+      return (terms, .remote(program.types[shape].effect, t, isAddressor: false))
     }
   }
 
@@ -2086,9 +2086,11 @@ internal struct IREmitter {
 
   /// Inserts a `witnesstable` instruction.
   internal mutating func _witnesstable(
-    type: AnyTypeIdentity, members: [IRValue]
+    type: AnyTypeIdentity, operands: [IRValue]
   ) -> IRValue {
-    insert(IRWitnessTable(witnessType: type, members: members, anchor: currentAnchor))!
+    let t = program.types.dealiased(type)
+    let s = IRWitnessTable(witnessType: t, operands: operands, anchor: currentAnchor)
+    return insert(s)!
   }
 
   /// Inserts a `return` instruction.

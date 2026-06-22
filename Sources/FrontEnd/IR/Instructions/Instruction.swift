@@ -16,7 +16,7 @@ public protocol Instruction: Hashable, Showable, Sendable {
   /// Creates a copy of `other`, substituting its properties with `properties`.
   init(_ other: Self, substituting properties: borrowing IRSubstitutionTable)
 
-  /// Asserts that the well-formedness conditions of the instruction hold.
+  /// Asserts the well-formedness conditions of the instruction.
   func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool
 
 }

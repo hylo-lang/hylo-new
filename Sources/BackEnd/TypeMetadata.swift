@@ -4,9 +4,15 @@ import SwiftyLLVM
 internal struct TypeMetadata {
 
   /// A handle to the LLVM instance representing the type.
-  internal let llvm: SwiftyLLVM.AnyType.UnsafeReference
+  internal let llvm: LLVMType
 
   /// Information about the size, alignment, and fields of the type.
   internal let layout: ConcreteLayout
+
+  /// Creates an instance with the given properties.
+  internal init<T: SwiftyLLVM.IRType>(llvm: T.UnsafeReference, layout: ConcreteLayout) {
+    self.llvm = llvm.asAnyType
+    self.layout = layout
+  }
 
 }

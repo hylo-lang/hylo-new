@@ -316,9 +316,21 @@ public struct Program: Sendable {
     tag(of: n).value is any TypeDeclaration.Type
   }
 
-  //// Returns `true` iff `n` denotes an extension or conformance declaration.
+  /// Returns `true` iff `n` denotes an extension or conformance declaration.
   public func isTypeExtendingDeclaration<T: SyntaxIdentity>(_ n: T) -> Bool {
     tag(of: n).value is any TypeExtendingDeclaration.Type
+  }
+
+  /// Returns `true` iff `n` denotes a function or variant declaration.
+  public func isFunctionOrVariantDeclaration<T: SyntaxIdentity>(_ n: T) -> Bool {
+    switch tag(of: n) {
+    case FunctionDeclaration.self:
+      return true
+    case VariantDeclaration.self:
+      return true
+    default:
+      return false
+    }
   }
 
   /// Returns `true` iff `n` introduces a name that can be overloaded.

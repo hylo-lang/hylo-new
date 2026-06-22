@@ -40,12 +40,12 @@ public struct IRFunction: Sendable {
     case indirect
 
     /// The result is projected.
-    case remote(AccessEffect, AnyTypeIdentity)
+    case remote(AccessEffect, AnyTypeIdentity, isAddressor: Bool)
 
     /// The payload of `self` iff it denotes a projection.
-    public var remote: (AccessEffect, AnyTypeIdentity)? {
-      if case .remote(let k, let t) = self {
-        return (k, t)
+    public var remote: (AccessEffect, AnyTypeIdentity, Bool)? {
+      if case .remote(let k, let t, let b) = self {
+        return (k, t, b)
       } else {
         return nil
       }
@@ -98,7 +98,7 @@ public struct IRFunction: Sendable {
       switch output {
       case .indirect:
         self.head = Arrow(style: .parenthesized, inputs: ps.dropLast(), output: ps.last!.type)
-      case .remote(let k, let o):
+      case .remote(let k, let o, _):
         self.head = Arrow(style: .bracketed, effect: k, inputs: ps, output: o.erased)
       }
     }
@@ -154,9 +154,18 @@ public struct IRFunction: Sendable {
     typeParameters.isEmpty
   }
 
-  /// `true` iff the function describes a subscript.
+  /// `true` iff the function is a subscript.
   public var isSubscript: Bool {
     output != .indirect
+  }
+
+  /// `true` iff the function is an addressor (i.e., a subscript with an empty slide).
+  public var isAddressor: Bool {
+    if case .remote(_, _, let a) = output {
+      return a
+    } else {
+      return false
+    }
   }
 
    /// `true` iff the function returns a unit value (i.e., an instance of `Hylo.Void`).
@@ -373,6 +382,21 @@ public struct IRFunction: Sendable {
       return termParameters[i].access == .sink
     default:
       return false
+    }
+  }
+
+  /// Returns `v` iff it denotes a subscript in `program` known to have an empty slide.
+  public func seenAsAddressor(_ v: IRValue, in program: Program) -> IRFunction.ID? {
+    switch v {
+    case .function(let f, let m, _):
+      if case .remote(_, _, let b) = program[m].ir[f].output {
+        return b ? f : nil
+      } else {
+        return nil
+      }
+
+    default:
+      return nil
     }
   }
 
@@ -794,8 +818,9 @@ extension IRFunction: Showable {
     }
     result.append(")")
 
-    if case .remote(let k, let t) = self.output {
-      result.append(" -> \(k) \(printer.show(t))")
+    if case .remote(let k, let t, let b) = self.output {
+      if b { result = "@addressor\n\(result)" }
+      result.append(" \(k) <: \(printer.show(t))")
     }
 
     if !slots.isEmpty {
