@@ -58,7 +58,7 @@ public struct IRProject: IRRegionEntry {
     true
   }
 
-  /// Asserts that the well-formedness conditions of the instruction hold.
+  /// Asserts the well-formedness conditions of the instruction.
   ///
   /// Returns `true` iff the following conditions hold:
   ///

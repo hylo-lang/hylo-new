@@ -1,3 +1,5 @@
+import Utilities
+
 /// Returns the address of a property stored in an opaque record.
 public struct IRProperty: Instruction {
 
@@ -45,6 +47,19 @@ public struct IRProperty: Instruction {
   /// `true`.
   public var isExtendingOperandLifetimes: Bool {
     true
+  }
+
+  /// Asserts the well-formedness conditions of the instruction.
+  public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
+    // The record is a place storing a witness table.
+    guard
+      let t = parent.result(of: record),
+      let (c, _) = program.types.seenAsTraitApplication(t.type)
+    else { preconditionFailure("bad operand") }
+
+    // The selected property exists.
+    precondition(program.requirements(of: c).index(of: property) != nil)
+    return true
   }
 
 }

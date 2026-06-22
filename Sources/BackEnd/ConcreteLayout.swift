@@ -51,7 +51,7 @@ internal struct ConcreteLayout {
   ///
   /// This property may be empty if the type described by `self` has no stored property, either
   /// because it is opaque or because it is a machine type.
-  internal let fields: [SwiftyLLVM.AnyType.UnsafeReference]
+  internal let fields: [LLVMType]
 
   /// A map from the index of a property to the index of its corresponding field, or `-1` if that
   /// property's representation is erased.

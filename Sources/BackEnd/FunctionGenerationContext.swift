@@ -20,7 +20,7 @@ internal struct FunctionGenerationContext: ~Copyable {
   internal var block: [FrontEnd.IRBlock.ID: SwiftyLLVM.BasicBlock.UnsafeReference]
 
   /// A map from Hylo IR register to its LLVM counterpart, unless it has been erased.
-  internal var value: [FrontEnd.IRValue: SwiftyLLVM.AnyValue.UnsafeReference]
+  internal var value: [FrontEnd.IRValue: LLVMValue]
 
   /// The set of basic blocks that have been factored out into a plateau.
   internal var factoredOut: IRBlockSet
@@ -45,7 +45,7 @@ internal struct FunctionGenerationContext: ~Copyable {
 
   /// The LLVM function being built.
   internal var llvm: SwiftyLLVM.Function.UnsafeReference {
-    result.llvm
+    result.value
   }
 
   /// Returns the resources held by this instance.

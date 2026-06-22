@@ -36,7 +36,7 @@ fileprivate struct RegionPrologue {
   fileprivate let boundary: FrontEnd.AnyInstructionIdentity
 
   /// How the parameters of the Hylo IR function are mapped.
-  fileprivate let inputs: [FunctionMetadata.Parameter]
+  fileprivate let inputs: [Prototype.Parameter]
 
   /// The definitions dominating the region.
   fileprivate let definitions: [FrontEnd.IRValue]
@@ -68,7 +68,7 @@ extension FunctionGenerationContext {
     var definitions: [FrontEnd.IRValue] = []
 
     // Collect non-erased parameters.
-    for (i, p) in result.inputs.enumerated() where p.convention != .erased {
+    for (i, p) in result.prototype.mapping.inputs.enumerated() where p.convention != .erased {
       definitions.append(.parameter(i))
     }
     if let r = ir.returnRegister {
@@ -100,7 +100,7 @@ extension FunctionGenerationContext {
 
     let captureBufferType = module.llvm.arrayType(captures.count, module.llvm.ptr)
     return .init(
-      boundary: y, inputs: result.inputs, definitions: definitions,
+      boundary: y, inputs: result.prototype.mapping.inputs, definitions: definitions,
       captures: captures, captureBufferType: captureBufferType)
   }
 
@@ -193,8 +193,11 @@ extension Program {
     let n = mangled(name, of: ctx.module.hylo)
     let f = ctx.module.llvm.declareFunction(n, ctx.module.slide)
     let u = metadata(of: .void, in: &ctx.module)
-    let slide = FunctionMetadata(llvm: f, inputs: [], output: .init(type: u, convention: .erased))
-    ctx.module.llvm.setLinkage(.private, for: slide.llvm)
+
+    let m = Prototype.Mapping(inputs: [], output: .init(type: u, convention: .erased))
+    let p = Prototype(signature: FunctionType.UnsafeReference(f.unsafe[].valueType)!, mapping: m)
+    let slide = FunctionMetadata(prototype: p, value: f)
+    ctx.module.llvm.setLinkage(.private, for: slide.value)
 
     // Save pointers to the parameters and allocations dominating `y`.
     let prologue = ctx.prologue(dominating: y.erased)
@@ -252,8 +255,11 @@ extension Program {
     let name = IRFunction.Name.plateau(ctx.ir.name, y.erased.address.rawValue)
     let n = mangled(name, of: ctx.module.hylo)
     let f = ctx.module.llvm.declareFunction(n, ctx.module.plateau)
-    let plateau = FunctionMetadata(llvm: f, inputs: [], output: nil)
-    ctx.module.llvm.setLinkage(.private, for: plateau.llvm)
+
+    let m = Prototype.Mapping(inputs: [], output: nil)
+    let p = Prototype(signature: FunctionType.UnsafeReference(f.unsafe[].valueType)!, mapping: m)
+    let plateau = FunctionMetadata(prototype: p, value: f)
+    ctx.module.llvm.setLinkage(.private, for: plateau.value)
 
     // Save pointers to the parameters and allocations dominating `y`.
     let prologue = ctx.prologue(dominating: y.erased)
@@ -386,8 +392,7 @@ extension Program {
     _ i: IRProject.End.ID, dominatedBy p: RegionPrologue,
     in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
-    typealias V = SwiftyLLVM.AnyValue.UnsafeReference
-    func insertCall(_ f: V, _ e: V) {
+    func insertCall(_ f: LLVMValue, _ e: LLVMValue) {
       _ = ctx.module.llvm.insertCall(
         f, typed: ctx.module.slide.asAnyType, on: [e],
         at: ctx.insertionPoint!)
