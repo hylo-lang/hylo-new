@@ -23,4 +23,11 @@ final class ArrayTests: XCTestCase {
     XCTAssert(a.appending(9).elementsEqual(0 ..< 10))
   }
 
+  func testAppendCount() {
+    var a = Array(0 ..< 3)
+    a.append(3, count: 3)
+    XCTAssertEqual(a.count, 6)
+    XCTAssertEqual(a, [0, 1, 2, 3, 3, 3])
+  }
+
 }
