@@ -1,5 +1,6 @@
-//! stage:lowering
+//! exit-status:23
 
+@inline(never)
 subscript id(x: inout Int32) inout -> Int32 {
   yield &x
 }
@@ -7,13 +8,19 @@ subscript id(x: inout Int32) inout -> Int32 {
 fun main() -> Int32 {
   var a: Int32 = 0
   var b: Int32 = 0
+
+  // Lifetime of `x` starts here and ends in two different scopes, meaning that subscript
+  // decomposition will create a plateau with multiple successors.
   inout x = &id[&a]
+
   if true {
+    // Lifetime of `y` overlap with that of `x` without being nested.
     inout y = &id[&b]
     &x = 23
     &y = 34
   } else {
     &x = 45
   }
+
   return a
 }

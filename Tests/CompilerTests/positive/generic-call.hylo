@@ -1,0 +1,18 @@
+//! exit-status:42
+
+public fun use<T>(x: T) {}
+
+trait P { fun f() -> Int32 }
+
+given Void is P {
+
+  fun f() -> Int32 {
+    use(self)
+    return 42
+  }
+
+}
+
+public fun main() -> Int32 {
+  ().f()
+}
