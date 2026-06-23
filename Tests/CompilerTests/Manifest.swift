@@ -17,10 +17,10 @@ struct Manifest {
     case lowering
 
     /// After LLVM lowering.
-    case llvmLowering
+    case llvm
 
-    /// After the program has been linked into an executable.
-    case executableLinking
+    /// After the program has been compiled and ran.
+    case execution
 
   }
 
@@ -28,7 +28,10 @@ struct Manifest {
   private(set) var requiresStandardLibrary: Bool = true
 
   /// The stage up to which the input should be compiled.
-  private(set) var stage: Stage = .llvmLowering
+  private(set) var stage: Stage = .execution
+
+  /// The expected exit status of the input, if executed.
+  private(set) var exitStatus: Int32 = 0
 
   /// Creates an instance with a default configuration.
   init() {}
@@ -78,6 +81,8 @@ struct Manifest {
       requiresStandardLibrary = false
     case "stage":
       stage = try Stage(rawValue: v).unwrapOrThrow(ManifestError.invalidStage(v))
+    case "exit-status":
+      exitStatus = try Int32(v).unwrapOrThrow(ManifestError.invalidExitStatus(v))
     default:
       throw ManifestError.unknownOption
     }
@@ -117,5 +122,8 @@ enum ManifestError: Error {
 
   /// An invalid stage argument.
   case invalidStage(String)
+
+  /// An invalid exit status.
+  case invalidExitStatus(String)
 
 }
