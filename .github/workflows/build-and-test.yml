@@ -38,7 +38,7 @@ jobs:
             llvm-build-type: Debug
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           submodules: recursive
 
