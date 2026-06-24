@@ -12,7 +12,7 @@ internal struct ConcreteLayout {
 
     /// The raw value of the instance.
     ///
-    /// Non-negative numbers represent a fixed size, in bytes. `-1` represents a dynmic size. All
+    /// Non-negative numbers represent a fixed size, in bytes. `-1` represents a dynamic size. All
     /// other values are undefined.
     private let raw: Int
 
