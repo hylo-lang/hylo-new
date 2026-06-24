@@ -39,7 +39,7 @@ internal struct Prototype {
 
     /// A table mapping each term parameter of the Hylo function to its passing convention.
     ///
-    /// This property describes how each parameter of an Hylo IR function are represented (or not)
+    /// This property describes how each parameter of a Hylo IR function are represented (or not)
     /// in the corresponding LLVM function. It contains exactly as many elements as the number of
     /// input parameters in the Hylo IR function. The compiled LLVM function, however, may have a
     /// different number of parameters. Some may have been erased or added to implement Hylo's ABI.
