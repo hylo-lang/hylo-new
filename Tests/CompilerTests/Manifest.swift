@@ -4,8 +4,8 @@ import Utilities
 /// A test manifest.
 struct Manifest {
 
-  /// A stage of the compilation pipeline.
-  enum Stage: String {
+  /// A stage of the compilation and testing pipeline.
+  enum Stage: String, Comparable {
 
     /// After the abstract syntax tree has been parsed.
     case parsing
@@ -21,6 +21,22 @@ struct Manifest {
 
     /// After the program has been compiled and ran.
     case execution
+
+    /// The position of `self` in the pipeline.
+    var order: Int {
+      switch self {
+      case .parsing: 0
+      case .typing: 1
+      case .lowering: 2
+      case .llvm: 3
+      case .execution: 4
+      }
+    }
+
+    /// True iff `l` is earlier in the pipeline than `r`.
+    static func < (l: Stage, r: Stage) -> Bool {
+      l.order < r.order
+    }
 
   }
 
@@ -46,6 +62,9 @@ struct Manifest {
 
   /// The expected exit status of the input, if executed.
   private(set) var exitStatus: Int32 = 0
+
+  /// The expected textual artifacts of the test run, asserted when present.
+  private(set) var artifactExpectations = SortedDictionary<CompilerTests.ArtifactTag, String>()
 
   /// Creates an instance with a default configuration.
   init() {}
@@ -82,6 +101,33 @@ struct Manifest {
     else {
       self.init()
     }
+
+    try self.readArtifactExpectations(forTestAt: root, stage: stage)
+  }
+
+  /// Reads and sets expectations for the test case at `root`.
+  mutating func readArtifactExpectations(forTestAt root: URL, stage: Stage) throws {
+    for tag in CompilerTests.ArtifactTag.allTextual {
+      self.artifactExpectations[tag] = try Self.readFromDisk(
+        forTestAt: root, tag: tag, minimumStage: tag.minimumStage, stage: stage)
+    }
+  }
+
+  /// Reads the `tag`-specific expectation for a test case at `root`.
+  static func readFromDisk(
+    forTestAt root: URL, tag: CompilerTests.ArtifactTag, minimumStage: Manifest.Stage,
+    stage: Manifest.Stage
+  ) throws -> String? {
+    let r = try? String(
+      contentsOf: root.deletingPathExtension().appendingPathExtension("\(tag).expected"),
+      encoding: .utf8)
+
+    if stage < minimumStage && r != nil {
+      throw TestFailure.invalidTestDescription(
+        "\(tag) assertion requires stage:\(minimumStage) or higher but was \(stage).")
+    }
+
+    return r
   }
 
   /// Updates the configuration of `self` with the option parsed from `s`.
@@ -111,10 +157,25 @@ struct Manifest {
     try parse(v).unwrapOrThrow(ManifestError.invalidArgument(option: String(k), argument: v))
   }
 
-  /// Returns the first line of the file at `url`, which is encoded in UTF-8, or `nil`if that
-  /// this file could not be read.
+  /// Returns the first line of the file at `url`, which is encoded in UTF-8, or `nil` if this file
+  /// could not be read.
   private static func firstLine(of url: URL) -> Substring? {
     (try? String(contentsOf: url, encoding: .utf8))?.firstLine
+  }
+
+  /// A failure reported when parsing a test manifest.
+  private enum TestFailure: Error {
+
+    /// The test failed because its description was invalid.
+    case invalidTestDescription(String)
+
+    var localizedDescription: String {
+      switch self {
+      case .invalidTestDescription(let d):
+        return "Invalid test description (\(d))"
+      }
+    }
+
   }
 
 }

@@ -65,4 +65,9 @@ extension Sequence {
     joinedString(separator: separator) { String(describing: $0) }
   }
 
+  /// Returns the element of `self` that minimizes `f`, or `nil` if `self` is empty.
+  public func min<R: Comparable>(by keyPath: (Element) -> R) -> Element? {
+    self.min(by: { (a, b) in keyPath(a) < keyPath(b) })
+  }
+
 }

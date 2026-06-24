@@ -17,6 +17,12 @@ final class SequenceTests: XCTestCase {
     XCTAssertEqual(x2.least(by: E.areInIncreasingOrder(_:_:)), .f)
   }
 
+  func testMin() {
+    let xs = [1, 2, 3, 4]
+    XCTAssertEqual(xs.min(by: { (x) in x }), 1)
+    XCTAssertEqual(xs.min(by: { (x) in -x }), 4)
+  }
+
 }
 
 private enum E: Equatable {

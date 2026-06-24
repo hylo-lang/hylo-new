@@ -1,0 +1,7 @@
+fun P.f<Self: Void>(let %p0: P<Void>, let %p1: Void, set %p2: Int32) {
+%b0:
+  %r0 = access [let] %p1
+  %r1 = access [set] %p2
+  %r2 = apply $<ConformanceDeclaration at generic-call:7.1>.f(%r0) => %r1
+  %r3 = return
+}
