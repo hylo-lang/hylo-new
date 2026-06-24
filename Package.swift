@@ -15,7 +15,7 @@ let commonSwiftSettings: [SwiftSetting] = [
 let package = Package(
   name: "Hylo",
   platforms: [
-    .macOS(.v15)
+    .macOS(.v26)
   ],
   products: [
     .executable(name: "hc", targets: ["hc"]),
