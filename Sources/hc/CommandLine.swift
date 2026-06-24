@@ -131,7 +131,7 @@ private typealias Module = FrontEnd.Module
       moduleCachePath: noCaching ? nil : moduleCachePath!,
       targetSpecification: try resolveTarget(),
       optimization: optimizationLevel,
-      relocation: relocationModel ?? defaultRelocationModel(),
+      relocation: relocationModel ?? Driver.defaultRelocationModel,
       codeModel: codeModel ?? .default,
       librarySearchPaths: librarySearchPaths)
 
@@ -276,17 +276,6 @@ private typealias Module = FrontEnd.Module
       target: triple,
       cpu: resolveCPU(crossCompiling: crossCompiling),
       features: resolveCPUFeatures(crossCompiling: crossCompiling))
-  }
-
-  /// The default relocation model when not specified on the command line.
-  ///
-  /// Note: This may be obsolete after https://github.com/hylo-lang/hylo-new/issues/96 is resolved.
-  private func defaultRelocationModel() -> RelocationModel {
-    #if os(Linux)
-      return .pic
-    #else
-      return .default
-    #endif
   }
 
   /// Emits the AST of `module` in `program` with name `name`, using the tree printer.

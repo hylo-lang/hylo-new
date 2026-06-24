@@ -1104,7 +1104,7 @@ extension Program {
       fields: fields, propertyToField: rowToField, size: .fixed(size), alignment: a)
   }
 
-  /// Returns the LLVM IR type of the entity decalred by `d`, which is a property of an opaque
+  /// Returns the LLVM IR type of the entity declared by `d`, which is a property of an opaque
   /// record having type `t`.
   private mutating func typeOfProperty(
     declaredBy d: DeclarationIdentity, withType t: AnyTypeIdentity,

@@ -48,11 +48,25 @@ public struct Driver {
   /// A map from a Hylo module to its corresponding LLVM module, populated by `lowerToLLVM(_:)`.
   private var llvmModules: [Module.ID: LLVMModuleBox] = [:]
 
+  /// The relocation model that suits the host platform when none is specified.
+  ///
+  /// On Linux, the system toolchain links position-independent executables (PIE) by default, which
+  /// requires position-independent object code; emitting code with the target's own default (which
+  /// is `static` on x86-64 Linux) produces absolute relocations that the PIE linker rejects.
+  /// Elsewhere we defer to the target's default.
+  public static var defaultRelocationModel: RelocationModel {
+    #if os(Linux)
+      return .pic
+    #else
+      return .default
+    #endif
+  }
+
   /// Creates an instance with the given properties.
   public init(
     moduleCachePath: URL? = nil, targetSpecification: TargetSpecification,
     optimization: OptimizationLevel = .none,
-    relocation: RelocationModel = .default,
+    relocation: RelocationModel = Driver.defaultRelocationModel,
     codeModel: CodeModel = .default,
     librarySearchPaths: [URL] = [], librariesToLink: [String] = []
   ) {
