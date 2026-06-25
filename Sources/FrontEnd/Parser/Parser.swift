@@ -45,10 +45,14 @@ public struct Parser {
   /// The context in which the parser is being used.
   private var context: Context = .default
 
+  /// Conditions for selecting conditional compilation branches.
+  private let compilationConditions: ConditionalCompilationFactors
+
   /// Creates an instance parsing `source`.
-  public init(_ source: SourceFile) {
+  public init(_ source: SourceFile, compilationConditions: ConditionalCompilationFactors) {
     self.tokens = Lexer(tokenizing: source)
     self.position = .init(source.startIndex, in: source)
+    self.compilationConditions = compilationConditions
   }
 
   // MARK: Declarations
@@ -1035,7 +1039,7 @@ public struct Parser {
     let start = nextTokenStart()
 
     let vs = try inBraces { (m0) in
-      try m0.semicolonSeparated(until: .rightBrace) { (m1) in
+      try m0.semicolonSeparated(until: Token.hasTag(.rightBrace)) { (m1) in
         try m1.parseVariant(introducedBy: head, in: &file)
       }
     }
@@ -1159,7 +1163,7 @@ public struct Parser {
   ) throws -> [DeclarationIdentity] {
     try entering(.typeBody(.init(T.self))) { (m0) in
       try m0.inBraces { (m1) in
-        try m1.semicolonSeparated(until: .rightBrace) { (m2) in
+        try m1.semicolonSeparated(until: Token.hasTag(.rightBrace)) { (m2) in
           let d = try m2.parseDeclaration(in: &file)
           if !isValid(file.tag(of: d)) {
             m2.report(.init("declaration is not allowed here", at: .empty(at: file[d].site.start)))
@@ -1694,7 +1698,7 @@ public struct Parser {
     let i = try take(.match) ?? expected("'match'")
     let s = try parseExpression(in: &file)
     let b = try inBraces { (m0) in
-      try m0.semicolonSeparated(until: .rightBrace) { (m1) in
+      try m0.semicolonSeparated(until: Token.hasTag(.rightBrace)) { (m1) in
         try m1.parsePatternMatchCase(in: &file)
       }
     }
@@ -1714,7 +1718,7 @@ public struct Parser {
     let i = try take(.case) ?? expected("'case'")
     let p = try parsePattern(in: &file)
     let b = try inBraces { (m0) in
-      try m0.semicolonSeparated(until: .rightBrace) { (m1) in
+      try m0.semicolonSeparated(until: Token.hasTag(.rightBrace)) { (m1) in
         try m1.parseStatement(in: &file)
       }
     }
@@ -2192,6 +2196,7 @@ public struct Parser {
   ///
   ///     statement ::=
   ///       assignment-statement
+  ///       conditional-compilation-statement
   ///       discard-statement
   ///       return-statement
   ///       declaration
@@ -2204,6 +2209,8 @@ public struct Parser {
     defer { ensureStatementDelimiter() }
 
     switch head.tag {
+    case .poundIf:
+      return try .init(parseConditionalCompilation(in: &file))
     case .underscore:
       return try .init(parseDiscardStement(in: &file))
     case .return:
@@ -2215,6 +2222,287 @@ public struct Parser {
     default:
       return try parseAssignmentOrExpression(in: &file)
     }
+  }
+
+  /// Parses a conditional compilation statement.
+  ///
+  ///     conditional-compilation-statement ::=
+  ///       '#if' conditional-compilation-tail
+  ///     conditional-compilation-statement-tail ::=
+  ///       conditional-compilation-condition '{' statement-list '}' conditional-compilation-fallback
+  ///     conditional-compilation-fallback ::=
+  ///       '#elseif' conditional-compilation-tail
+  ///       '#else' '{' statement-list '}' `#endif`
+  ///       `#endif`
+  ///     conditional-compilation-condition ::=
+  ///       `true`
+  ///       `false`
+  ///       `operatingSystem` `(` identifier `)`
+  ///       `architecture` `(` identifier `)`
+  ///       `feature` `(` identifier `)`
+  ///       `compiler` `(` identifier `)`
+  ///       `compilerVersion` `(` comparison `)`
+  ///       `hyloVersion` `(` comparison `)`
+  ///       `not` `(` conditional-compilation-condition `)`
+  ///       `and` `(` conditional-compilation-condition `,` conditional-compilation-condition `)`
+  ///       `or` `(` conditional-compilation-condition `,` conditional-compilation-condition `)`
+  ///     comparison ::=
+  ///       `>=` semantic-version
+  ///       `<` semantic-version
+  ///     semantic-version ::=
+  ///       decimal-number '.' decimal-number '.' decimal-number
+  ///
+  private mutating func parseConditionalCompilation(
+    in file: inout Module.SourceContainer
+  ) throws -> ConditionalCompilation.ID {
+    let i = try take(.poundIf) ?? expected("'#if'")
+    return try parseConditionalCompilationTail(head: i, in: &file)
+  }
+
+  /// Parses the conditional compilation tail after `head`, which is either `#if` or `#elseif`.
+  /// 
+  /// If `canBeActive` is `false`, the caller has already determined that the condition of this
+  /// branch cannot hold.
+  private mutating func parseConditionalCompilationTail(
+    head: Token, canBeActive: Bool = true,
+    in file: inout Module.SourceContainer
+  ) throws -> ConditionalCompilation.ID {
+    let c = try parseConditionalCompilationCondition(in: &file)
+    let active = canBeActive && c.holds(for: compilationConditions)
+    let b = try parseConditionalCompilationStatements(
+      skipParsing: !active && c.mayNotNeedParsing, in: &file)
+    let t = try parseConditionalCompilationFallback(
+      active: !active, skipParsing: active && c.mayNotNeedParsing, in: &file)
+    return file.insert(ConditionalCompilation(
+      introducer: head, condition: c, statements: b, fallback: t, site: span(from: head)))
+  }
+
+  /// Parses a conditional compilation body.
+  ///
+  /// If `skipParsing` is `true`, all the tokens are skipped until the next `#elseif`, `#else`, or
+  /// `#endif` that matches the current nesting level.
+  private mutating func parseConditionalCompilationStatements(
+    skipParsing: Bool,
+    in file: inout Module.SourceContainer
+  ) throws -> [StatementIdentity] {
+    if skipParsing {
+      try skipConditionalCompilationBranch(stoppingAtElse: true)
+      return []
+    } else {
+      return try semicolonSeparated(
+        until: Token.oneOf([.poundElse, .poundElseif, .poundEndif])
+      ) { (m) in
+        try m.parseStatement(in: &file)
+      }
+    }
+  }
+
+  /// Skips the branch body of a conditional compilation statement, including any nested conditional
+  /// compilation statements.
+  ///
+  /// If `stoppingAtElse` is `true`, the skipping stops at the next `#elseif` or `#else` that
+  /// matches the current nesting level. Otherwise, it stops at the next `#endif` that matches the
+  /// current nesting level.
+  private mutating func skipConditionalCompilationBranch(stoppingAtElse: Bool) throws {
+    var innerCompilerConditions = 0
+    discard(while: { (head) in
+      switch head.tag {
+      case .poundEndif:
+        innerCompilerConditions -= 1
+      case .poundIf:
+        innerCompilerConditions += 1
+      case .poundElse, .poundElseif:
+        // Check if we need to stop at the corresponding #else[if].
+        if stoppingAtElse && innerCompilerConditions == 0 {
+          innerCompilerConditions -= 1
+        }
+      default:
+        break
+      }
+      return innerCompilerConditions >= 0
+    })
+  }
+
+  /// Parses a conditional compilation fallback.
+  ///
+  /// `active` is `true` iff the caller has already determined that the condition of the current
+  /// branch does hold. `skipParsing` is `true` iff the caller has determined that the branch does
+  /// not need parsing.
+  private mutating func parseConditionalCompilationFallback(
+    active: Bool,
+    skipParsing: Bool,
+    in file: inout Module.SourceContainer
+  ) throws -> [StatementIdentity] {
+    if skipParsing {
+      try skipConditionalCompilationBranch(stoppingAtElse: false)
+      guard take(.poundEndif) != nil else { throw expected("'#endif'") }
+      return []
+    }
+
+    if let head = take(.poundElseif) {
+      return [.init(try parseConditionalCompilationTail(head: head, canBeActive: active, in: &file))]
+    }
+    else if take(.poundElse) != nil {
+      let b = try parseConditionalCompilationStatements(skipParsing: false, in: &file)
+      guard take(.poundEndif) != nil else { throw expected("'#endif'") }
+      return b
+    }
+    else if take(.poundEndif) != nil {
+      return []
+    }
+    else {
+      throw expected("'#elseif', '#else', or '#endif'")
+    }
+  }
+
+  /// Parses a conditional compilation condition.
+  private mutating func parseConditionalCompilationCondition(
+    in file: inout Module.SourceContainer
+  ) throws -> ConditionalCompilation.Condition {
+    return try condition(withInfixConnectiveStrongerOrEqualTo: .disjunction)
+
+    /// A conjunction (`&&`) or disjunction (`||`) operator.
+    enum Connective: Int {
+
+      /// The logical disjunction.
+      case disjunction
+
+      /// The logical conjunction.
+      case conjunction
+
+    }
+
+    /// Parses a logical connective from `state`.
+    func parseConnective(in file: inout Module.SourceContainer) -> Connective? {
+      guard let t = peek(), t.tag == .`operator` else { return nil }
+      var r: Connective
+      switch t.text {
+      case "||":
+        r = .disjunction
+      case "&&":
+        r = .conjunction
+      default:
+        return nil
+      }
+
+      // Consume the token and "succeed".
+      _ = take()
+      return r
+    }
+
+    /// Parses a condition as a proposition, a negation, or an infix sentence whose operator has
+    /// a precedence at least as strong as `p`.
+    func condition(
+      withInfixConnectiveStrongerOrEqualTo p: Connective
+    ) throws -> ConditionalCompilation.Condition {
+      var left = try parseConditionalCompilationUnaryExpression(in: &file)
+
+      while true {
+        // Tentatively parse a connective.
+        var backup = self
+        guard let c = parseConnective(in: &file) else { return left }
+
+        // Backtrack if the connective we got hasn't strong enough precedence.
+        if (c.rawValue < p.rawValue) {
+          swap(&self, &backup)
+          return left
+        }
+
+        // If we parsed `||` the RHS must be a conjunction. Otherwise it must be a proposition or
+        // negation. In either case we'll come back here to parse the remainder of the expression.
+        switch c {
+        case .disjunction:
+          let right = try condition(withInfixConnectiveStrongerOrEqualTo: .conjunction)
+          left = .or(left, right)
+        case .conjunction:
+          let right = try parseConditionalCompilationUnaryExpression(in: &file)
+          left = .and(left, right)
+        }
+      }
+
+      return left
+    }
+  }
+
+  /// Parses a conditional compilation condition unary expression.
+  private mutating func parseConditionalCompilationUnaryExpression(
+    in file: inout Module.SourceContainer
+  ) throws -> ConditionalCompilation.Condition {
+    if let t = take(oneOf: [.`true`, .`false`]) {
+      return t.text == "true" ? .`true` : .`false`
+    }
+
+    if peek()?.text == "!" {
+      _ = take(.`operator`)
+      return .not(try parseConditionalCompilationCondition(in: &file))
+    }
+
+    if let name = take(.name) {
+      let expectVersionNumber: Bool
+      switch name.text {
+      case "compiler_version", "hylo_version":
+        expectVersionNumber = true
+      default:
+        expectVersionNumber = false
+      }
+
+      if expectVersionNumber {
+        guard take(.leftParenthesis) != nil else { throw expected("'('") }
+
+        let o = try parseOperator()
+        let comparison: ConditionalCompilation.VersionComparison
+        let s = try parseSemanticVersion(in: &file)
+        guard take(.rightParenthesis) != nil else { throw expected("')'") }
+        switch o.text {
+        case ">=":
+          comparison = .greaterOrEqual(s)
+        case "<":
+          comparison = .less(s)
+        default:
+          throw expected("'>=' or '<'", at: o)
+        }
+        switch name.text {
+        case "compiler_version":
+          return .compilerVersion(comparison: comparison)
+        case "hylo_version":
+          return .hyloVersion(comparison: comparison)
+        default:
+          unreachable()
+        }
+      } else {
+        // We have the form #if identifier(identifier), and our current parsing state starts at '('.
+        guard take(.leftParenthesis) != nil else { throw expected("'('") }
+        let x = try take(.name) ?? expected("identifier")
+        guard take(.rightParenthesis) != nil else { throw expected("')'") }
+
+        switch name.text {
+        case "os": return .operatingSystem(.init(x))
+        case "arch": return .architecture(.init(x))
+        case "feature": return .feature(.init(x))
+        case "compiler": return .compiler(.init(x))
+        default:
+          throw expected("'os', 'arch', 'feature', or 'compiler'", at: name.site)
+        }
+      }
+    } else {
+      throw expected("compiler condition")
+    }
+  }
+
+  /// Parses a semantic version.
+  private mutating func parseSemanticVersion(
+    in file: inout Module.SourceContainer
+  ) throws -> SemanticVersion {
+    let major = Int((try take(.integerLiteral) ?? expected("integer literal")).text)!
+    var minor = 0
+    var patch = 0
+    if take(.dot) != nil {
+      minor = Int((try take(.integerLiteral) ?? expected("integer literal")).text)!
+      if take(.dot) != nil {
+        patch = Int((try take(.integerLiteral) ?? expected("integer literal")).text)!
+      }
+    }
+    return SemanticVersion(major: major, minor: minor, patch: patch)
   }
 
   /// Parses a discard statement.
@@ -2298,7 +2586,7 @@ public struct Parser {
     in file: inout Module.SourceContainer
   ) throws -> [StatementIdentity] {
     try inBraces { (m0) in
-      try m0.semicolonSeparated(until: .rightBrace) { (m1) in
+      try m0.semicolonSeparated(until: Token.hasTag(.rightBrace)) { (m1) in
         try m1.parseStatement(in: &file)
       }
     }
@@ -2656,17 +2944,17 @@ public struct Parser {
 
   /// Parses a list of instances of `T` separated by newlines or semicolons.
   private mutating func semicolonSeparated<T>(
-    until rightDelimiter: Token.Tag?, _ parse: (inout Self) throws -> T
+    until stopCondition: (Token) -> Bool, _ parse: (inout Self) throws -> T
   ) throws -> [T] {
     var xs: [T] = []
     while let head = peek() {
       discard(while: { (t) in t.tag == .semicolon })
-      if head.tag == rightDelimiter { break }
+      if stopCondition(head) { break }
       do {
         try xs.append(parse(&self))
       } catch let e as ParseError {
         report(e)
-        recover(at: { (t) in t.tag == rightDelimiter || t.tag == .semicolon })
+        recover(at: { (t) in stopCondition(t) || t.tag == .semicolon })
       }
     }
     return xs

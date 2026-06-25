@@ -212,6 +212,9 @@ public struct Module: Sendable {
   /// The position of `self` in the containing program.
   public let identity: Module.ID
 
+  /// Conditions for selecting conditional compilation branches.
+  private let compilationConditions: ConditionalCompilationFactors
+
   /// The dependencies of the module.
   public private(set) var dependencies: [Module.Name] = []
 
@@ -221,10 +224,11 @@ public struct Module: Sendable {
   /// The IR functions in the module.
   public internal(set) var ir: IR = .init()
 
-  /// Creates an empty module with the given name and identity.
-  public init(name: Name, identity: Module.ID) {
+  /// Creates an empty module with the given name, identity, and compilation conditions.
+  public init(name: Name, identity: Module.ID, compilationConditions: ConditionalCompilationFactors) {
     self.name = name
     self.identity = identity
+    self.compilationConditions = compilationConditions
   }
 
   /// `true` iff `self` is Hylo's standard library.
@@ -276,7 +280,7 @@ public struct Module: Sendable {
     if let f = sources.index(forKey: s.name) {
       return (inserted: false, identity: .init(module: identity, offset: f))
     } else {
-      let p = Parser(s)
+      let p = Parser(s, compilationConditions: compilationConditions)
       var f = Module.SourceContainer(
         identity: .init(module: identity, offset: sources.count), source: s)
       p.parseTopLevelDeclarations(in: &f)
@@ -484,6 +488,9 @@ extension Module: Archivable {
     /// A mapping from file name to its contents.
     internal var sources = OrderedDictionary<FileName, SourceFile>()
 
+    /// Conditions for selecting conditional compilation branches.
+    internal var compilationConditions: ConditionalCompilationFactors
+
     /// Returns the result of calling `action` on `self` wrapped in `Any`.
     internal mutating func withWrapped<T>(_ action: (inout Any) throws -> T) rethrows -> T {
       try withUnsafeMutablePointer(to: &self) { (this) in
@@ -523,7 +530,8 @@ extension Module: Archivable {
         ctx.modules[Module.ID(i + 1)] = ctx.identities[d]
       }
 
-      var me = Self(name: name, identity: ctx.identities[name]!)
+      var me = Self(name: name, identity: ctx.identities[name]!,
+        compilationConditions: ctx.compilationConditions)
 
       // <source count> <identity> <contents> ...
       let count = try Int(archive.readUnsignedLEB128())

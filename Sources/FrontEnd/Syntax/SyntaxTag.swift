@@ -79,6 +79,7 @@ public struct SyntaxTag: Sendable {
     // Statements
     Assignment.self,
     Block.self,
+    ConditionalCompilation.self,
     Discard.self,
     Return.self,
     Yield.self,

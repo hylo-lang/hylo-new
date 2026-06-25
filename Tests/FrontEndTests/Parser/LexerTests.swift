@@ -177,6 +177,14 @@ final class LexerTests: XCTestCase {
     XCTAssertNil(scanner.next())
   }
 
+  func testPoundKeywords() throws {
+    var scanner = Lexer(tokenizing: "#if #else #elseif #endif")
+    try assertNext(from: &scanner, is: .poundIf, withValue: "#if")
+    try assertNext(from: &scanner, is: .poundElse, withValue: "#else")
+    try assertNext(from: &scanner, is: .poundElseif, withValue: "#elseif")
+    try assertNext(from: &scanner, is: .poundEndif, withValue: "#endif")
+  }
+
   func testPoundLiteral() throws {
     var scanner = Lexer(tokenizing: "#a #0 #")
     try assertNext(from: &scanner, is: .poundLiteral, withValue: "#a")

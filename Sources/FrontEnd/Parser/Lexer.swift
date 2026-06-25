@@ -195,6 +195,10 @@ public struct Lexer: IteratorProtocol, Sequence {
 
     let tag: Token.Tag
     switch take(while: \.isIdentifierTail) {
+    case "if": tag = .poundIf
+    case "else": tag = .poundElse
+    case "elseif": tag = .poundElseif
+    case "endif": tag = .poundEndif
     case "": tag = .error
     default: tag = .poundLiteral
     }
