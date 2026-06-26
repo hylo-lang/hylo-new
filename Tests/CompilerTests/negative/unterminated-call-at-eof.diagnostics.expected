@@ -1,0 +1,21 @@
+negative/unterminated-call-at-eof.hylo:4.9: error: expected expression
+  _ = f(
+        ^
+negative/unterminated-call-at-eof.hylo:5.2: error: expected expression
+}
+ ^
+negative/unterminated-call-at-eof.hylo:7.14: error: consecutive statements on the same line must be separated by ';'
+subscript x(){
+             ^
+negative/unterminated-call-at-eof.hylo:8.4: error: expected ','
+  _ = x[
+   ^
+negative/unterminated-call-at-eof.hylo:8.4: error: expected expression
+  _ = x[
+   ^
+negative/unterminated-call-at-eof.hylo:9.2: error: consecutive statements on the same line must be separated by ';'
+}
+ ^
+negative/unterminated-call-at-eof.hylo:9.2: error: expected '}'
+}
+ ^
