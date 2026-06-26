@@ -1,0 +1,9 @@
+//! stage:parsing no-std
+
+fun f() {
+  _ = f(
+}
+
+subscript x(){
+  _ = x[
+}

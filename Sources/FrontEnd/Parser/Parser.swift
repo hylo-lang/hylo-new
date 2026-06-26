@@ -2487,7 +2487,7 @@ public struct Parser {
     if let n = peek() {
       return tokens.source[position.index ..< n.site.start.index].contains(where: \.isNewline)
     } else {
-      return tokens.source.index(after: position.index) == tokens.source.endIndex
+      return position.index == tokens.source.endIndex
     }
   }
 
