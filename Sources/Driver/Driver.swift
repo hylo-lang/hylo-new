@@ -162,7 +162,7 @@ public struct Driver {
       var m = try program.compileToLLVM(module, target: t)
 
       try m.verifyInDebugBuilds()
-      m.runDefaultModulePasses()
+      m.runDefaultModulePasses(optimization: optimization)
       try m.verifyInDebugBuilds()
 
       llvmModules[module] = LLVMModuleBox(consume m)

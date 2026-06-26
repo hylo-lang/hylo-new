@@ -24,11 +24,25 @@ struct Manifest {
 
   }
 
+  /// The configuration of the optimizer.
+  enum Optimizations: String {
+
+    /// No optimization is applied.
+    case none
+
+    /// All optimizations are applied
+    case all
+
+  }
+
   /// `true` iff `self` requires a standard library.
   private(set) var requiresStandardLibrary: Bool = true
 
   /// The stage up to which the input should be compiled.
   private(set) var stage: Stage = .execution
+
+  /// The optimizer configuration with which the input should be compiled.
+  private(set) var optimizations: Optimizations = .none
 
   /// The expected exit status of the input, if executed.
   private(set) var exitStatus: Int32 = 0
@@ -80,12 +94,21 @@ struct Manifest {
     case "no-std":
       requiresStandardLibrary = false
     case "stage":
-      stage = try Stage(rawValue: v).unwrapOrThrow(ManifestError.invalidStage(v))
+      stage = try parse(v, for: k, with: Stage.init(rawValue:))
+    case "optimizations":
+      optimizations = try parse(v, for: k, with: Optimizations.init(rawValue:))
     case "exit-status":
-      exitStatus = try Int32(v).unwrapOrThrow(ManifestError.invalidExitStatus(v))
+      exitStatus = try parse(v, for: k, with: Int32.init(_:))
     default:
       throw ManifestError.unknownOption
     }
+  }
+
+  /// Returns the value of the argument `v` of the option `k`, parsed with `parse`.
+  private func parse<T, S: StringProtocol>(
+    _ v: String, for k: S, with parse: (String) -> T?
+  ) throws -> T {
+    try parse(v).unwrapOrThrow(ManifestError.invalidArgument(option: String(k), argument: v))
   }
 
   /// Returns the first line of the file at `url`, which is encoded in UTF-8, or `nil`if that
@@ -120,10 +143,7 @@ enum ManifestError: Error {
   /// An invalid option.
   case unknownOption
 
-  /// An invalid stage argument.
-  case invalidStage(String)
-
-  /// An invalid exit status.
-  case invalidExitStatus(String)
+  /// An invalid option argument.
+  case invalidArgument(option: String, argument: String)
 
 }

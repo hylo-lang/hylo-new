@@ -6,7 +6,7 @@ import Utilities
 import XCTest
 
 /// `true` iff intermediate compilation artifacts must be saved for successful tests.
-private let artifactsAreSavedOnSuccess: Bool = false
+private let alwaysSaveArtifacts: Bool = false
 
 /// The driver for generated compiler tests.
 ///
@@ -180,38 +180,37 @@ final class CompilerTests: XCTestCase {
     moduleCachePath.delete()
   }
 
-  /// Compiles `input` expecting no compilation error.
+  /// Compiles and runs `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    do {
-      // Compile the input up until the specified stage.
-      let r = try await compile(input)
-      try assertSansError(r.driver.program)
+    // Compile the input up until the specified stage.
+    let o = input.manifest.optimizations != .none
+    let r = try await compile(input, withOptimizations: o)
+    try assertSansError(r.driver.program)
 
-      // Should an executable be tested?
-      if input.manifest.stage == .execution {
-        let e = try XCTUnwrap(r.artifacts.executable)
-        let x = try Process.execute(e)
-        assertExitStatus(x, describedBy: input)
-      }
-    } catch let error as TestFailure {
-      XCTFail("\(error)\nSource: \(input.root.path)\n")
+    // Should an executable be tested?
+    if input.manifest.stage == .execution {
+      let e = try XCTUnwrap(r.artifacts.executable)
+      let x = try Process.execute(e)
+      assertExitStatus(x, describedBy: input)
     }
+
+    if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    do {
-      let r = try await compile(input)
-      let m = "program compiled but an error was expected.\nSource: \(input.root.path)\n"
-      XCTAssert(r.driver.program.containsError, m)
-      assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
-    } catch let error as TestFailure {
-      XCTFail("\(error)\nSource: \(input.root.path)\n")
-    }
+    let r = try await compile(input, withOptimizations: false)
+    let m = "program compiled but an error was expected.\nSource: \(input.root.path)\n"
+    XCTAssert(r.driver.program.containsError, m)
+    assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
+
+    if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
   }
 
   /// Compiles `input` and returns the resulting artifacts.
-  private func compile(_ input: TestDescription) async throws -> CompilationResult {
+  private func compile(
+    _ input: TestDescription, withOptimizations optimized: Bool
+  ) async throws -> CompilationResult {
     var driver = try Driver(
       moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native())
 
@@ -244,7 +243,6 @@ final class CompilerTests: XCTestCase {
       throw e
     }
 
-    if artifactsAreSavedOnSuccess { try artifacts.save(into: input) }
     return .init(
       testCase: input,
       driver: driver,

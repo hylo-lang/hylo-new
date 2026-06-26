@@ -44,7 +44,10 @@ private typealias Module = FrontEnd.Module
   @Option(
     name: [.customLong("cpu")],
     help: ArgumentHelp(
-      "Target CPU: native, generic, or an explicit name (default: native for host, generic for cross).",
+      """
+      Target CPU: native, generic, or an explicit name \
+      (default: native for host, generic for cross).
+      """,
       valueName: "cpu"))
   private var targetCPU: String?
 
@@ -52,15 +55,18 @@ private typealias Module = FrontEnd.Module
   @Option(
     name: [.customLong("cpu-features")],
     help: ArgumentHelp(
-      "CPU features: native, or an explicit feature string (default: native for host, none for cross).",
+      """
+      CPU features: native, or an explicit feature string \
+      (default: native for host, none for cross).
+      """,
       valueName: "features"))
   private var targetCPUFeatures: String?
 
-  /// The code generation optimization level (0-3).
-  @Option(
-    name: [.customShort("O"), .customLong("optimization-level")],
-    help: "Optimization level: 0, 1, 2, 3 (default: 0).")
-  private var optimizationLevel: OptimizationLevel = .none
+  /// `true` iff optimizations are enabled.
+  @Flag(
+    name: [.customShort("O")],
+    help: "Enable all optimizations.")
+  private var optimized: Bool = false
 
   /// The relocation model for code generation.
   @Option(
@@ -98,6 +104,7 @@ private typealias Module = FrontEnd.Module
     help: "Trace type inference")
   private var lineTracingInference: LineLocator?
 
+  /// The destination to which the result of the compilation is written.
   @Option(
     name: [.customShort("o")],
     help: ArgumentHelp(
@@ -130,7 +137,7 @@ private typealias Module = FrontEnd.Module
     var driver = Driver(
       moduleCachePath: noCaching ? nil : moduleCachePath!,
       targetSpecification: try resolveTarget(),
-      optimization: optimizationLevel,
+      optimization: optimized ? .aggressive : .none,
       relocation: relocationModel ?? Driver.defaultRelocationModel,
       codeModel: codeModel ?? .default,
       librarySearchPaths: librarySearchPaths)
