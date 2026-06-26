@@ -884,12 +884,12 @@ extension Program {
     _ v: FrontEnd.IRValue, in ctx: inout FunctionGenerationContext
   ) -> LLVMValue {
     switch v {
+    case .parameter, .register:
+      return ctx.value[v]!
     case .integer(let n, let t):
       return codegen(integer: n, instanceOf: t, in: &ctx.module)
     case .function(let n, _, _):
       return demandFunction(n, in: &ctx.module).value.asAnyValue
-    case .register:
-      return ctx.value[v]!
     default:
       fatalError("no LLVM representation of the Hylo value '\(show(v))'")
     }
