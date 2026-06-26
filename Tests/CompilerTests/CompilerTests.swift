@@ -139,7 +139,7 @@ final class CompilerTests: XCTestCase {
   }
 
   /// An error thrown to signal test failure with given reason.
-  private enum TestFailure: Error {
+  private enum TestFailure: Error, CustomStringConvertible {
 
     /// The test failed because an executable could not be located.
     case missingExecutableOutput
@@ -150,14 +150,15 @@ final class CompilerTests: XCTestCase {
     /// The test failed because its description was invalid.
     case invalidTestDescription(String)
 
-    var localizedDescription: String {
+    /// A textual description of the error.
+    var description: String {
       switch self {
       case .missingExecutableOutput:
         return "missing executable output"
-      case .compilationError(let message):
-        return "Compilation failure:\n\(message)"
-      case .invalidTestDescription(let d):
-        return "Invalid test description (\(d))"
+      case .compilationError(let m):
+        return "compilation failure: \(m)"
+      case .invalidTestDescription(let m):
+        return "invalid test description: \(m)"
       }
     }
 
@@ -193,7 +194,7 @@ final class CompilerTests: XCTestCase {
         assertExitStatus(x, describedBy: input)
       }
     } catch let error as TestFailure {
-      XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
+      XCTFail("\(error)\nSource: \(input.root.path)\n")
     }
   }
 
@@ -205,7 +206,7 @@ final class CompilerTests: XCTestCase {
       XCTAssert(r.driver.program.containsError, m)
       assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
     } catch let error as TestFailure {
-      XCTFail(error.localizedDescription + "\nSource: \(input.root.path)\n")
+      XCTFail("\(error)\nSource: \(input.root.path)\n")
     }
   }
 
