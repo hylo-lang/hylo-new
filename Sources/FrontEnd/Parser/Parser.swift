@@ -2205,7 +2205,7 @@ public struct Parser {
 
     switch head.tag {
     case .underscore:
-      return try .init(parseDiscardStement(in: &file))
+      return try .init(parseDiscardStatement(in: &file))
     case .return:
       return try .init(parseReturnStatement(in: &file))
     case .yield:
@@ -2222,7 +2222,7 @@ public struct Parser {
   ///     discard-statement ::=
   ///       '_' '=' expression
   ///
-  private mutating func parseDiscardStement(
+  private mutating func parseDiscardStatement(
     in file: inout Module.SourceContainer
   ) throws -> Discard.ID {
     let i = try take(.underscore) ?? expected("'_'")
