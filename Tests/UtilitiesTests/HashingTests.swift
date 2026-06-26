@@ -31,6 +31,15 @@ final class HashingTests: XCTestCase {
     XCTAssertNotEqual(h1.state, h2.state)
   }
 
+  func testHashValue() {
+    let s1 = FNV1.hash(0 ..< 128, into: FNV1.native())
+    let s2 = FNV1.hash(0 ..< 128, into: FNV1.native())
+    XCTAssertEqual(s1.state, s2.state)
+
+    let s3 = FNV1.hash(1 ..< 129, into: FNV1.native())
+    XCTAssertNotEqual(s1.state, s3.state)
+  }
+
   func testU128() {
     var h1 = FNV1.u128()
     h1.combine(bytes: 0 ..< 10)
