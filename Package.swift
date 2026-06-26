@@ -7,7 +7,7 @@ import PackageDescription
   let onWindows = false
 #endif
 
-/// Swttings common to all Swift targets.
+/// Settings common to all Swift targets.
 let commonSwiftSettings: [SwiftSetting] = [
   .unsafeFlags(["-warnings-as-errors"])
 ]
