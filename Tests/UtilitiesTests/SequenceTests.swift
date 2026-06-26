@@ -19,8 +19,8 @@ final class SequenceTests: XCTestCase {
 
   func testMin() {
     let xs = [1, 2, 3, 4]
-    XCTAssertEqual(xs.min(by: { (x) in x }), 1)
-    XCTAssertEqual(xs.min(by: { (x) in -x }), 4)
+    XCTAssertEqual(xs.min(measuredBy: { (x) in x }), 1)
+    XCTAssertEqual(xs.min(measuredBy: { (x) in -x }), 4)
   }
 
 }

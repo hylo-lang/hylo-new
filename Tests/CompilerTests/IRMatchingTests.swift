@@ -164,12 +164,46 @@ final class IRMatchingTests: XCTestCase {
 
   func testSectionsSplitsOnBlankAndWhitespaceOnlyLines() {
     let s = "a\nb\n\nc\n   \nd\n"
-    XCTAssertEqual(IRMatching.sections(of: s), [["a", "b"], ["c"], ["d"]])
+    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a\nb", "c", "d"])
   }
 
   func testSectionsOfEmptyInputIsEmpty() {
-    XCTAssertEqual(IRMatching.sections(of: "").count, 0)
-    XCTAssertEqual(IRMatching.sections(of: "\n  \n").count, 0)
+    XCTAssertEqual(Array(IRMatching.sections(of: "")).count, 0)
+    XCTAssertEqual(Array(IRMatching.sections(of: "\n  \n")).count, 0)
+  }
+
+  func testSectionsSkipsLeadingBlankLines() {
+    let s = "\n  \n\t\na\nb"
+    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a\nb"])
+  }
+
+  func testSectionsIgnoresTrailingBlankLines() {
+    let s = "a\nb\n\n  \n"
+    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a\nb"])
+  }
+
+  func testSectionsCollapsesConsecutiveBlankLinesBetweenSections() {
+    let s = "a\n\n\n\nb"
+    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a", "b"])
+  }
+
+  func testSectionsTreatsTabsAndSpacesAsBlankSeparators() {
+    let s = "a\n\t \t\nb"
+    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a", "b"])
+  }
+
+  func testSectionsSingleSectionWithoutTrailingNewline() {
+    let s = "only\nsection"
+    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["only\nsection"])
+  }
+
+  func testSectionsPreservesLeadingAndInteriorWhitespaceWithinALine() {
+    let s = "  indented\n    body  \n\nnext"
+    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["  indented\n    body  ", "next"])
+  }
+
+  func testSectionsOfSingleNonBlankLine() {
+    XCTAssertEqual(Array(IRMatching.sections(of: "a")), ["a"])
   }
 
 }
