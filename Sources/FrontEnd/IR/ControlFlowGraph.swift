@@ -71,21 +71,6 @@ public struct ControlFlowGraph: Sendable {
     }
   }
 
-  /// Returns the subgraph of `self` that is rooted at `root`.
-  public func subgraph(rootedAt root: IRBlock.ID) -> ControlFlowGraph {
-    var result = ControlFlowGraph()
-    var work = [root]
-    var done = IRBlockSet()
-    while let a = work.popLast() {
-      done.insert(a)
-      for b in successors(of: a) {
-        result.define(a, predecessorOf: b)
-        if !done.contains(b) { work.append(b) }
-      }
-    }
-    return result
-  }
-
 }
 
 extension ControlFlowGraph: CustomStringConvertible {
