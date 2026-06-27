@@ -1,6 +1,11 @@
+import Archivist
 import BigInt
 
 /// A value in Hylo IR.
+///
+/// Instances are defined relative to the function in which they may be used, similarly to how
+/// indices are defined relative to a particular collection.
+@Archivable
 public enum IRValue: Hashable, Sendable {
 
   /// The `i`-th parameter of a function.

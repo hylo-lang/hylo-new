@@ -28,7 +28,7 @@ let package = Package(
       from: "5.7.0"),
     .package(
       url: "https://github.com/kyouko-taiga/Archivist.git",
-      revision: "0b66ecdb3a0da5a94af49274e2751e3332f12b90"),
+      revision: "9d5540fe2b7143c4ee1bb40e0f578a29bbfdf86f"),
     .package(
       url: "https://github.com/apple/swift-algorithms.git",
       from: "1.2.0"),

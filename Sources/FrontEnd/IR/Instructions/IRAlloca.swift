@@ -1,3 +1,5 @@
+import Archivist
+
 /// Allocates memory on the stack.
 ///
 /// The instruction defines a place capable of storing an instance of `storage`, allocated on the
@@ -7,6 +9,7 @@
 /// Unlike LLVM's alloca, this instruction cannot be used to allocate dynamically sized buffers. It
 /// is nonetheless possible to allocate storage for a fixed number of contiguous instances using a
 /// tuple (e.g., `Int[8]` in surface syntax).
+@Archivable
 public struct IRAlloca: Instruction {
 
   /// The operands of the instruction.

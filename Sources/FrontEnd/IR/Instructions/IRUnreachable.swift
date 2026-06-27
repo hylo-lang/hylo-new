@@ -1,6 +1,7 @@
 import Archivist
 
 /// Marks the execution path as unreachable.
+@Archivable
 public struct IRUnreachable: Terminator {
 
   /// The region of the code corresponding to this instruction.

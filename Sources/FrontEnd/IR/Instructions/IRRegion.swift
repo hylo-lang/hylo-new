@@ -1,3 +1,4 @@
+import Archivist
 import Utilities
 
 /// An instruction marking the entry into a region within an IR function.
@@ -10,6 +11,7 @@ extension IRRegionEntry {
 }
 
 /// The exit of a region.
+@Archivable
 public struct IRRegionEnd<T: IRRegionEntry>: Instruction {
 
   /// The operands of the instruction.

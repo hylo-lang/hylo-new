@@ -1,9 +1,11 @@
+import Archivist
 import Utilities
 
 /// Invokes an IR function.
 ///
 /// This instruction does not define any register. The return value of the function being applied
 /// is stored in the last argument of the function, which is always a `set` access.
+@Archivable
 public struct IRApply: Instruction {
 
   /// The operands of the instruction.

@@ -1,6 +1,8 @@
+import Archivist
 import Utilities
 
 /// Computes the address of storage for a field or sub-field of a record.
+@Archivable
 public struct IRSubfield: Instruction {
 
   /// The operands of the instruction.

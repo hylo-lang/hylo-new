@@ -1,8 +1,10 @@
+import Archivist
 import Utilities
 
 /// Applies a type abstraction.
 ///
 /// This instruction is used to supplies type arguments to polymorphic values.
+@Archivable
 public struct IRTypeApply: Instruction {
 
   /// The operands of the instruction.

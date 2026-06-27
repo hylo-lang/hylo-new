@@ -1,3 +1,5 @@
+import Archivist
+
 /// Relocates a value to different storages.
 ///
 /// This instruction abstracts over either move-assignment or move-initialization, depending on the
@@ -8,6 +10,7 @@
 /// requires exclusive access on both the source and the target. The source must be initialized
 /// before the operation and is left uninitialized after. The target is contains the value that
 /// was held in the source after the operation.
+@Archivable
 public struct IRMove: Instruction {
 
   /// The operands of the instruction.

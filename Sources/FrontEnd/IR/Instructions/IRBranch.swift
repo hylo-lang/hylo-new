@@ -47,3 +47,21 @@ extension IRBranch: Showable {
   }
 
 }
+
+extension IRBranch: Archivable {
+
+  public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
+    self.anchor = try archive.read(Anchor.self, in: &context)
+    self.successors = try archive.readArray(of: IRBlock.ID.self, in: &context) { (a, _) in
+      try a.read(address: IRBlock.ID.self)
+    }
+  }
+
+  public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
+    try archive.write(anchor, in: &context)
+    try archive.write(contentsOf: successors, in: &context) { (x, a, _) in
+      try a.write(x)
+    }
+  }
+
+}

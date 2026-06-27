@@ -1,3 +1,4 @@
+import Archivist
 import StableCollections
 
 /// A type denoting the identity of an instruction.
@@ -30,6 +31,7 @@ extension InstructionIdentity {
 
 }
 
+/// The type-erased identity of an IR instruction.
 public struct AnyInstructionIdentity {
 
   /// The address of the instruction identified by `self` in its containing function.
@@ -57,6 +59,18 @@ extension AnyInstructionIdentity: InstructionIdentity {
   /// Returns `true` if `l` is ordered before `r`.
   public static func < (l: Self, r: Self) -> Bool {
     l.address < r.address
+  }
+
+}
+
+extension AnyInstructionIdentity: Archivable {
+
+  public init<A>(from archive: inout ReadableArchive<A>, in context: inout Any) throws {
+    self.address = try archive.read(address: List<IRFunction.Slot>.Address.self)
+  }
+
+  public func write<A>(to archive: inout WriteableArchive<A>, in context: inout Any) throws {
+    try archive.write(address)
   }
 
 }

@@ -1,7 +1,11 @@
+import Archivist
+
 /// A global variable in Hylo IR.
+@Archivable
 public struct IRGlobal: Hashable, Sendable {
 
   /// The name of an global IR variable.
+  @Archivable
   public enum Name: Hashable, Sendable {
 
     /// The identity of a variable lowered from sources.
@@ -19,6 +23,7 @@ public struct IRGlobal: Hashable, Sendable {
   }
 
   /// A function or constant defining the value initializing the storage.
+  @Archivable
   public enum Initializer: Hashable, Sendable {
 
     /// A function that called once, on the first access to the global.

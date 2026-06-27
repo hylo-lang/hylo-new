@@ -1,3 +1,4 @@
+import Archivist
 import StableCollections
 import Utilities
 
@@ -8,6 +9,7 @@ public struct IRFunction: Sendable {
   public typealias ID = Int
 
   /// The name of an IR function.
+  @Archivable
   public enum Name: Hashable, Sendable {
 
     /// The identity of a function lowered from sources.
@@ -34,6 +36,7 @@ public struct IRFunction: Sendable {
   }
 
   /// The way in which an IR function returns its result.
+  @Archivable
   public enum Output: Hashable, Sendable {
 
     /// The result is written to an output parameter.

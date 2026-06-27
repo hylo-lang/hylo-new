@@ -1,4 +1,7 @@
+import Archivist
+
 /// Creates a witness table.
+@Archivable
 public struct IRWitnessTable: Instruction {
 
   /// The operands of the instruction.

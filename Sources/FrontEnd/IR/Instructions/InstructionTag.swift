@@ -1,3 +1,5 @@
+import Archivist
+
 /// The type of an IR instruction.
 public struct InstructionTag: Sendable {
 
@@ -67,6 +69,18 @@ extension InstructionTag: Hashable {
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(value))
+  }
+
+}
+
+extension InstructionTag: Archivable {
+
+  public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
+    self = try .init(Self.allValues[Int(archive.readUnsignedLEB128())])
+  }
+
+  public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
+    archive.write(unsignedLEB128: Self.indices[self]!)
   }
 
 }
