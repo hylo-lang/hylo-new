@@ -3036,7 +3036,7 @@ public struct Typer {
 
   /// Returns the type of an instance of `Self` in `s`, or `nil` if `s` isn't notionally in the
   /// scope of a type declaration.
-  private mutating func typeOfSelf(in s: ScopeIdentity) -> AnyTypeIdentity? {
+  internal mutating func typeOfSelf(in s: ScopeIdentity) -> AnyTypeIdentity? {
     if let memoized = cache.scopeToTypeOfSelf[s] { return memoized }
 
     guard let n = s.node else { return nil }

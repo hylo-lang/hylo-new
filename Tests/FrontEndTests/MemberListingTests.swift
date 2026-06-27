@@ -99,6 +99,38 @@ final class MemberListingTests: XCTestCase {
     XCTAssertEqual(p.show(member.type), "[let A<B>](let B) let -> Void")
   }
 
+  func testTypeOfSelfIsTheEnclosingTypeWithinAStructScope() async throws {
+    // "Self" inside a struct's body denotes an instance of that struct.
+    var p = Program()
+    let _ = await typeChecked(
+      &p,
+      """
+      struct A {
+        public memberwise init
+      }
+      """)
+
+    let d = try XCTUnwrap(
+      p.select(.and(.tag(StructDeclaration.self), .name(.init(identifier: "A")))).first,
+      "no struct named 'A'")
+    let selfType = try XCTUnwrap(p.typeOfSelf(in: .init(uncheckedFrom: d.erased)))
+    XCTAssertEqual(p.show(selfType), "A")
+  }
+
+  func testTypeOfSelfIsNilAtFileScope() async throws {
+    // "Self" is not legal at the top level of a file, where no type encloses the use.
+    var p = Program()
+    let (_, f) = await typeChecked(
+      &p,
+      """
+      struct A {
+        public memberwise init
+      }
+      """)
+
+    XCTAssertNil(p.typeOfSelf(in: .init(file: f)))
+  }
+
   // MARK: - Helpers
 
   /// Returns the identifiers of the members `Program.members` reports for the struct named
