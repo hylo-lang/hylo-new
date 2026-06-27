@@ -353,14 +353,14 @@ extension Program {
       // control flow should be transferred. This basic block must be a successor of one of the
       // blocks having been incorporated that is not dominated by `i`.
       let after = ctx.module.llvm.insertCall(f.value, on: x, at: ctx.insertionPoint!)
-      let successors = ctx.ir.decode(covered).reduce(into: IRBlockSet()) { (s, a) in
+      let successors = covered.elements.reduce(into: IRBlockSet()) { (s, a) in
         for b in ctx.ir.successors(of: a) where !covered.contains(b) { s.insert(b) }
       }
 
       // Compute the branches of a switch terminator redirecting control-flow.
       typealias Case = SwiftyLLVM.Module.SwitchCase
       let i32 = ctx.module.llvm.i32
-      let cases = ctx.ir.decode(successors).map { (b: IRBlock.ID) -> Case in
+      let cases = successors.elements.map { (b: IRBlock.ID) -> Case in
         let n = i32.unsafe[].constant(b.rawValue).v
         let b = ctx.demandBasicBlock(b)
         return (n, b)

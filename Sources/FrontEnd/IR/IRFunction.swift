@@ -536,11 +536,6 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns the identities encoded in `bs`.
-  public func decode(_ bs: IRBlockSet) -> some Sequence<IRBlock.ID> {
-    bs.elements.lazy.compactMap(blocks.address(rawValue:))
-  }
-
   /// Returns the control flow graph of this function.
   public func controlFlow() -> ControlFlowGraph {
     var g = ControlFlowGraph()
