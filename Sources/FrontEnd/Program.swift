@@ -1823,6 +1823,16 @@ extension Program {
     })
   }
 
+  /// Returns the type denoted by "Self" in `scopeOfUse`, or `nil` if "Self"
+  /// is not legal there.
+  ///
+  /// - Requires: The module containing `scopeOfUse` has been type checked.
+  public mutating func typeOfSelf(in scopeOfUse: ScopeIdentity) -> AnyTypeIdentity? {
+    withTyper(typing: scopeOfUse.file.module) { (typer) in
+      typer.typeOfSelf(in: scopeOfUse)
+    }
+  }
+
   /// Returns every member reachable on a value of type `t` from `scopeOfUse`.
   ///
   /// The result is the union of `t`'s native members, the members of the extensions of `t` visible
