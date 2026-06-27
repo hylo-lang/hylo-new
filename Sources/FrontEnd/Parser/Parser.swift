@@ -1180,7 +1180,7 @@ public struct Parser {
     in file: inout Module.SourceContainer
   ) throws -> VariableDeclaration.ID {
     let n = try take(.name) ?? expected("identifier")
-    return file.insert(VariableDeclaration(identifier: .init(n)))
+    return file.insert(VariableDeclaration(identifier: .init(n), synthesized: false))
   }
 
   /// Parses a type alias or associated type declaration.
@@ -3009,7 +3009,7 @@ extension Module.SourceContainer {
     let s = SourceSpan.empty(at: site.start)
 
     let p: PatternIdentity = if let i = identifier {
-      .init(insert(VariableDeclaration(identifier: .init(i))))
+      .init(insert(VariableDeclaration(identifier: .init(i), synthesized: false)))
     } else {
       .init(synthesizeVariableDeclaration(at: s))
     }
@@ -3035,7 +3035,7 @@ extension Module.SourceContainer {
     at site: SourceSpan
   ) -> VariableDeclaration.ID {
     let n = String(syntax.count, radix: 36)
-    return insert(VariableDeclaration(identifier: .init("$\(n)", at: site)))
+    return insert(VariableDeclaration(identifier: .init("$\(n)", at: site), synthesized: true))
   }
 
 }
