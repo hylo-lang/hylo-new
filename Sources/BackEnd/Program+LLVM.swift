@@ -61,7 +61,7 @@ extension Program {
     if case .lowered(let d) = v, let n = externName(of: d) {
       return n
     } else {
-      return mangled(f, of: ctx.hylo)
+      return mangled(v)
     }
   }
 

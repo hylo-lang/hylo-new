@@ -39,13 +39,6 @@ internal struct ManglingEncoding: Sendable {
     append(decl: s, to: &output)
   }
 
-  /// Writes to `output` the mangled representation of `s` from module `m`.
-  internal mutating func mangled(
-    function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
-  ) {
-    append(function: s, of: m, to: &output)
-  }
-
   /// Writes to `output` the mangled representation of `n`.
   internal mutating func mangled(function n: IRFunction.Name, to output: inout ManglingContext) {
     append(function: n, to: &output)
@@ -549,13 +542,6 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     source.takeString().map({ (s) in .virtualSourceFile(s) }) ?? .error
-  }
-
-  /// Writes the mangled representation of `s` defined in `m`, to `output`.
-  private mutating func append(
-    function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
-  ) {
-    append(function: program[m].ir[s].name, to: &output)
   }
 
   /// Writes the mangled representation of `s` to `output`.

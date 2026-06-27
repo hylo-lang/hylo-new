@@ -190,7 +190,7 @@ extension Program {
     dominatedBy y: IRYield.ID, in ctx: inout FunctionGenerationContext
   ) -> (FunctionMetadata, Alloca.UnsafeReference) {
     let name = IRFunction.Name.slide(ctx.ir.name, ctx.ir.block(defining: y).rawValue)
-    let n = mangled(name, of: ctx.module.hylo)
+    let n = mangled(name)
     let f = ctx.module.llvm.declareFunction(n, ctx.module.slide)
     let u = metadata(of: .void, in: &ctx.module)
 
@@ -253,7 +253,7 @@ extension Program {
     dominatedBy y: IRProject.ID, in ctx: inout FunctionGenerationContext
   ) -> (FunctionMetadata, Alloca.UnsafeReference, IRBlockSet) {
     let name = IRFunction.Name.plateau(ctx.ir.name, y.erased.address.rawValue)
-    let n = mangled(name, of: ctx.module.hylo)
+    let n = mangled(name)
     let f = ctx.module.llvm.declareFunction(n, ctx.module.plateau)
 
     let m = Prototype.Mapping(inputs: [], output: nil)
