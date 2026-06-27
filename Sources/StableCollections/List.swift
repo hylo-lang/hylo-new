@@ -20,7 +20,7 @@ public struct List<Element> {
     public fileprivate(set) var rawValue: Int
 
     /// Creates an address with the given raw value.
-    fileprivate init(_ rawValue: Int) {
+    public init(_ rawValue: Int) {
       self.rawValue = rawValue
     }
 
