@@ -2130,4 +2130,41 @@ extension Program {
     })
   }
 
+  /// Returns every member reachable on a value of type `t` from `scopeOfUse`.
+  ///
+  /// The result is the union of `t`'s native members, the members of the extensions of `t` visible
+  /// from `scopeOfUse`, and the requirements of every visible trait to which `t` conforms in the
+  /// implicit context at `scopeOfUse`.
+  ///
+  /// Pass `selectionIsStatic` to choose which members are returned: static members and initializers
+  /// reached through a type or instance members reached through a value.
+  ///
+  /// - Requires: `m` has been type checked.
+  public mutating func members(
+    of t: AnyTypeIdentity, in m: Module.ID, visibleFrom scopeOfUse: ScopeIdentity,
+    resolvedStatically selectionIsStatic: Bool
+  ) -> [MemberCandidate] {
+    withTyper(typing: m) { (typer) in
+      typer.members(of: t, visibleFrom: scopeOfUse, resolvedStatically: selectionIsStatic)
+        .map { (c) in MemberCandidate(declaration: c.reference, type: c.type) }
+    }
+  }
+
+}
+
+/// A member declaration and its type.
+public struct MemberCandidate: Sendable {
+
+  /// How the member is referred to (direct, bound member, or inherited via extension/conformance).
+  public let declaration: DeclarationReference
+
+  /// The type of the member as selected on the receiver, with conformance substitutions applied.
+  public let type: AnyTypeIdentity
+
+  /// Creates an instance with the given properties.
+  public init(declaration: DeclarationReference, type: AnyTypeIdentity) {
+    self.declaration = declaration
+    self.type = type
+  }
+
 }
