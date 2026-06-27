@@ -11,7 +11,7 @@ internal struct TypeMetadata {
 
   /// Creates an instance with the given properties.
   internal init<T: SwiftyLLVM.IRType>(llvm: T.UnsafeReference, layout: ConcreteLayout) {
-    self.llvm = llvm.asAnyType
+    self.llvm = llvm.t
     self.layout = layout
   }
 
