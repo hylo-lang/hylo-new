@@ -76,11 +76,11 @@ internal struct ModuleGenerationContext: ~Copyable {
     self.strings = [:]
     self.compiled = []
 
-    let fun = self.llvm.functionPointer.asAnyType
-    let ptr = self.llvm.ptr.asAnyType
-    let iptr = self.llvm.iptr.asAnyType
-    let i32 = self.llvm.i32.asAnyType
-    let i16 = self.llvm.i16.asAnyType
+    let fun = self.llvm.functionPointer.t
+    let ptr = self.llvm.ptr.t
+    let iptr = self.llvm.iptr.t
+    let i32 = self.llvm.i32.t
+    let i16 = self.llvm.i16.t
 
     self.empty = self.llvm.structType([])
     self.slide = self.llvm.functionType(from: [ptr])

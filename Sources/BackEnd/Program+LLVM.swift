@@ -207,7 +207,7 @@ extension Program {
     ctx.module.llvm.setAlignment(t.layout.alignment, for: x)
 
     let v = IRValue.register(i.erased)
-    ctx.value[v] = x.asAnyValue
+    ctx.value[v] = x.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -265,7 +265,7 @@ extension Program {
     let s = ctx.ir.at(i)
     let x = demandGlobal(s.source, in: &ctx.module)
     let v = IRValue.register(i.erased)
-    ctx.value[v] = x.asAnyValue
+    ctx.value[v] = x.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -277,7 +277,7 @@ extension Program {
     let t = metadata(of: ctx.ir.resolved(s.type)!.type, in: &ctx.module)
     let x = ctx.module.llvm.insertLoad(t.llvm, from: ctx.value[s.source]!, at: ctx.insertionPoint!)
     let v = IRValue.register(i.erased)
-    ctx.value[v] = x.asAnyValue
+    ctx.value[v] = x.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -292,12 +292,12 @@ extension Program {
     let ptr = ctx.module.llvm.ptr
     let i32 = ctx.module.llvm.i32
     let memcpy = ctx.module.llvm.intrinsic(
-      named: IntrinsicFunction.llvm.memcpy, for: [ptr.asAnyType, ptr.asAnyType, i32.asAnyType])!
+      named: IntrinsicFunction.llvm.memcpy, for: [ptr.t, ptr.t, i32.t])!
 
-    let x0 = codegen(s.target, in: &ctx).asAnyValue
-    let x1 = codegen(s.source, in: &ctx).asAnyValue
-    let x2 = i32.unsafe[].constant(n).asAnyValue
-    let x3 = ctx.module.llvm.i1.unsafe[].constant(0).asAnyValue
+    let x0 = codegen(s.target, in: &ctx).v
+    let x1 = codegen(s.source, in: &ctx).v
+    let x2 = i32.unsafe[].constant(n).v
+    let x3 = ctx.module.llvm.i1.unsafe[].constant(0).v
     _ = ctx.module.llvm.insertCall(
       memcpy, on: [x0, x1, x2, x3],
       at: ctx.insertionPoint!)
@@ -346,8 +346,8 @@ extension Program {
     case .function(let n, _, _):
       let f = demandFunction(n, in: &ctx.module)
       var x = insertArguments(s.arguments, mappedWith: f.prototype.mapping, in: &ctx)
-      x.append(plateau.value.asAnyValue)
-      x.append(captures.asAnyValue)
+      x.append(plateau.value.v)
+      x.append(captures.v)
 
       // The call to the subscript's ramp returns with the identifier of the basic block to which
       // control flow should be transferred. This basic block must be a successor of one of the
@@ -361,7 +361,7 @@ extension Program {
       typealias Case = SwiftyLLVM.Module.SwitchCase
       let i32 = ctx.module.llvm.i32
       let cases = ctx.ir.decode(successors).map { (b: IRBlock.ID) -> Case in
-        let n = i32.unsafe[].constant(b.rawValue).asAnyValue
+        let n = i32.unsafe[].constant(b.rawValue).v
         let b = ctx.demandBasicBlock(b)
         return (n, b)
       }
@@ -407,12 +407,12 @@ extension Program {
       let whole = codegen(s.record, in: &ctx)
       let part = ctx.module.llvm.insertGetElementPointerInBounds(
         of: whole, typed: w.llvm,
-        indices: [0, index], instancesOf: ctx.module.llvm.i32,
+        indices: [0, index], indexType: ctx.module.llvm.i32,
         at: ctx.insertionPoint!)
 
       let x = ctx.module.llvm.insertLoad(p, from: part, at: ctx.insertionPoint!)
       let v = FrontEnd.IRValue.register(i.erased)
-      ctx.value[v] = x.asAnyValue
+      ctx.value[v] = x.v
     }
 
     // Otherwise, the property is a public property of some resilient type.
@@ -456,11 +456,11 @@ extension Program {
     let t = ctx.ir.result(of: s.base)!.type
 
     let i32 = ctx.module.llvm.i32
-    var indices = [i32.unsafe[].constant(0).asAnyValue]
+    var indices = [i32.unsafe[].constant(0).v]
     var u = t
     for p in s.path {
       let m = metadata(of: u, in: &ctx.module)
-      indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).asAnyValue)
+      indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).v)
       u = storage(of: u, visibleFrom: ctx.module.hylo)![p]
     }
 
@@ -470,7 +470,7 @@ extension Program {
       of: b, typed: m.llvm, indices: indices, at: ctx.insertionPoint!)
 
     let v = IRValue.register(i.erased)
-    ctx.value[v] = x.asAnyValue
+    ctx.value[v] = x.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -489,7 +489,7 @@ extension Program {
       of: StructType.UnsafeReference(tableType.llvm)!, aggregating: entries)
 
     let v = IRValue.register(i.erased)
-    ctx.value[v] = table.asAnyValue
+    ctx.value[v] = table.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -503,17 +503,17 @@ extension Program {
     // Call the plateau, which will call the slide.
     let instruction = ctx.ir.at(i)
     let control = ctx.module.llvm.insertCall(
-      ctx.llvm.unsafe[].parameters[fromLast: 1].asAnyValue,
-      typed: ctx.module.plateau.asAnyType,
+      ctx.llvm.unsafe[].parameters[fromLast: 1].v,
+      typed: ctx.module.plateau.t,
       on: [
         // projected value
         ctx.value[instruction.projectee]!,
         // the plateau's environment
-        ctx.llvm.unsafe[].parameters[fromLast: 0].asAnyValue,
+        ctx.llvm.unsafe[].parameters[fromLast: 0].v,
         // the slide
-        slide.value.asAnyValue,
+        slide.value.v,
         // the slide's environment
-        captures.asAnyValue,
+        captures.v,
       ],
       at: ctx.insertionPoint!)
 
@@ -577,7 +577,7 @@ extension Program {
         inputs.append(t.llvm)
       } else {
         inputMap.append(.init(type: t, convention: .byReference(inputs.count)))
-        inputs.append(ctx.llvm.ptr.asAnyType)
+        inputs.append(ctx.llvm.ptr.t)
       }
     }
 
@@ -585,11 +585,11 @@ extension Program {
     if a.style == .bracketed {
       // Otherwise, `f` is compiled as a ramp, which accepts two extra parameters for the caller's
       // plateau and its environment.
-      inputs.append(ctx.llvm.functionPointer.asAnyType)
-      inputs.append(ctx.llvm.ptr.asAnyType)
+      inputs.append(ctx.llvm.functionPointer.t)
+      inputs.append(ctx.llvm.ptr.t)
 
       let u = metadata(of: .void, in: &ctx)
-      let t = ctx.llvm.functionType(from: inputs, to: ctx.llvm.i32.asAnyType)
+      let t = ctx.llvm.functionType(from: inputs, to: ctx.llvm.i32.t)
       return .init(
         signature: t,
         mapping: .init(inputs: inputMap, output: .init(type: u, convention: .erased)))
@@ -658,7 +658,7 @@ extension Program {
     case .erased:
       // `p` has been erased and can thus be represented by a 0-byte alloca.
       let x = ctx.module.llvm.insertAlloca(ctx.module.empty, at: ctx.insertionPoint!)
-      ctx.value[v] = x.asAnyValue
+      ctx.value[v] = x.v
 
     case .byValue(let j):
       // The argument to `p` is passed by value. Store it into an alloca so that it can be read
@@ -673,11 +673,11 @@ extension Program {
           ctx.llvm.unsafe[].parameters[j], to: x, at: ctx.insertionPoint!)
         // TODO: Alignment
       }
-      ctx.value[v] = x.asAnyValue
+      ctx.value[v] = x.v
 
     case .byReference(let j):
       // The argument to `p` is passed by reference. It is already in memory.
-      ctx.value[v] = ctx.llvm.unsafe[].parameters[j].asAnyValue
+      ctx.value[v] = ctx.llvm.unsafe[].parameters[j].v
     }
   }
 
@@ -709,10 +709,10 @@ extension Program {
       guard let s = m.layout.size.fixed else { return symbol }
 
       let fields: [LLVMValue] = [
-        demandGlobalString(show(t), in: &ctx).asAnyValue,
-        ctx.llvm.i32.unsafe[].constant(s).asAnyValue,
-        ctx.llvm.i16.unsafe[].constant(m.layout.alignment).asAnyValue,
-        ctx.llvm.i16.unsafe[].zero.asAnyValue,
+        demandGlobalString(show(t), in: &ctx).v,
+        ctx.llvm.i32.unsafe[].constant(s).v,
+        ctx.llvm.i16.unsafe[].constant(m.layout.alignment).v,
+        ctx.llvm.i16.unsafe[].zero.v,
       ]
 
       let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
@@ -742,7 +742,7 @@ extension Program {
       for (i, u) in s.utf8.enumerated() {
         units |= UInt64(u) << (i + 1) * 8
       }
-      let v = iptr.unsafe[].constant(units).asAnyValue
+      let v = iptr.unsafe[].constant(units).v
       ctx.strings[s] = v
       return v
     }
@@ -750,7 +750,7 @@ extension Program {
     // Contents must be allocated in static memory.
     let name = String(FNV1.hash(s.utf8, into: FNV1.u128()).state, radix: 36)
     let payload = ctx.llvm.arrayConstant(bytes: s.utf8)
-    let storage = ctx.llvm.structType([iptr.asAnyType, iptr.asAnyType, payload.unsafe[].type])
+    let storage = ctx.llvm.structType([iptr.t, iptr.t, payload.unsafe[].type])
     let symbol = ctx.llvm.declareGlobalVariable("str_\(name)", storage)
     ctx.llvm.setLinkage(.private, for: symbol)
 
@@ -758,9 +758,9 @@ extension Program {
     let alignment = max(ctx.llvm.layout.preferredAlignment(of: storage), 4)
     ctx.llvm.setAlignment(alignment, for: symbol)
 
-    let count = iptr.unsafe[].constant(payloadSize).asAnyValue
+    let count = iptr.unsafe[].constant(payloadSize).v
     let initializer = ctx.llvm.structConstant(
-      of: storage, aggregating: [count, count, payload.asAnyValue])
+      of: storage, aggregating: [count, count, payload.v])
     ctx.llvm.setInitializer(initializer, for: symbol)
     ctx.llvm.setGlobalConstant(true, for: symbol)
 
@@ -788,7 +788,7 @@ extension Program {
       case .byValue:
         let x = ctx.module.llvm.insertLoad(p.type.llvm, from: l, at: ctx.insertionPoint!)
         // TODO: alignment
-        actual.append(x.asAnyValue)
+        actual.append(x.v)
       case .byReference:
         actual.append(l)
       }
@@ -818,11 +818,11 @@ extension Program {
     switch shape.mapping.output!.convention {
     case .erased:
       _ = ctx.module.llvm.insertCall(
-        callee.asAnyValue, typed: shape.signature.asAnyType, on: xs, at: ctx.insertionPoint!)
+        callee.v, typed: shape.signature.t, on: xs, at: ctx.insertionPoint!)
 
     case .byValue:
       let x = ctx.module.llvm.insertCall(
-        callee.asAnyValue, typed: shape.signature.asAnyType, on: xs, at: ctx.insertionPoint!)
+        callee.v, typed: shape.signature.t, on: xs, at: ctx.insertionPoint!)
       let o = codegen(result, in: &ctx)
       ctx.module.llvm.insertStore(x, to: o, at: ctx.insertionPoint!)
       // TODO: Alignment
@@ -831,7 +831,7 @@ extension Program {
       let o = codegen(result, in: &ctx)
       xs.append(o)
       _ = ctx.module.llvm.insertCall(
-        callee.asAnyValue, typed: shape.signature.asAnyType, on: xs, at: ctx.insertionPoint!)
+        callee.v, typed: shape.signature.t, on: xs, at: ctx.insertionPoint!)
     }
   }
 
@@ -864,7 +864,7 @@ extension Program {
     calling f: FunctionMetadata, in ctx: inout ModuleGenerationContext
   ) {
     let i32 = ctx.llvm.i32
-    let m = ctx.llvm.declareFunction("main", ctx.llvm.functionType(from: [], to: i32))
+    let m = ctx.llvm.declareFunction("main", ctx.llvm.functionType(from: [], to: i32.t))
     let e = ctx.llvm.appendBlock(to: m)
     let p = ctx.llvm.endOf(e)
     let r = ctx.llvm.insertCall(f.value, on: [], at: p)
@@ -889,7 +889,7 @@ extension Program {
     case .integer(let n, let t):
       return codegen(integer: n, instanceOf: t, in: &ctx.module)
     case .function(let n, _, _):
-      return demandFunction(n, in: &ctx.module).value.asAnyValue
+      return demandFunction(n, in: &ctx.module).value.v
     default:
       fatalError("no LLVM representation of the Hylo value '\(show(v))'")
     }
@@ -902,9 +902,9 @@ extension Program {
     let u = metadata(of: t, in: &ctx)
     let t = IntegerType.UnsafeReference(u.llvm)!
     if n == 0 {
-      return t.unsafe[].zero.asAnyValue
+      return t.unsafe[].zero.v
     } else {
-      return t.unsafe[].constant(words: n.words.map(UInt64.init(_:))).asAnyValue
+      return t.unsafe[].constant(words: n.words.map(UInt64.init(_:))).v
     }
   }
 
@@ -957,7 +957,7 @@ extension Program {
     of t: Arrow.ID, in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
-      let v = ctx.llvm.functionPointer.asAnyType
+      let v = ctx.llvm.functionPointer.t
       let s = ctx.llvm.layout.storageSize(of: v)
       let a = ctx.llvm.layout.preferredAlignment(of: v)
       let l = ConcreteLayout(fields: [], propertyToField: [], size: .fixed(s), alignment: a)
@@ -969,7 +969,7 @@ extension Program {
   private mutating func metadata(
     of t: GenericParameter.ID, in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
-    let v = ctx.llvm.ptr.asAnyType
+    let v = ctx.llvm.ptr.t
     let a = ctx.llvm.layout.preferredAlignment(of: v)
     let l = ConcreteLayout(fields: [], propertyToField: [], size: .dynamic, alignment: a)
     return .init(llvm: v, layout: l)
@@ -982,11 +982,11 @@ extension Program {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
       let v = switch program.types[t] {
       case .i(let width):
-        ctx.llvm.integerType(Int(width)).asAnyType
+        ctx.llvm.integerType(Int(width)).t
       case .word:
-        ctx.llvm.iptr.asAnyType
+        ctx.llvm.iptr.t
       case .ptr:
-        ctx.llvm.ptr.asAnyType
+        ctx.llvm.ptr.t
       default:
         unimplemented("no LLVM representation of the type '\(program.show(t))'")
       }
@@ -1031,8 +1031,8 @@ extension Program {
         // pointers. Other implementations are stored as function pointers.
         let rs = program.requirements(of: concept)
         var fs: [LLVMType] = .init(minimumCapacity: rs.all.count)
-        fs.append(ctx.llvm.ptr.asAnyType, count: rs.all.count - rs.members.count)
-        fs.append(ctx.llvm.functionPointer.asAnyType, count: rs.members.count)
+        fs.append(ctx.llvm.ptr.t, count: rs.all.count - rs.members.count)
+        fs.append(ctx.llvm.functionPointer.t, count: rs.members.count)
 
         let v = ctx.llvm.structType(named: n, fs)
         let s = ctx.llvm.layout.storageSize(of: v)
@@ -1091,7 +1091,7 @@ extension Program {
       // Add padding if necessary.
       if next != size {
         let padding = next - size
-        fields.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).asAnyType)
+        fields.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).t)
       }
 
       rowToField[p] = fields.count
@@ -1111,7 +1111,7 @@ extension Program {
     in ctx: inout ModuleGenerationContext
   ) -> LLVMType {
     if isFunctionOrVariantDeclaration(d) {
-      return ctx.llvm.functionPointer.asAnyType
+      return ctx.llvm.functionPointer.t
     } else {
       return metadata(of: t, in: &ctx).llvm
     }

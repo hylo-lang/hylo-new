@@ -108,7 +108,7 @@ extension FunctionGenerationContext {
   /// function being compiled, which is a plateau.
   private func isBareProject(_ d: FrontEnd.IRValue) -> Bool {
     if let i = d.register, ir.tag(of: i) == IRProject.self {
-      return value[d] == llvm.unsafe[].parameters.first?.asAnyValue
+      return value[d] == llvm.unsafe[].parameters.first?.v
     } else {
       return false
     }
@@ -122,7 +122,7 @@ extension FunctionGenerationContext {
       let d = prologue.definitions[c]
       let x = module.llvm.insertGetElementPointerInBounds(
         of: captures, typed: prologue.captureBufferType,
-        indices: [0, i], instancesOf: module.llvm.i32,
+        indices: [0, i], indexType: module.llvm.i32,
         at: insertionPoint!)
 
       if isBareProject(d) {
@@ -299,7 +299,7 @@ extension Program {
     nested.insertionPoint = nested.module.llvm.endOf(slideEntry)
 
     let v = IRValue.register(prologue.boundary.erased)
-    nested.value[v] = nested.llvm.unsafe[].parameters[0].asAnyValue
+    nested.value[v] = nested.llvm.unsafe[].parameters[0].v
     setupDominatingDefinitions(
       prologue, capturedIn: nested.llvm.unsafe[].parameters[1], in: &nested)
 
@@ -394,7 +394,7 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     func insertCall(_ f: LLVMValue, _ e: LLVMValue) {
       _ = ctx.module.llvm.insertCall(
-        f, typed: ctx.module.slide.asAnyType, on: [e],
+        f, typed: ctx.module.slide.t, on: [e],
         at: ctx.insertionPoint!)
     }
 
@@ -404,24 +404,24 @@ extension Program {
     if case .register(p.boundary) = s.start {
       let f = ctx.llvm.unsafe[].parameters[2]
       let e = ctx.llvm.unsafe[].parameters[3]
-      insertCall(f.asAnyValue, e.asAnyValue)
+      insertCall(f.v, e.v)
     }
 
     // The start of the projection has been captured.
     else if let c = p.captureIndex(of: s.start) {
       let x0 = ctx.llvm.unsafe[].parameters[1]
       let x1 = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: x0, typed: p.captureBufferType, indices: [0, c], instancesOf: ctx.module.llvm.i32,
+        of: x0, typed: p.captureBufferType, indices: [0, c], indexType: ctx.module.llvm.i32,
         at: ctx.insertionPoint!)
       let x2 = ctx.module.llvm.insertLoad(
-        ctx.module.llvm.ptr, from: x1,
+        ctx.module.llvm.ptr.t, from: x1.v,
         at: ctx.insertionPoint!)
       let x3 = ctx.module.llvm.insertLoad(
         ctx.module.nestedProject, from: x2,
         at: ctx.insertionPoint!)
       let f = ctx.module.llvm.insertExtractValue(from: x3, at: 1, at: ctx.insertionPoint!)
       let e = ctx.module.llvm.insertExtractValue(from: x3, at: 2, at: ctx.insertionPoint!)
-      insertCall(f.asAnyValue, e.asAnyValue)
+      insertCall(f.v, e.v)
     }
 
     return ctx.ir.instruction(after: i.erased)
@@ -462,18 +462,18 @@ extension Program {
           let u0 = ctx.module.llvm.insertGetStructElementPointer(
             of: v, typed: ctx.module.nestedProject, index: 0, at: ctx.insertionPoint!)
           let u1 = ctx.module.llvm.insertLoad(ptr, from: u0, at: ctx.insertionPoint!)
-          ctx.value[d] = u1.asAnyValue
+          ctx.value[d] = u1.v
         }
 
         // Otherwise, the i-th position is a pointer to the capture.
-        else { ctx.value[d] = v.asAnyValue }
+        else { ctx.value[d] = v.v }
       }
     }
 
     // Erased parameters must be redefined.
     for i in prologue.inputs.indices where prologue.inputs[i].convention == .erased {
       let x = ctx.module.llvm.insertAlloca(ctx.module.empty, at: ctx.insertionPoint!)
-      ctx.value[.parameter(i)] = x.asAnyValue
+      ctx.value[.parameter(i)] = x.v
     }
 
     // Other dominating definitions may have to be redefined as well.
