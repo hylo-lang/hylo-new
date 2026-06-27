@@ -74,7 +74,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns the identity of the module with the given `name` or `nil` if no such module exists.
+  /// Returns the identity of the module named `name`, if it exists in the program.
   public func identity(module name: Module.Name) -> Module.ID? {
     modules.index(forKey: name)
   }

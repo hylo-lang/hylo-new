@@ -41,8 +41,9 @@ extension IREmitter {
     // Otherwise, replace the type application's arguments with type witnesses. The way in which
     // this substitution is done depends on the way the type application is used.
     switch f.at(i).callee {
-    case .function(let c, _, _):
-      depolymorphize(c, operandOf: i, in: &f, reusing: &witnesses)
+    case .function(let c, _):
+      let k = program[module].ir.identity(function: c)!
+      depolymorphize(k, operandOf: i, in: &f, reusing: &witnesses)
 
     default:
       unimplemented("first class function deploymorphization")

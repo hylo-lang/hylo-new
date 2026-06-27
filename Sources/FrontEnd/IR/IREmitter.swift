@@ -131,7 +131,8 @@ internal struct IREmitter {
       // Emit the definition of the global's initializer.
       let global = demandLoweredDeclaration(variable: d)
       let lhs = program[program[d].pattern].pattern
-      defining(global.initializer.function!, at: program.anchor(introducerOf: d)) { (me) in
+      let initializer = program[module].ir.identity(function: global.initializer.function!)!
+      defining(initializer, at: program.anchor(introducerOf: d)) { (me) in
         me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
         me.lowering(rhs, { $0._return() })
       }
@@ -1439,7 +1440,8 @@ internal struct IREmitter {
     let f = program[module].ir.addFunction(i)
 
     // Declare the global itself.
-    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: .function(f))
+    let n = program[module].ir[f].name
+    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: .function(n))
     program[module].ir.addGlobal(g)
     return g
   }
@@ -2689,9 +2691,9 @@ internal struct IREmitter {
 
   /// Returns a reference to the given lowered function.
   internal mutating func functionReference(to f: IRFunction.ID) -> IRValue {
-    let s = program[module].ir[f].signature()
-    let t = program.types.demand(s)
-    return .function(f, module, t)
+    let d = program[module].ir[f]
+    let s = d.signature()
+    return .function(d.name, program.types.demand(s))
   }
 
   /// Returns the type arguments defined in the type of `q`, which occurs as qualification for a

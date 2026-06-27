@@ -385,21 +385,6 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `v` iff it denotes a subscript in `program` known to have an empty slide.
-  public func seenAsAddressor(_ v: IRValue, in program: Program) -> IRFunction.ID? {
-    switch v {
-    case .function(let f, let m, _):
-      if case .remote(_, _, let b) = program[m].ir[f].output {
-        return b ? f : nil
-      } else {
-        return nil
-      }
-
-    default:
-      return nil
-    }
-  }
-
   /// Returns the type of the value computed by `v` or `nil` if `v` doesn't compute any.
   ///
   /// - Requires: `v` is either a constant or an instruction in this function.
@@ -413,7 +398,7 @@ public struct IRFunction: Sendable {
       return (t.erased, false)
     case .floatingPoint(_, let t):
       return (t.erased, false)
-    case .function(_, _, let t):
+    case .function(_, let t):
       return (t, true)
     case .bundle(_, let t, _):
       return (t, true)

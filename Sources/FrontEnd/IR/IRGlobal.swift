@@ -22,13 +22,13 @@ public struct IRGlobal: Hashable, Sendable {
   public enum Initializer: Hashable, Sendable {
 
     /// A function that called once, on the first access to the global.
-    case function(IRFunction.ID)
+    case function(IRFunction.Name)
 
     /// A constant type witness.
     case typeWitness(AnyTypeIdentity)
 
     /// The payload of `self` iff it is `.function`.
-    public var function: IRFunction.ID? {
+    public var function: IRFunction.Name? {
       if case .function(let f) = self {
         return f
       } else {

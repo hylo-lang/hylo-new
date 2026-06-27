@@ -8,8 +8,8 @@ extension IRFunction {
 
     var success = true
     for i in instructions() {
-      if let s = at(i) as? IRApply, case .function(let f, _, _) = s.callee {
-        if typer.program.isPrivate(typer.program[m].ir[f].name, in: m) {
+      if let s = at(i) as? IRApply, case .function(let f, _) = s.callee {
+        if typer.program.isPrivate(f, in: m) {
           let d = Diagnostic(
             .error, "use of non-exposed function in inlined function", at: s.anchor.site)
           typer.program[m].addDiagnostic(d)
@@ -33,9 +33,9 @@ extension IRFunction {
       while i != b.last {
         var j = instruction(after: i)!
 
-        if let s = at(i) as? IRApply, case .function(let f, _, _) = s.callee {
+        if let s = at(i) as? IRApply, case .function(let f, _) = s.callee {
           // Should the callee be inlined?
-          let callee = typer.program[m].ir[f]
+          let callee = typer.program[m].ir.functions[f]!
           if !callee.isDefined || !typer.program.shouldInline(callee.name) { break }
 
           // Construct a table mapping each parameter to its argument.

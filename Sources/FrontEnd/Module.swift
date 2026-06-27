@@ -179,6 +179,11 @@ public struct Module: Sendable {
       _modify { yield &functions.values[f] }
     }
 
+    /// Returns the identity of the function named `name`, if it exists in the module.
+    public func identity(function name: IRFunction.Name) -> Module.ID? {
+      functions.index(forKey: name)
+    }
+
     /// Adds `f` to this module.
     ///
     /// - Requires: `self` contains no IR function having the name of `f`.
