@@ -1,0 +1,3 @@
+negative/bodyless-local-function.hylo:4.7-12: error: declaration requires a body
+  fun inner()
+      ~~~~~

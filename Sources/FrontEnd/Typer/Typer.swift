@@ -274,8 +274,11 @@ public struct Typer {
       }
     }
 
+    /// Nothing to do if the function has no body; missing definitions are diagnosed elsewhere.
+    guard let body = program[d].body else { return captures }
+
     // Visit the syntax tree to collect all captures.
-    var work = program[d].body!.reversed().map({ (s) in (s.erased, false) })
+    var work = body.reversed().map({ (s) in (s.erased, false) })
     while let (n, isMarkedForMutation) = work.popLast() {
       switch program.tag(of: n) {
       case InoutExpression.self:
