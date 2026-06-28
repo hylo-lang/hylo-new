@@ -75,7 +75,7 @@ extension IRFunction {
       }
 
       // Collect the next blocks to visit.
-      for s in successors(of: b) where !visited.contains(b) {
+      for s in successors(of: b) where !visited.contains(s) {
         slide[s] = y
         work.append(s)
       }
