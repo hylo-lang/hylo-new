@@ -229,9 +229,7 @@ public struct Driver {
   /// fingerprint matches the fingerprint of the source files in `root`. Otherwise, the module is
   /// compiled from sources and an archive is stored at `moduleCachePath`. If `moduleCachePath` is
   /// not set, the module is unconditionally compiled from sources and no archive is stored.
-  public mutating func load(
-    _ module: Module.Name, withSourcesAt root: URL
-  ) async throws {
+  public mutating func load(_ module: Module.Name, withSourcesAt root: URL) async throws {
     // Compute a fingerprint of all source files.
     var sources: [SourceFile] = []
     try SourceFile.forEach(in: root) { (s) in
@@ -284,11 +282,10 @@ public struct Driver {
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    let sourceRoot: URL
     #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
-    sourceRoot = bundledStandardLibrarySources
+    let sourceRoot = bundledStandardLibrarySources
     #else
-    sourceRoot = localStandardLibrarySources
+    let sourceRoot = localStandardLibrarySources
     #endif
     try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
   }
