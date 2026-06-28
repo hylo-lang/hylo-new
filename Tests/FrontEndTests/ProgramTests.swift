@@ -84,6 +84,31 @@ final class ProgramTests: XCTestCase {
     XCTAssert(loaded)
   }
 
+  func testSerializationWithIR() async throws {
+    var p = await Program.withMinimalStandardLibrary()
+    let m = p.addUserModule(
+      named: "Main", source: """
+        public fun main() {}
+        """)
+
+    // Lower the main module to IR and write it to an archive.
+    await p.assignScopes(m)
+    p.assignTypes(m, loggingInferenceWhere: nil)
+    p.lower(m)
+    p.applyTransformationPasses(m)
+    let a = try p.archive(module: m)
+
+    var q = await Program.withMinimalStandardLibrary()
+    let (loaded, n) = try q.load(module: p[m].name, from: a)
+    XCTAssert(loaded)
+
+    for f in p[m].ir.functions.values {
+      let g = try XCTUnwrap(q[n].ir.functions[f.name])
+      XCTAssert(f.blocks.count == g.blocks.count)
+      XCTAssert(f.instructions().count == g.instructions().count)
+    }
+  }
+
   func testQueryGivenFromCheckedProgram() async throws {
     var p = Program(forTesting: true)
     let m = p.demandModule("Main")

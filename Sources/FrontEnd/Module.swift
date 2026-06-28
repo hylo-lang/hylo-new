@@ -563,6 +563,20 @@ extension Module: Archivable {
       }
     }
 
+    // IR functions.
+    let functionCount = try archive.readUnsignedLEB128()
+    for _ in 0 ..< functionCount {
+      let f = try archive.read(IRFunction.self, in: &context)
+      ir.addFunction(f)
+    }
+
+    // IR variables.
+    let variableCount = try archive.readUnsignedLEB128()
+    for _ in 0 ..< variableCount {
+      let g = try archive.read(IRGlobal.self, in: &context)
+      ir.addGlobal(g)
+    }
+
     assert(hash == fingerprint, "module fingerprint does not match")
   }
 
@@ -616,6 +630,17 @@ extension Module: Archivable {
         try archive.write(s.syntaxToType, in: &ctx, sortedBy: \.key)
         try archive.write(s.nameToDeclaration, in: &ctx, sortedBy: \.key)
         try archive.write(s.witnessTables, in: &ctx)
+      }
+
+      // IR functions.
+      archive.write(unsignedLEB128: ir.functions.count)
+      for f in ir.functions.values {
+        try archive.write(f, in: &ctx)
+      }
+
+      // IR variables.
+      try archive.write(contentsOf: ir.variables.values, in: &ctx) { (e, a, c) in
+        try e.write(to: &a, in: &c)
       }
     }
   }

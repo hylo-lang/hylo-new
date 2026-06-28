@@ -34,9 +34,9 @@ public struct Program: Sendable {
   /// case, the absence of some standard library declarations won't be treated as an error.
   private var allowPartialStandardLibrary: Bool = false
 
-  /// Creates an empty program.
-  public init(allowPartialStandardLibrary: Bool = false) {
-    self.allowPartialStandardLibrary = allowPartialStandardLibrary
+  /// Creates an empty program, only for the purpose of testing iff `isForTesting` is `true`.
+  public init(forTesting isForTesting: Bool = false) {
+    self.allowPartialStandardLibrary = isForTesting
   }
 
   /// `true` if the program has errors.
