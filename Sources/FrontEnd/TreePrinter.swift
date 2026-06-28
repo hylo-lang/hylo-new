@@ -90,6 +90,11 @@ public struct TreePrinter {
     return (i == 0) ? s : s + superscript(i)
   }
 
+  /// Clears the table ensuring the discrimination of different entities sharing the same name.
+  public mutating func resetUniquization() {
+    identifiers.removeAll(keepingCapacity: true)
+  }
+
   /// Returns `n` as a superscript.
   private func superscript(_ n: Int) -> String {
     if n == 0 { return Self.digitToSuperscript[0] }

@@ -672,11 +672,14 @@ extension Module.IR: Showable {
 
     for g in variables.values {
       if first { first = false } else { result.write("\n") }
+      printer.resetUniquization()
       result.write(printer.show(g))
       result.write("\n")
     }
+
     for f in functions.values {
       if first { first = false } else { result.write("\n") }
+      printer.resetUniquization()
       result.write(printer.show(f))
       result.write("\n")
     }
