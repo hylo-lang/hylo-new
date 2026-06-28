@@ -2134,9 +2134,8 @@ internal struct IREmitter {
     }
 
     // Use the dominance relationship to ensure definitions are visited before their uses.
-    let cfg = source.controlFlow()
-    let dominance = DominatorTree(function: source, controlFlow: cfg)
-    for b in dominance.bfs {
+    let dominance = DominatorTree(function: source, controlFlow: source.controlFlow())
+    for b in dominance {
       insertionContext.point = .end(of: properties.blocks[b]!)
       for i in source.instructions(in: b) {
         // If next instruction returns, then jump to the "after" block if it's been defined or

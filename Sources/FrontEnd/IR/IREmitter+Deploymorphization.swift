@@ -218,8 +218,7 @@ extension IREmitter {
     }
 
     // Iterate over the basic blocks in such a way that definitions are visited before their uses.
-    let cfg = poly.controlFlow()
-    let dominance = DominatorTree(function: poly, controlFlow: cfg)
+    let dominance = DominatorTree(function: poly, controlFlow: poly.controlFlow())
     for b in dominance {
       for i in poly.instructions(in: b) {
         /// Where the next instruction should be inserted.
