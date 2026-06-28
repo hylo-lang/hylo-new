@@ -47,7 +47,7 @@ final class ProgramTests: XCTestCase {
     let m = p.moduleIdentities.first!
     let a = try p.archive(module: m)
 
-    var q = Program()
+    var q = Program(forTesting: true)
     let (loaded, n) = try q.load(module: p[m].name, from: a)
 
     // Syntax trees should have the same identities.
@@ -72,7 +72,7 @@ final class ProgramTests: XCTestCase {
       try archives.append((m, p.archive(module: m)))
     }
 
-    var q = Program()
+    var q = Program(forTesting: true)
 
     // Re-load modules out of order.
     var loaded = false
@@ -84,124 +84,104 @@ final class ProgramTests: XCTestCase {
     XCTAssert(loaded)
   }
 
-  func testGivensCanBeQueriedThroughTypeCheckedProgram() async throws {
-    var p = Program()
-    let m = p.demandModule(.init("Main"))
+  func testQueryGivenFromCheckedProgram() async throws {
+    var p = Program(forTesting: true)
+    let m = p.demandModule("Main")
     let (_, f) = p[m].addSource(
       """
       trait P {}
-
-      struct A { 
-        given w1: B is P {}
-      }
-
+      struct A { given w1: B is P {} }
       struct B {}
-
       given w2: A is P {}
       """)
 
     await p.assignScopes(m)
     p.assignTypes(m, loggingInferenceWhere: nil)
 
-    // Query givens visible from the file level.
+    // Query givens visible from the top-level scope of the file.
     let givens = p.givens(in: m, visibleFrom: .init(file: f))
 
     // The visible given should be the top-level `w2`.
-    guard givens.count == 1, case .user(let given) = givens[0] else {
-      return XCTFail("expected exactly one user-defined given, got \(givens)")
+    if case .user(let g) = givens.uniqueElement {
+      let w2 = try XCTUnwrap(
+        p.select(
+          from: m,
+          .and(.tag(ConformanceDeclaration.self), .name(.init(identifier: "w2")))).first)
+      XCTAssertEqual(g.erased, w2)
+    } else {
+      XCTFail("expected exactly one user-defined given, found \(givens.count)")
     }
-
-    let w2 = try XCTUnwrap(
-      p.select(from: m, .and(.tag(ConformanceDeclaration.self), .name(.init(identifier: "w2"))))
-        .first)
-    XCTAssertEqual(given.erased, w2)
   }
 
-  func testQueryingSourceFileWithName() throws {
-    var p = Program()
+  func testQuerySourceFileWithName() throws {
+    var p = Program(forTesting: true)
 
     let m0 = p.demandModule("M0")
     let s0: SourceFile = "trait A {}"
-    let (_, id0) = p[m0].addSource(s0)
+    let (_, i0) = p[m0].addSource(s0)
 
     let m1 = p.demandModule("M1")
     let s1: SourceFile = "trait B {}"
-    let (_, id1) = p[m1].addSource(s1)
+    let (_, i1) = p[m1].addSource(s1)
 
     // Sources that are present should be found:
     let f0 = try XCTUnwrap(p.sourceFile(named: s0.name))
-    XCTAssertEqual(f0, id0)
+    XCTAssertEqual(f0, i0)
     XCTAssertEqual(p[sourceFile: f0], s0)
 
     let f1 = try XCTUnwrap(p.sourceFile(named: s1.name))
-    XCTAssertEqual(f1, id1)
+    XCTAssertEqual(f1, i1)
     XCTAssertEqual(p[sourceFile: f1], s1)
 
-    // Missing sources should result in nil:
+    // Missing sources should result in nil.
     let missing: FileName = .virtual(URL(string: "virtual:///nonexistent")!)
     XCTAssertNil(p.sourceFile(named: missing))
   }
 
-  func testQueryingSourceFileLevelDiagnostics() throws {
-    var p = Program()
+  func testQuerySourceFileLevelDiagnostics() throws {
+    var p = Program(forTesting: true)
     let m = p.demandModule("Main")
-    let s0: SourceFile = "trait Foo {}"
-    let s1: SourceFile = "trait Bar {}"
-    let (_, id0) = p[m].addSource(s0)
-    let (_, id1) = p[m].addSource(s1)
+    let (_, s0) = p[m].addSource("trait Foo {}")
+    let (_, s1) = p[m].addSource("trait Bar {}")
 
     // Well-formed sources have no diagnostics.
-    XCTAssert(p.diagnostics(in: id0).elements.isEmpty)
-    XCTAssert(p.diagnostics(in: id1).elements.isEmpty)
+    XCTAssert(p.diagnostics(in: s0).elements.isEmpty)
+    XCTAssert(p.diagnostics(in: s1).elements.isEmpty)
 
     // Adding a diagnostic to one source file must not affect the other.
-    p[m].addDiagnostic(.init(.error, "boom", at: p[sourceFile: id0].span))
+    p[m].addDiagnostic(.init(.error, "boom", at: p[sourceFile: s0].span))
 
-    let ds0 = p.diagnostics(in: id0)
-    XCTAssertEqual(ds0.elements.count, 1)
-    XCTAssert(ds0.containsError)
+    let d0 = p.diagnostics(in: s0)
+    XCTAssertEqual(d0.elements.count, 1)
+    XCTAssert(d0.containsError)
 
-    let ds1 = p.diagnostics(in: id1)
-    XCTAssert(ds1.elements.isEmpty)
-    XCTAssertFalse(ds1.containsError)
+    let d1 = p.diagnostics(in: s1)
+    XCTAssert(d1.elements.isEmpty)
+    XCTAssertFalse(d1.containsError)
   }
 
-  func testQueryingTopLevelDeclarationsPerSourceFile() async throws {
-    var p = Program()
+  func testQueryTopLevelDeclarationsPerSourceFile() async throws {
+    var p = Program(forTesting: true)
     let m = p.demandModule("Main")
-    let (_, id) = p[m].addSource(
-      """
-      trait A {}
-      struct B {}
-      """)
-
-    _ = p[m].addSource(
-      """
-      enum C {}
-      """)
+    let (_, s) = p[m].addSource("trait A {} ; struct B {}")
+    _ = p[m].addSource("enum C {}")
 
     await p.assignScopes(m)
 
-    let ds = Array(p.topLevelDeclarations(in: id))
-
-    // `ds` should contain exactly the declarations from the first source file, and not
-    // ones from the second.
+    // `ds` should contain the declarations from the first source  only.
+    let ds = Array(p.topLevelDeclarations(in: s))
     XCTAssertEqual(ds.count, 2)
 
-    let tags = Set(ds.map { p.tag(of: $0) })
+    let tags = Set(ds.map(p.tag(of:)))
     XCTAssert(tags.contains(.init(TraitDeclaration.self)))
     XCTAssert(tags.contains(.init(StructDeclaration.self)))
     XCTAssertFalse(tags.contains(.init(EnumDeclaration.self)))
   }
 
-  func testReturnsNilDeclarationIffNameIsNotResolved() async throws {
-    var p = Program()
+  func testDeclarationMaybeReferredToByNil() async throws {
+    var p = Program(forTesting: true)
     let m = p.demandModule("Main")
-    let s: SourceFile = """
-      let x = nonexistent.y
-      let z = x
-      """
-    _ = p[m].addSource(s)
+    _ = p[m].addSource("let x = nonexistent.y ; let z = x")
 
     await p.assignScopes(m)
     p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
@@ -233,13 +213,11 @@ final class ProgramTests: XCTestCase {
     XCTAssertEqual(p.declaration(maybeReferredToBy: xName)?.target?.erased, xd)
   }
 
-  func testReturnsNilTypeIfCouldntTypeCheck() async throws {
-    let s: SourceFile = """
-      let (e, b) = ((), (), ())
-      """
-    var p = Program()
+  func testTypeMaybeAssignedNil() async throws {
+    var p = Program(forTesting: true)
     let m = p.demandModule("Main")
-    _ = p[m].addSource(s)
+    _ = p[m].addSource("let (e, b) = ((), (), ())")
+
     await p.assignScopes(m)
     p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
     

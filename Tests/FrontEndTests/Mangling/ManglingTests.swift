@@ -8,9 +8,9 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of all kinds of types.
   func testTypes() async {
-    var p = await Program.testProgramWithMinimalStandardLibrary()
+    var p = await Program.withMinimalStandardLibrary()
 
-    let m0 = p.addModule(
+    let m0 = p.addUserModule(
       named: "M0",
       source:
         """
@@ -56,9 +56,9 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of specific declarations.
   func testSpecificDeclarations() async {
-    var p = await Program.testProgramWithMinimalStandardLibrary()
+    var p = await Program.withMinimalStandardLibrary()
 
-    let m0 = p.addModule(
+    let m0 = p.addUserModule(
       named: "M0",
       source:
         """
@@ -188,9 +188,9 @@ final class ManglingTests: XCTestCase {
 
   /// Tests that the demangling for a selection of declarations don't contain errors.
   func testDeclarationsSelection() async {
-    var p = await Program.testProgramWithMinimalStandardLibrary()
+    var p = await Program.withMinimalStandardLibrary()
 
-    let m0 = p.addModule(
+    let m0 = p.addUserModule(
       named: "M0",
       source:
         """
@@ -270,9 +270,9 @@ final class ManglingTests: XCTestCase {
 
   /// Tests demangling for declarations with more generics.
   func testDeclarationsWithMoreGenerics() async {
-    var p = await Program.testProgramWithMinimalStandardLibrary()
+    var p = await Program.withMinimalStandardLibrary()
 
-    let m0 = p.addModule(
+    let m0 = p.addUserModule(
       named: "M0",
       source:
         """
@@ -306,9 +306,9 @@ final class ManglingTests: XCTestCase {
 
   /// Tests mangling and demangling in cases where entity lookup is used internally.
   func testReuseScopes() async {
-    var p = await Program.testProgramWithMinimalStandardLibrary()
+    var p = await Program.withMinimalStandardLibrary()
 
-    let m0 = p.addModule(
+    let m0 = p.addUserModule(
       named: "M0",
       source:
         """
