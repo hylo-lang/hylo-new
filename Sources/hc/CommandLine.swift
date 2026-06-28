@@ -482,7 +482,7 @@ private typealias Module = FrontEnd.Module
         guard case .local(let u) = s.source.name else { return false }
         if u.absoluteURL.pathComponents.starts(with: l.path.pathComponents) {
           let (a, _) = s.start.lineAndOffset
-          let (b, _) = s.start.lineAndOffset
+          let (b, _) = s.end.lineAndOffset
           return (a + 1 <= l.line) && (l.line <= b + 1)
         } else {
           return false
