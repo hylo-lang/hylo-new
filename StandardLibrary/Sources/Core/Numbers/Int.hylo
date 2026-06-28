@@ -69,6 +69,10 @@ public given Int is AdditiveArithmetic {
     }
   }
 
+  public fun infix+= (other: Self) inout {
+    &self = self + other
+  }
+
   fun infix- (other: Self) -> Self {
     let (result, overflow) = Builtin.ssub_with_overflow_word(self.value, other.value)
     if Bool(value: overflow) {
@@ -76,6 +80,10 @@ public given Int is AdditiveArithmetic {
     } else {
       return .new(value: result)
     }
+  }
+
+  public fun infix-= (other: Self) inout {
+    &self = self - other
   }
 
   static fun zero() -> Self {
@@ -88,6 +96,10 @@ public given Int is Numeric {
 
   fun infix* (other: Self) -> Self {
     .new(value: Builtin.mul_word(self.value, other.value))
+  }
+
+  public fun infix*= (other: Self) inout {
+    &self.value = Builtin.mul_word(self.value, other.value)
   }
 
 }
