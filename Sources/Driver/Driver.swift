@@ -270,6 +270,12 @@ public struct Driver {
     await assignTypes(of: m)
     try throwIfContainsError(m)
 
+    await lower(m)
+    try throwIfContainsError(m)
+
+    await applyTransformationPasses(m)
+    try throwIfContainsError(m)
+
     if cachingIsEnabled {
       let a = try program.archive(module: m)
       let f = moduleCachePath!.appending(component: module + ".hylomodule")
