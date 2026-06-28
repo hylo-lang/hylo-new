@@ -2101,7 +2101,12 @@ internal struct IREmitter {
   }
 
   /// Inserts the contents of `source` before `boundary`, which is in `target`, substituting the
-  /// properties of copied instructions using `properties`
+  /// properties of copied instructions using `properties`.
+  ///
+  /// If `source` contains more than a single basic block, then all instructions from `boundary`
+  /// are placed in a new basic block and return instructions from `source` are inlined as jumps
+  /// to that block. If `source` contains exactly one basic block, then its return instructions
+  /// are simply ignored.
   internal mutating func insert(
     contentsOf source: IRFunction,
     before boundary: AnyInstructionIdentity, in target: inout IRFunction,
