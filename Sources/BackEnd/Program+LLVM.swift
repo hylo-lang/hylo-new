@@ -1126,7 +1126,7 @@ extension Program {
     }
   }
 
-  /// Returns `v` iff it denotes a subscript in `program` known to have an empty slide.
+  /// Returns `v` iff identifies a subscript known to have a slide that compiles to a no-op.
   private func seenAsAddressor(
     _ v: FrontEnd.IRValue, in ctx: borrowing FunctionGenerationContext
   ) -> IRFunction.Name? {
