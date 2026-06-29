@@ -85,10 +85,10 @@ final class ProgramTests: XCTestCase {
   }
 
   func testSerializationWithIR() async throws {
-    var p = await Program.withMinimalStandardLibrary()
+    var p = try await Program.withStandardLibrary()
     let m = p.addUserModule(
       named: "Main", source: """
-        public fun main() {}
+        public fun main() -> Int32 { 42 }
         """)
 
     // Lower the main module to IR and write it to an archive.

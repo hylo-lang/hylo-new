@@ -129,7 +129,8 @@ let package = Package(
     .testTarget(
       name: "FrontEndTests",
       dependencies: [
-        .target(name: "FrontEnd")
+        .target(name: "FrontEnd"),
+        .target(name: "StandardLibrary"),
       ],
       swiftSettings: commonSwiftSettings),
 

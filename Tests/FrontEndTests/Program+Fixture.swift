@@ -1,4 +1,5 @@
 import FrontEnd
+import StandardLibrary
 
 extension Program {
 
@@ -48,6 +49,16 @@ extension Program {
       @_symbol("Int64")
       public struct Int64 { public memberwise init }
       """)
+    return await p.typeChecked()
+  }
+
+  /// Creates an instance with the standard library loaded and type checked.
+  static func withStandardLibrary() async throws -> Program {
+    var p = Program(forTesting: true)
+    let m = p.demandModule(Module.standardLibraryName)
+    try SourceFile.forEach(in: StandardLibrary.localStandardLibrarySources) { (s) in
+      p[m].addSource(s)
+    }
     return await p.typeChecked()
   }
 
