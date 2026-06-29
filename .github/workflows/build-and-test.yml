@@ -13,6 +13,15 @@ env:
   ACTIONS_RUNNER_DISABLE_NODE_MAGLEV: 1
 
 jobs:
+  line-length:
+    name: "Line length"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check max line length of 100 characters
+        run: "! grep -rnE --include=*.swift --exclude-dir=cmake.* --exclude-dir=.build '.{101,}' ."
+
   test:
     strategy:
       fail-fast: false
