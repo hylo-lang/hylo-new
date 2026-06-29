@@ -900,7 +900,8 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    return takeKind(from: &source).map({ (k) in .genericParameterConformer(declaration: d, kind: k) }) ?? .error
+    return takeKind(from: &source)
+      .map({ (k) in .genericParameterConformer(declaration: d, kind: k) }) ?? .error
   }
 
   /// Demangles a generic parameter user type from `source`.
@@ -908,7 +909,8 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    return takeKind(from: &source).map({ (k) in .genericParameterUser(declaration: d, kind: k) }) ?? .error
+    return takeKind(from: &source)
+      .map({ (k) in .genericParameterUser(declaration: d, kind: k) }) ?? .error
   }
 
   /// Demangles a generic parameter nth type from `source`.

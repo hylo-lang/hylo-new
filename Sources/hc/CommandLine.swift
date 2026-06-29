@@ -44,7 +44,8 @@ private typealias Module = FrontEnd.Module
   @Option(
     name: [.customLong("cpu")],
     help: ArgumentHelp(
-      "Target CPU: native, generic, or an explicit name (default: native for host, generic for cross).",
+      "Target CPU: native, generic, or an explicit name "
+        + "(default: native for host, generic for cross).",
       valueName: "cpu"))
   private var targetCPU: String?
 
@@ -52,7 +53,8 @@ private typealias Module = FrontEnd.Module
   @Option(
     name: [.customLong("cpu-features")],
     help: ArgumentHelp(
-      "CPU features: native, or an explicit feature string (default: native for host, none for cross).",
+      "CPU features: native, or an explicit feature string "
+        + "(default: native for host, none for cross).",
       valueName: "features"))
   private var targetCPUFeatures: String?
 
@@ -173,7 +175,8 @@ private typealias Module = FrontEnd.Module
         return
       }
 
-      await perform("normalization", for: module, { await driver.applyTransformationPasses(module) })
+      await perform(
+        "normalization", for: module, { await driver.applyTransformationPasses(module) })
       if outputType == .ir {
         try emitIR(module, in: driver.program, name: product)
         return
@@ -266,7 +269,8 @@ private typealias Module = FrontEnd.Module
     }
   }
 
-  /// Resolves the `--target`, `--cpu`, and `--cpu-features` CLI options into a `TargetSpecification`.
+  /// Resolves the `--target`, `--cpu`, and `--cpu-features` CLI options into a
+  /// `TargetSpecification`.
   private func resolveTarget() throws -> TargetSpecification {
     let host = try Target.host()
     let triple = try targetTriple.map(Target.init) ?? host

@@ -81,7 +81,9 @@ extension URL {
   /// Returns the drive letter of an absolute file URL on Windows, nil otherwise.
   fileprivate var windowsDriveLetter: Character? {
     #if os(Windows)
-      guard isFileURL, let firstChar = path.first, firstChar.isLetter, path.dropFirst().first == ":" 
+      guard
+        isFileURL, let firstChar = path.first, firstChar.isLetter,
+        path.dropFirst().first == ":"
       else { return nil }
 
       return Character(firstChar.uppercased())
