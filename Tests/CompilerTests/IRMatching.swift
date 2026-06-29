@@ -51,8 +51,9 @@ enum IRMatching {
 
   /// Returns an iterator over the sections of `s`, in order of appearance.
   ///
-  /// A section is a maximal run of consecutive non-blank lines, where a line is blank if it's empty
-  /// or contains only whitespace. Sections are yielded as slices of `s` in a single forward pass.
+  /// A section is a maximal run of consecutive non-blank lines, where a line is blank if it is
+  /// empty or contains only whitespace. Sections are yielded as slices of `s` computed with a
+  // single forward pass over `s`.
   static func sections(of s: String) -> AnyIterator<Substring> {
     var i = s.startIndex
     var done = false
