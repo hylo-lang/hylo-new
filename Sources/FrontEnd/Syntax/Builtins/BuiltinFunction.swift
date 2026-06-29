@@ -1301,8 +1301,8 @@ extension BuiltinFunction {
   //    }
   //  }
   //
-  //  /// An atomic non-fence function whose name—up to the open parenthesis—is `n`, or `nil` if no such
-  //  /// built-in function exists.
+  //  /// An atomic non-fence function whose name—up to the open parenthesis—is `n`, or `nil` if no
+  //  /// such built-in function exists.
   //  private init?(atomic n: String) {
   //    // The type of all atomics (except fences) is mentioned at the end.
   //    let m = n.split(atLastIndexOf: "_")

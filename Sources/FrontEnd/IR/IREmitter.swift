@@ -1329,9 +1329,9 @@ internal struct IREmitter {
   /// Returns the value denoted by `source` interpreted as the floating point
   /// type `target`, defined in the standard library.
   ///
-  /// Standard library floating point types are thin wrappers around a machine type. For instance, `Float32` wraps
-  /// a single `Builtin.float32` property. This method returns the value of that property converted from
-  /// a floating point number literal.
+  /// Standard library floating point types are thin wrappers around a machine type. For instance,
+  /// `Float32` wraps a single `Builtin.float32` property. This method returns the value of that
+  /// property converted from a floating point number literal.
   private mutating func loweredBuiltinFloatingPointLiteralConversion(
     from source: FloatingPointLiteral.ID, to target: AnyTypeIdentity
   ) -> IRValue {

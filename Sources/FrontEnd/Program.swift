@@ -1612,7 +1612,8 @@ extension Program {
   public func standardLibraryDeclaration(
     _ n: StandardLibraryEntity
   ) -> DeclarationIdentity {
-    standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library; missing \(n)")
+    standardLibraryDeclarations[n]
+      ?? fatalError("missing or corrupt standard library; missing \(n)")
   }
 
   /// Returns the declaration of the given standard library assuming it is represented by `T`.

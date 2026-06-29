@@ -214,9 +214,11 @@ final class CompilerTests: XCTestCase {
     }
   }
 
-  /// Compiles `input` into `outputDirectory` and returns expected diagnostics for each compiled source file.
+  /// Compiles `input` into `outputDirectory` and returns expected diagnostics for each compiled
+  /// source file.
   ///
-  /// Sets up the `testCase` context and populates `artifacts` as soon as compilation stages succeed.
+  /// Sets up the `testCase` context and populates `artifacts` as soon as compilation stages
+  /// succeed.
   private func compile(_ input: TestDescription) async throws -> CompilationResult {
     self.testCase = input
 

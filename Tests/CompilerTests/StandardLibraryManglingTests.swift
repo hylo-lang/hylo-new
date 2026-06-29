@@ -8,7 +8,8 @@ final class StandardLibraryManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of all the declarations in the standard library.
   func testStandardLibraryMangling() async throws {
-    var driver = try Driver(moduleCachePath: Self.moduleCachePath.url, targetSpecification: .native())
+    var driver = try Driver(
+      moduleCachePath: Self.moduleCachePath.url, targetSpecification: .native())
     try await driver.loadStandardLibrary()
 
     let m = driver.program.modules[Module.standardLibraryName]!
