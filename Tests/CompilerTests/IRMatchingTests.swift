@@ -145,7 +145,7 @@ final class IRMatchingTests: XCTestCase {
         %r0 = return
       }
       """
-    // No exact first-line match: the body changes the signature slightly. The closest section wins.
+    // No exact first-line match: the body changes the signature slightly. Closest section wins.
     let observed = """
       fun helper(let %p0: Void) {
         %r0 = return

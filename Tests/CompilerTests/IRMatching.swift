@@ -24,12 +24,14 @@ enum IRMatching {
   /// result has one comparison per expected section. Sections of `observed` with no counterpart in
   /// `expected` are ignored, making `expected` a partial specification of `observed`.
   ///
-  /// A section is a maximal run of consecutive non-blank lines. An expected section is matched
-  /// against the observed section having the most similar first line.
+  /// A section is a maximal run of consecutive non-blank lines, where a line is blank if it's
+  /// empty or contains only whitespace. Sections are yielded as slices of `s` computed with a
+  /// single forward pass over `s`.
   static func comparisons(expected: String, observed: String) -> [Comparison] {
     let observed = Array(sections(of: observed.normalizedLineEndings()))
 
-    // Index the observed sections by their first line so the common case (an exact match) is just a lookup.
+    // Index the observed sections by their first line so the common case (an exact match) is just
+    // a lookup.
     var byFirstLine: [Substring: Substring] = [:]
     for s in observed {
       byFirstLine[s.firstLine] = byFirstLine[s.firstLine] ?? s
@@ -55,19 +57,19 @@ enum IRMatching {
     var i = s.startIndex
     var done = false
 
-    // Returns the next line of `s`—excluding its terminating newline—or `nil` once every line has
-    // been consumed. As in `split(omittingEmptySubsequences: false)`, a trailing newline yields a
-    // final empty line.
-    func nextLine() -> Substring? {
-      if done { return nil }
-      let start = i
-      while (i != s.endIndex) && !s[i].isNewline { i = s.index(after: i) }
-      let line = s[start ..< i]
-      if i == s.endIndex { done = true } else { i = s.index(after: i) }
-      return line
-    }
-
     return AnyIterator { () -> Substring? in
+      /// Returns the next line of `s` (excluding its terminating newline) or `nil` once every line
+      /// has been consumed. As in `split(omittingEmptySubsequences: false)`, a trailing newline
+      /// yields a final empty line.
+      func nextLine() -> Substring? {
+        if done { return nil }
+        let start = i
+        while (i != s.endIndex) && !s[i].isNewline { i = s.index(after: i) }
+        let line = s[start ..< i]
+        if i == s.endIndex { done = true } else { i = s.index(after: i) }
+        return line
+      }
+
       // Skip blank lines until the start of the next section, if any.
       var line = nextLine()
       while let l = line, l.allSatisfy(\.isWhitespace) { line = nextLine() }
