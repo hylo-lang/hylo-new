@@ -940,23 +940,28 @@ extension IRFunction: Archivable {
     try archive.write(typeParameters, in: &context)
     try archive.write(termParameters, in: &context)
 
-    // Prepare a substitution table to compute the canonical form of the function as we go.
-    var table = IRSubstitutionTable()
-    var registers = 0
-    for b in blocks.addresses {
-      table[b] = IRBlock.ID(table.blocks.count)
-    }
-
-    // Write the number of basic blocks in the function.
+    // Write the number of basic blocks in the function. Note that the function cannot contain any
+    // unreachable block at this point.
     archive.write(unsignedLEB128: blocks.count)
 
     // Nothing else to do if there aren't any basic blocks.
     if !isDefined { return }
 
+    // Prepare a substitution table to compute the canonical form of the function as we go. Basic
+    // blocks are renamed with a zero-based offset and serialized in an order guaranteeing that
+    // definitions appear before their uses when the archive is deserialized.
+    let dominance = DominatorTree(function: self, controlFlow: self.controlFlow())
+    let ordered = Array(dominance)
+    var table = IRSubstitutionTable()
+    for b in ordered {
+      table[b] = IRBlock.ID(table.blocks.count)
+    }
+    assert(blocks.count == table.blocks.count)
+
     // Write the contents of the function to the archive, visiting its basic blocks in such a way
     // that they can be deserialized in a single forward pass.
-    let dominance = DominatorTree(function: self, controlFlow: self.controlFlow())
-    for b in dominance {
+    var registers = 0
+    for b in ordered {
       // Write the number of instructions in the block.
       let all = Array(instructions(in: b))
       archive.write(unsignedLEB128: all.count)
@@ -968,7 +973,7 @@ extension IRFunction: Archivable {
         let t = type(of: s)
         let c = t.init(s, substituting: table)!
 
-        // Does the instruction defines a register that may be referred to?
+        // Does the instruction define a register that may be referred to?
         if c.type != .nothing {
           table[.register(i)] = .register(.init(address: .init(registers)))
         }
