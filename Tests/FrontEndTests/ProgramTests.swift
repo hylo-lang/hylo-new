@@ -86,24 +86,21 @@ final class ProgramTests: XCTestCase {
 
   func testSerializationWithIR() async throws {
     var p = try await Program.withStandardLibrary()
-    let m = p.addUserModule(
-      named: "Main", source: """
-        public fun main() -> Int32 { 42 }
-        """)
+    let m = p.identity(module: Module.standardLibraryName)!
 
-    // Lower the main module to IR and write it to an archive.
-    await p.assignScopes(m)
-    p.assignTypes(m, loggingInferenceWhere: nil)
+    // Compile the standard library to IR and archive it.
     p.lower(m)
     p.applyTransformationPasses(m)
     let a = try p.archive(module: m)
 
-    var q = await Program.withMinimalStandardLibrary()
+    // Reload the standard library from the archive.
+    var q = Program(forTesting: true)
     let (loaded, n) = try q.load(module: p[m].name, from: a)
     XCTAssert(loaded)
 
-    for f in p[m].ir.functions.values {
-      let g = try XCTUnwrap(q[n].ir.functions[f.name])
+    // Check that all functions have been deserialized.
+    XCTAssertEqual(p[m].ir.functions.count, q[n].ir.functions.count)
+    for (f, g) in zip(p[m].ir.functions.values, q[n].ir.functions.values) {
       XCTAssert(f.blocks.count == g.blocks.count)
       XCTAssert(f.instructions().count == g.instructions().count)
     }
