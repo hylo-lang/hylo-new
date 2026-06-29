@@ -12,6 +12,6 @@ public let localStandardLibrarySources = URL(fileURLWithPath: #filePath)
 /// 
 /// This folder is intended to be used in distributable builds, in order to bundle the standard
 /// library together with the executable. The driver will pick this folder over the local one if
-/// the its sources are compiled with the flag `USE_BUNDLED_STANDARD_LIBRARY` set.
+/// its sources are compiled with the flag `USE_BUNDLED_STANDARD_LIBRARY` set.
 public let bundledStandardLibrarySources = Bundle.module.url(
   forResource: "Sources", withExtension: nil)!
