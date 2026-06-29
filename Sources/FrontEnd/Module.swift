@@ -180,7 +180,7 @@ public struct Module: Sendable {
     }
 
     /// Returns the identity of the function named `name`, if it exists in the module.
-    public func identity(function name: IRFunction.Name) -> Module.ID? {
+    public func identity(function name: IRFunction.Name) -> IRFunction.ID? {
       functions.index(forKey: name)
     }
 
