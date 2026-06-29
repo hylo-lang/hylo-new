@@ -3,9 +3,10 @@ import Foundation
 import FrontEnd
 import StandardLibrary
 import Utilities
+import StableCollections
 import XCTest
 
-/// `true` iff intermediate compilation artifacts must be saved for successful tests.
+/// `true` iff intermediate compilation artifacts shall be saved for successful tests.
 private let alwaysSaveArtifacts: Bool = false
 
 /// The driver for generated compiler tests.
@@ -63,10 +64,11 @@ final class CompilerTests: XCTestCase {
     /// Returns where to save the generated executable upon failure.
     func executableDestination() -> URL {
       let suffix = Host.nativeExecutableSuffix
+      let tag = ArtifactTag.executable
       if isPackage {
-        return root.appending(component: ".executable\(suffix)")
+        return root.appending(component: ".\(tag).observed\(suffix)")
       } else {
-        return root.deletingPathExtension().appendingPathExtension("executable\(suffix)")
+        return root.deletingPathExtension().appendingPathExtension("\(tag).observed\(suffix)")
       }
     }
 
@@ -80,19 +82,63 @@ final class CompilerTests: XCTestCase {
 
   }
 
-  /// The intermediate artifacts of a module's compilation.
+  /// The type of a compilation artifact.
+  enum ArtifactTag: String, CustomStringConvertible, Comparable {
+
+    /// Hylo IR immediately after lowering, without any processing.
+    case rawIR = "raw-ir"
+
+    /// Hylo IR after mandatory transformation passes.
+    case refinedIR = "refined-ir"
+
+    /// LLVM IR.
+    case llvmIR = "llvm-ir"
+
+    /// The executable generated from the compiled program.
+    case executable = "executable"
+
+    /// All textual artifacts of the compilation and testing pipeline.
+    static var allTextual: [ArtifactTag] {
+      [.rawIR, .refinedIR, .llvmIR]
+    }
+
+    /// The minimum stage of compilation to produce this artifact.
+    var minimumStage: Manifest.Stage {
+      switch self {
+      case .rawIR: .lowering
+      case .refinedIR: .lowering
+      case .llvmIR: .llvm
+      case .executable: .execution
+      }
+    }
+
+    /// The textual description of `self`.
+    var description: String { rawValue }
+
+    /// The order of `self` among all artifact tags, which is used to sort them.
+    var order: Int {
+      switch self {
+      case .rawIR: 0
+      case .refinedIR: 1
+      case .llvmIR: 2
+      case .executable: 3
+      }
+    }
+
+    /// Returns true iff `l` is ordered before `r`.
+    static func < (l: CompilerTests.ArtifactTag, r: CompilerTests.ArtifactTag) -> Bool {
+      l.order < r.order
+    }
+
+  }
+
+  /// The intermediate artifacts of a module's compilation and testing.
   ///
   /// Members shall be set after the corresponding stage is completed.
   private struct Artifacts {
 
-    /// The lowered IR of the compiled module, if any.
-    var rawIR: String?
-
-    /// The transformed IR of the compiled module, if any.
-    var transformedIR: String?
-
-    /// The compiled IR artifact of the tested module, if any.
-    var llvmIR: String?
+    /// The textual artifacts of the compilation and testing pipeline, keyed by their tag.
+    private(set) var textual = SortedDictionary<ArtifactTag, String>()
 
     /// The URL of the generated executable residing in a temporary directory, if any.
     ///
@@ -102,18 +148,19 @@ final class CompilerTests: XCTestCase {
 
     /// Saves the artifacts into test-case-level observation files of `test`.
     func save(into test: TestDescription) throws {
-      if let a = rawIR {
-        try test.saveTestCaseLevelObservation(a, tag: "raw-ir")
+      for (tag, artifact) in textual {
+        try test.saveTestCaseLevelObservation(artifact, tag: tag.rawValue)
       }
-      if let a = transformedIR {
-        try test.saveTestCaseLevelObservation(a, tag: "transformed-ir")
-      }
-      if let a = llvmIR {
-        try test.saveTestCaseLevelObservation(a, tag: "ll")
-      }
-      if let a = executable {
+
+      if let a: URL = executable {
+        try? FileManager.default.removeItem(at: test.executableDestination())
         try FileManager.default.copyItem(at: a, to: test.executableDestination())
       }
+    }
+
+    /// Records the textual `artifact` as the artifact tagged `tag`.
+    mutating func record(_ artifact: String, for tag: ArtifactTag) {
+      textual[tag] = artifact
     }
 
   }
@@ -182,29 +229,47 @@ final class CompilerTests: XCTestCase {
 
   /// Compiles and runs `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    // Compile the input up until the specified stage.
-    let o = input.manifest.optimizations != .none
-    let r = try await compile(input, withOptimizations: o)
-    try assertSansError(r.driver.program)
+    await loggingSourceOnFailure(root: input.root) {
+      // Compile the input up until the specified stage.
+      let o = input.manifest.optimizations != .none
+      let r = try await compile(input, withOptimizations: o)
+      try assertSansError(r.driver.program)
 
-    // Should an executable be tested?
-    if input.manifest.stage == .execution {
-      let e = try XCTUnwrap(r.artifacts.executable)
-      let x = try Process.execute(e)
-      assertExitStatus(x, describedBy: input)
+      // Should an executable be tested?
+      if input.manifest.stage == .execution {
+        let e = try XCTUnwrap(r.artifacts.executable)
+        let x = try Process.execute(e)
+        assertExitStatus(x, describedBy: input)
+      }
+
+      if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
     }
-
-    if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    let r = try await compile(input, withOptimizations: false)
-    let m = "program compiled but an error was expected.\nSource: \(input.root.path)\n"
-    XCTAssert(r.driver.program.containsError, m)
-    assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
+    await loggingSourceOnFailure(root: input.root) {
+      let r = try await compile(input, withOptimizations: false)
+      let m = "program compiled but an error was expected.\nSource: \(input.root.path)\n"
+      XCTAssert(r.driver.program.containsError, m)
+      assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
 
-    if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
+      if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
+    }
+  }
+
+  /// Executes `action`, and logs the test case's `root` on test failure for easier diagnostics.
+  ///
+  /// Also logs and catches any error thrown by `action`, failing the test case.
+  private func loggingSourceOnFailure<T>(root: URL, _ action: () async throws -> T) async {
+    do {
+      _ = try await action()
+      if testFailed {
+        XCTFail("\nSource: \(root.path)\n")
+      }
+    } catch let e {
+      XCTFail("\(e)\nSource: \(root.path)\n")
+    }
   }
 
   /// Compiles `input` and returns the resulting artifacts.
@@ -236,8 +301,8 @@ final class CompilerTests: XCTestCase {
     var artifacts = Artifacts()
     do {
       try await compile(
-        m, until: input.manifest.stage, using: &driver,
-        accumulatingArtifactsInto: &artifacts)
+        m, until: input.manifest.stage, using: &driver, accumulatingArtifactsInto: &artifacts,
+        expectedArtifacts: input.manifest.artifactExpectations)
     } catch let e {
       try artifacts.save(into: input)
       throw e
@@ -255,7 +320,8 @@ final class CompilerTests: XCTestCase {
   /// adding compilation artifacts to `artifacts`.
   private func compile(
     _ m: Module.ID, until stage: Manifest.Stage, using driver: inout Driver,
-    accumulatingArtifactsInto artifacts: inout Artifacts
+    accumulatingArtifactsInto artifacts: inout Artifacts,
+    expectedArtifacts: SortedDictionary<ArtifactTag, String>
   ) async throws {
     // Exit if there are parsing errors or if the stage is set to `parsing`.
     if driver.program[m].containsError || (stage == .parsing) { return }
@@ -268,17 +334,24 @@ final class CompilerTests: XCTestCase {
     // IR Lowering.
     let l = await driver.lower(m)
     if l.containsError { return }
-    artifacts.rawIR = driver.program.show(driver.program[m].ir)
+    let rawIR = driver.program.show(driver.program[m].ir)
+    artifacts.record(rawIR, for: .rawIR)
+    assertArtifact(.rawIR, expected: expectedArtifacts[.rawIR], observed: rawIR)
 
     // IR Transformation passes.
     let t = await driver.applyTransformationPasses(m)
     if t.containsError { return }
-    artifacts.transformedIR = driver.program.show(driver.program[m].ir)
+    let refinedIR = driver.program.show(driver.program[m].ir)
+    artifacts.record(refinedIR, for: .refinedIR)
+    assertArtifact(.refinedIR, expected: expectedArtifacts[.refinedIR],
+      observed: refinedIR)
     if stage == .lowering { return }
 
     // LLVM Lowering.
     if (try driver.compileToLLVM(m)).containsError { return }
-    artifacts.llvmIR = driver.llvmIR(of: m)!
+    let llvmIR = driver.llvmIR(of: m)!
+    artifacts.record(llvmIR, for: .llvmIR)
+    assertArtifact(.llvmIR, expected: expectedArtifacts[.llvmIR], observed: llvmIR)
     if stage == .llvm { return }
 
     // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
@@ -292,6 +365,20 @@ final class CompilerTests: XCTestCase {
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
       _ = try driver.generateExecutable(from: m, writingTo: executable)
       artifacts.executable = executable
+    }
+  }
+
+  /// Asserts that the `observed` artifact tagged `tag` matches `expected`, if present.
+  private func assertArtifact(_ tag: ArtifactTag, expected: String?, observed: String) {
+    guard let e = expected else { return }
+
+    for c in IRMatching.comparisons(expected: e, observed: observed) {
+      guard let o = c.observed else {
+        XCTFail("No section in observed \(tag) matches:\n```\(c.expected)```\n")
+        continue
+      }
+
+      XCTAssertEqual(o, c.expected, "\(tag) did not meet expectations.")
     }
   }
 
