@@ -1976,6 +1976,19 @@ extension Program {
     }
   }
 
+  /// Returns the types the argument at `holeIndex` of `call` could be expected to have, unioned over
+  /// every overload of the callee viable given the other arguments.
+  ///
+  /// See `Typer.expectedArgumentTypes(at:ofCall:visibleFrom:)`. `self` is assumed already
+  /// type-checked.
+  public mutating func expectedArgumentTypes(
+    at holeIndex: Int, ofCall call: Call.ID, in m: Module.ID, visibleFrom scopeOfUse: ScopeIdentity
+  ) -> [AnyTypeIdentity] {
+    withTyper(typing: m) { (typer) in
+      typer.expectedArgumentTypes(at: holeIndex, ofCall: call, visibleFrom: scopeOfUse)
+    }
+  }
+
 }
 
 /// A member declaration and its type.
