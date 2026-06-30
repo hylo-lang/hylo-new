@@ -4264,8 +4264,94 @@ public struct Typer {
     }
   }
 
+  /// Returns the types the argument at `holeIndex` of `call` could be expected to have, unioned over
+  /// every overload of the callee that remains viable given the other arguments.
+  ///
+  /// This drives leading-dot completion in an argument position (`a(.<cursor>)`). A bare implicit
+  /// member there is never assigned an expected type by inference — doing so would force a premature
+  /// commitment to one overload (see `inferredType(of:Call.ID:)`) — so completion instead asks for
+  /// *all* plausible expected types and unions the members reachable on each. An overload is viable
+  /// iff the *other* arguments coerce to their corresponding parameters; that judgment is delegated
+  /// to the real solver, so disambiguation (`a(., B())`) and conformance/generic matching agree with
+  /// what the type checker would accept. The argument types of `call` are read from `self`, which is
+  /// assumed already type-checked.
+  internal mutating func expectedArgumentTypes(
+    at holeIndex: Int, ofCall call: Call.ID, visibleFrom scopeOfUse: ScopeIdentity
+  ) -> [AnyTypeIdentity] {
+    guard let callee = program.cast(program[call].callee, to: NameExpression.self) else { return [] }
+    let arguments = program[call].arguments
+    guard holeIndex < arguments.count else { return [] }
+
+    var result: [AnyTypeIdentity] = []
+    var seen: Set<AnyTypeIdentity> = []
+    for candidate in calleeCandidates(callee, visibleFrom: scopeOfUse) {
+      guard
+        let t = expectedHoleType(of: candidate, at: holeIndex, in: call, arguments: arguments)
+      else { continue }
+      if seen.insert(t).inserted { result.append(t) }
+    }
+    return result
+  }
+
+  /// Returns the overload set of the callee `callee` of a call in `scopeOfUse`.
+  private mutating func calleeCandidates(
+    _ callee: NameExpression.ID, visibleFrom scopeOfUse: ScopeIdentity
+  ) -> [NameResolutionCandidate] {
+    let name = program[callee].name.value
+    // Qualified callee (`x.a(...)`): resolve as a member of the qualification's type.
+    if let q = program[callee].qualification {
+      guard
+        let qt = program.type(maybeAssignedTo: q), qt != .error, !qt.isVariable,
+        !program.types.isMetatype(qt, of: \.isVariable)
+      else { return [] }
+      return resolve(name, memberOf: qt, visibleFrom: scopeOfUse)
+    }
+    // Unqualified callee (`a(...)`).
+    return resolve(name, unqualifiedIn: scopeOfUse)
+  }
+
+  /// Returns the parameter type aligned to `holeIndex` if `candidate` is a viable callee for `call`
+  /// given its other arguments, or `nil` otherwise.
+  private mutating func expectedHoleType(
+    of candidate: NameResolutionCandidate, at holeIndex: Int,
+    in call: Call.ID, arguments: [LabeledExpression]
+  ) -> AnyTypeIdentity? {
+    // Open generic parameters so they can unify with the argument types.
+    let (_, head) = program.types.open(candidate.type)
+    guard
+      program.types.isCallable(head, program[call].style),
+      let arrow = program.types.seenAsTermAbstraction(head)
+    else { return nil }
+
+    // Align arguments to parameters positionally and label-tolerantly: a value being completed is
+    // often unlabeled mid-edit. Arguments fill the leading parameters; any parameter left uncovered
+    // must be defaulted for the call to be viable (dropping defaultable overloads would narrow the
+    // union and hide valid completions).
+    let parameters = program.types[arrow].inputs
+    guard arguments.count <= parameters.count, holeIndex < parameters.count else { return nil }
+    for i in arguments.count ..< parameters.count where parameters[i].defaultValue == nil {
+      return nil
+    }
+
+    // The non-hole arguments must coerce to their parameters for this overload to be viable.
+    var obligations = Obligations()
+    for (i, a) in arguments.enumerated() where i != holeIndex {
+      guard let t = program.type(maybeAssignedTo: a.value), t != .error else { continue }
+      obligations.assume(
+        CoercionConstraint(
+          on: a.value, from: t, to: parameters[i].type, reason: .argument,
+          at: program.spanForDiagnostic(about: a.value)))
+    }
+    var solver = Solver(obligations, withLoggingEnabled: false)
+    let solution = solver.solution(using: &self)
+    guard !solution.diagnostics.containsError else { return nil }
+
+    let t = program.types.reify(parameters[holeIndex].type, applying: solution.substitutions)
+    return t == .error ? nil : t
+  }
+
   /// Returns a candidate for every native member of `q`.
-  /// 
+  ///
   /// Static members are returned iff `selectionIsStatic` is true.
   private mutating func nativeMembers(
     of q: AnyTypeIdentity, statically selectionIsStatic: Bool
