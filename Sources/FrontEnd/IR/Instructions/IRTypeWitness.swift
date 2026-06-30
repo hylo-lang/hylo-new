@@ -1,4 +1,7 @@
+import Archivist
+
 /// Creates a type witness using a runtime type constructor.
+@Archivable
 public struct IRTypeWitness: Instruction {
 
   /// The operands of the instruction.

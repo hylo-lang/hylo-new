@@ -131,7 +131,8 @@ internal struct IREmitter {
       // Emit the definition of the global's initializer.
       let global = demandLoweredDeclaration(variable: d)
       let lhs = program[program[d].pattern].pattern
-      defining(global.initializer.function!, at: program.anchor(introducerOf: d)) { (me) in
+      let initializer = program[module].ir.identity(function: global.initializer.function!)!
+      defining(initializer, at: program.anchor(introducerOf: d)) { (me) in
         me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
         me.lowering(rhs, { $0._return() })
       }
@@ -1439,7 +1440,8 @@ internal struct IREmitter {
     let f = program[module].ir.addFunction(i)
 
     // Declare the global itself.
-    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: .function(f))
+    let n = program[module].ir[f].name
+    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: .function(n))
     program[module].ir.addGlobal(g)
     return g
   }
@@ -2099,7 +2101,12 @@ internal struct IREmitter {
   }
 
   /// Inserts the contents of `source` before `boundary`, which is in `target`, substituting the
-  /// properties of copied instructions using `properties`
+  /// properties of copied instructions using `properties`.
+  ///
+  /// If `source` contains more than a single basic block, then all instructions from `boundary`
+  /// are placed in a new basic block and return instructions from `source` are inlined as jumps
+  /// to that block. If `source` contains exactly one basic block, then its return instructions
+  /// are simply ignored.
   internal mutating func insert(
     contentsOf source: IRFunction,
     before boundary: AnyInstructionIdentity, in target: inout IRFunction,
@@ -2127,9 +2134,8 @@ internal struct IREmitter {
     }
 
     // Use the dominance relationship to ensure definitions are visited before their uses.
-    let cfg = source.controlFlow()
-    let dominance = DominatorTree(function: source, controlFlow: cfg)
-    for b in dominance.bfs {
+    let dominance = DominatorTree(function: source, controlFlow: source.controlFlow())
+    for b in dominance {
       insertionContext.point = .end(of: properties.blocks[b]!)
       for i in source.instructions(in: b) {
         // If next instruction returns, then jump to the "after" block if it's been defined or
@@ -2450,28 +2456,52 @@ internal struct IREmitter {
     _end(IRAccess.self, openedBy: x0)
   }
 
-  /// Generates the IR for deinitializing `source` and returns `true` iff `source` can be
-  /// deinitialized. Otherwise, inserts a trap and returns `false`.
+  /// Generates the IR for deinitializing `source` and returns `true` iff `source` or its parts can
+  /// be deinitialized. Otherwise, inserts a trap and returns `false`.
+  ///
+  /// If `s` is instance of a structural type (e.g., a tuple), the method attempts to deinitialize
+  /// each part inidividually rather than the whole. Otherwise, deinitialization is done using a
+  /// witness of `Deinitializable`.
   @discardableResult
   internal mutating func _emitDeinitialize(_ source: IRValue) -> Bool {
-    let (typeOfSource, _) = currentFunction.result(of: source) ?? badOperand()
-    switch witnessOfDeinitializable(for: typeOfSource) {
+    let (t, _) = currentFunction.result(of: source) ?? badOperand()
+    return _emitDeinitialize(source, instanceOf: t)
+  }
+
+  /// Implements `_emitDeinitialize(_:)` for arbitrary types.
+  private mutating func _emitDeinitialize(
+    _ s: IRValue, instanceOf t: AnyTypeIdentity
+  ) -> Bool {
+    switch program.types.tag(of: t) {
+    case Tuple.self:
+      let u = program.types.castUnchecked(t, to: Tuple.self)
+      return _emitDeinitialize(tuple: s, instanceOf: u)
+    default:
+      return _emitDeinitialize(whole: s, instanceOf: t)
+    }
+  }
+
+  /// Implements `_emitDeinitialize(_:)` for types that cannot be decomposed structurally.
+  private mutating func _emitDeinitialize(
+    whole s: IRValue, instanceOf t: AnyTypeIdentity
+  ) -> Bool {
+    switch witnessOfDeinitializable(for: t) {
     case .none:
       _ = _apply_builtin(.trap, to: [])
       return false
 
     case .trivial:
-      _assume_state(source, initialized: false)
+      _assume_state(s, initialized: false)
       return true
 
     case .nontrivial(let w):
       let deinitializable = _emit(witness: w)
       let member = program.standardLibraryDeclaration(.deinitializableDeinit)
       let t0 = program.types.demand(
-        Arrow(inputs: [.init(access: .sink, type: typeOfSource)], output: .void))
+        Arrow(inputs: [.init(access: .sink, type: t)], output: .void))
 
       let x0 = _alloca(.void)
-      let x1 = _access([.sink], from: source)
+      let x1 = _access([.sink], from: s)
       let x2 = _access([.set], from: x0)
       let x3 = _property(member, of: deinitializable, withType: t0.erased)
       let x4 = _access([.let], from: x3)
@@ -2484,6 +2514,23 @@ internal struct IREmitter {
 
       return true
     }
+  }
+
+  /// Implements `_emitDeinitialize(_:)` for tuples..
+  private mutating func _emitDeinitialize(tuple s: IRValue, instanceOf t: Tuple.ID) -> Bool {
+    // Is the tuple empty?
+    let (ms, _) = program.types.members(of: t)
+    if ms.isEmpty {
+      _assume_state(s, initialized: false)
+      return true
+    }
+
+    // Otherwise, deinitialize each element individually.
+    for (i, m) in ms.enumerated() {
+      let s = _subfield(s, at: [i])
+      if !_emitDeinitialize(s, instanceOf: m) { return false }
+    }
+    return true
   }
 
   /// Generates the IR for move-initializing or move-assigning `target` with `source`.
@@ -2689,9 +2736,9 @@ internal struct IREmitter {
 
   /// Returns a reference to the given lowered function.
   internal mutating func functionReference(to f: IRFunction.ID) -> IRValue {
-    let s = program[module].ir[f].signature()
-    let t = program.types.demand(s)
-    return .function(f, module, t)
+    let d = program[module].ir[f]
+    let s = d.signature()
+    return .function(d.name, program.types.demand(s))
   }
 
   /// Returns the type arguments defined in the type of `q`, which occurs as qualification for a

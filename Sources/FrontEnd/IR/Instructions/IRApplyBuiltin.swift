@@ -1,6 +1,9 @@
+import Archivist
+
 /// Invokes a function of the `Builtin` module.
 ///
 /// Unlike `apply`, this instruction does produce a result.
+@Archivable
 public struct IRApplyBuiltin: Instruction {
 
   /// The operands of the instruction.

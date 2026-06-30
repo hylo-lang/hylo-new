@@ -7,6 +7,7 @@ import Archivist
 ///
 /// Refined IR requires that the return register of the function be definitely initialized before
 /// `return` is executed.
+@Archivable
 public struct IRReturn: Terminator {
 
   /// The region of the code corresponding to this instruction.

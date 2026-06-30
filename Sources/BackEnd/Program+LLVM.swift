@@ -61,7 +61,7 @@ extension Program {
     if case .lowered(let d) = v, let n = externName(of: d) {
       return n
     } else {
-      return mangled(f, of: ctx.hylo)
+      return mangled(v)
     }
   }
 
@@ -218,8 +218,8 @@ extension Program {
     let s = ctx.ir.at(i)
 
     // Is the call direct?
-    if case .function(let n, _, _) = s.callee {
-      let f = demandFunction(n, in: &ctx.module)
+    if case .function(let n, _) = s.callee {
+      let f = demandFunction(named: n, in: &ctx.module)
       let x = insertArguments(s.arguments, mappedWith: f.prototype.mapping, in: &ctx)
       insertCall(applying: f, to: x, writingResultTo: s.result, in: &ctx)
     }
@@ -331,8 +331,8 @@ extension Program {
     let s = ctx.ir.at(i)
 
     // Is the callee an addressor?
-    if let n = ctx.ir.seenAsAddressor(s.callee, in: self) {
-      let f = demandFunction(n, in: &ctx.module)
+    if let n = seenAsAddressor(s.callee, in: ctx) {
+      let f = demandFunction(named: n, in: &ctx.module)
       let x = insertArguments(s.arguments, mappedWith: f.prototype.mapping, in: &ctx)
       let y = ctx.module.llvm.insertCall(f.value, on: x, at: ctx.insertionPoint!)
       _ = y
@@ -343,8 +343,8 @@ extension Program {
     let (plateau, captures, covered) = definePlateau(dominatedBy: i, in: &ctx)
 
     switch s.callee {
-    case .function(let n, _, _):
-      let f = demandFunction(n, in: &ctx.module)
+    case .function(let n, _):
+      let f = demandFunction(named: n, in: &ctx.module)
       var x = insertArguments(s.arguments, mappedWith: f.prototype.mapping, in: &ctx)
       x.append(plateau.value.v)
       x.append(captures.v)
@@ -353,14 +353,14 @@ extension Program {
       // control flow should be transferred. This basic block must be a successor of one of the
       // blocks having been incorporated that is not dominated by `i`.
       let after = ctx.module.llvm.insertCall(f.value, on: x, at: ctx.insertionPoint!)
-      let successors = ctx.ir.decode(covered).reduce(into: IRBlockSet()) { (s, a) in
+      let successors = covered.elements.reduce(into: IRBlockSet()) { (s, a) in
         for b in ctx.ir.successors(of: a) where !covered.contains(b) { s.insert(b) }
       }
 
       // Compute the branches of a switch terminator redirecting control-flow.
       typealias Case = SwiftyLLVM.Module.SwitchCase
       let i32 = ctx.module.llvm.i32
-      let cases = ctx.ir.decode(successors).map { (b: IRBlock.ID) -> Case in
+      let cases = successors.elements.map { (b: IRBlock.ID) -> Case in
         let n = i32.unsafe[].constant(b.rawValue).v
         let b = ctx.demandBasicBlock(b)
         return (n, b)
@@ -542,6 +542,15 @@ extension Program {
     let v = ctx.llvm.declareFunction(name, p.signature)
     setupAttributes(of: v, compiledFrom: f, in: &ctx)
     return FunctionMetadata(prototype: p, value: v)
+  }
+
+  /// Returns the result of `demandFunction(_:in:)` with the identity of `f`, which is declared in
+  /// the module being compiled.
+  private mutating func demandFunction(
+    named f: IRFunction.Name, in ctx: inout ModuleGenerationContext
+  ) -> FunctionMetadata {
+    let k = self[ctx.hylo].ir.identity(function: f)!
+    return demandFunction(k, in: &ctx)
   }
 
   /// Returns the prototype of a LLVM IR function corresponding to a Hylo IR function whose
@@ -888,8 +897,8 @@ extension Program {
       return ctx.value[v]!
     case .integer(let n, let t):
       return codegen(integer: n, instanceOf: t, in: &ctx.module)
-    case .function(let n, _, _):
-      return demandFunction(n, in: &ctx.module).value.v
+    case .function(let n, _):
+      return demandFunction(named: n, in: &ctx.module).value.v
     default:
       fatalError("no LLVM representation of the Hylo value '\(show(v))'")
     }
@@ -1114,6 +1123,23 @@ extension Program {
       return ctx.llvm.functionPointer.t
     } else {
       return metadata(of: t, in: &ctx).llvm
+    }
+  }
+
+  /// Returns `v` iff identifies a subscript known to have a slide that compiles to a no-op.
+  private func seenAsAddressor(
+    _ v: FrontEnd.IRValue, in ctx: borrowing FunctionGenerationContext
+  ) -> IRFunction.Name? {
+    switch v {
+    case .function(let f, _):
+      if case .remote(_, _, let b) = self[ctx.module.hylo].ir.functions[f]?.output {
+        return b ? f : nil
+      } else {
+        return nil
+      }
+
+    default:
+      return nil
     }
   }
 

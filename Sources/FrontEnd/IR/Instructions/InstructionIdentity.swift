@@ -1,3 +1,4 @@
+import Archivist
 import StableCollections
 
 /// A type denoting the identity of an instruction.
@@ -30,10 +31,17 @@ extension InstructionIdentity {
 
 }
 
+/// The type-erased identity of an IR instruction.
+@Archivable
 public struct AnyInstructionIdentity {
 
   /// The address of the instruction identified by `self` in its containing function.
   public let address: List<IRFunction.Slot>.Address
+
+  /// Creates an instance identitfying the instruction at `address`.
+  public init(address: List<IRFunction.Slot>.Address) {
+    self.address = address
+  }
 
 }
 

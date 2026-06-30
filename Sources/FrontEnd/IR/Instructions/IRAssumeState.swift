@@ -1,4 +1,7 @@
+import Archivist
+
 /// Unsafely assumes the initialization state of memory storage.
+@Archivable
 public struct IRAssumeState: Instruction {
 
   /// The operands of the instruction.

@@ -1,6 +1,8 @@
+import Archivist
 import Utilities
 
 /// Projects a value by invoking the ramp of a subscript.
+@Archivable
 public struct IRProject: IRRegionEntry {
 
   /// The operands of the instruction.

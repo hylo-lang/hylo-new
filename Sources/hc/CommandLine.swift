@@ -166,21 +166,25 @@ private typealias Module = FrontEnd.Module
         return
       }
 
-      await perform("typing", for: module, {
+      await perform("typing", for: module) {
         await driver.assignTypes(of: module, loggingInferenceWhere: inferenceLoggerFilter())
-      })
+      }
       if outputType == .typedAST {
         try emitAst(module, in: driver.program, name: product)
         return
       }
 
-      await perform("lowering", for: module, { await driver.lower(module) })
+      await perform("lowering", for: module) { await
+        driver.lower(module)
+      }
       if outputType == .rawIR {
         try emitIR(module, in: driver.program, name: product)
         return
       }
 
-      await perform("normalization", for: module, { await driver.applyTransformationPasses(module) })
+      await perform("normalization", for: module) {
+        await driver.applyTransformationPasses(module)
+      }
       if outputType == .ir {
         try emitIR(module, in: driver.program, name: product)
         return
@@ -190,16 +194,16 @@ private typealias Module = FrontEnd.Module
       let a = try driver.program.archive(module: module)
       note("module archive size: \(a.count)")
 
-      try await perform("code generation", for: module, { try driver.compileToLLVM(module) })
+      try await perform("code generation", for: module) {
+        try driver.compileToLLVM(module)
+      }
       if outputType == .llvm {
         try emitLLVM(module, from: driver, name: product)
         return
-      }
-      if outputType == .asm {
+      } else if outputType == .asm {
         try write(driver.assembly(of: module), to: asmFile(product))
         return
-      }
-      if outputType == .object {
+      } else if outputType == .object {
         // FIXME: output the dependencies of `module`, including the standard library.
         let directory = try objectFilesDirectory()
         try driver.writeObjectFiles(for: [module], into: directory)
@@ -208,8 +212,9 @@ private typealias Module = FrontEnd.Module
       }
 
       assert(outputType == .binary)
-      try await perform("generating executable", for: module,
-        { try driver.generateExecutable(from: module, writingTo: binaryFile(product)) })
+      try await perform("generating executable", for: module) {
+        try driver.generateExecutable(from: module, writingTo: binaryFile(product))
+      }
     } catch let e as CompilationError {
       render(e.diagnostics.elements)
       CommandLine.exit(withError: ExitCode.failure)
@@ -328,15 +333,15 @@ private typealias Module = FrontEnd.Module
 
   /// Sets up the value of search paths for locating libraries and cached artifacts.
   private mutating func configureSearchPaths() throws {
-    let fm = FileManager.default
-    if let m = moduleCachePath {
-      librarySearchPaths.append(m)
+    let m = FileManager.default
+    if let cache = moduleCachePath {
+      librarySearchPaths.append(cache)
     } else {
-      let m = fm.temporaryDirectory.appending(path: ".hylocache")
-      try fm.createDirectory(at: m, withIntermediateDirectories: true)
-      note("using module cache path: \(m.path)")
-      librarySearchPaths.append(m)
-      moduleCachePath = m
+      let cache = m.temporaryDirectory.appending(path: ".hylocache")
+      try m.createDirectory(at: cache, withIntermediateDirectories: true)
+      note("module cache path: \(cache.path)")
+      librarySearchPaths.append(cache)
+      moduleCachePath = cache
     }
 
     librarySearchPaths = .init(librarySearchPaths.uniqued())

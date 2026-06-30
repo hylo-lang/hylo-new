@@ -1,3 +1,5 @@
+import Archivist
+
 /// Loads a value from memory to register.
 ///
 /// If the source is not a machine type, the operation requires exclusive access to the source,
@@ -5,6 +7,7 @@
 /// types, we always copy the values, so no consume semantics.
 /// 
 /// The size of the value being loaded must be known at compile-time.
+@Archivable
 public struct IRLoad: Instruction {
 
   /// The operands of the instruction.

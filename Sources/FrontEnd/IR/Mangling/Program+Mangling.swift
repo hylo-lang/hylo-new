@@ -16,12 +16,7 @@ extension Program {
   }
 
   /// Returns the mangled representation of `f` from module `m`.
-  public func mangled(_ f: IRFunction.ID, of m: Module.ID) -> String {
-    mangled(f, applying: { (s, me, o) in me.mangled(function: s, of: m, to: &o) })
-  }
-
-  /// Returns the mangled representation of `f` from module `m`.
-  public func mangled(_ n: IRFunction.Name, of m: Module.ID) -> String {
+  public func mangled(_ n: IRFunction.Name) -> String {
     mangled(n, applying: { (s, me, o) in me.mangled(function: n, to: &o) })
   }
 

@@ -179,6 +179,11 @@ public struct Module: Sendable {
       _modify { yield &functions.values[f] }
     }
 
+    /// Returns the identity of the function named `name`, if it exists in the module.
+    public func identity(function name: IRFunction.Name) -> IRFunction.ID? {
+      functions.index(forKey: name)
+    }
+
     /// Adds `f` to this module.
     ///
     /// - Requires: `self` contains no IR function having the name of `f`.
@@ -558,6 +563,20 @@ extension Module: Archivable {
       }
     }
 
+    // IR functions.
+    let functionCount = try archive.readUnsignedLEB128()
+    for _ in 0 ..< functionCount {
+      let f = try archive.read(IRFunction.self, in: &context)
+      ir.addFunction(f)
+    }
+
+    // IR variables.
+    let variableCount = try archive.readUnsignedLEB128()
+    for _ in 0 ..< variableCount {
+      let g = try archive.read(IRGlobal.self, in: &context)
+      ir.addGlobal(g)
+    }
+
     assert(hash == fingerprint, "module fingerprint does not match")
   }
 
@@ -612,6 +631,17 @@ extension Module: Archivable {
         try archive.write(s.nameToDeclaration, in: &ctx, sortedBy: \.key)
         try archive.write(s.witnessTables, in: &ctx)
       }
+
+      // IR functions.
+      archive.write(unsignedLEB128: ir.functions.count)
+      for f in ir.functions.values {
+        try archive.write(f, in: &ctx)
+      }
+
+      // IR variables.
+      try archive.write(contentsOf: ir.variables.values, in: &ctx) { (e, a, c) in
+        try e.write(to: &a, in: &c)
+      }
     }
   }
 
@@ -642,11 +672,14 @@ extension Module.IR: Showable {
 
     for g in variables.values {
       if first { first = false } else { result.write("\n") }
+      printer.resetUniquization()
       result.write(printer.show(g))
       result.write("\n")
     }
+
     for f in functions.values {
       if first { first = false } else { result.write("\n") }
+      printer.resetUniquization()
       result.write(printer.show(f))
       result.write("\n")
     }

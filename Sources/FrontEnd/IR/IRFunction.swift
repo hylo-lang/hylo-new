@@ -1,3 +1,4 @@
+import Archivist
 import StableCollections
 import Utilities
 
@@ -8,6 +9,7 @@ public struct IRFunction: Sendable {
   public typealias ID = Int
 
   /// The name of an IR function.
+  @Archivable
   public enum Name: Hashable, Sendable {
 
     /// The identity of a function lowered from sources.
@@ -34,6 +36,7 @@ public struct IRFunction: Sendable {
   }
 
   /// The way in which an IR function returns its result.
+  @Archivable
   public enum Output: Hashable, Sendable {
 
     /// The result is written to an output parameter.
@@ -385,21 +388,6 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `v` iff it denotes a subscript in `program` known to have an empty slide.
-  public func seenAsAddressor(_ v: IRValue, in program: Program) -> IRFunction.ID? {
-    switch v {
-    case .function(let f, let m, _):
-      if case .remote(_, _, let b) = program[m].ir[f].output {
-        return b ? f : nil
-      } else {
-        return nil
-      }
-
-    default:
-      return nil
-    }
-  }
-
   /// Returns the type of the value computed by `v` or `nil` if `v` doesn't compute any.
   ///
   /// - Requires: `v` is either a constant or an instruction in this function.
@@ -413,7 +401,7 @@ public struct IRFunction: Sendable {
       return (t.erased, false)
     case .floatingPoint(_, let t):
       return (t.erased, false)
-    case .function(_, _, let t):
+    case .function(_, let t):
       return (t, true)
     case .bundle(_, let t, _):
       return (t, true)
@@ -549,11 +537,6 @@ public struct IRFunction: Sendable {
     } else {
       return []
     }
-  }
-
-  /// Returns the identities encoded in `bs`.
-  public func decode(_ bs: IRBlockSet) -> some Sequence<IRBlock.ID> {
-    bs.elements.lazy.compactMap(blocks.address(rawValue:))
   }
 
   /// Returns the control flow graph of this function.
@@ -908,6 +891,106 @@ extension IRBlock {
       }
     }
 
+  }
+
+}
+
+extension IRFunction: Archivable {
+
+  public init<A>(from archive: inout ReadableArchive<A>, in context: inout Any) throws {
+    self.name = try archive.read(Name.self, in: &context)
+    self.output = try archive.read(Output.self, in: &context)
+    self.typeParameters = try archive.read([GenericParameter.ID].self, in: &context)
+    self.termParameters = try archive.read([IRParameter].self, in: &context)
+    self.slots = []
+    self.blocks = []
+    self.uses = [:]
+    self.bindings = [:]
+
+    /// Read the number of basic blocks in the function.
+    let blockCount = try archive.readUnsignedLEB128()
+
+    // Nothing else to do if there aren't any basic blocks.
+    if blockCount == 0 { return }
+
+    // Create the basic blocks and populate them.
+    for _ in 0 ..< blockCount { _ = addBlock() }
+    for b in blocks.addresses {
+      let instructionCount = try archive.readUnsignedLEB128()
+      for _ in 0 ..< instructionCount {
+        let t = try archive.read(InstructionTag.self, in: &context)
+        let v = try archive.read(t.value, in: &context)
+        append(v, to: b)
+      }
+    }
+
+    // Read the binding map.
+    let bindingCount = try archive.readUnsignedLEB128()
+    bindings.reserveCapacity(Int(bindingCount))
+    for _ in 0 ..< bindingCount {
+      let d = try archive.read(DeclarationIdentity.self, in: &context)
+      let v = try archive.read(IRValue.self, in: &context)
+      associate(d, with: v)
+    }
+  }
+
+  public func write<A>(to archive: inout WriteableArchive<A>, in context: inout Any) throws {
+    try archive.write(name, in: &context)
+    try archive.write(output, in: &context)
+    try archive.write(typeParameters, in: &context)
+    try archive.write(termParameters, in: &context)
+
+    // Write the number of basic blocks in the function. Note that the function cannot contain any
+    // unreachable block at this point.
+    archive.write(unsignedLEB128: blocks.count)
+
+    // Nothing else to do if there aren't any basic blocks.
+    if !isDefined { return }
+
+    // Prepare a substitution table to compute the canonical form of the function as we go. Basic
+    // blocks are renamed with a zero-based offset and serialized in an order guaranteeing that
+    // definitions appear before their uses when the archive is deserialized.
+    let dominance = DominatorTree(function: self, controlFlow: self.controlFlow())
+    let ordered = Array(dominance)
+    var table = IRSubstitutionTable()
+    for b in ordered {
+      table[b] = IRBlock.ID(table.blocks.count)
+    }
+    assert(blocks.count == table.blocks.count)
+
+    // Write the contents of the function to the archive, visiting its basic blocks in such a way
+    // that they can be deserialized in a single forward pass.
+    var registers = 0
+    for b in ordered {
+      // Write the number of instructions in the block.
+      let all = Array(instructions(in: b))
+      archive.write(unsignedLEB128: all.count)
+
+      for i in all {
+        // Create a copy of the instruction in which references to registers and basic blocks have
+        // been replaced with their corresponding values in the archive.
+        let s = at(i)
+        let t = type(of: s)
+        let c = t.init(s, substituting: table)!
+
+        // Does the instruction define a register that may be referred to?
+        if c.type != .nothing {
+          table[.register(i)] = .register(.init(address: .init(registers)))
+        }
+
+        // Write the instruction.
+        try archive.write(InstructionTag(t), in: &context)
+        try archive.write(c, in: &context)
+
+        registers += 1
+      }
+    }
+
+    // Write the binding map.
+    try archive.write(contentsOf: bindings.sorted(by: \.key), in: &context) { (x, a, c) in
+      try x.key.write(to: &a, in: &c)
+      try x.value.write(to: &a, in: &c)
+    }
   }
 
 }
