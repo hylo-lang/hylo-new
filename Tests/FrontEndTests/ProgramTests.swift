@@ -238,13 +238,13 @@ final class ProgramTests: XCTestCase {
   func testTypeMaybeAssignedNil() async throws {
     var p = Program(forTesting: true)
     let m = p.demandModule("Main")
-    _ = p[m].addSource("let (e, b) = ((), (), ())")
+    _ = p[m].addSource("let (ill, typed) = ((), (), ())")
 
     await p.assignScopes(m)
     p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
     
-    // `e` should not have a type; it's not assigned.
-    let e = try XCTUnwrap(p.select(.name("e")).first)
+    // `ill` should not have a type; it's not assigned.
+    let e = try XCTUnwrap(p.select(.name("ill")).first)
     XCTAssertNil(p.type(maybeAssignedTo: e))
   }
 
