@@ -4147,7 +4147,7 @@ public struct Typer {
   }
 
   /// Returns candidates for resolving `n` without qualification in `scopeOfUse`.
-  private mutating func resolve(
+  internal mutating func resolve(
     _ n: Name, unqualifiedIn scopeOfUse: ScopeIdentity
   ) -> [NameResolutionCandidate] {
     var candidates: [NameResolutionCandidate] = []
@@ -4349,7 +4349,7 @@ public struct Typer {
   }
 
   /// Returns the natives members of `q`.
-  /// 
+  ///
   /// Static members are included iff `selectionIsStatic` is true.
   private mutating func nativeMembers(
     of q: AnyTypeIdentity, resolvedStatically selectionIsStatic: Bool
@@ -4375,7 +4375,7 @@ public struct Typer {
   /// 
   /// Static members are included iff `selectionIsStatic` is true.
   private mutating func extensionMembers(
-    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, 
+    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity,
     resolvedStatically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
     // Mirrors `resolve(_:declaredIn:applyingTo:in:statically:)` but without filtering by name.
@@ -4563,7 +4563,7 @@ public struct Typer {
   /// are contained in `bound` (unless it is `nil`).
   ///
   /// If `bound` is not `nil`, it is a scope equal to or ancestor of `scopeOfUse`.
-  private mutating func lookup(
+  internal mutating func lookup(
     _ name: Name, unqualifiedIn scopeOfUse: ScopeIdentity, containedIn bound: ScopeIdentity? = nil
   ) -> [DeclarationIdentity] {
     var result: [DeclarationIdentity] = []
@@ -4680,7 +4680,7 @@ public struct Typer {
 
   /// Returns `true` iff `m` is part of the declaration shown when enumerating the members of a type.
   ///
-  /// In addition to `resolvableWithQualification`, this excludes the synthesized variable 
+  /// In addition to `resolvableWithQualification`, this excludes the synthesized variable
   /// introduced by a given. Such a value should be reached through implicit resolution, not
   /// member selection.
   private func isEnumerableMember(_ m: DeclarationIdentity) -> Bool {
@@ -4793,7 +4793,7 @@ public struct Typer {
   }
 
   /// Returns the modules that are imported by `f`, which is in the module being typed.
-  private mutating func imports(of f: SourceFile.ID) -> [Module.ID] {
+  internal mutating func imports(of f: SourceFile.ID) -> [Module.ID] {
     if let table = cache.sourceToImports[f.offset] {
       return table
     } else {
