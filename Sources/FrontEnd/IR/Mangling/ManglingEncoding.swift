@@ -1197,7 +1197,7 @@ internal struct ManglingEncoding: Sendable {
     // Only encode notation and introducer; labels are encoded in types.
     // Encode the presence of introducer in the tag.
     var tag = UInt8(name.notation.rawValue)
-    if name.introducer != nil { tag = tag | 0x80 }
+    if name.introducer != nil { tag = tag | 0x20 }
     output.add(base64Digit: tag)
     if let i = name.introducer {
       output.add(base64Digit: i)
@@ -1208,8 +1208,8 @@ internal struct ManglingEncoding: Sendable {
   /// Demangles a name from `source`.
   private static func takeName(from source: inout DemanglingContext) -> Name? {
     guard let tag = source.take(Base64Digit.self)?.rawValue else { return nil }
-    let hasIntroducer = (tag & 0x80) != 0
-    let notation = OperatorNotation(rawValue: tag & 0x7F)
+    let hasIntroducer = (tag & 0x20) != 0
+    let notation = OperatorNotation(rawValue: tag & 0x1F)
     let introducer = hasIntroducer
       ? source.take(Base64Digit.self).flatMap { (d) in AccessEffect(rawValue: d.rawValue) }
       : nil
