@@ -1,7 +1,10 @@
+import Archivist
+
 /// Copies the memory representation of the value stored in memory.
 ///
 /// This instruction implements the behavior of `memcpy` from libc. The source of the copy must not
 /// overlap with its destination.
+@Archivable
 public struct IRMemoryCopy: Instruction {
 
   /// The operands of the instruction.

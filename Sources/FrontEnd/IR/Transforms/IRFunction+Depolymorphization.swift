@@ -22,7 +22,7 @@ extension IRFunction {
     emittingInto m: Module.ID, using typer: inout Typer
   ) {
     assert(isDefined)
-    if isMonomorphic || !typer.program.isPrivate(name, in: m) { return }
+    if isMonomorphic || typer.program.isPrivate(name, in: m) { return }
 
     typer.program.withEmitter(insertingIn: m) { (emitter) in
       emitter.existentialize(self)

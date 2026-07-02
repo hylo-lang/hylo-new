@@ -17,6 +17,7 @@ Tests/CompilerTests/CompilerTests+GeneratedTests.swift
 
 # Observations during testing
 Tests/CompilerTests/**/*.observed
+Tests/CompilerTests/**/*.observed.exe
 StandardLibrary/**/*.observed
 
 # Local development

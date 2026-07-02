@@ -9,8 +9,6 @@ public trait Numeric refines AdditiveArithmetic {
   /// Writes the result of `self * other` to `self`.
   ///
   /// - Requires: `self * other` is representable in `Self`.
-  fun infix*= (other: Self) inout {
-    &self = self * other
-  }
+  fun infix*= (other: Self) inout
 
 }

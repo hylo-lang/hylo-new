@@ -5,11 +5,12 @@ import XCTest
 
 final class SimpleFunctionEmitterTest: XCTestCase {
 
-  // TODO: Re-enable when transpileToLLVM is implemented.
   func testTrivial() async throws {
     var driver = try Driver(targetSpecification: .native())
 
-    let m = driver.program.demandModule("M0")
+    let m = driver.program.demandModule("test")
+    let s: SourceFile = "public fun main() {}"
+    driver.program[m].addSource(s)
 
     if await driver.assignScopes(of: m).containsError { return XCTFail("Failed to assign scopes") }
     if await driver.assignTypes(of: m).containsError { return XCTFail("Failed to assign types") }
@@ -24,20 +25,27 @@ final class SimpleFunctionEmitterTest: XCTestCase {
 
     // LLVM Lowering.
     if (try driver.compileToLLVM(m)).containsError { return XCTFail("Failed to lower to LLVM") }
+    let llvmIR = try XCTUnwrap(driver.llvmIR(of: m))
 
-    XCTAssertEqual(
-      driver.llvmIR(of: m),
-      """
-      ; ModuleID = 'MainModule'
-      source_filename = "MainModule"
+    // Did de lower the main function?
+    XCTAssert(
+      llvmIR.containsOnce(
+        """
+        define private void @"M6testvUpvirtualu6rky9fkv9x3F06mainlT01tR50tR5$gP71L1L1L"() {
+          %1 = alloca {}, align 8
+          ret void
+        }
+        """))
 
-      define i32 @main() {
-        ret i32 0
-      }
-
-      """)
-
-    XCTAssertTrue(try driver.assembly(of: m).contains("main:"))
+    // Did de lower the entry point?
+    XCTAssert(
+      llvmIR.containsOnce(
+        """
+        define i32 @main() {
+          call void @"M6testvUpvirtualu6rky9fkv9x3F06mainlT01tR50tR5$gP71L1L1L"()
+          ret i32 0
+        }
+        """))
 
     let output = try FileManager.default.withUniqueTemporaryDirectory { (d) in
       let executable = d.appendingPathComponent(driver.program[m].name)
@@ -46,6 +54,19 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     }
 
     XCTAssertEqual(output.trimming(while: \.isWhitespace), "")
+  }
+
+}
+
+extension StringProtocol {
+
+  /// Returns `true` iff `self` contains exactly one occurrence of `s`.s
+  fileprivate func containsOnce(_ s: String) -> Bool {
+    if let i = self.firstRange(of: s) {
+      return !self.suffix(from: i.upperBound).contains(s)
+    } else {
+      return false
+    }
   }
 
 }

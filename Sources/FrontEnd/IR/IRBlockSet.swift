@@ -5,24 +5,25 @@ import StableCollections
 public struct IRBlockSet: Hashable, Sendable {
 
   /// The raw values of the identities in `self`.
-  ///
-  /// The elements of this collection can be passed to `IRFunction.decode(_:)` to obtain the
-  /// corresponding identity.
-  public private(set) var elements: BitSet
+  private(set) var rawValue: BitSet
 
   /// Creates an empty instance.
   public init() {
-    self.elements = .init()
+    self.rawValue = .init()
+  }
+
+  public var elements: some Sequence<IRBlock.ID> {
+    rawValue.lazy.compactMap(IRBlock.ID.init(_:))
   }
 
   /// Inserts all the contents `other` into `self`.
   public mutating func formUnion<S: Sequence<IRBlock.ID>>(_ other: S) {
-    for b in other { elements.insert(b.rawValue) }
+    for b in other { rawValue.insert(b.rawValue) }
   }
 
   /// Removes all elements in `self`.
   public mutating func removeAll() {
-    self.elements = .init()
+    self.rawValue = .init()
   }
 
 }
@@ -32,28 +33,28 @@ extension IRBlockSet: SetAlgebra {
   public typealias Element = IRBlock.ID
 
   public func contains(_ b: IRBlock.ID) -> Bool {
-    elements.contains(b.rawValue)
+    rawValue.contains(b.rawValue)
   }
 
   @discardableResult
   public mutating func insert(_ b: IRBlock.ID) -> (inserted: Bool, memberAfterInsert: IRBlock.ID) {
-    let inserted = elements.insert(b.rawValue).inserted
+    let inserted = rawValue.insert(b.rawValue).inserted
     return (inserted, b)
   }
 
   @discardableResult
   public mutating func update(with b: IRBlock.ID) -> IRBlock.ID? {
-    let inserted = elements.insert(b.rawValue).inserted
+    let inserted = rawValue.insert(b.rawValue).inserted
     return inserted ? b : nil
   }
 
   @discardableResult
   public mutating func remove(_ b: IRBlock.ID) -> IRBlock.ID? {
-    elements.remove(b.rawValue).map({ _ in b })
+    rawValue.remove(b.rawValue).map({ _ in b })
   }
 
   public mutating func formUnion(_ other: Self) {
-    elements.formUnion(other.elements)
+    rawValue.formUnion(other.rawValue)
   }
 
   public func union(_ other: IRBlockSet) -> IRBlockSet {
@@ -63,7 +64,7 @@ extension IRBlockSet: SetAlgebra {
   }
 
   public mutating func formIntersection(_ other: Self) {
-    elements.formIntersection(other.elements)
+    rawValue.formIntersection(other.rawValue)
   }
 
   public func intersection(_ other: IRBlockSet) -> IRBlockSet {
@@ -73,7 +74,7 @@ extension IRBlockSet: SetAlgebra {
   }
 
   public mutating func formSymmetricDifference(_ other: Self) {
-    elements.formSymmetricDifference(other.elements)
+    rawValue.formSymmetricDifference(other.rawValue)
   }
 
   public func symmetricDifference(_ other: IRBlockSet) -> IRBlockSet {

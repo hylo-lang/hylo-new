@@ -41,8 +41,9 @@ extension IREmitter {
     // Otherwise, replace the type application's arguments with type witnesses. The way in which
     // this substitution is done depends on the way the type application is used.
     switch f.at(i).callee {
-    case .function(let c, _, _):
-      depolymorphize(c, operandOf: i, in: &f, reusing: &witnesses)
+    case .function(let c, _):
+      let k = program[module].ir.identity(function: c)!
+      depolymorphize(k, operandOf: i, in: &f, reusing: &witnesses)
 
     default:
       unimplemented("first class function deploymorphization")
@@ -217,9 +218,8 @@ extension IREmitter {
     }
 
     // Iterate over the basic blocks in such a way that definitions are visited before their uses.
-    let cfg = poly.controlFlow()
-    let dominance = DominatorTree(function: poly, controlFlow: cfg)
-    for b in dominance.bfs {
+    let dominance = DominatorTree(function: poly, controlFlow: poly.controlFlow())
+    for b in dominance {
       for i in poly.instructions(in: b) {
         /// Where the next instruction should be inserted.
         let p = InsertionPoint.end(of: properties[b])

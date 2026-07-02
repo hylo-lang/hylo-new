@@ -62,7 +62,15 @@ public struct Parser {
   internal consuming func parseTopLevelDeclarations(in file: inout Module.SourceContainer) {
     assert(file.roots.isEmpty)
     var roots: [DeclarationIdentity] = []
-    while peek() != nil {
+
+    while true {
+      // Ignore leading semicolons.
+      discard(while: { (t) in t.tag == .semicolon })
+
+      // Did we reach the end of the stream?
+      if peek() == nil { break }
+
+      // Otherwise, parse a declaration.
       do {
         try roots.append(parseDeclaration(in: &file))
       } catch let e as ParseError {
@@ -72,6 +80,7 @@ public struct Parser {
         unreachable()
       }
     }
+
     for e in errors { file.addDiagnostic(.init(e)) }
     swap(&file.roots, &roots)
   }

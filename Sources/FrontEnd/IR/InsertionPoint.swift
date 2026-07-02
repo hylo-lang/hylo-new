@@ -9,8 +9,8 @@ internal enum InsertionPoint {
 
   /// Returns the insertion at the start of `b`, which is in `f`.
   static func start(of b: IRBlock.ID, in f: IRFunction) -> InsertionPoint {
-    if let i = f.blocks[b].first, let j = f.instruction(after: i) {
-      return .before(j)
+    if let i = f.blocks[b].first {
+      return .before(i)
     } else {
       return .end(of: b)
     }

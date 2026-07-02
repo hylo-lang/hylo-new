@@ -470,11 +470,19 @@ public struct TypeStore: Sendable {
   public func seenAsTraitApplication<T: TypeIdentity>(
     _ n: T
   ) -> (concept: Trait.ID, arguments: TypeArguments)? {
-    if let t = cast(n, to: TypeApplication.self),
-      let u = cast(self[t].abstraction, to: Trait.self),
-      !self[t].arguments.isEmpty
-    {
-      return (concept: u, arguments: self[t].arguments)
+    if let t = cast(n, to: TypeApplication.self) {
+      return seenAsTraitApplication(t)
+    } else {
+      return nil
+    }
+  }
+
+  /// Returns `(P, [A...])` iff `n` has the form `P<A...>`.
+  public func seenAsTraitApplication(
+    _ n: TypeApplication.ID
+  ) -> (concept: Trait.ID, arguments: TypeArguments)? {
+    if let u = cast(self[n].abstraction, to: Trait.self), !self[n].arguments.isEmpty {
+      return (concept: u, arguments: self[n].arguments)
     } else {
       return nil
     }

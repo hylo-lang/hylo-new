@@ -1,8 +1,11 @@
+import Archivist
+
 /// Creates a closure by partially applying a function to a sequence of arguments.
 ///
 /// The function being partially applied is monomorphic (i.e., it does not accept any generic type
 /// parameter). The sequence of arguments are passed to the parameters of the function, from left
 /// to right. The lifetime of each argument is extended by the lifetime of the resulting closure.
+@Archivable
 public struct IRPartialApply: Instruction {
 
   /// The operands of the instruction.

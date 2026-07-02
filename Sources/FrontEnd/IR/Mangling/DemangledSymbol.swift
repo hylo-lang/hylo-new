@@ -134,6 +134,12 @@ internal indirect enum DemangledEntity: Hashable, Sendable {
   /// An IRFunction with `name == .existentialized`.
   case existentialized(DemangledEntity)
 
+  /// An IRFunction with `name == .slide`.
+   case slide(DemangledEntity, Int)
+
+  /// An IRFunction with `name == .plateau`.
+  case plateau(DemangledEntity, Int)
+
   /// A qualified entity with `head` as the innermost component and `previous` as the qualification.
   case qualified(head: DemangledEntity, previous: DemangledEntity)
 
@@ -193,6 +199,10 @@ extension DemangledEntity: CustomStringConvertible {
       return "\(e) implements \(c)<\(args)>"
     case .existentialized(let e):
       return "some \(e)"
+    case .slide(let e, let n):
+      return "slide \(e) \(n)"
+    case .plateau(let e, let n):
+      return "plateau \(e) \(n)"
     case .qualified(let head, let previous):
       return "\(previous).\(head)"
     case .error:
@@ -287,6 +297,9 @@ internal indirect enum DemangledType: Hashable, Sendable {
 
   /// A type application.
   case typeApplication(abstraction: DemangledType, arguments: [TypeApplicationArgument])
+
+  /// A type witness.
+  case typeWitness
 
   /// An universal type.
   case universalType(parameters: [DemangledType], head: DemangledType)
@@ -395,6 +408,9 @@ extension DemangledType: CustomStringConvertible {
     case .typeApplication(let abstraction, let arguments):
       let args = arguments.map({ (a) in "[\(a.formal): \(a.argument)]" }).joined(separator: ", ")
       return "\(abstraction)<\(args)>"
+
+    case .typeWitness:
+      return "Type"
 
     case .universalType(let parameters, let head):
       return "<\(list: parameters)> \(head)"

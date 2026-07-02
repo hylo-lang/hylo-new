@@ -1,0 +1,20 @@
+//! exit-status:23
+
+@inline(never)
+subscript id(x: inout Int32) inout -> Int32 {
+  yield &x
+}
+
+@inline(never)
+subscript reset(x: inout Int32) inout -> Int32 {
+  &id[&x] = 34
+  &id[&x] = 45
+  yield &x
+  &id[&x] = 23
+}
+
+fun main() -> Int32 {
+  var a: Int32 = 0
+  &reset[&a] = 99
+  return a
+}

@@ -1,5 +1,7 @@
+import Archivist
+
 /// An instruction in Hylo IR.
-public protocol Instruction: Hashable, Showable, Sendable {
+public protocol Instruction: Hashable, Showable, Archivable, Sendable {
 
   /// The operands of the instruction.
   var operands: [IRValue] { get }
@@ -16,7 +18,7 @@ public protocol Instruction: Hashable, Showable, Sendable {
   /// Creates a copy of `other`, substituting its properties with `properties`.
   init(_ other: Self, substituting properties: borrowing IRSubstitutionTable)
 
-  /// Asserts that the well-formedness conditions of the instruction hold.
+  /// Asserts the well-formedness conditions of the instruction.
   func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool
 
 }
@@ -51,6 +53,11 @@ extension Instruction {
 
   public var isExtendingOperandLifetimes: Bool {
     false
+  }
+
+  /// Returns `true` iff `self` has the same representation as `other`.
+  public func equals(_ other: any Instruction) -> Bool {
+    self == other as? Self
   }
 
   /// Returns `self` in which properties have been replaced with their substitution in `ss`.

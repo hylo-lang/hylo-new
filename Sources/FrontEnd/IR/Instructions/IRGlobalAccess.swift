@@ -1,7 +1,10 @@
+import Archivist
+
 /// Accesses the storage of a global variable.
 ///
 /// This instruction defines a place representing the contents of a global variable after it has
 /// been initialized. The object stored at that place is immutable.
+@Archivable
 public struct IRGlobalAccess: Instruction {
 
   /// The global variable being accessed.

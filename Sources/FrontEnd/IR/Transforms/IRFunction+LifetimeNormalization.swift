@@ -425,6 +425,7 @@ private struct Transfer: AbstractTransferFunction {
 
     context.memory[source] = nil
     context.locals[source] = nil
+    context.locals.removeAll(where: { (_, p) in p.place?.location.root == source })
     return f.instruction(after: i.erased)
   }
 
@@ -517,7 +518,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRYield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let (k, _) = f.output.remote!
+    let (k, _, _) = f.output.remote!
     passArgument(k, f.at(i).projectee, insertingDeinitializationBefore: i.erased, in: &f)
     return f.instruction(after: i.erased)
   }

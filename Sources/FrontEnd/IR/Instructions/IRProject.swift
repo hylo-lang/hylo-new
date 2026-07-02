@@ -1,6 +1,8 @@
+import Archivist
 import Utilities
 
 /// Projects a value by invoking the ramp of a subscript.
+@Archivable
 public struct IRProject: IRRegionEntry {
 
   /// The operands of the instruction.
@@ -58,7 +60,7 @@ public struct IRProject: IRRegionEntry {
     true
   }
 
-  /// Asserts that the well-formedness conditions of the instruction hold.
+  /// Asserts the well-formedness conditions of the instruction.
   ///
   /// Returns `true` iff the following conditions hold:
   ///

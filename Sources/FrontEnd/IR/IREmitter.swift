@@ -131,7 +131,8 @@ internal struct IREmitter {
       // Emit the definition of the global's initializer.
       let global = demandLoweredDeclaration(variable: d)
       let lhs = program[program[d].pattern].pattern
-      defining(global.initializer, at: program.anchor(introducerOf: d)) { (me) in
+      let initializer = program[module].ir.identity(function: global.initializer.function!)!
+      defining(initializer, at: program.anchor(introducerOf: d)) { (me) in
         me.lowerInitialization(bindingsIn: lhs, storedIn: .parameter(0), consuming: rhs)
         me.lowering(rhs, { $0._return() })
       }
@@ -202,7 +203,7 @@ internal struct IREmitter {
   /// insertion context is configured to generate IR into its lowered form.
   private mutating func lowerDefinition(_ d: ConformanceDeclaration.ID) {
     insertionContext.anchor = .init(site: program[d].introducer.site, scope: .init(node: d))
-    let (_, w) = currentFunction.output.remote!
+    let (_, w, _) = currentFunction.output.remote!
 
     // If the conformance is a nested given, we can simply extract the witness from the parameter
     // accepting a witness of a conformance to the enclosing trait.
@@ -277,7 +278,7 @@ internal struct IREmitter {
     precondition(requirements.types.isEmpty, "not implemented")
 
     let x0 = _alloca(w.erased)
-    let x1 = _witnesstable(type: w.erased, members: members)
+    let x1 = _witnesstable(type: w.erased, operands: members)
     _emitInitialize(x0, with: x1)
     let x2 = _access([.let], from: x0)
     _yield(x2)
@@ -572,7 +573,7 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Yield.ID) -> ControlFlow {
-    let (k, _) = currentFunction.output.remote!
+    let (k, _, _) = currentFunction.output.remote!
     let v = lowered(lvalue: program[s].value)
     lowering(s) { (me) in
       let x = me._access([k], from: v)
@@ -622,7 +623,10 @@ internal struct IREmitter {
     let v = IRValue.integer(
       program[e].value ? 1 : 0,
       program.types.demand(MachineType.i(1)))
-    lowering(e, { $0._emitInitialize(target, with: v) })
+    lowering(e) { (me) in
+      let x0 = me._subfield(target, at: [0])
+      me._emitInitialize(x0, with: v)
+    }
   }
 
   /// Implements `lower(store:to:)` for call expressions.
@@ -632,19 +636,15 @@ internal struct IREmitter {
       let scalar = loweredBuiltinScalarLiteralConversion(e, applying: f)
       return lowering(e) { (me) in
         let x0 = me._subfield(target, at: [0])
-        let x1 = me._access([.set], from: x0)
-        me._store(scalar, to: x1)
-        me._end(IRAccess.self, openedBy: x1)
+        me._emitInitialize(x0, with: scalar)
       }
     }
 
     // Are we lowering a built-in call?
     else if let f = program.asBuiltinFunction(program[e].callee) {
       return lowering(e) { (me) in
-        let x0 = me._lower(builtin: f, appliedTo: me.program[e].arguments)
-        let x1 = me._access([.set], from: target)
-        me._store(x0, to: x1)
-        me._end(IRAccess.self, openedBy: x1)
+        let result = me._lower(builtin: f, appliedTo: me.program[e].arguments)
+        me._emitInitialize(target, with: result)
       }
     }
 
@@ -731,7 +731,7 @@ internal struct IREmitter {
   private mutating func lower(store e: IntegerLiteral.ID, to target: IRValue) {
     unreachable()
   }
-  
+
   /// Implements `lower(store:to:)` for integer literals.
   private mutating func lower(store e: FloatingPointLiteral.ID, to target: IRValue) {
     unreachable()
@@ -1440,7 +1440,26 @@ internal struct IREmitter {
     let f = program[module].ir.addFunction(i)
 
     // Declare the global itself.
-    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: f)
+    let n = program[module].ir[f].name
+    let g = IRGlobal(name: name, storageType: t, alignment: .preferred, initializer: .function(n))
+    program[module].ir.addGlobal(g)
+    return g
+  }
+
+  /// Returns a IR variable assigned to the type witness of `t`, which is a closed type.
+  private mutating func demandGlobalTypeWitness(
+    _ t: AnyTypeIdentity
+  ) -> IRGlobal {
+    let u = program.types.dealiased(t)
+
+    let name = IRGlobal.Name.witness(u)
+    if let g = program[module].ir.variables[name] {
+      return g
+    }
+
+    let w = program.types.demand(TypeWitness())
+    let g = IRGlobal(
+      name: name, storageType: w.erased, alignment: .preferred, initializer: .typeWitness(u))
     program[module].ir.addGlobal(g)
     return g
   }
@@ -1483,7 +1502,7 @@ internal struct IREmitter {
       terms.append(IRParameter(type: u, access: .let, declaration: nil))
     }
 
-    return (terms, .remote(.let, witness.head))
+    return (terms, .remote(.let, witness.head, isAddressor: false))
   }
 
   /// Returns the term parameters and return type of `d`'s lowered representation.
@@ -1554,7 +1573,7 @@ internal struct IREmitter {
       terms.append(IRParameter(type: t, access: .set, declaration: nil))
       return (terms, .indirect)
     } else {
-      return (terms, .remote(program.types[shape].effect, t))
+      return (terms, .remote(program.types[shape].effect, t, isAddressor: false))
     }
   }
 
@@ -1995,12 +2014,10 @@ internal struct IREmitter {
 
   /// Inserts a `property` instruction.
   internal mutating func _property(
-    _ property: DeclarationIdentity,
-    of receiver: IRValue,
-    withType propertyType: AnyTypeIdentity
+    _ property: DeclarationIdentity, of record: IRValue, withType propertyType: AnyTypeIdentity
   ) -> IRValue {
     let s = IRProperty(
-      receiver: receiver, property: property, propertyType: propertyType,
+      record: record, property: property, propertyType: propertyType,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2071,9 +2088,11 @@ internal struct IREmitter {
 
   /// Inserts a `witnesstable` instruction.
   internal mutating func _witnesstable(
-    type: AnyTypeIdentity, members: [IRValue]
+    type: AnyTypeIdentity, operands: [IRValue]
   ) -> IRValue {
-    insert(IRWitnessTable(witnessType: type, members: members, anchor: currentAnchor))!
+    let t = program.types.dealiased(type)
+    let s = IRWitnessTable(witnessType: t, operands: operands, anchor: currentAnchor)
+    return insert(s)!
   }
 
   /// Inserts a `return` instruction.
@@ -2082,7 +2101,12 @@ internal struct IREmitter {
   }
 
   /// Inserts the contents of `source` before `boundary`, which is in `target`, substituting the
-  /// properties of copied instructions using `properties`
+  /// properties of copied instructions using `properties`.
+  ///
+  /// If `source` contains more than a single basic block, then all instructions from `boundary`
+  /// are placed in a new basic block and return instructions from `source` are inlined as jumps
+  /// to that block. If `source` contains exactly one basic block, then its return instructions
+  /// are simply ignored.
   internal mutating func insert(
     contentsOf source: IRFunction,
     before boundary: AnyInstructionIdentity, in target: inout IRFunction,
@@ -2110,9 +2134,8 @@ internal struct IREmitter {
     }
 
     // Use the dominance relationship to ensure definitions are visited before their uses.
-    let cfg = source.controlFlow()
-    let dominance = DominatorTree(function: source, controlFlow: cfg)
-    for b in dominance.bfs {
+    let dominance = DominatorTree(function: source, controlFlow: source.controlFlow())
+    for b in dominance {
       insertionContext.point = .end(of: properties.blocks[b]!)
       for i in source.instructions(in: b) {
         // If next instruction returns, then jump to the "after" block if it's been defined or
@@ -2433,28 +2456,52 @@ internal struct IREmitter {
     _end(IRAccess.self, openedBy: x0)
   }
 
-  /// Generates the IR for deinitializing `source` and returns `true` iff `source` can be
-  /// deinitialized. Otherwise, inserts a trap and returns `false`.
+  /// Generates the IR for deinitializing `source` and returns `true` iff `source` or its parts can
+  /// be deinitialized. Otherwise, inserts a trap and returns `false`.
+  ///
+  /// If `s` is instance of a structural type (e.g., a tuple), the method attempts to deinitialize
+  /// each part inidividually rather than the whole. Otherwise, deinitialization is done using a
+  /// witness of `Deinitializable`.
   @discardableResult
   internal mutating func _emitDeinitialize(_ source: IRValue) -> Bool {
-    let (typeOfSource, _) = currentFunction.result(of: source) ?? badOperand()
-    switch witnessOfDeinitializable(for: typeOfSource) {
+    let (t, _) = currentFunction.result(of: source) ?? badOperand()
+    return _emitDeinitialize(source, instanceOf: t)
+  }
+
+  /// Implements `_emitDeinitialize(_:)` for arbitrary types.
+  private mutating func _emitDeinitialize(
+    _ s: IRValue, instanceOf t: AnyTypeIdentity
+  ) -> Bool {
+    switch program.types.tag(of: t) {
+    case Tuple.self:
+      let u = program.types.castUnchecked(t, to: Tuple.self)
+      return _emitDeinitialize(tuple: s, instanceOf: u)
+    default:
+      return _emitDeinitialize(whole: s, instanceOf: t)
+    }
+  }
+
+  /// Implements `_emitDeinitialize(_:)` for types that cannot be decomposed structurally.
+  private mutating func _emitDeinitialize(
+    whole s: IRValue, instanceOf t: AnyTypeIdentity
+  ) -> Bool {
+    switch witnessOfDeinitializable(for: t) {
     case .none:
       _ = _apply_builtin(.trap, to: [])
       return false
 
     case .trivial:
-      _assume_state(source, initialized: false)
+      _assume_state(s, initialized: false)
       return true
 
     case .nontrivial(let w):
       let deinitializable = _emit(witness: w)
       let member = program.standardLibraryDeclaration(.deinitializableDeinit)
       let t0 = program.types.demand(
-        Arrow(inputs: [.init(access: .sink, type: typeOfSource)], output: .void))
+        Arrow(inputs: [.init(access: .sink, type: t)], output: .void))
 
       let x0 = _alloca(.void)
-      let x1 = _access([.sink], from: source)
+      let x1 = _access([.sink], from: s)
       let x2 = _access([.set], from: x0)
       let x3 = _property(member, of: deinitializable, withType: t0.erased)
       let x4 = _access([.let], from: x3)
@@ -2467,6 +2514,23 @@ internal struct IREmitter {
 
       return true
     }
+  }
+
+  /// Implements `_emitDeinitialize(_:)` for tuples..
+  private mutating func _emitDeinitialize(tuple s: IRValue, instanceOf t: Tuple.ID) -> Bool {
+    // Is the tuple empty?
+    let (ms, _) = program.types.members(of: t)
+    if ms.isEmpty {
+      _assume_state(s, initialized: false)
+      return true
+    }
+
+    // Otherwise, deinitialize each element individually.
+    for (i, m) in ms.enumerated() {
+      let s = _subfield(s, at: [i])
+      if !_emitDeinitialize(s, instanceOf: m) { return false }
+    }
+    return true
   }
 
   /// Generates the IR for move-initializing or move-assigning `target` with `source`.
@@ -2591,9 +2655,8 @@ internal struct IREmitter {
 
     // If `t` has no free type parameter, then we can just use a constant value.
     if ps.isEmpty {
-      let u = program.types.demand(TypeWitness())
-      let a = _alloca(u.erased)
-      _emitInitialize(a, with: .type(t.erased, u))
+      let g = demandGlobalTypeWitness(t)
+      let a = _global_access(g)
       witnesses[t.erased] = a
 
       swap(&insertionContext.point, &p)
@@ -2673,10 +2736,9 @@ internal struct IREmitter {
 
   /// Returns a reference to the given lowered function.
   internal mutating func functionReference(to f: IRFunction.ID) -> IRValue {
-    // let n = program[module].ir[f].name
-    let s = program[module].ir[f].signature()
-    let t = program.types.demand(s)
-    return .function(f, module, t)
+    let d = program[module].ir[f]
+    let s = d.signature()
+    return .function(d.name, program.types.demand(s))
   }
 
   /// Returns the type arguments defined in the type of `q`, which occurs as qualification for a

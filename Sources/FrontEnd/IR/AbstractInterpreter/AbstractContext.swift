@@ -102,6 +102,11 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
       }
     }
 
+    /// Removes all key/value pairs satisfying `predicate`.
+    internal mutating func removeAll(where predicate: (IRValue, AbstractValue<Domain>) -> Bool) {
+      contents.removeAll(where: { (slot) in predicate(slot.key, slot.value) })
+    }
+
     /// Returns a representation of `v` suitable to sort the internal storage of a context.
     private static func rank(_ v: IRValue) -> Int {
       switch v {

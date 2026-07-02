@@ -77,7 +77,8 @@ extension Process {
     return .init(
       standardOutput: output,
       standardError: error,
-      exitCode: process.terminationStatus)
+      exitCode: process.terminationStatus,
+      terminationReason: process.terminationReason)
   }
 
 
@@ -93,11 +94,18 @@ extension Process {
     /// The exit code of the process.
     public let exitCode: Int32
 
+    /// The reason why the process terminated.
+    public let terminationReason: Process.TerminationReason
+
     /// Creates an instance from its parts.
-    public init(standardOutput: String, standardError: String, exitCode: Int32) {
+    public init(
+      standardOutput: String, standardError: String, exitCode: Int32,
+      terminationReason: Process.TerminationReason
+    ) {
       self.standardOutput = standardOutput
       self.standardError = standardError
       self.exitCode = exitCode
+      self.terminationReason = terminationReason
     }
 
   }

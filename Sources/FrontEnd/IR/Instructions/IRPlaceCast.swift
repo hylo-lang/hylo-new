@@ -1,7 +1,10 @@
+import Archivist
+
 /// Converts a place of type `A` to a place of type `B`.
 ///
 /// The conversion is not checked. Accessing the resulting place has undefined behavior unless `B`
 /// is layout-compatible with `A`.
+@Archivable
 public struct IRPlaceCast: Instruction {
 
   /// The operands of the instruction.
@@ -36,6 +39,11 @@ public struct IRPlaceCast: Instruction {
   /// The type of the instruction's result.
   public var type: IRType {
     .place(target)
+  }
+
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
   }
 
 }

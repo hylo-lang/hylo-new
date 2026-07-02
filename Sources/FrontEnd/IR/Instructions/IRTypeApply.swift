@@ -1,8 +1,10 @@
+import Archivist
 import Utilities
 
 /// Applies a type abstraction.
 ///
 /// This instruction is used to supplies type arguments to polymorphic values.
+@Archivable
 public struct IRTypeApply: Instruction {
 
   /// The operands of the instruction.
@@ -51,7 +53,7 @@ public struct IRTypeApply: Instruction {
     true
   }
 
-  /// Asserts that the well-formedness conditions of the instruction hold.
+  /// Asserts the well-formedness conditions of the instruction.
   public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
     // The callee must be instance of a universal type.
     guard

@@ -1,3 +1,5 @@
+import Archivist
+
 /// Projects a value out of the current function.
 ///
 /// This instruction is only about control flow. Return values are stored in the return registers
@@ -5,6 +7,7 @@
 ///
 /// Refined IR requires that the return register of the function be definitely initialized before
 /// `return` is executed.
+@Archivable
 public struct IRYield: Instruction {
 
   /// The operands of the instruction.

@@ -1954,11 +1954,9 @@ public struct Typer {
     case InoutExpression.self:
       return inferredType(of: castUnchecked(e, to: InoutExpression.self), in: &context)
     case IntegerLiteral.self:
-      return inferredType(of: castUnchecked(e, to: IntegerLiteral.self), in: &context, 
-        conversionLabel: "integer_literal", defaultInferredType: .int)
+      return inferredType(of: castUnchecked(e, to: IntegerLiteral.self), in: &context)
     case FloatingPointLiteral.self:
-      return inferredType(of: castUnchecked(e, to: FloatingPointLiteral.self), in: &context,
-        conversionLabel: "floating_point_literal", defaultInferredType: .float64)
+      return inferredType(of: castUnchecked(e, to: FloatingPointLiteral.self), in: &context)
     case Lambda.self:
       return inferredType(of: castUnchecked(e, to: Lambda.self), in: &context)
     case NameExpression.self:
@@ -2247,10 +2245,9 @@ public struct Typer {
   }
 
   /// Returns the inferred type of a primitive literal `e`, ensuring `e` is elaborated to a call 
-  /// to the inferred type's `.new(<conversionLabel>: e)` initializer.
-  private mutating func inferredType<Literal: LiteralExpression>(
-    of e: Literal.ID, in context: inout InferenceContext, conversionLabel: String,
-    defaultInferredType: Program.StandardLibraryEntity
+  /// to `.new(x: e)`, where `x` is the constructor label of `T`.
+  private mutating func inferredType<T: LiteralExpression>(
+    of e: T.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
     // Did we already elaborate this expression?
     if let t = program[e.module].type(assignedTo: e) {
@@ -2263,7 +2260,7 @@ public struct Typer {
       let p = program.parent(containing: e)
 
       let literal = program[e.module].insert(program[e], in: p)
-      program[e.module].setType(demand(Literal.literalType).erased, for: literal)
+      program[e.module].setType(demand(T.literalType).erased, for: literal)
 
       let q = program[e.module].insert(
         ImplicitQualification(site: s), in: p)
@@ -2275,11 +2272,11 @@ public struct Typer {
         .init(e),
         with: Call(
           callee: .init(m),
-          arguments: [.init(label: Parsed(conversionLabel, at: s), value: .init(literal))],
+          arguments: [.init(label: Parsed(T.constructorLabel, at: s), value: .init(literal))],
           style: .parenthesized,
           site: program[e].site))
 
-      let qualification = context.expectedType ?? standardLibraryType(defaultInferredType)
+      let qualification = context.expectedType ?? standardLibraryType(T.defaultType)
       return context.withSubcontext(expectedType: qualification) { (ctx) in
         inferredType(of: c, in: &ctx)
       }

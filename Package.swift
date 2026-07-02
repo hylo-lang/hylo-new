@@ -7,7 +7,7 @@ import PackageDescription
   let onWindows = false
 #endif
 
-/// Swttings common to all Swift targets.
+/// Settings common to all Swift targets.
 let commonSwiftSettings: [SwiftSetting] = [
   .unsafeFlags(["-warnings-as-errors"])
 ]
@@ -15,7 +15,7 @@ let commonSwiftSettings: [SwiftSetting] = [
 let package = Package(
   name: "Hylo",
   platforms: [
-    .macOS(.v15)
+    .macOS(.v26)
   ],
   products: [
     .executable(name: "hc", targets: ["hc"]),
@@ -28,7 +28,7 @@ let package = Package(
       from: "5.7.0"),
     .package(
       url: "https://github.com/kyouko-taiga/Archivist.git",
-      revision: "0b66ecdb3a0da5a94af49274e2751e3332f12b90"),
+      revision: "9d5540fe2b7143c4ee1bb40e0f578a29bbfdf86f"),
     .package(
       url: "https://github.com/apple/swift-algorithms.git",
       from: "1.2.0"),
@@ -129,7 +129,8 @@ let package = Package(
     .testTarget(
       name: "FrontEndTests",
       dependencies: [
-        .target(name: "FrontEnd")
+        .target(name: "FrontEnd"),
+        .target(name: "StandardLibrary"),
       ],
       swiftSettings: commonSwiftSettings),
 

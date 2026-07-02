@@ -39,11 +39,14 @@ internal struct ManglingEncoding: Sendable {
     append(decl: s, to: &output)
   }
 
-  /// Writes to `output` the mangled representation of `s` from module `m`.
-  internal mutating func mangled(
-    function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
-  ) {
-    append(function: s, of: m, to: &output)
+  /// Writes to `output` the mangled representation of `n`.
+  internal mutating func mangled(function n: IRFunction.Name, to output: inout ManglingContext) {
+    append(function: n, to: &output)
+  }
+
+  /// Writes to `output` the mangled representation of `n`.
+  internal mutating func mangled(global n: IRGlobal.Name, to output: inout ManglingContext) {
+    append(global: n, to: &output)
   }
 
   /// Writes to `output` the mangled representation of `s`.
@@ -541,16 +544,9 @@ internal struct ManglingEncoding: Sendable {
     source.takeString().map({ (s) in .virtualSourceFile(s) }) ?? .error
   }
 
-  /// Writes the mangled representation of `s` defined in `m`, to `output`.
+  /// Writes the mangled representation of `s` to `output`.
   private mutating func append(
-    function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
-  ) {
-    append(function: program[m].ir[s].name, of: m, to: &output)
-  }
-
-  /// Writes the mangled representation of `s` defined in `m`, to `output`.
-  private mutating func append(
-    function s: IRFunction.Name, of m: Module.ID, to output: inout ManglingContext
+    function s: IRFunction.Name, to output: inout ManglingContext
   ) {
     switch s {
     case .lowered(let d):
@@ -570,7 +566,15 @@ internal struct ManglingEncoding: Sendable {
       append(typeArguments: a, to: &output)
     case .existentialized(let s):
       output.add(operator: .existentializedDeclaration)
-      append(function: s, of: m, to: &output)
+      append(function: s, to: &output)
+    case .slide(let s, let n):
+      output.add(operator: .slideDeclaration)
+      append(function: s, to: &output)
+      output.add(integer: n)
+    case .plateau(let s, let n):
+      output.add(operator: .plateauDeclaration)
+      append(function: s, to: &output)
+      output.add(integer: n)
     }
   }
 
@@ -611,6 +615,41 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     .existentialized(takeEntity(from: &source))
+  }
+
+  /// Demangles a slide declaration from `source`.
+  private static func slideDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    let e = takeEntity(from: &source)
+     if let i = source.takeInt() {
+       return .slide(e, i)
+     } else {
+       return .error
+     }
+  }
+
+  /// Demangles a plateau declaration from `source`.
+  private static func plateauDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    let e = takeEntity(from: &source)
+     if let i = source.takeInt() {
+       return .plateau(e, i)
+     } else {
+       return .error
+     }
+  }
+
+  /// Writes the mangled representation of `s` to `output`.
+  private mutating func append(global s: IRGlobal.Name, to output: inout ManglingContext) {
+    // Note: no symbol needed; we assume it's a lowered global.
+    switch s {
+    case .lowered(let d):
+      append(decl: .init(d), to: &output)
+    case .witness(let t):
+      append(type: t, to: &output)
+    }
   }
 
   /// Writes the mangled representation of `s` to `output`.
@@ -674,6 +713,8 @@ internal struct ManglingEncoding: Sendable {
       append(typeAlias: t, to: &output)
     case let t as TypeApplication:
       append(typeApplication: t, to: &output)
+    case let t as TypeWitness:
+      append(typeWitness: t, to: &output)
     case let t as UniversalType:
       append(universal: t, to: &output)
     default:
@@ -743,7 +784,9 @@ internal struct ManglingEncoding: Sendable {
     case .typeAliasType:
       demangled = takeTypeAlias(from: &source)
     case .typeApplicationType:
-      demangled = takeApplicationType(from: &source)
+      demangled = takeTypeApplication(from: &source)
+    case .typeWitnessType:
+      demangled = takeTypeWitness(from: &source)
     case .universalType:
       demangled = takeUniversalType(from: &source)
     default:
@@ -1144,13 +1187,26 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Demangles an application type from `source`.
-  private static func takeApplicationType(from source: inout DemanglingContext) -> DemangledType {
+  private static func takeTypeApplication(from source: inout DemanglingContext) -> DemangledType {
     let t = takeType(from: &source)
     if let a = takeTypeArguments(from: &source) {
       return .typeApplication(abstraction: t, arguments: a)
     } else {
       return .error
     }
+  }
+
+  /// Writes the mangled representation of `t` to `output`.
+  private mutating func append(
+    typeWitness t: TypeWitness,
+    to output: inout ManglingContext
+  ) {
+    output.add(operator: .typeWitnessType)
+  }
+
+  /// Demangles a type witness type from `source`.
+  private static func takeTypeWitness(from source: inout DemanglingContext) -> DemangledType {
+    return .typeWitness
   }
 
   /// Writes the mangled representation of `a` to `output`.

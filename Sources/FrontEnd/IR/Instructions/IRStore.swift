@@ -1,3 +1,5 @@
+import Archivist
+
 /// Writes a value to memory.
 ///
 /// The target refers to storage capable of holding the value being stored.
@@ -9,6 +11,7 @@
 /// For machine types, we always copy the values, so no consume semantics.
 /// 
 /// Regardless of the type being stored, the target is in an initialized state after the operation.
+@Archivable
 public struct IRStore: Instruction {
 
   /// The operands of the instruction.

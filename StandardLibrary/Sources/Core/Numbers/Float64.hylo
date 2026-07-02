@@ -58,8 +58,16 @@ public given Float64 is AdditiveArithmetic {
     Self(value: Builtin.fadd_float64(self.value, other.value))
   }
 
+  public fun infix+= (other: Self) inout {
+    &self.value = Builtin.fadd_float64(self.value, other.value)
+  }
+
   public fun infix- (other: Self) -> Self {
     Self(value: Builtin.fsub_float64(self.value, other.value))
+  }
+
+  public fun infix-= (other: Self) inout {
+    &self.value = Builtin.fsub_float64(self.value, other.value)
   }
 
   public static fun zero() -> Self {
@@ -72,6 +80,10 @@ public given Float64 is Numeric {
 
   public fun infix* (other: Self) -> Self {
     .new(value: Builtin.fmul_float64(self.value, other.value))
+  }
+
+  public fun infix*= (other: Self) inout {
+    &self.value = Builtin.fmul_float64(self.value, other.value)
   }
 
 }
