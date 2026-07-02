@@ -4099,8 +4099,7 @@ public struct Typer {
       return [.init(reference: .builtin(.alias), type: u.erased)]
 
     case "Never":
-      let t = program.types.never()
-      let u = demand(Metatype(inhabitant: t.erased))
+      let u = demand(Metatype(inhabitant: .never))
       return [.init(reference: .builtin(.alias), type: u.erased)]
 
     case "Void":

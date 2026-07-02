@@ -30,8 +30,7 @@ internal struct ManglingContext {
 
   /// Initializes the table of reserved symbols.
   private mutating func initializeReservedSymbols(program: Program) {
-    var types = program.types
-    reserved[.type(AnyTypeIdentity(types.never()))] = .never
+    reserved[.type(.never)] = .never
     reserved[.type(.void)] = .void
     if program.containsStandardLibrary {
       let stdlib = program.modules.values.first(where: { (m) in m.isStandardLibrary })!
