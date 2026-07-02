@@ -12,7 +12,7 @@ given Int is P {
   fun i() -> Int32 { 24 }
 }
 
-given <where Int is P> Int is Q {
+given <where Int is P> => Int is Q {
   fun i() -> Int32 { 42 }
 }
 

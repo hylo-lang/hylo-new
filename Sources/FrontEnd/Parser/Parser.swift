@@ -470,7 +470,7 @@ public struct Parser {
     // Parse the context parameters and conformer of a conformance declaration.
     let parameters = try parseOptionalContextClause(in: &file)
     if !parameters.isEmpty {
-      _ = try take(.fatarrow) ?? expected("'=>'")
+      _ = try take(.thickArrow) ?? expected("'=>'")
     }
     let lhs = try parseExpression(in: &file)
 
