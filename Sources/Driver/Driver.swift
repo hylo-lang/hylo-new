@@ -161,13 +161,31 @@ public struct Driver {
         target: target, optimization: optimization, relocation: relocation, codeModel: codeModel)
       var m = try program.compileToLLVM(module, target: t)
 
-      try m.verifyInDebugBuilds()
+      try verify(m)
       m.runDefaultModulePasses(optimization: optimization)
-      try m.verifyInDebugBuilds()
+      try verify(m)
 
       llvmModules[module] = LLVMModuleBox(consume m)
     }
     return .init(elapsed: elapsed, containsError: program[module].containsError)
+  }
+
+  /// Applies LLVM IR verification passes to `module` iff this file has been compiled in debug
+  /// mode; does nothing otherwise.
+  ///
+  /// - Throws: if the contents of `module` failed verification.
+  private func verify(_ module: borrowing SwiftyLLVM.Module) throws {
+    do {
+      try module.verifyInDebugBuilds()
+    } catch let e as LLVMError {
+      throw Error(
+        message: """
+        LLVM verification failed with the following message: \(e.description)
+
+        Module contents:
+        \(module.description)
+        """)
+    }
   }
 
   /// Generates an executable from `module` and its dependencies.
