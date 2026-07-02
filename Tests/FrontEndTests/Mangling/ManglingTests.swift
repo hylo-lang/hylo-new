@@ -371,8 +371,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of reserved types in `program`.
   private func testReservedTypesMangling(program: inout Program) {
-    let never = AnyTypeIdentity(program.types.never())
-    assertManglingOf(type: never, in: program, is: "Never")
+    assertManglingOf(type: .never, in: program, is: "Never")
     assertManglingOf(type: .void, in: program, is: "Void")
   }
 

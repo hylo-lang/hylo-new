@@ -399,8 +399,7 @@ extension BuiltinFunction {
 
     switch self {
     case .trap:
-      let t0 = s.never().erased
-      return s.demand(Arrow(inputs: [], output: t0))
+      return s.demand(Arrow(inputs: [], output: .never))
 
     case .addressOf:
       let t0 = s.fresh().erased

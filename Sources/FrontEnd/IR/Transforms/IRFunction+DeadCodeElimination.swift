@@ -3,9 +3,9 @@ import Utilities
 extension IRFunction {
 
   /// Removes the code after calls returning `Never`.
-  internal mutating func removeCodeAfterCallsReturning(never: AnyTypeIdentity) {
+  internal mutating func removeCodeAfterCallsReturning() {
     for b in blocks.addresses {
-      if let i = instructions(in: b).first(where: { (i) in returns(never: never, i) }) {
+      if let i = instructions(in: b).first(where: { (i) in neverReturns(i) }) {
         removeAll(after: i)
 
         let a = at(i).anchor
@@ -81,12 +81,12 @@ extension IRFunction {
   /// wrapped into a type application so that the it matches the expected type. This method can
   /// therefore identify the instruction denoting the lowered form of a never-returning expression
   /// right before any type application.
-  private func returns(never: AnyTypeIdentity, _ i: AnyInstructionIdentity) -> Bool {
+  private func neverReturns(_ i: AnyInstructionIdentity) -> Bool {
     // Note that it's fine to compare the return type of applications with `Never` because the
     // expression should still have the form `<T> T` at this point.
     switch at(i) {
     case let s as IRApply:
-      return result(of: s.result)?.type == never
+      return result(of: s.result)?.type == .never
     default:
       return false
     }
