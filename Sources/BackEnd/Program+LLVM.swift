@@ -707,7 +707,7 @@ extension Program {
       var work = [e]
       while let b = work.popLast() {
         result.insert(b)
-        if !ir.instructions(in: b).contains(where: { (s) in ir.tag(of: s) == IRYield.self }) {
+        if !ir.contains(in: b, IRYield.self) {
           work.append(contentsOf: ir.successors(of: b).filter({ (n) in !result.contains(n) }))
         }
       }

@@ -530,6 +530,11 @@ public struct IRFunction: Sendable {
       current: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
   }
 
+  /// Returns `true` iff `b` contains an instruction of type `T`.
+  public func contains<T: Instruction>(in b: IRBlock.ID, _: T.Type) -> Bool {
+    instructions(in: b).contains(where: { (i) in tag(of: i) == T.self })
+  }
+
   /// Returns the successors of `b`.
   public func successors(of b: IRBlock.ID) -> [IRBlock.ID] {
     if let i = blocks[b].last, let s = at(i) as? any Terminator {
