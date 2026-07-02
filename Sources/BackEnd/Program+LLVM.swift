@@ -112,7 +112,8 @@ extension Program {
     }
 
     // Translate the instructions of the Hylo function to LLVM.
-    for b in nested.dominance where !nested.factoredOut.contains(b) {
+    let included = blocksToIncorporate(ir)
+    for b in nested.dominance where included.contains(b) && !nested.factoredOut.contains(b) {
       guard let i = nested.ir.blocks[b].first else { continue }
       incorporate(from: i, in: &nested)
     }
@@ -371,11 +372,12 @@ extension Program {
         ctx.module.llvm.insertSwitch(on: after, cases: cs, default: c.1, at: ctx.insertionPoint!)
       } else {
         // If none of the blocks covered by the plateau has a successor, then the remainder of the
-        // function has been incorporated to the plateau.
+        // function has been incorporated into the plateau.
         assert(successors.isEmpty)
-        if ctx.result.isPlateau {
+        if ctx.result.isPlateau || ctx.result.isRamp {
           ctx.module.llvm.insertReturn(after, at: ctx.insertionPoint!)
         } else {
+          // If we are the ramp of a subscript we should also return.
           insertReturn(in: &ctx)
         }
       }
@@ -502,14 +504,15 @@ extension Program {
 
     // Call the plateau, which will call the slide.
     let instruction = ctx.ir.at(i)
+
+    let (plateau, environment) = ctx.insertExtractPlateau()
     let control = ctx.module.llvm.insertCall(
-      ctx.llvm.unsafe[].parameters[fromLast: 1].v,
-      typed: ctx.module.plateau.t,
+      plateau, typed: ctx.module.plateau.t,
       on: [
         // projected value
         ctx.value[instruction.projectee]!,
         // the plateau's environment
-        ctx.llvm.unsafe[].parameters[fromLast: 0].v,
+        environment,
         // the slide
         slide.value.v,
         // the slide's environment
@@ -541,7 +544,10 @@ extension Program {
     let p = prototype(signature.head, in: &ctx)
     let v = ctx.llvm.declareFunction(name, p.signature)
     setupAttributes(of: v, compiledFrom: f, in: &ctx)
-    return FunctionMetadata(prototype: p, value: v)
+
+    let m = FunctionMetadata(prototype: p, value: v, isRamp: ir.isSubscript)
+    ctx.functionMetadata[ir.name] = m
+    return m
   }
 
   /// Returns the result of `demandFunction(_:in:)` with the identity of `f`, which is declared in
@@ -687,6 +693,27 @@ extension Program {
     case .byReference(let j):
       // The argument to `p` is passed by reference. It is already in memory.
       ctx.value[v] = ctx.llvm.unsafe[].parameters[j].v
+    }
+  }
+
+  /// Returns the set of blocks whose instructions have to be incorporated in the LLVM function
+  /// representing the entry of `ir`.
+  ///
+  /// If `ir` is a subscript, then the result contains all the basic blocks that are part of its
+  /// ramp. Otherwise, the result is the set of basic blocks in `ir`.
+  private func blocksToIncorporate(_ ir: IRFunction) -> IRBlockSet {
+    if ir.isSubscript, let e = ir.entry {
+      var result = IRBlockSet()
+      var work = [e]
+      while let b = work.popLast() {
+        result.insert(b)
+        if !ir.instructions(in: b).contains(where: { (s) in ir.tag(of: s) == IRYield.self }) {
+          work.append(contentsOf: ir.successors(of: b).filter({ (n) in !result.contains(n) }))
+        }
+      }
+      return result
+    } else {
+      return .init(ir.blocks.addresses)
     }
   }
 
@@ -846,14 +873,15 @@ extension Program {
 
   /// Generates the LLVM IR code for returning from the function being compiled.
   private func insertReturn(in ctx: inout FunctionGenerationContext) {
-    switch ctx.result.prototype.mapping.output!.convention {
+    let p = ctx.module.functionMetadata[ctx.ir.name]!.prototype.mapping.output!
+
+    switch p.convention {
     case .erased, .byReference:
       ctx.module.llvm.insertReturn(at: ctx.insertionPoint!)
 
     case .byValue:
-      let t = ctx.result.prototype.mapping.output!.type.llvm
       let x = ctx.value[ctx.ir.returnRegister!]!
-      let y = ctx.module.llvm.insertLoad(t, from: x, at: ctx.insertionPoint!)
+      let y = ctx.module.llvm.insertLoad(p.type.llvm, from: x, at: ctx.insertionPoint!)
       // TODO: alignment
       ctx.module.llvm.insertReturn(y, at: ctx.insertionPoint!)
     }

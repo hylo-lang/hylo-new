@@ -46,6 +46,13 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// once the plateau (and subsequently the subscript having called it) returns.
   internal let plateau: SwiftyLLVM.FunctionType.UnsafeReference
 
+  /// The type of a pair representing a plateau callback.
+  ///
+  /// A plateau callback is composed of a pointer to a plateau function and a pointer to that
+  /// function's' environment. It corresponds to the values of the two last parameters passed to
+  /// a subscript ramp.
+  internal let plateauCallback: SwiftyLLVM.StructType.UnsafeReference
+
   /// The data structure representing ongoing projections captured by a slide or plateau.
   ///
   /// When the result of a subscript has to be used in a plateau, a triple is formed with the
@@ -86,6 +93,7 @@ internal struct ModuleGenerationContext: ~Copyable {
     self.slide = self.llvm.functionType(from: [ptr])
     self.plateau = self.llvm.functionType(from: [ptr, ptr, fun, ptr], to: i32)
     self.nestedProject = self.llvm.structType([ptr, fun, ptr])
+    self.plateauCallback = self.llvm.structType([fun, ptr])
     self.typeWitnessHeader = [iptr, i32, i16, i16]
   }
 

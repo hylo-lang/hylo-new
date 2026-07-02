@@ -32,7 +32,10 @@ import SwiftyLLVM
 /// Information about the definitions that dominate a region of a Hylo IR function.
 fileprivate struct RegionPrologue {
 
-  /// The instruction immediately before the region of which `self` is the prologue.
+  /// The instruction at the start of the region of which `self` is the prologue.
+  ///
+  /// This property identifies either a `project` or a `yield` instruction. The prologue is defined
+  /// for a plateau in the former case and for a slide otherwise.
   fileprivate let boundary: FrontEnd.AnyInstructionIdentity
 
   /// How the parameters of the Hylo IR function are mapped.
@@ -44,8 +47,8 @@ fileprivate struct RegionPrologue {
   /// The indices of the elements of `definitions` that should be captured in frames and plateaus.
   fileprivate let captures: [Int]
 
-  /// The type of an array of pointers storing the addresses of all captures.
-  fileprivate let captureBufferType: SwiftyLLVM.ArrayType.UnsafeReference
+  /// The type of the data structure storing the captures made by this prologue.
+  fileprivate let captureFrame: SwiftyLLVM.StructType.UnsafeReference
 
   /// Returns the index of `d` in the array of captures made by this prologue.
   fileprivate func captureIndex(of d: FrontEnd.IRValue) -> Int? {
@@ -68,7 +71,8 @@ extension FunctionGenerationContext {
     var definitions: [FrontEnd.IRValue] = []
 
     // Collect non-erased parameters.
-    for (i, p) in result.prototype.mapping.inputs.enumerated() where p.convention != .erased {
+    let prototype = module.functionMetadata[ir.name]!.prototype
+    for (i, p) in prototype.mapping.inputs.enumerated() where p.convention != .erased {
       definitions.append(.parameter(i))
     }
     if let r = ir.returnRegister {
@@ -98,10 +102,55 @@ extension FunctionGenerationContext {
       }
     }
 
-    let captureBufferType = module.llvm.arrayType(captures.count, module.llvm.ptr)
+    let t = startsProjectionInRamp(y) ? module.plateauCallback.t : module.empty.t
+    let u = module.llvm.arrayType(captures.count, module.llvm.ptr).t
+    let v = module.llvm.structType([t, u])
     return .init(
       boundary: y, inputs: result.prototype.mapping.inputs, definitions: definitions,
-      captures: captures, captureBufferType: captureBufferType)
+      captures: captures, captureFrame: v)
+  }
+
+  /// Returns `true` iff `y` is starts a projection in a ramp.
+  private func startsProjectionInRamp(_ y: FrontEnd.AnyInstructionIdentity) -> Bool {
+    (ir.tag(of: y) == IRProject.self) && result.isRamp
+  }
+
+  /// Allocates a buffer of pointers, initialized with the values of all captures in `prologue`.
+  fileprivate mutating func saveCaptures(_ prologue: RegionPrologue) -> LLVMValue {
+    let frame = module.llvm.insertAlloca(prologue.captureFrame, atEntryOf: llvm).v
+
+    // If the prologue is that of a plateau called from a ramp, allocate extra storage to capture
+    // the plateau and its environment *before* other definitions.
+    if startsProjectionInRamp(prologue.boundary) {
+      var v = module.llvm.poisonValue(of: module.plateauCallback.t).v
+      if result.isPlateau {
+        let (f, e) = insertExtractPlateau()
+        v = module.llvm.insertInsertValue(f, at: 0, into: v, at: insertionPoint!).v
+        v = module.llvm.insertInsertValue(e, at: 1, into: v, at: insertionPoint!).v
+      } else {
+        let ps = llvm.unsafe[].parameters
+        v = module.llvm.insertInsertValue(ps[toLast: 1].v, at: 0, into: v, at: insertionPoint!).v
+        v = module.llvm.insertInsertValue(ps[toLast: 0].v, at: 1, into: v, at: insertionPoint!).v
+      }
+      let x = module.llvm.insertGetStructElementPointer(
+        of: frame, typed: prologue.captureFrame, index: 0, at: insertionPoint!)
+      module.llvm.insertStore(v, to: x, at: insertionPoint!)
+    }
+
+    // Store captured definitions.
+    for (i, c) in prologue.captures.enumerated() {
+      let d = prologue.definitions[c]
+      let x = module.llvm.insertGetElementPointerInBounds(
+        of: frame, typed: prologue.captureFrame, indices: [0, 1, i], indexType: module.llvm.i32,
+        at: insertionPoint!)
+      if isBareProject(d) {
+        saveBareProject(to: x)
+      } else {
+        module.llvm.insertStore(value[d]!, to: x, at: insertionPoint!)
+      }
+    }
+
+    return frame
   }
 
   /// Returns `true` iff  `d` is a `project` instruction represented in the parameters of the
@@ -112,27 +161,6 @@ extension FunctionGenerationContext {
     } else {
       return false
     }
-  }
-
-  /// Allocates a buffer of pointers, initialized with the values of all captures in `prologue`.
-  fileprivate mutating func saveCaptures(_ prologue: RegionPrologue) -> Alloca.UnsafeReference {
-    let captures = module.llvm.insertAlloca(prologue.captureBufferType, atEntryOf: llvm)
-
-    for (i, c) in prologue.captures.enumerated() {
-      let d = prologue.definitions[c]
-      let x = module.llvm.insertGetElementPointerInBounds(
-        of: captures, typed: prologue.captureBufferType,
-        indices: [0, i], indexType: module.llvm.i32,
-        at: insertionPoint!)
-
-      if isBareProject(d) {
-        saveBareProject(to: x)
-      } else {
-        module.llvm.insertStore(value[d]!, to: x, at: insertionPoint!)
-      }
-    }
-
-    return captures
   }
 
   /// Stores to `slot` the address of a triple describing arguments of the plateau being compiled
@@ -147,20 +175,12 @@ extension FunctionGenerationContext {
     let parameters = llvm.unsafe[].parameters
     let project = module.llvm.insertAlloca(module.nestedProject, atEntryOf: llvm)
 
-    let x0 = module.llvm.insertGetStructElementPointer(
-      of: project, typed: module.nestedProject, index: 0,
-      at: insertionPoint!)
-    let x1 = module.llvm.insertGetStructElementPointer(
-      of: project, typed: module.nestedProject, index: 1,
-      at: insertionPoint!)
-    let x2 = module.llvm.insertGetStructElementPointer(
-      of: project, typed: module.nestedProject, index: 2,
-      at: insertionPoint!)
-
+    var v = module.llvm.poisonValue(of: module.nestedProject).v
+    v = module.llvm.insertInsertValue(parameters[0], at: 0, into: v, at: insertionPoint!).v
+    v = module.llvm.insertInsertValue(parameters[2], at: 1, into: v, at: insertionPoint!).v
+    v = module.llvm.insertInsertValue(parameters[3], at: 2, into: v, at: insertionPoint!).v
+    module.llvm.insertStore(v, to: project, at: insertionPoint!)
     module.llvm.insertStore(project, to: slot, at: insertionPoint!)
-    module.llvm.insertStore(parameters[0], to: x0, at: insertionPoint!)
-    module.llvm.insertStore(parameters[2], to: x1, at: insertionPoint!)
-    module.llvm.insertStore(parameters[3], to: x2, at: insertionPoint!)
   }
 
   /// Returns the first instruction in `b` that is strictly dominated by `y`.
@@ -188,7 +208,7 @@ extension Program {
   /// implementation of `f` includes all possible code paths starting from `y`.
   internal mutating func defineSlide(
     dominatedBy y: IRYield.ID, in ctx: inout FunctionGenerationContext
-  ) -> (FunctionMetadata, Alloca.UnsafeReference) {
+  ) -> (FunctionMetadata, LLVMValue) {
     let name = IRFunction.Name.slide(ctx.ir.name, ctx.ir.block(defining: y).rawValue)
     let n = mangled(name)
     let f = ctx.module.llvm.declareFunction(n, ctx.module.slide)
@@ -196,7 +216,7 @@ extension Program {
 
     let m = Prototype.Mapping(inputs: [], output: .init(type: u, convention: .erased))
     let p = Prototype(signature: FunctionType.UnsafeReference(f.unsafe[].valueType)!, mapping: m)
-    let slide = FunctionMetadata(prototype: p, value: f)
+    let slide = FunctionMetadata(prototype: p, value: f, isRamp: false)
     ctx.module.llvm.setLinkage(.private, for: slide.value)
 
     // Save pointers to the parameters and allocations dominating `y`.
@@ -233,8 +253,8 @@ extension Program {
     let slideEntry = nested.demandBasicBlock(entryInSource)
     nested.insertionPoint = nested.module.llvm.endOf(slideEntry)
 
-    setupDominatingDefinitions(
-      prologue, capturedIn: nested.llvm.unsafe[].parameters[0], in: &nested)
+    let p = nested.llvm.unsafe[].parameters[0]
+    setupDominatingDefinitions(prologue, capturedIn: p, inRamp: false, in: &nested)
 
     let reachable = nested.ir.blocks(reachableFrom: entryInSource)
     for b in nested.dominance where reachable.contains(b) && !nested.factoredOut.contains(b) {
@@ -251,14 +271,14 @@ extension Program {
   /// `c` is the set of basic blocks whose contents have been compiled into `f`.
   internal mutating func definePlateau(
     dominatedBy y: IRProject.ID, in ctx: inout FunctionGenerationContext
-  ) -> (FunctionMetadata, Alloca.UnsafeReference, IRBlockSet) {
+  ) -> (FunctionMetadata, LLVMValue, IRBlockSet) {
     let name = IRFunction.Name.plateau(ctx.ir.name, y.erased.address.rawValue)
     let n = mangled(name)
     let f = ctx.module.llvm.declareFunction(n, ctx.module.plateau)
 
     let m = Prototype.Mapping(inputs: [], output: nil)
     let p = Prototype(signature: FunctionType.UnsafeReference(f.unsafe[].valueType)!, mapping: m)
-    let plateau = FunctionMetadata(prototype: p, value: f)
+    let plateau = FunctionMetadata(prototype: p, value: f, isRamp: ctx.result.isRamp)
     ctx.module.llvm.setLinkage(.private, for: plateau.value)
 
     // Save pointers to the parameters and allocations dominating `y`.
@@ -266,7 +286,8 @@ extension Program {
     let captures = ctx.saveCaptures(prologue)
 
     let covered = incorporateContentsOfPlateau(
-      dominatedBy: prologue, from: ctx.ir, into: plateau, queryingDominanceWith: ctx.dominance,
+      dominatedBy: prologue, inRamp: ctx.result.isRamp, from: ctx.ir, into: plateau,
+      queryingDominanceWith: ctx.dominance,
       in: &ctx.module)
     ctx.factoredOut.formUnion(covered)
 
@@ -286,7 +307,8 @@ extension Program {
   ///   - dominance: the dominator tree of `source`.
   /// - Returns: The set of basic blocks whose contents have been incorporated.
   private mutating func incorporateContentsOfPlateau(
-    dominatedBy prologue: RegionPrologue, from source: IRFunction, into result: FunctionMetadata,
+    dominatedBy prologue: RegionPrologue, inRamp isRamp: Bool,
+    from source: IRFunction, into result: FunctionMetadata,
     queryingDominanceWith dominance: DominatorTree,
     in ctx: inout ModuleGenerationContext
   ) -> IRBlockSet {
@@ -300,8 +322,8 @@ extension Program {
 
     let v = IRValue.register(prologue.boundary.erased)
     nested.value[v] = nested.llvm.unsafe[].parameters[0].v
-    setupDominatingDefinitions(
-      prologue, capturedIn: nested.llvm.unsafe[].parameters[1], in: &nested)
+    let p = nested.llvm.unsafe[].parameters[1]
+    setupDominatingDefinitions(prologue, capturedIn: p, inRamp: isRamp, in: &nested)
 
     var covered = IRBlockSet()
     var work = nested.dominance.region(dominatedBy: entryInSource)
@@ -411,7 +433,7 @@ extension Program {
     else if let c = p.captureIndex(of: s.start) {
       let x0 = ctx.llvm.unsafe[].parameters[1]
       let x1 = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: x0, typed: p.captureBufferType, indices: [0, c], indexType: ctx.module.llvm.i32,
+        of: x0, typed: p.captureFrame, indices: [0, 1, c], indexType: ctx.module.llvm.i32,
         at: ctx.insertionPoint!)
       let x2 = ctx.module.llvm.insertLoad(
         ctx.module.llvm.ptr.t, from: x1.v,
@@ -442,6 +464,7 @@ extension Program {
   /// which is the environment of the lifted lambda being compiled.
   private mutating func setupDominatingDefinitions(
     _ prologue: RegionPrologue, capturedIn captures: SwiftyLLVM.Parameter.UnsafeReference,
+    inRamp isRamp: Bool,
     in ctx: inout FunctionGenerationContext
   ) {
     let ptr = ctx.module.llvm.ptr
@@ -449,12 +472,16 @@ extension Program {
     // The captures are stored in an array referred to by the slide's first parameter. This array
     // can be used to define the context in which the instructions of the slide are compiled.
     if !prologue.captures.isEmpty {
-      let x = ctx.module.llvm.insertLoad(
-        prologue.captureBufferType, from: captures, at: ctx.insertionPoint!)
+      let x0 = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: captures, typed: prologue.captureFrame,
+        indices: [0, 1], indexType: ctx.module.llvm.i32,
+        at: ctx.insertionPoint!)
+      let x1 = ctx.module.llvm.insertLoad(
+        prologue.captureFrame.unsafe[].fields[1], from: x0, at: ctx.insertionPoint!)
 
       for (i, c) in prologue.captures.enumerated() {
         let d = prologue.definitions[c]
-        let v = ctx.module.llvm.insertExtractValue(from: x, at: i, at: ctx.insertionPoint!)
+        let v = ctx.module.llvm.insertExtractValue(from: x1, at: i, at: ctx.insertionPoint!)
 
         // If the capture is a project, the i-th position of the captures is a pointer to a triple
         // containing a pointer to the projected value along with the corresponding slide.

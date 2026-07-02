@@ -66,4 +66,36 @@ internal struct FunctionGenerationContext: ~Copyable {
     }
   }
 
+  /// Returns the value of the plateau callback that has been captured and passed to the function
+  /// being compiled, which is the plateau of a projection started in a ramp.
+  internal mutating func insertExtractCapturedPlateau() -> (LLVMValue, LLVMValue) {
+    assert(result.isRamp && result.isPlateau)
+
+    let t = module.plateauCallback
+    let u = module.llvm.structType([t.t])
+    let x = module.llvm.insertGetStructElementPointer(
+      of: llvm.unsafe[].parameters[1], typed: u, index: 0, at: insertionPoint!)
+    let p = module.llvm.insertLoad(t, from: x, at: insertionPoint!)
+
+    let f = module.llvm.insertExtractValue(from: p, at: 0, at: insertionPoint!)
+    let e = module.llvm.insertExtractValue(from: p, at: 1, at: insertionPoint!)
+    return (f.v, e.v)
+  }
+
+  /// Returns the value of the plateau callback of the ramp being compiled.
+  ///
+  /// If the function being compiled is a plateau, then the callback is read from its second
+  /// parameter, which is the environment of the code covered by the plateau. Otherwise, the
+  /// callback is defined by the last two parameters of the function.
+  internal mutating func insertExtractPlateau() -> (LLVMValue, LLVMValue) {
+    if result.isPlateau {
+      return insertExtractCapturedPlateau()
+    } else {
+      assert(result.isRamp)
+      let f = llvm.unsafe[].parameters[toLast: 1]
+      let e = llvm.unsafe[].parameters[toLast: 0]
+      return(f.v, e.v)
+    }
+  }
+
 }

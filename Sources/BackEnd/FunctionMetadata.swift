@@ -9,7 +9,14 @@ internal struct FunctionMetadata {
   /// The declaration (and possibly definition) of the function.
   internal let value: SwiftyLLVM.Function.UnsafeReference
 
-  /// `true` iff the function being compiled is a plateau encapsulating the uses of a projection.
+  /// `true` iff the function being compiled is a subscript ramp.
+  ///
+  /// This property is `if` when `value` represents either the entry point of a subscript or some
+  /// plateau covering a projection whose start dominates a `yield` instruction, in which case
+  /// `isPlateau` is also `true`.
+  internal let isRamp: Bool
+
+  /// `true` iff the function being compiled is a plateau covering the uses of a projection.
   internal var isPlateau: Bool {
     prototype.mapping.output == nil
   }
