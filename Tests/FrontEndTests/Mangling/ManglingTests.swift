@@ -115,7 +115,13 @@ final class ManglingTests: XCTestCase {
       "MyEnum": (EnumDeclaration.self, "M0.#.MyEnum"),
       "複雑(サ:シ:)": (
         FunctionDeclaration.self,
-        "M0.#.fun 複雑: [Void](サ: M0.#.B<[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>, シ: M0.#.P<[GenericParameterUser<M0.#.P.X, *>: Hylo.Int], [GenericParameterUser<M0.#.P.Y, *>: M0.#.P<[GenericParameterUser<M0.#.P.X, *>: Hylo.Bool], [GenericParameterUser<M0.#.P.Y, *>: M0.#.B<[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>]>]>) let -> Hylo.Int"
+        "M0.#.fun 複雑: [Void](サ: M0.#.B<[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>, "
+          + "シ: M0.#.P<[GenericParameterUser<M0.#.P.X, *>: Hylo.Int], "
+          + "[GenericParameterUser<M0.#.P.Y, *>: M0.#.P<"
+          + "[GenericParameterUser<M0.#.P.X, *>: Hylo.Bool], "
+          + "[GenericParameterUser<M0.#.P.Y, *>: M0.#.B<"
+          + "[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>]>]>) "
+          + "let -> Hylo.Int"
       ),
       "複雑2(ス:_:)": (
         FunctionDeclaration.self,
@@ -125,7 +131,13 @@ final class ManglingTests: XCTestCase {
       "B.X": (GenericParameterDeclaration.self, "M0.#.B.X"),
       "複雑(サ:シ:).a": (
         ParameterDeclaration.self,
-        "M0.#.fun 複雑: [Void](サ: M0.#.B<[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>, シ: M0.#.P<[GenericParameterUser<M0.#.P.X, *>: Hylo.Int], [GenericParameterUser<M0.#.P.Y, *>: M0.#.P<[GenericParameterUser<M0.#.P.X, *>: Hylo.Bool], [GenericParameterUser<M0.#.P.Y, *>: M0.#.B<[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>]>]>) let -> Hylo.Int.a"
+        "M0.#.fun 複雑: [Void](サ: M0.#.B<[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>, "
+          + "シ: M0.#.P<[GenericParameterUser<M0.#.P.X, *>: Hylo.Int], "
+          + "[GenericParameterUser<M0.#.P.Y, *>: M0.#.P<"
+          + "[GenericParameterUser<M0.#.P.X, *>: Hylo.Bool], "
+          + "[GenericParameterUser<M0.#.P.Y, *>: M0.#.B<"
+          + "[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>]>]>) "
+          + "let -> Hylo.Int.a"
       ),
       "B": (StructDeclaration.self, "M0.#.B"),
       "P": (StructDeclaration.self, "M0.#.P"),
@@ -157,7 +169,8 @@ final class ManglingTests: XCTestCase {
       ),
       "$<ExtensionDeclaration at": (
         ExtensionDeclaration.self,
-        "M0.#.extension <GenericParameterUser<...T, *>> (Void, GenericParameterUser<...T, *>, Void) where "
+        "M0.#.extension <GenericParameterUser<...T, *>> "
+          + "(Void, GenericParameterUser<...T, *>, Void) where "
       ),
       ">.b": (
         VariableDeclaration.self, "M0.#.fun g: [Void]() let -> Void.$anonymous.b"
@@ -412,7 +425,8 @@ final class ManglingTests: XCTestCase {
         )
       ).erased, in: program,
       is:
-        "M0.#.Provider.Output.M0.#.Provider<[GenericParameterConformer<M0.#.Provider, *>: GenericParameterConformer<M0.#.Provider, *>]>"
+        "M0.#.Provider.Output.M0.#.Provider<[GenericParameterConformer<M0.#.Provider, *>: "
+          + "GenericParameterConformer<M0.#.Provider, *>]>"
     )
   }
 

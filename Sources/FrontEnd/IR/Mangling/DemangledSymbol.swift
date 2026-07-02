@@ -24,8 +24,8 @@ internal indirect enum DemangledSymbol: Hashable, Sendable {
 
   /// An error encountered during demangling.
   ///
-  /// The payload captures what we could demangle until we encountered the error, if any, and the characters
-  /// still remaining to be parsed.
+  /// The payload captures what we could demangle until we encountered the error, if any, and the
+  /// characters still remaining to be parsed.
   case error(DemangledSymbol?, remaining: String)
 
   /// An instance decoding a reserved symbol identifier.

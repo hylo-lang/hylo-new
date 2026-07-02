@@ -863,7 +863,8 @@ private struct Transfer: AbstractTransferFunction {
 
   }
 
-  /// Classification of a record type's subfields into uninitialized, initialized, and consumed sets.
+  /// Classification of a record type's subfields into uninitialized, initialized, and consumed
+  /// sets.
   private struct SubfieldsByInitializationState {
 
     /// The paths to the initialized parts.

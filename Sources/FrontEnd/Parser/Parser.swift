@@ -28,6 +28,11 @@ public struct Parser {
       if case .typeBody = self { return true } else { return false }
     }
 
+    /// Returns `true` iff `self` denotes the body of a trait declaration.
+    var isTraitBody: Bool {
+      self == .typeBody(.init(TraitDeclaration.self))
+    }
+
   }
 
   /// The tokens in the input.
@@ -1194,8 +1199,23 @@ public struct Parser {
     let introducer = try take(.type) ?? expected("'type'")
     let identifier = parseSimpleIdentifier()
 
-    // If the next token is `<` or `=`, commit to a type alias declaration.
-    if next(is: .leftAngle) || next(is: .assign) {
+    // In a trait body, a 'type' declaration that is not followed by `<` or `=` introduces an
+    // associated type. Everywhere else, 'type' always introduces a type alias.
+    if !next(is: .assign) && !next(is: .leftAngle) && context.isTraitBody {
+      // No modifiers or annotations allowed on associated types.
+      _ = sanitize(prologue.annotations, accepting: { _ in false })
+      _ = sanitize(prologue.modifiers, accepting: { _ in false })
+
+      let d = file.insert(
+        AssociatedTypeDeclaration(
+          introducer: introducer,
+          identifier: identifier,
+          site: span(from: introducer)))
+      return .init(d)
+    }
+
+    // Otherwise, commit to a type alias declaration.
+    else {
       let parameters = try parseOptionalTypeParameterClause(in: &file)
       _ = try take(.assign) ?? expected("'='")
       let aliasee = try parseExpression(in: &file)
@@ -1211,25 +1231,6 @@ public struct Parser {
           parameters: parameters,
           aliasee: aliasee,
           site: introducer.site.extended(upTo: position.index)))
-      return .init(d)
-    }
-
-    // Otherwise, commit to an associated type declaration.
-    else {
-      // No modifiers or annotations allowed on associated types.
-      _ = sanitize(prologue.annotations, accepting: { _ in false })
-      _ = sanitize(prologue.modifiers, accepting: { _ in false })
-
-      // An error has already been reported if the identifier is `$!`.
-      if !context.isTypeBody && (identifier.value != "$!") {
-        report(.init("declaration is not allowed here", at: introducer.site))
-      }
-
-      let d = file.insert(
-        AssociatedTypeDeclaration(
-          introducer: introducer,
-          identifier: identifier,
-          site: span(from: introducer)))
       return .init(d)
     }
   }
@@ -2214,7 +2215,7 @@ public struct Parser {
 
     switch head.tag {
     case .underscore:
-      return try .init(parseDiscardStement(in: &file))
+      return try .init(parseDiscardStatement(in: &file))
     case .return:
       return try .init(parseReturnStatement(in: &file))
     case .yield:
@@ -2231,7 +2232,7 @@ public struct Parser {
   ///     discard-statement ::=
   ///       '_' '=' expression
   ///
-  private mutating func parseDiscardStement(
+  private mutating func parseDiscardStatement(
     in file: inout Module.SourceContainer
   ) throws -> Discard.ID {
     let i = try take(.underscore) ?? expected("'_'")
