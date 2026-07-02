@@ -42,7 +42,7 @@ internal struct ConcreteLayout {
 
     /// Returns `true` iff `l` denotes a fixed size of less than or exactly `r` bytes.
     internal static func <= (l: Self, r: Int) -> Bool {
-      UInt(bitPattern: l.raw) < r
+      UInt(bitPattern: l.raw) <= r
     }
 
   }
