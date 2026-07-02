@@ -126,7 +126,7 @@ public struct Program: Sendable {
       for i in work.indices {
         work[i].function.foldRedundantInstructions()
         work[i].function.simplifyControlFlow()
-        work[i].function.removeCodeAfterCallsReturning(never: .never)
+        work[i].function.removeCodeAfterCallsReturning()
         work[i].function.removeUnreachableBlocks()
         work[i].function.removedUnusedDefinitions()
         // reifyBundles

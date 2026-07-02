@@ -112,7 +112,7 @@ internal struct ManglingContext {
   }
 
   /// Records `s` in the symbol lookup table if it is not reserved or already recorded.
-  internal mutating func record(symbol s: MangledSymbol, in program: Program) {
+  internal mutating func record(symbol s: MangledSymbol) {
     if symbolPosition.keys.contains(s) || reserved.keys.contains(s) { return }
     symbolPosition[s] = symbolPosition.count
   }
@@ -126,8 +126,8 @@ internal struct ManglingContext {
 
   /// Writes a lookup reference to `s` iff `s` is reserved or has already been inserted in the
   /// symbol lookup table.
-  internal mutating func addIf(reservedOrRecorded s: MangledSymbol, in program: Program) -> Bool {
-    addIf(reserved: s) || addIf(recorded: s, in: program)
+  internal mutating func addIf(reservedOrRecorded s: MangledSymbol) -> Bool {
+    addIf(reserved: s) || addIf(recorded: s)
   }
 
   /// Writes a lookup reference to `s` iff `s` is a reserved mangling symbol.
@@ -146,7 +146,7 @@ internal struct ManglingContext {
   }
 
   /// Writes a lookup reference to `s` iff `s` is in the lookup table.
-  private mutating func addIf(recorded s: MangledSymbol, in program: Program) -> Bool {
+  private mutating func addIf(recorded s: MangledSymbol) -> Bool {
     if let p = symbolPosition[s] {
       if case .type = s {
         add(operator: .lookupType)
