@@ -102,12 +102,44 @@ It accepts a single pointer to its environment and returns no value.
 
 Finally, when the code generator encounters a `project` instruction, it emits a call to the corresponding ramp and generates all code dominated by that instruction into a plateau.
 
+### Slides and plateaus
+
+The contents of a function that is compiled into a slide or plateau is determined by enumerating the basic blocks that are dominated by the start of the slide or plateau.
+This approach identifies the largest possible region that cannot possibly contain a back edge to a position before the instruction at the start of the slide or plateau.
+This property is most relevant in the presence of loops, as it prevents unintended (and possibly diverging) unrolling.
+
+One exception is made for plateaus that cover a `yield` instruction.
+Specifically, if a plateau is formed over a region that contains a `yield` instruction, then its contents is made of the set of blocks *reachable* from its start, which thereby includes the set of blocks dominated by the `yield` instructions that are part of the plateau.
+
 ### Environments
 
-The environment of a slide or plateau is computed in two steps.
+The environment of a slide or plateau is represented by a pair whose second element is an array of pointers to captured values and whose first element is either an empty tuple or, if the environment is built in the context of a ramp, another pair representing the plateau callback of the subscript.
+
+The captures of an environment are identified in two steps.
 First, we gather all the definitions dominating the instruction causing the slide or plateau to be created.
 Second, we filter out definitions that can be recomputed in another function.
 In other words, we keep only parameters, allocations, and projections.
 The values of those definitions are captured in an array of pointers.
 
-An environment is represented by a pair whose second element is an array of pointers to captured values and whose first element is either an empty tuple or, if the environment is built in the context of a ramp, another pair representing the plateau callback of the subscript.
+Consider the following IR subscript to illustrate:
+
+```
+fun id(_:)(inout %p0: Int32) inout <: Int32 {
+%b0:
+  %r0 = alloca Int, #preferred
+  %r1 = subfield %r0 at 0 as word
+  %r2 = access [set] %r1
+  %r3 = store word 0 to %r2
+  %r4 = end %r2
+  %r5 = access [inout] %p0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+```
+
+The `yield` statement will be compiled as a call to a slide covering `%r7` through `%r11`.
+The environment of this slides captures `%p0`, `%r0`, `%r1`, `%r2`, and `%r5` (`%r3` and `%r4` do not define values) but only `%p0` and `%r0` need to be stored in the environment, since all other definitions can be recomputed in the slide.

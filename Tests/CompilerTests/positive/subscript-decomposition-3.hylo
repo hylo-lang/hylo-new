@@ -6,15 +6,21 @@ subscript id(x: inout Int32) inout -> Int32 {
 }
 
 @inline(never)
-subscript reset(x: inout Int32) inout -> Int32 {
-  &id[&x] = 34
-  &id[&x] = 45
-  yield &x
-  &id[&x] = 23
+subscript pick(c: Bool, x: inout Int32, y: inout Int32) inout -> Int32 {
+  if c {
+    &id[&x] = 0 ; yield &x
+  } else {
+    &id[&x] = 0 ; yield &y
+  }
+  &x = 12
 }
 
 fun main() -> Int32 {
   var a: Int32 = 0
-  &reset[&a] = 99
-  return a
+  var b: Int32 = 0
+
+  inout p = &pick[false, &a, &b]
+  &p = 23
+
+  return b
 }

@@ -327,6 +327,7 @@ extension Program {
     setupDominatingDefinitions(prologue, capturedIn: p, inRamp: isRamp, in: &nested)
 
     var covered = IRBlockSet()
+    var coveredYield = false
     var work = nested.dominance.region(dominatedBy: entryInSource)
     while let b = work.next() {
       if nested.factoredOut.contains(b) { continue }
@@ -340,10 +341,18 @@ extension Program {
       }
 
       covered.insert(b)
+      coveredYield = coveredYield || source.contains(in: b, IRYield.self)
     }
 
     ctx = nested.release()
-    return covered
+
+    // If a yield statement was covered, then all blocks reachable from the boundary have been
+    // covered in the silde following that statement.
+    if coveredYield {
+      return source.blocks(reachableFrom: entryInSource)
+    } else {
+      return covered
+    }
   }
 
   /// Generates the LLVM IR code corresponding to `i`, which is the end of a projection occurring
