@@ -3036,7 +3036,7 @@ public struct Typer {
 
   /// Returns the type of an instance of `Self` in `s`, or `nil` if `s` isn't notionally in the
   /// scope of a type declaration.
-  private mutating func typeOfSelf(in s: ScopeIdentity) -> AnyTypeIdentity? {
+  internal mutating func typeOfSelf(in s: ScopeIdentity) -> AnyTypeIdentity? {
     if let memoized = cache.scopeToTypeOfSelf[s] { return memoized }
 
     guard let n = s.node else { return nil }
@@ -4168,6 +4168,126 @@ public struct Typer {
     return candidates
   }
 
+  /// Returns a candidate for every member of `q` reachable in `scopeOfUse`.
+  ///
+  /// This is the enumerating counterpart of `resolve(_:memberOf:visibleFrom:)`: rather than
+  /// resolving a single name, it collects all native members, all members of the applicable
+  /// extensions visible from `scopeOfUse`, and all requirements of every visible trait to which `q`
+  /// conforms (decided by `summon`, exactly as name resolution would). It is the building block for
+  /// IDE features such as member completion.
+  ///
+  /// - Requires: `q` is not a unification variable and the enclosing module has been type checked.
+  internal mutating func members(
+    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, static s: Bool
+  ) -> [NameResolutionCandidate] {
+    if q.isVariable { return [] }
+
+    // `qualificationForSelection` normalizes the receiver type (a `let`/`inout` projection unwraps
+    // to its projectee, a metatype to its inhabitant). The static/instance choice is the caller's,
+    // not derived from `q`, so the two cannot silently disagree.
+    let r = qualificationForSelection(on: q).type
+
+    var candidates: [NameResolutionCandidate] = []
+    candidates.append(contentsOf: nativeMembers(of: r, statically: s))
+    candidates.append(contentsOf: extensionMembers(of: r, visibleFrom: scopeOfUse, statically: s))
+    candidates.append(contentsOf: inheritedMembers(of: r, visibleFrom: scopeOfUse, statically: s))
+
+    // Dedup by declaration identity (e.g. the same trait requirement reached through several
+    // witnesses) while keeping same-named members of distinct declarations (overloads, or members
+    // offered by more than one in-scope trait).
+    var seen: Set<DeclarationIdentity> = []
+    return candidates.filter { (c) in
+      guard let d = c.reference.target else { return true }
+      return seen.insert(d).inserted
+    }
+  }
+
+  /// Returns a candidate for every native member of `q`.
+  /// 
+  /// Static members are returned iff `selectionIsStatic` is true.
+  private mutating func nativeMembers(
+    of q: AnyTypeIdentity, statically selectionIsStatic: Bool
+  ) -> [NameResolutionCandidate] {
+    //  Mirrors `resolve(_:nativeMemberOf:statically:)` but without filtering by name.
+    let (context, receiver) = program.types.contextAndHead(q)
+    var candidates: [NameResolutionCandidate] = []
+    for ds in declarations(nativeMembersOf: q).values {
+      for m in ds {
+        if !isEnumerableMember(m) { continue }
+        var member = typeOfName(referringTo: m, statically: selectionIsStatic)
+        if let a = program.types[receiver] as? TypeApplication {
+          member = program.types.substitute(a.arguments, in: member)
+        }
+        member = program.types.introduce(context, into: member)
+        candidates.append(
+          .init(reference: selectionIsStatic ? .direct(m) : .member(m), type: member))
+      }
+    }
+    return candidates
+  }
+
+  /// Returns a candidate for every member declared in an extension of `q` visible from 
+  /// `scopeOfUse`.
+  /// 
+  /// Static members are returned iff `selectionIsStatic` is true.
+  private mutating func extensionMembers(
+    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, statically selectionIsStatic: Bool
+  ) -> [NameResolutionCandidate] {
+    // Mirrors `resolve(_:declaredIn:applyingTo:in:statically:)` but without filtering by name.
+    var candidates: [NameResolutionCandidate] = []
+    for e in extensions(visibleFrom: scopeOfUse) where !declarationsOnStack.contains(.init(e)) {
+      guard let a = applies(e, to: q, in: scopeOfUse) else { continue }
+      let w = program.types.reify(
+        a.witness, applying: a.substitutions, withVariables: .substitutedByError)
+      let arguments = w.typeArguments(appliedTo: e)
+      for ds in declarations(lexicallyIn: .init(node: e)).values {
+        for m in ds {
+          if !isEnumerableMember(m) { continue }
+          var member = typeOfName(referringTo: m, statically: selectionIsStatic)
+          if let a = arguments {
+            member = program.types.substitute(a, in: member)
+          }
+          candidates.append(
+            .init(reference: .inherited(w, m, statically: selectionIsStatic), type: member))
+        }
+      }
+    }
+    return candidates
+  }
+
+  /// Returns a candidate for every trait requirement reachable on `q` through conformances visible
+  /// from `scopeOfUse`.
+  /// 
+  /// Static members are returned iff `selectionIsStatic` is true.
+  private mutating func inheritedMembers(
+    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, statically selectionIsStatic: Bool
+  ) -> [NameResolutionCandidate] {
+    // Mirrors `resolve(_:inheritedMemberOf:visibleFrom:statically:)` but enumerates every visible 
+    // trait and all of its requirements instead of resolving a single name.
+
+    var candidates: [NameResolutionCandidate] = []
+    for concept in traits(visibleFrom: scopeOfUse) {
+      let vs = program[concept].parameters.map({ _ in fresh().erased })
+      let model = typeOfModel(of: q, conformingTo: concept, with: vs)
+      for a in summon(model.erased, in: scopeOfUse) {
+        let w = program.types.reify(
+          a.witness, applying: a.substitutions, withVariables: .substitutedByError)
+        for m in program[concept].members {
+          if !isEnumerableMember(m) { continue }
+          // Ignore the member if it is static but the qualification isn't.
+          if program.isStatic(m) && !selectionIsStatic { continue }
+          var member = typeOfImplementation(satisfying: m, in: w)
+          if !selectionIsStatic {
+            member = typeOfBoundMember(referringTo: m, withUnboundType: member)
+          }
+          candidates.append(
+            .init(reference: .inherited(w, m, statically: selectionIsStatic), type: member))
+        }
+      }
+    }
+    return candidates
+  }
+
   /// Returns candidates for resolving `n` as a member of `q` in `scopeOfUse`.
   private mutating func resolve(
     _ n: Name, memberOf q: Namespace.ID, visibleFrom scopeOfUse: ScopeIdentity
@@ -4413,6 +4533,19 @@ public struct Typer {
     default:
       return true
     }
+  }
+
+  /// Returns `true` iff `m` should be offered when enumerating the members of a type.
+  ///
+  /// In addition to `resolvableWithQualification`, this excludes the variable introduced by an
+  /// implicit (`using`/`given`) binding. Such a value is should be reached through implicit
+  /// resolution, not member selection.
+  private func isEnumerableMember(_ m: DeclarationIdentity) -> Bool {
+    guard resolvableWithQualification(m) else { return false }
+    if let v = program.cast(m, to: VariableDeclaration.self) {
+      return !program[v].synthesized
+    }
+    return true
   }
 
   /// Returns the declarations lexically contained in the declaration of `t`.
