@@ -119,8 +119,8 @@ extension FunctionGenerationContext {
   fileprivate mutating func saveCaptures(_ prologue: RegionPrologue) -> LLVMValue {
     let frame = module.llvm.insertAlloca(prologue.captureFrame, atEntryOf: llvm).v
 
-    // If the prologue is that of a plateau called from a ramp, allocate extra storage to capture
-    // the plateau and its environment *before* other definitions.
+    // If the prologue is that of a projection called from a ramp, allocate extra storage to
+    // capture the plateau and its environment *before* other definitions.
     if startsProjectionInRamp(prologue.boundary) {
       var v = module.llvm.poisonValue(of: module.plateauCallback.t).v
       if result.isPlateau {
@@ -302,9 +302,10 @@ extension Program {
   ///
   /// - Parameters:
   ///   - prologue: The region dominating part of `source` that is incorporated.
+  ///   - isRamp: `true` iff the prologue is that of a projection called from a ramp.
   ///   - source: The Hylo function whose contents is being compiled.
   ///   - result: The declaration of a plateau whose body has not been defined yet.
-  ///   - dominance: the dominator tree of `source`.
+  ///   - dominance: The dominator tree of `source`.
   /// - Returns: The set of basic blocks whose contents have been incorporated.
   private mutating func incorporateContentsOfPlateau(
     dominatedBy prologue: RegionPrologue, inRamp isRamp: Bool,
@@ -462,6 +463,8 @@ extension Program {
 
   /// Extends `ctx` to map each dominating definition in `prologue` to its value in `captures`,
   /// which is the environment of the lifted lambda being compiled.
+  ///
+  /// `isRamp` is `true` iff the prologue is that of a projection called from a ramp.
   private mutating func setupDominatingDefinitions(
     _ prologue: RegionPrologue, capturedIn captures: SwiftyLLVM.Parameter.UnsafeReference,
     inRamp isRamp: Bool,
