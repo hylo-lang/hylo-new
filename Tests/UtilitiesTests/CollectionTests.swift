@@ -32,11 +32,11 @@ final class CollectionTests: XCTestCase {
     XCTAssertEqual(n, [9, 16])
   }
 
-  func testSubscriptFromLast() {
+  func testSubscriptToLast() {
     let a = [1, 2, 3]
-    XCTAssertEqual(a[fromLast: 0], 3)
-    XCTAssertEqual(a[fromLast: 1], 2)
-    XCTAssertEqual(a[fromLast: 2], 1)
+    XCTAssertEqual(a[toLast: 0], 3)
+    XCTAssertEqual(a[toLast: 1], 2)
+    XCTAssertEqual(a[toLast: 2], 1)
   }
 
   func testRemoveDuplicates() {

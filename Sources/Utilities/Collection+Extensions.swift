@@ -55,7 +55,7 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(1) if the collection conforms to `RandomAccessCollection`; otherwise, O(k),
   ///   where k is the absolute value of `distanceToLast`.
-  public subscript(fromLast distanceToLast: Int) -> Element {
+  public subscript(toLast distanceToLast: Int) -> Element {
     let i = index(endIndex, offsetBy: -(distanceToLast + 1))
     return self[i]
   }
