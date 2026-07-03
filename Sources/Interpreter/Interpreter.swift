@@ -120,7 +120,7 @@ public struct Interpreter {
   }
 
   /// `true` iff the program is still running.
-  public private(set) var isRunning: Bool = true
+  public var isRunning: Bool { callStack.count > 1 }
 
   /// Local variables, parameters and return address.
   private var callStack = Stack()
@@ -177,9 +177,6 @@ public struct Interpreter {
 
     if case .jump(let pc) = r {
       programCounter = pc
-      if callStack.count == 1 {
-        isRunning = false
-      }
       return
     }
 
