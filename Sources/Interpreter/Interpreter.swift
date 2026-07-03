@@ -46,8 +46,7 @@ private enum InstructionEpilogue {
 
 }
 
-/// The local variables, parameters, and return address for a function
-/// call.
+/// The ephermal (on non-Memory) execution state of a function call.
 private struct StackFrame {
 
   // TODO: add local variables and parameters, which require `Memory`.
@@ -55,9 +54,8 @@ private struct StackFrame {
   /// The results of instructions.
   public var registers: [AnyInstructionIdentity: Value] = [:]
 
-  /// The program counter to which execution should return when
-  /// popping this frame.
-  public var returnAddress: InstructionPointer
+  /// Next instruction in the function.
+  public var programCounter: InstructionPointer
 
 }
 
@@ -67,20 +65,18 @@ private struct Stack {
   /// Local variables, parameters, and return addresses.
   private var frames: [StackFrame] = []
 
-  /// Adds a new frame on top with the given `returnAddress` and `parameters`.
-  public mutating func push(returnAddress: InstructionPointer) {
+  /// Adds a new call frame for a function invocation with `parameters`,
+  /// starting execution at `entry`.
+  public mutating func push(entry: InstructionPointer) {
     // TODO: support parameters.
-    let f = StackFrame(returnAddress: returnAddress)
+    let f = StackFrame(programCounter: entry)
     frames.append(f)
   }
 
-  /// Removes the top frame and returns its `returnAddress`.
+  /// Removes the top frame and returns next instruction to be executed.
   public mutating func pop() -> InstructionPointer {
-    let f = frames.last!
-    defer {
-      frames.removeLast()
-    }
-    return f.returnAddress
+    frames.removeLast()
+    return frames.last!.programCounter
   }
 
   /// The top stack frame.
@@ -93,6 +89,11 @@ private struct Stack {
       precondition(!isEmpty)
       yield &frames[frames.count - 1]
     }
+  }
+
+  /// Number of frames in call stack.
+  public var count: Int {
+    frames.count
   }
 
   /// `true` iff there is at least 1 stack frame.
@@ -108,8 +109,15 @@ public struct Interpreter {
   /// The program to be executed.
   private let program: Program
 
-  /// Identity of the next instruction to be executed.
-  private var programCounter: InstructionPointer
+  /// Next instruction to be executed.
+  private var programCounter: InstructionPointer {
+    _read {
+      yield topOfStack.programCounter
+    }
+    _modify {
+      yield &topOfStack.programCounter
+    }
+  }
 
   /// `true` iff the program is still running.
   public private(set) var isRunning: Bool = true
@@ -146,15 +154,17 @@ public struct Interpreter {
     let e = program.entry
     let f = program[e.module].functions[e.function]
     let i = f.blocks[f.entry!].first!
-    programCounter = .init(
+
+    let pc = InstructionPointer(
       module: e.module,
       functionInModule: e.function,
       instructionInFunction: i
     )
+    /// The program counter of bottom-most frame would never be used, so we
+    /// fill it with something arbitrary.
+    callStack.push(entry: pc)
 
-    // The return address of the bottom-most frame will never be used,
-    // so we fill it with something arbitrary.
-    callStack.push(returnAddress: programCounter)
+    callStack.push(entry: pc)
   }
 
   /// Executes a single instruction.
@@ -167,7 +177,7 @@ public struct Interpreter {
 
     if case .jump(let pc) = r {
       programCounter = pc
-      if callStack.isEmpty {
+      if callStack.count == 1 {
         isRunning = false
       }
       return
