@@ -71,6 +71,8 @@ extension Program {
   ) {
     // Don't compile generic functions.
     if !self[ctx.hylo].ir[f].isMonomorphic { return }
+    // Don't compile functions without a definition.
+    if !self[ctx.hylo].ir[f].isDefined { return }
     // Don't re-compile functions.
     if !ctx.compiled.insert(f).inserted { return }
 
