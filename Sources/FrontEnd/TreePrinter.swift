@@ -90,6 +90,16 @@ public struct TreePrinter {
     return (i == 0) ? s : s + superscript(i)
   }
 
+  /// Clears the table ensuring the discrimination of different entities sharing the same name.
+  ///
+  /// When an identifier is generated for a specific entity, such as a type, the printer makes sure
+  /// that the identifier has not been generated for a different entity already. If it has, then a
+  /// superscript is added to disambiguate. Calling this method clears the table that the printer
+  /// uses to determine whether such disambiguation is required.
+  public mutating func resetUniquization() {
+    identifiers.removeAll(keepingCapacity: true)
+  }
+
   /// Returns `n` as a superscript.
   private func superscript(_ n: Int) -> String {
     if n == 0 { return Self.digitToSuperscript[0] }

@@ -1,4 +1,7 @@
+import Archivist
+
 /// The identity of a lexical scope.
+@Archivable
 public struct ScopeIdentity: Hashable, Sendable {
 
   /// The internal representation of this identity.

@@ -64,7 +64,8 @@ final class DiagnosticTests: XCTestCase {
     XCTAssertEqual(
       rendered,
       """
-      \u{001B}[1mvirtual:///1ssiyy33rbj6z:1.1-3\u{001B}[0m: \u{001B}[1m\u{001B}[31merror\u{001B}[0m: \u{001B}[1mbang\u{001B}[0m
+      \u{001B}[1mvirtual:///1ssiyy33rbj6z:1.1-3\u{001B}[0m: \
+      \u{001B}[1m\u{001B}[31merror\u{001B}[0m: \u{001B}[1mbang\u{001B}[0m
       Hello.
       ~~
 

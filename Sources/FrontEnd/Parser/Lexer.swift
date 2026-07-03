@@ -163,12 +163,11 @@ public struct Lexer: IteratorProtocol, Sequence {
     case "infix": tag = .infix
     case "init": tag = .`init`
     case "inout": tag = .inout
-    case "internal": tag = .internal
     case "let": tag = .let
+    case "module": tag = .module
     case "match": tag = .match
     case "postfix": tag = .postfix
     case "prefix": tag = .prefix
-    case "private": tag = .private
     case "public": tag = .public
     case "return": tag = .return
     case "set": tag = .set
@@ -223,6 +222,7 @@ public struct Lexer: IteratorProtocol, Sequence {
     case "&": tag = .ampersand
     case "=": tag = .assign
     case "->": tag = .arrow
+    case "=>": tag = .thickArrow
     case "==": tag = .equal
     default: tag = .operator
     }

@@ -2,9 +2,9 @@ name: Spell check
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ "**" ]
 
 jobs:
   run:
@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Actions Repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         submodules: true
         show-progress: false
 
     - name: Check spelling
-      uses: crate-ci/typos@v1.46.2
+      uses: crate-ci/typos@v1.47.2

@@ -41,8 +41,9 @@ extension IREmitter {
     // Otherwise, replace the type application's arguments with type witnesses. The way in which
     // this substitution is done depends on the way the type application is used.
     switch f.at(i).callee {
-    case .function(let c, _, _):
-      depolymorphize(c, operandOf: i, in: &f, reusing: &witnesses)
+    case .function(let c, _):
+      let k = program[module].ir.identity(function: c)!
+      depolymorphize(k, operandOf: i, in: &f, reusing: &witnesses)
 
     default:
       unimplemented("first class function deploymorphization")
@@ -151,7 +152,7 @@ extension IREmitter {
       assert(t == f.resolved(s.type)!.type)
       f.replace(user, with: s)
     } else {
-      let x0 = insert(s)
+      let x0 = lowering(before: user, in: &f, { $0.insert(s) })
       f.replace(user, with: IRPlaceCast(source: x0!, target: t, anchor: old.anchor))
     }
   }
@@ -181,10 +182,22 @@ extension IREmitter {
     return program[module].ir.addFunction(mono)
   }
 
-  /// Emits the existentialized definition of `f` into `g`.
-  internal mutating func existentialize(_ f: IRFunction.ID, into g: IRFunction.ID) {
-    let poly = program[module].ir[f]
-    var mono = program[module].ir[g].move()
+  /// Emits the existentialized definition of `poly` into its existentialized form, adding the
+  /// latter to the module if necessary.
+  ///
+  /// `poly` is a polymorphic function whose implementation is defined in the current module. Its
+  /// existentialized form has not been defined yet, although it may have been declared.
+  internal mutating func existentialize(_ poly: IRFunction) {
+    let m = demandExistentialized(poly)
+    existentialize(poly, into: m)
+  }
+
+  /// Emits the existentialized definition of `poly` into `m`.
+  ///
+  /// `poly` is a polymorphic function whose implementation is defined in the current module. `m`
+  /// identifies the existentialized form of this function and has not been defined yet.
+  internal mutating func existentialize(_ poly: IRFunction, into m: IRFunction.ID) {
+    var mono = program[module].ir[m].move()
     assert(poly.isDefined && !mono.isDefined, "existentialization already completed")
 
     /// The type parameters of the function being existentialized.
@@ -205,9 +218,8 @@ extension IREmitter {
     }
 
     // Iterate over the basic blocks in such a way that definitions are visited before their uses.
-    let cfg = poly.controlFlow()
-    let dominance = DominatorTree(function: poly, controlFlow: cfg)
-    for b in dominance.bfs {
+    let dominance = DominatorTree(function: poly, controlFlow: poly.controlFlow())
+    for b in dominance {
       for i in poly.instructions(in: b) {
         /// Where the next instruction should be inserted.
         let p = InsertionPoint.end(of: properties[b])
@@ -227,7 +239,7 @@ extension IREmitter {
               properties[.register(i)] = me.insert(s)!
             } else {
               let w = me._emitTypeWitness(of: s.storage, reusing: &witnesses)
-              properties[.register(i)] = me._allocx(w, as: s.storage, alignment: s.alignment)
+              properties[.register(i)] = me._alloca(w, as: s.storage, alignment: s.alignment)
             }
           }
 
@@ -243,7 +255,7 @@ extension IREmitter {
     }
 
     depolymorphize(&mono, passing: witnesses.filter({ (k, v) in v.parameter != nil }))
-    program[module].ir[g].take(definition: mono)
+    program[module].ir[m].take(definition: mono)
   }
 
 }

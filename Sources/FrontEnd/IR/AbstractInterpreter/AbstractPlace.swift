@@ -13,6 +13,16 @@ internal enum AbstractPlace: Hashable, Sendable {
   /// Use `appending(contentsOf:)` to create instances of this case.
   indirect case subplace(root: IRValue, path: IndexPath)
 
+  /// A pair (`r`, `p`) where `p` is the path to this place, relative to the root location `r`.
+  internal var location: (root: IRValue, path: IndexPath) {
+    switch self {
+    case .root(let root):
+      return (root, .init())
+    case .subplace(let root, let path):
+      return (root, path)
+    }
+  }
+
   /// Returns a new place created by appending `suffix` to `self`.
   ///
   /// - Requires: `self` is not `.null`.
@@ -34,40 +44,6 @@ internal enum AbstractPlace: Hashable, Sendable {
   }
 
 }
-
-//extension AbstractPlace: Comparable {
-//
-//  /// Returns `true` iff `self` precedes `other` in a lexicographical order.
-//  internal static func < (l: Self, r: Self) -> Bool {
-//    switch (l, r) {
-//    case (.root(let a), .root(let b)):
-//      return areInIncreasingOrder(a, b)
-//    case (.root(let a), .subplace(let b, _)):
-//      return (a == b) || areInIncreasingOrder(a, b)
-//    case (.subplace(let a, _), .root(let b)):
-//      return areInIncreasingOrder(a, b)
-//    case (.subplace(let a, let p), .subplace(let b, let q)):
-//      return (a == b) ? p.lexicographicallyPrecedes(q) : areInIncreasingOrder(a, b)
-//    }
-//  }
-//
-//  /// Returns `true` iff `l` precedes `r` when computing whether two abstract places are in order.
-//  private static func areInIncreasingOrder(_ l: IRValue, _ r: IRValue) -> Bool {
-//    switch (l, r) {
-//    case (.parameter(let a), .parameter(let b)):
-//      return a < b
-//    case (.parameter, _):
-//      return true
-//    case (.register, .parameter):
-//      return false
-//    case (.register(let a), .register(let b)):
-//      return a < b
-//    default:
-//      fatalError()
-//    }
-//  }
-//
-//}
 
 extension AbstractPlace: Showable {
 

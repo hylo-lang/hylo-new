@@ -399,8 +399,7 @@ extension BuiltinFunction {
 
     switch self {
     case .trap:
-      let t0 = s.never().erased
-      return s.demand(Arrow(inputs: [], output: t0))
+      return s.demand(Arrow(inputs: [], output: .never))
 
     case .addressOf:
       let t0 = s.fresh().erased
@@ -1301,8 +1300,8 @@ extension BuiltinFunction {
   //    }
   //  }
   //
-  //  /// An atomic non-fence function whose name—up to the open parenthesis—is `n`, or `nil` if no such
-  //  /// built-in function exists.
+  //  /// An atomic non-fence function whose name—up to the open parenthesis—is `n`, or `nil` if no
+  //  /// such built-in function exists.
   //  private init?(atomic n: String) {
   //    // The type of all atomics (except fences) is mentioned at the end.
   //    let m = n.split(atLastIndexOf: "_")

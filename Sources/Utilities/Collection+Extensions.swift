@@ -49,6 +49,19 @@ extension Collection {
 
 }
 
+extension BidirectionalCollection {
+
+  /// Accesses the element that is at `distanceToLast` positions before the last element of `self`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to `RandomAccessCollection`; otherwise, O(k),
+  ///   where k is the absolute value of `distanceToLast`.
+  public subscript(toLast distanceToLast: Int) -> Element {
+    let i = index(endIndex, offsetBy: -(distanceToLast + 1))
+    return self[i]
+  }
+
+}
+
 extension RangeReplaceableCollection where Element: Hashable {
 
   /// Removes all except the first element from every consecutive group of equivalent elements.

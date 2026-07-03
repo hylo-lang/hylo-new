@@ -1,3 +1,5 @@
+import Archivist
+
 /// Creates an access on a storage.
 ///
 /// Hylo IR uses a capability system to govern storage accesses. To read/write values from/to
@@ -10,6 +12,7 @@
 /// It is possible to create accesses on "raw addresses" (those result from instructions allocating
 /// memory or computing addresses) or on other accesses. For example, it is legal to form a `let`
 /// access from an `inout` access.
+@Archivable
 public struct IRAccess: IRRegionEntry {
 
   /// The operands of the instruction.
@@ -35,10 +38,10 @@ public struct IRAccess: IRRegionEntry {
     self.capabilities = capabilities
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.source]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.source]]
+    self.anchor = properties.anchor(other)
     self.capabilities = other.capabilities
   }
 

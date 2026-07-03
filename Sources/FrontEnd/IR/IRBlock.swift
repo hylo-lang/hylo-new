@@ -49,4 +49,13 @@ public struct IRBlock: Sendable {
     if first == nil { first = i }
   }
 
+  /// Unassigns the first and last instructions of `self`.
+  ///
+  /// Do not call this method directly. The contents of a basic block can only be modified through
+  /// the API of the containing `IRFunction`.
+  internal mutating func clear() {
+    first = nil
+    last = nil
+  }
+
 }

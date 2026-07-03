@@ -114,6 +114,9 @@ public struct AnyTypeIdentity: Hashable, Sendable {
   /// The identity of `Hylo.Void`, which is an empty tuple.
   public static let void = AnyTypeIdentity(predefined: 1, properties: [])
 
+  /// The identity of `Hylo.Never`, which is equivalent to `<T> T`.
+  public static let never = AnyTypeIdentity(predefined: 2, properties: [])
+
 }
 
 extension AnyTypeIdentity: TypeIdentity {

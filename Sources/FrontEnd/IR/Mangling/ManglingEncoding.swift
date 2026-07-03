@@ -39,11 +39,14 @@ internal struct ManglingEncoding: Sendable {
     append(decl: s, to: &output)
   }
 
-  /// Writes to `output` the mangled representation of `s` from module `m`.
-  internal mutating func mangled(
-    function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
-  ) {
-    append(function: s, of: m, to: &output)
+  /// Writes to `output` the mangled representation of `n`.
+  internal mutating func mangled(function n: IRFunction.Name, to output: inout ManglingContext) {
+    append(function: n, to: &output)
+  }
+
+  /// Writes to `output` the mangled representation of `n`.
+  internal mutating func mangled(global n: IRGlobal.Name, to output: inout ManglingContext) {
+    append(global: n, to: &output)
   }
 
   /// Writes to `output` the mangled representation of `s`.
@@ -73,7 +76,7 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `d` to `output`.
   private mutating func append(decl d: DeclarationIdentity, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: .node(.init(d)), in: program) { return }
+    if output.addIf(reservedOrRecorded: .node(.init(d))) { return }
 
     // First add the qualification of the declaration.
     appendQualification(of: d, to: &output)
@@ -103,7 +106,7 @@ internal struct ManglingEncoding: Sendable {
       program.unexpected(d)
     }
 
-    output.record(symbol: .node(AnySyntaxIdentity(d)), in: program)
+    output.record(symbol: .node(AnySyntaxIdentity(d)))
   }
 
   /// Demangles a (possibly qualified) entity from `source`.
@@ -213,10 +216,10 @@ internal struct ManglingEncoding: Sendable {
     var earlyExit = false
     let p = program.parent(containing: n)
     for s in program.scopes(from: p) {
-      if s.node != nil, output.addIf(reservedOrRecorded: .node(s.node!), in: program) {
+      if s.node != nil, output.addIf(reservedOrRecorded: .node(s.node!)) {
         earlyExit = true
         break
-      } else if output.addIf(reservedOrRecorded: s.asSymbol, in: program) {
+      } else if output.addIf(reservedOrRecorded: s.asSymbol) {
         earlyExit = true
         break
       } else if output.addIf(qualification: s) {
@@ -230,11 +233,11 @@ internal struct ManglingEncoding: Sendable {
     // Write the mangled representation of the qualification's suffix.
     if !earlyExit {
       append(module: p.module, to: &output)
-      output.record(symbol: .module(p.module), in: program)
+      output.record(symbol: .module(p.module))
     }
     for s in qs.reversed() {
       append(scope: s, to: &output)
-      output.record(symbol: s.asSymbol, in: program)
+      output.record(symbol: s.asSymbol)
     }
   }
 
@@ -302,7 +305,7 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `m` to `output`.
   private mutating func append(module m: Module.ID, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: .module(m), in: program) { return }
+    if output.addIf(reservedOrRecorded: .module(m)) { return }
     output.add(operator: .module)
     output.add(string: program[m].name.description)
   }
@@ -314,7 +317,7 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(scope s: ScopeIdentity, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: s.asSymbol, in: program) { return }
+    if output.addIf(reservedOrRecorded: s.asSymbol) { return }
 
     let q = output.record(qualification: s)
 
@@ -356,7 +359,7 @@ internal struct ManglingEncoding: Sendable {
       append(translationUnit: s.file, to: &output)
     }
     _ = output.record(qualification: q)
-    output.record(symbol: s.asSymbol, in: program)
+    output.record(symbol: s.asSymbol)
   }
 
   /// Writes the mangled representation of `d` to `output`.
@@ -541,16 +544,9 @@ internal struct ManglingEncoding: Sendable {
     source.takeString().map({ (s) in .virtualSourceFile(s) }) ?? .error
   }
 
-  /// Writes the mangled representation of `s` defined in `m`, to `output`.
+  /// Writes the mangled representation of `s` to `output`.
   private mutating func append(
-    function s: IRFunction.ID, of m: Module.ID, to output: inout ManglingContext
-  ) {
-    append(function: program[m].ir[s].name, of: m, to: &output)
-  }
-
-  /// Writes the mangled representation of `s` defined in `m`, to `output`.
-  private mutating func append(
-    function s: IRFunction.Name, of m: Module.ID, to output: inout ManglingContext
+    function s: IRFunction.Name, to output: inout ManglingContext
   ) {
     switch s {
     case .lowered(let d):
@@ -570,7 +566,15 @@ internal struct ManglingEncoding: Sendable {
       append(typeArguments: a, to: &output)
     case .existentialized(let s):
       output.add(operator: .existentializedDeclaration)
-      append(function: s, of: m, to: &output)
+      append(function: s, to: &output)
+    case .slide(let s, let n):
+      output.add(operator: .slideDeclaration)
+      append(function: s, to: &output)
+      output.add(integer: n)
+    case .plateau(let s, let n):
+      output.add(operator: .plateauDeclaration)
+      append(function: s, to: &output)
+      output.add(integer: n)
     }
   }
 
@@ -613,6 +617,41 @@ internal struct ManglingEncoding: Sendable {
     .existentialized(takeEntity(from: &source))
   }
 
+  /// Demangles a slide declaration from `source`.
+  private static func slideDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    let e = takeEntity(from: &source)
+     if let i = source.takeInt() {
+       return .slide(e, i)
+     } else {
+       return .error
+     }
+  }
+
+  /// Demangles a plateau declaration from `source`.
+  private static func plateauDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    let e = takeEntity(from: &source)
+     if let i = source.takeInt() {
+       return .plateau(e, i)
+     } else {
+       return .error
+     }
+  }
+
+  /// Writes the mangled representation of `s` to `output`.
+  private mutating func append(global s: IRGlobal.Name, to output: inout ManglingContext) {
+    // Note: no symbol needed; we assume it's a lowered global.
+    switch s {
+    case .lowered(let d):
+      append(decl: .init(d), to: &output)
+    case .witness(let t):
+      append(type: t, to: &output)
+    }
+  }
+
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(table s: IRWitnessTable, to output: inout ManglingContext) {
     output.add(operator: .witnessTable)
@@ -632,7 +671,7 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(type s: AnyTypeIdentity, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: .type(s), in: program) { return }
+    if output.addIf(reservedOrRecorded: .type(s)) { return }
 
     let a = program.types[s]
     switch a {
@@ -674,12 +713,14 @@ internal struct ManglingEncoding: Sendable {
       append(typeAlias: t, to: &output)
     case let t as TypeApplication:
       append(typeApplication: t, to: &output)
+    case let t as TypeWitness:
+      append(typeWitness: t, to: &output)
     case let t as UniversalType:
       append(universal: t, to: &output)
     default:
       unreachable()
     }
-    output.record(symbol: .type(s), in: program)
+    output.record(symbol: .type(s))
   }
 
   /// Demangles a type from `source`.
@@ -743,7 +784,9 @@ internal struct ManglingEncoding: Sendable {
     case .typeAliasType:
       demangled = takeTypeAlias(from: &source)
     case .typeApplicationType:
-      demangled = takeApplicationType(from: &source)
+      demangled = takeTypeApplication(from: &source)
+    case .typeWitnessType:
+      demangled = takeTypeWitness(from: &source)
     case .universalType:
       demangled = takeUniversalType(from: &source)
     default:
@@ -900,7 +943,8 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    return takeKind(from: &source).map({ (k) in .genericParameterConformer(declaration: d, kind: k) }) ?? .error
+    return takeKind(from: &source)
+      .map({ (k) in .genericParameterConformer(declaration: d, kind: k) }) ?? .error
   }
 
   /// Demangles a generic parameter user type from `source`.
@@ -908,7 +952,8 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    return takeKind(from: &source).map({ (k) in .genericParameterUser(declaration: d, kind: k) }) ?? .error
+    return takeKind(from: &source)
+      .map({ (k) in .genericParameterUser(declaration: d, kind: k) }) ?? .error
   }
 
   /// Demangles a generic parameter nth type from `source`.
@@ -1142,13 +1187,26 @@ internal struct ManglingEncoding: Sendable {
   }
 
   /// Demangles an application type from `source`.
-  private static func takeApplicationType(from source: inout DemanglingContext) -> DemangledType {
+  private static func takeTypeApplication(from source: inout DemanglingContext) -> DemangledType {
     let t = takeType(from: &source)
     if let a = takeTypeArguments(from: &source) {
       return .typeApplication(abstraction: t, arguments: a)
     } else {
       return .error
     }
+  }
+
+  /// Writes the mangled representation of `t` to `output`.
+  private mutating func append(
+    typeWitness t: TypeWitness,
+    to output: inout ManglingContext
+  ) {
+    output.add(operator: .typeWitnessType)
+  }
+
+  /// Demangles a type witness type from `source`.
+  private static func takeTypeWitness(from source: inout DemanglingContext) -> DemangledType {
+    return .typeWitness
   }
 
   /// Writes the mangled representation of `a` to `output`.
@@ -1195,7 +1253,7 @@ internal struct ManglingEncoding: Sendable {
     // Only encode notation and introducer; labels are encoded in types.
     // Encode the presence of introducer in the tag.
     var tag = UInt8(name.notation.rawValue)
-    if name.introducer != nil { tag = tag | 0x80 }
+    if name.introducer != nil { tag = tag | 0x20 }
     output.add(base64Digit: tag)
     if let i = name.introducer {
       output.add(base64Digit: i)
@@ -1206,8 +1264,8 @@ internal struct ManglingEncoding: Sendable {
   /// Demangles a name from `source`.
   private static func takeName(from source: inout DemanglingContext) -> Name? {
     guard let tag = source.take(Base64Digit.self)?.rawValue else { return nil }
-    let hasIntroducer = (tag & 0x80) != 0
-    let notation = OperatorNotation(rawValue: tag & 0x7F)
+    let hasIntroducer = (tag & 0x20) != 0
+    let notation = OperatorNotation(rawValue: tag & 0x1F)
     let introducer = hasIntroducer
       ? source.take(Base64Digit.self).flatMap { (d) in AccessEffect(rawValue: d.rawValue) }
       : nil

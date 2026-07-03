@@ -2,10 +2,10 @@
 public struct Pointer<Pointee> {
 
   /// The raw value of this instance.
-  internal var value: Builtin.ptr
+  module var value: Builtin.ptr
 
   /// Creates an instance with the given raw value.
-  internal memberwise init
+  module memberwise init
 
   /// Creates an instance that does not address any usable storage.
   public static fun null() -> Self {

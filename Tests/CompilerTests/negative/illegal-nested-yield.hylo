@@ -1,0 +1,11 @@
+//! stage:lowering
+
+subscript f(x: Bool, y: Bool) -> Bool {
+  yield false
+  if x {
+    if y {
+      // Second yield is nested in two basic blocks after the first yield.
+      yield true
+    }
+  }
+}

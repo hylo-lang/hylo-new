@@ -48,7 +48,8 @@ public struct SourceFile: Hashable, Sendable {
   ///
   /// - Requires: `n` has a file name component.
   public init(name n: FileName, contents: String) {
-    precondition(n.url.pathComponents.count >= 2) // The 0th component is `/`, followed by the real components.
+    // The 0th component is `/`, followed by the real components.
+    precondition(n.url.pathComponents.count >= 2)
     self.properties = .init(name: n.absolute, text: contents)
   }
 
@@ -60,10 +61,11 @@ public struct SourceFile: Hashable, Sendable {
 
   /// Creates a virtual source file with the given `contents`.
   public init(contents: String) {
-    var hasher = FNV()
+    var hasher = FNV1.native()
     hasher.combine(contents)
     self.init(
-      name: .virtual(URL(string: "virtual:///\(String(UInt(bitPattern: hasher.state), radix: 36))")!),
+      name: .virtual(
+        URL(string: "virtual:///\(String(UInt(bitPattern: hasher.state), radix: 36))")!),
       contents: contents)
   }
 
@@ -84,7 +86,7 @@ public struct SourceFile: Hashable, Sendable {
 
   /// Returns a hash of the source file that suitable for determining whether it has changed.
   public var fingerprint: UInt64 {
-    var hasher = FNV()
+    var hasher = FNV1.native()
     hasher.combine(baseName)
     hasher.combine(text.utf8.count)
     hasher.combine(bytes: text.utf8)
@@ -94,7 +96,7 @@ public struct SourceFile: Hashable, Sendable {
   /// Returns a hash of the contents of `files` that suitable for determining whether one of the
   /// source files have changed.
   public static func fingerprint<S: Sequence<SourceFile>>(contentsOf files: S) -> UInt64 {
-    var hasher = FNV()
+    var hasher = FNV1.native()
     for f in files.sorted(by: \.baseName) {
       hasher.combine(f.fingerprint)
     }
@@ -176,7 +178,8 @@ public struct SourceFile: Hashable, Sendable {
     return text.index(lineStart, offsetBy: offset, limitedBy: text.endIndex) ?? endIndex
   }
 
-  /// Returns the index in `text` corresponding to the 0-based `line` and `utf16Offset` from line start.
+  /// Returns the index in `text` corresponding to the 0-based `line` and `utf16Offset` from line
+  /// start.
   ///
   /// If `line` or `utf16Offset` are out of bounds, the result is clamped to [startIndex, endIndex].
   /// Note: this means, `endIndex` may be returned, which is illegal to subscript with.
@@ -187,7 +190,8 @@ public struct SourceFile: Hashable, Sendable {
     let lineStart = properties.lineStarts[line]
     let utf16Line = text[lineStart...].utf16
 
-    return utf16Line.index(utf16Line.startIndex, offsetBy: utf16Offset, limitedBy: endIndex) ?? endIndex
+    return utf16Line.index(utf16Line.startIndex, offsetBy: utf16Offset, limitedBy: endIndex)
+      ?? endIndex
   }
 
   /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`.

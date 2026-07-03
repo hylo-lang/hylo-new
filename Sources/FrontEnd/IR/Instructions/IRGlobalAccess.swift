@@ -1,7 +1,10 @@
+import Archivist
+
 /// Accesses the storage of a global variable.
 ///
 /// This instruction defines a place representing the contents of a global variable after it has
 /// been initialized. The object stored at that place is immutable.
+@Archivable
 public struct IRGlobalAccess: Instruction {
 
   /// The global variable being accessed.
@@ -16,9 +19,10 @@ public struct IRGlobalAccess: Instruction {
     self.source = source
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self = other
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.anchor = properties.anchor(other)
+    self.source = other.source
   }
 
   /// The type of the value loaded by this instruction.

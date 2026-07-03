@@ -1,7 +1,10 @@
+import Archivist
+
 /// Converts a place of type `A` to a place of type `B`.
 ///
 /// The conversion is not checked. Accessing the resulting place has undefined behavior unless `B`
 /// is layout-compatible with `A`.
+@Archivable
 public struct IRPlaceCast: Instruction {
 
   /// The operands of the instruction.
@@ -20,10 +23,10 @@ public struct IRPlaceCast: Instruction {
     self.target = target
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.source]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.source]]
+    self.anchor = properties.anchor(other)
     self.target = other.target
   }
 
@@ -38,13 +41,18 @@ public struct IRPlaceCast: Instruction {
     .place(target)
   }
 
+  /// `true`.
+  public var isExtendingOperandLifetimes: Bool {
+    true
+  }
+
 }
 
 extension IRPlaceCast: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "place_cast \(printer.show(source)) to \(printer.show(target))"
+    "place_cast \(printer.show(source)) as \(printer.show(target))"
   }
 
 }

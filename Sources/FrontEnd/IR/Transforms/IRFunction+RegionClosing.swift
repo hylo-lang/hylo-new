@@ -133,7 +133,7 @@ extension IRFunction {
     }
 
     // Mark successors of live out blocks as live in if they haven't been already.
-    for block in decode(successors) where coverage[block] == nil {
+    for block in successors.elements where coverage[block] == nil {
       coverage[block] = .liveIn(lastUse: nil)
     }
 

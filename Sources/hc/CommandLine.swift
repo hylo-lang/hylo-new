@@ -44,7 +44,10 @@ private typealias Module = FrontEnd.Module
   @Option(
     name: [.customLong("cpu")],
     help: ArgumentHelp(
-      "Target CPU: native, generic, or an explicit name (default: native for host, generic for cross).",
+      """
+      Target CPU: native, generic, or an explicit name \
+      (default: native for host, generic for cross).
+      """,
       valueName: "cpu"))
   private var targetCPU: String?
 
@@ -52,15 +55,18 @@ private typealias Module = FrontEnd.Module
   @Option(
     name: [.customLong("cpu-features")],
     help: ArgumentHelp(
-      "CPU features: native, or an explicit feature string (default: native for host, none for cross).",
+      """
+      CPU features: native, or an explicit feature string \
+      (default: native for host, none for cross).
+      """,
       valueName: "features"))
   private var targetCPUFeatures: String?
 
-  /// The code generation optimization level (0-3).
-  @Option(
-    name: [.customShort("O"), .customLong("optimization-level")],
-    help: "Optimization level: 0, 1, 2, 3 (default: 0).")
-  private var optimizationLevel: OptimizationLevel = .none
+  /// `true` iff optimizations are enabled.
+  @Flag(
+    name: [.customShort("O")],
+    help: "Enable all optimizations.")
+  private var optimized: Bool = false
 
   /// The relocation model for code generation.
   @Option(
@@ -98,6 +104,7 @@ private typealias Module = FrontEnd.Module
     help: "Trace type inference")
   private var lineTracingInference: LineLocator?
 
+  /// The destination to which the result of the compilation is written.
   @Option(
     name: [.customShort("o")],
     help: ArgumentHelp(
@@ -130,8 +137,8 @@ private typealias Module = FrontEnd.Module
     var driver = Driver(
       moduleCachePath: noCaching ? nil : moduleCachePath!,
       targetSpecification: try resolveTarget(),
-      optimization: optimizationLevel,
-      relocation: relocationModel ?? defaultRelocationModel(),
+      optimization: optimized ? .aggressive : .none,
+      relocation: relocationModel ?? Driver.defaultRelocationModel,
       codeModel: codeModel ?? .default,
       librarySearchPaths: librarySearchPaths)
 
@@ -159,21 +166,25 @@ private typealias Module = FrontEnd.Module
         return
       }
 
-      await perform("typing", for: module, {
+      await perform("typing", for: module) {
         await driver.assignTypes(of: module, loggingInferenceWhere: inferenceLoggerFilter())
-      })
+      }
       if outputType == .typedAST {
         try emitAst(module, in: driver.program, name: product)
         return
       }
 
-      await perform("lowering", for: module, { await driver.lower(module) })
+      await perform("lowering", for: module) { await
+        driver.lower(module)
+      }
       if outputType == .rawIR {
         try emitIR(module, in: driver.program, name: product)
         return
       }
 
-      await perform("normalization", for: module, { await driver.applyTransformationPasses(module) })
+      await perform("normalization", for: module) {
+        await driver.applyTransformationPasses(module)
+      }
       if outputType == .ir {
         try emitIR(module, in: driver.program, name: product)
         return
@@ -183,16 +194,16 @@ private typealias Module = FrontEnd.Module
       let a = try driver.program.archive(module: module)
       note("module archive size: \(a.count)")
 
-      try await perform("code generation", for: module, { try driver.compileToLLVM(module) })
+      try await perform("code generation", for: module) {
+        try driver.compileToLLVM(module)
+      }
       if outputType == .llvm {
         try emitLLVM(module, from: driver, name: product)
         return
-      }
-      if outputType == .asm {
+      } else if outputType == .asm {
         try write(driver.assembly(of: module), to: asmFile(product))
         return
-      }
-      if outputType == .object {
+      } else if outputType == .object {
         // FIXME: output the dependencies of `module`, including the standard library.
         let directory = try objectFilesDirectory()
         try driver.writeObjectFiles(for: [module], into: directory)
@@ -201,8 +212,9 @@ private typealias Module = FrontEnd.Module
       }
 
       assert(outputType == .binary)
-      try await perform("generating executable", for: module,
-        { try driver.generateExecutable(from: module, writingTo: binaryFile(product)) })
+      try await perform("generating executable", for: module) {
+        try driver.generateExecutable(from: module, writingTo: binaryFile(product))
+      }
     } catch let e as CompilationError {
       render(e.diagnostics.elements)
       CommandLine.exit(withError: ExitCode.failure)
@@ -266,7 +278,8 @@ private typealias Module = FrontEnd.Module
     }
   }
 
-  /// Resolves the `--target`, `--cpu`, and `--cpu-features` CLI options into a `TargetSpecification`.
+  /// Resolves the `--target`, `--cpu`, and `--cpu-features` CLI options into a
+  /// `TargetSpecification`.
   private func resolveTarget() throws -> TargetSpecification {
     let host = try Target.host()
     let triple = try targetTriple.map(Target.init) ?? host
@@ -276,17 +289,6 @@ private typealias Module = FrontEnd.Module
       target: triple,
       cpu: resolveCPU(crossCompiling: crossCompiling),
       features: resolveCPUFeatures(crossCompiling: crossCompiling))
-  }
-
-  /// The default relocation model when not specified on the command line.
-  ///
-  /// Note: This may be obsolete after https://github.com/hylo-lang/hylo-new/issues/96 is resolved.
-  private func defaultRelocationModel() -> RelocationModel {
-    #if os(Linux)
-      return .pic
-    #else
-      return .default
-    #endif
   }
 
   /// Emits the AST of `module` in `program` with name `name`, using the tree printer.
@@ -332,15 +334,15 @@ private typealias Module = FrontEnd.Module
 
   /// Sets up the value of search paths for locating libraries and cached artifacts.
   private mutating func configureSearchPaths() throws {
-    let fm = FileManager.default
-    if let m = moduleCachePath {
-      librarySearchPaths.append(m)
+    let m = FileManager.default
+    if let cache = moduleCachePath {
+      librarySearchPaths.append(cache)
     } else {
-      let m = fm.temporaryDirectory.appending(path: ".hylocache")
-      try fm.createDirectory(at: m, withIntermediateDirectories: true)
-      note("using module cache path: \(m.path)")
-      librarySearchPaths.append(m)
-      moduleCachePath = m
+      let cache = m.temporaryDirectory.appending(path: ".hylocache")
+      try m.createDirectory(at: cache, withIntermediateDirectories: true)
+      note("module cache path: \(cache.path)")
+      librarySearchPaths.append(cache)
+      moduleCachePath = cache
     }
 
     librarySearchPaths = .init(librarySearchPaths.uniqued())
@@ -482,7 +484,7 @@ private typealias Module = FrontEnd.Module
         guard case .local(let u) = s.source.name else { return false }
         if u.absoluteURL.pathComponents.starts(with: l.path.pathComponents) {
           let (a, _) = s.start.lineAndOffset
-          let (b, _) = s.start.lineAndOffset
+          let (b, _) = s.end.lineAndOffset
           return (a + 1 <= l.line) && (l.line <= b + 1)
         } else {
           return false

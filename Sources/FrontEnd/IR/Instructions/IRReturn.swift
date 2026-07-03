@@ -7,6 +7,7 @@ import Archivist
 ///
 /// Refined IR requires that the return register of the function be definitely initialized before
 /// `return` is executed.
+@Archivable
 public struct IRReturn: Terminator {
 
   /// The region of the code corresponding to this instruction.
@@ -17,9 +18,9 @@ public struct IRReturn: Terminator {
     self.anchor = anchor
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self = other
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.anchor = properties.anchor(other)
   }
 
 }

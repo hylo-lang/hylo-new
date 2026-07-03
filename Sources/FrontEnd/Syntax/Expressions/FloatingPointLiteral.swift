@@ -17,6 +17,10 @@ public struct FloatingPointLiteral: LiteralExpression {
 
   public static let literalType: LiteralType = .float
 
+  public static let defaultType: Program.StandardLibraryEntity = .float64
+
+  public static let constructorLabel: String = "floating_point_literal"
+
 }
 
 extension FloatingPointLiteral: Showable {

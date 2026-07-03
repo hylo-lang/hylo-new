@@ -1,8 +1,0 @@
-// Alias declaration
-type X = Int
-
-// Associated type declaration
-type X
-
-// Incomplete type declaration
-type

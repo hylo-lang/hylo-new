@@ -1,0 +1,26 @@
+//! exit-status:23
+
+@inline(never)
+subscript id(x: inout Int32) inout -> Int32 {
+  yield &x
+}
+
+@inline(never)
+subscript pick(c: Bool, x: inout Int32, y: inout Int32) inout -> Int32 {
+  if c {
+    &id[&x] = 0 ; yield &x
+  } else {
+    &id[&x] = 0 ; yield &y
+  }
+  &x = 12
+}
+
+fun main() -> Int32 {
+  var a: Int32 = 0
+  var b: Int32 = 0
+
+  inout p = &pick[false, &a, &b]
+  &p = 23
+
+  return b
+}

@@ -1,4 +1,7 @@
+import Archivist
+
 /// A parameter in a Hylo IR function.
+@Archivable
 public struct IRParameter: Sendable {
 
   /// The type of the parameter.

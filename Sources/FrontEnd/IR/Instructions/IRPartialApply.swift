@@ -1,8 +1,11 @@
+import Archivist
+
 /// Creates a closure by partially applying a function to a sequence of arguments.
 ///
 /// The function being partially applied is monomorphic (i.e., it does not accept any generic type
 /// parameter). The sequence of arguments are passed to the parameters of the function, from left
 /// to right. The lifetime of each argument is extended by the lifetime of the resulting closure.
+@Archivable
 public struct IRPartialApply: Instruction {
 
   /// The operands of the instruction.
@@ -24,10 +27,10 @@ public struct IRPartialApply: Instruction {
     self.closureType = closureType
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = other.operands.map({ (o) in ss[o] })
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in properties[o] })
+    self.anchor = properties.anchor(other)
     self.closureType = other.closureType
   }
 

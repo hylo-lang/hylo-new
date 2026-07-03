@@ -2,7 +2,7 @@ import Archivist
 
 /// The declaration of a conformance of a type to a trait.
 @Archivable
-public struct ConformanceDeclaration: TypeExtendingDeclaration {
+public struct ConformanceDeclaration: TypeExtendingDeclaration, ModifiableDeclaration {
 
   /// The modifiers applied to this declaration.
   public let modifiers: [Parsed<DeclarationModifier>]

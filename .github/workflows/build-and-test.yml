@@ -1,6 +1,9 @@
 name: Build and Test
 on:
+  pull_request:
   push:
+    branches:
+      - main
     paths-ignore:
       - "**.md"
       - "LICENSE"
@@ -10,13 +13,22 @@ env:
   ACTIONS_RUNNER_DISABLE_NODE_MAGLEV: 1
 
 jobs:
+  line-length:
+    name: "Line length"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check max line length of 100 characters
+        run: "! grep -rnE --include=*.swift --exclude-dir=cmake.* --exclude-dir=.build '.{101,}' ."
+
   test:
     strategy:
       fail-fast: false
       matrix:
         # Note: all combinations of the following will be run independently
-        os: [macos-15, ubuntu-24.04, windows-2025]
-        swift: ["6.2.4"]
+        os: [macos-26, ubuntu-24.04, windows-2025]
+        swift: ["6.3.2"]
         config: [release, debug]
 
         include:
@@ -35,7 +47,7 @@ jobs:
             llvm-build-type: Debug
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -62,7 +74,7 @@ jobs:
         id: get-llvm
         with:
           llvmVersion: "20.1.6"
-          llvmBuildRelease: "20260309-221030"
+          llvmBuildRelease: "20260521-114955"
           llvmBuildConfig: ${{ matrix.llvm-build-type }}
           addToPkgConfigPath: true
           addToPath: true
@@ -79,7 +91,7 @@ jobs:
 
       - name: Upload coverage report to Codecov
         if: ${{ matrix.export-coverage }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 

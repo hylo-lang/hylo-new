@@ -19,11 +19,11 @@ public struct IRConditionalBranch: Terminator {
     self.successors = [onSuccess, onFailure]
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = other.operands.map({ (o) in ss[o] })
-    self.anchor = other.anchor
-    self.successors = [ss[other.onSuccess], ss[other.onFailure]]
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in properties[o] })
+    self.anchor = properties.anchor(other)
+    self.successors = [properties[other.onSuccess], properties[other.onFailure]]
   }
 
   /// A Boolean condition determining where control flow will be transferred.
@@ -59,6 +59,26 @@ extension IRConditionalBranch: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     "condbr \(printer.show(condition)), %b\(onSuccess.rawValue), %b\(onFailure.rawValue)"
+  }
+
+}
+
+extension IRConditionalBranch: Archivable {
+
+  public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
+    self.anchor = try archive.read(Anchor.self, in: &context)
+    self.operands = [try archive.read(IRValue.self, in: &context)]
+    self.successors = try archive.readArray(of: IRBlock.ID.self, in: &context) { (a, c) in
+      try a.read(IRBlock.ID.self, in: &c)
+    }
+  }
+
+  public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
+    try archive.write(anchor, in: &context)
+    try archive.write(condition, in: &context)
+    try archive.write(contentsOf: successors, in: &context) { (x, a, c) in
+      try a.write(x, in: &c)
+    }
   }
 
 }

@@ -24,10 +24,15 @@ public struct TypeStore: Sendable {
   /// The identifier of the next fresh variable.
   private var nextFreshIdentifier: Int
 
+  /// The identity of a proper generic type parameter.
+  private var alpha: GenericParameter.ID
+
   /// Creates an empty instance.
   public init() {
     self.types = []
     self.nextFreshIdentifier = 0
+    self.alpha = .init(uncheckedFrom: .error)
+    self.alpha = demand(GenericParameter.nth(0, .proper))
   }
 
   /// Returns a number less than the number of types created with this store.
@@ -44,13 +49,6 @@ public struct TypeStore: Sendable {
   public mutating func fresh() -> TypeVariable.ID {
     defer { nextFreshIdentifier += 1 }
     return .init(uncheckedFrom: AnyTypeIdentity(variable: nextFreshIdentifier))
-  }
-
-  /// Returns the identity of `Hylo.Never`, which is equivalent to `<T> T`.
-  public mutating func never() -> UniversalType.ID {
-    let p = demand(GenericParameter.nth(0, .proper))
-    let t = demand(UniversalType(parameters: [p], head: p.erased))
-    return t
   }
 
   /// Returns the body of `f` with each parameter substituted with its corresponding argument.
@@ -81,13 +79,20 @@ public struct TypeStore: Sendable {
       return AnyTypeIdentity.error
     case let u as Tuple where u == .empty:
       return AnyTypeIdentity.void
+    case let u as UniversalType where isNever(u):
+      return AnyTypeIdentity.never
     case let u as TypeVariable:
       return AnyTypeIdentity(variable: u.identifier)
     default:
-      let i = types.insert(.init(t)).position
-      assert(i < (1 << 55), "too many types")  // 8 bits are reserved for the properties.
-      return .init(offset: i, properties: t.properties)
+      return insert(t)
     }
+  }
+
+  /// Inserts `t` in `self` and returns its identity, assuming `t` is not present in `self`.
+  private mutating func insert(_ t: any TypeTree) -> AnyTypeIdentity {
+    let i = types.insert(.init(t)).position
+    assert(i < (1 << 55), "too many types")  // 8 bits are reserved for the properties.
+    return .init(offset: i, properties: t.properties)
   }
 
   /// Returns the unique type corresponding to the given signature, creating it if necessary.
@@ -154,6 +159,11 @@ public struct TypeStore: Sendable {
     } else {
       return false
     }
+  }
+
+  /// Returns `true` iff `u` is a representation of `Hylo.Never`.
+  public func isNever(_ u: UniversalType) -> Bool {
+    (u.head == alpha) && (u.parameters.uniqueElement == alpha)
   }
 
   /// Returns `true` iff `n` is a universal type or an implication.
@@ -315,6 +325,23 @@ public struct TypeStore: Sendable {
     }
   }
 
+  /// Returns the canonical representation of a tuple of `count` instances of `element`.
+  ///
+  /// The result of `buffer(t, count: n)` is the same as the result of calling `tuple(of:)` with a
+  /// sequence `n` identical types. The result is `.void` if `count` is equal to 0. Otherwise, it
+  /// is an instance of `Tuple`.
+  public mutating func buffer(_ element: AnyTypeIdentity, count: Int) -> AnyTypeIdentity {
+    if count == 0 {
+      return .void
+    } else {
+      var result = demand(Tuple.empty)
+      for _ in 0 ..< count {
+        result = demand(Tuple.cons(head: element, tail: result.erased))
+      }
+      return result.erased
+    }
+  }
+
   /// Returns `(types, isOpenEnded)` where `types` contains the members of `t` and `isOpenEnded` is
   /// `true` iff `t` is open-ended.
   ///
@@ -453,11 +480,19 @@ public struct TypeStore: Sendable {
   public func seenAsTraitApplication<T: TypeIdentity>(
     _ n: T
   ) -> (concept: Trait.ID, arguments: TypeArguments)? {
-    if let t = cast(n, to: TypeApplication.self),
-      let u = cast(self[t].abstraction, to: Trait.self),
-      !self[t].arguments.isEmpty
-    {
-      return (concept: u, arguments: self[t].arguments)
+    if let t = cast(n, to: TypeApplication.self) {
+      return seenAsTraitApplication(t)
+    } else {
+      return nil
+    }
+  }
+
+  /// Returns `(P, [A...])` iff `n` has the form `P<A...>`.
+  public func seenAsTraitApplication(
+    _ n: TypeApplication.ID
+  ) -> (concept: Trait.ID, arguments: TypeArguments)? {
+    if let u = cast(self[n].abstraction, to: Trait.self), !self[n].arguments.isEmpty {
+      return (concept: u, arguments: self[n].arguments)
     } else {
       return nil
     }
@@ -652,6 +687,8 @@ public struct TypeStore: Sendable {
         yield ErrorType()
       case AnyTypeIdentity.void.offset:
         yield Tuple.empty
+      case AnyTypeIdentity.never.offset:
+        yield UniversalType(parameters: [alpha], head: alpha.erased)
       case let i where n.isVariable:
         yield TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
       case let i:

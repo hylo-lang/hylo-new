@@ -1,8 +1,10 @@
+import Archivist
 import Utilities
 
 /// Applies a type abstraction.
 ///
 /// This instruction is used to supplies type arguments to polymorphic values.
+@Archivable
 public struct IRTypeApply: Instruction {
 
   /// The operands of the instruction.
@@ -28,10 +30,10 @@ public struct IRTypeApply: Instruction {
     self.typeOfApplication = typeOfApplication
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.callee]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.callee]]
+    self.anchor = properties.anchor(other)
     self.arguments = other.arguments
     self.typeOfApplication = other.typeOfApplication
   }
@@ -51,7 +53,7 @@ public struct IRTypeApply: Instruction {
     true
   }
 
-  /// Asserts that the well-formedness conditions of the instruction hold.
+  /// Asserts the well-formedness conditions of the instruction.
   public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
     // The callee must be instance of a universal type.
     guard

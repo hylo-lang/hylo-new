@@ -4,13 +4,16 @@ internal enum InsertionPoint {
   /// Before another instruction.
   case before(AnyInstructionIdentity)
 
-  /// After another instruction.
-  case after(AnyInstructionIdentity)
-
-  /// The start of a basic block.
-  case start(of: IRBlock.ID)
-
   /// The end of a basic block.
   case end(of: IRBlock.ID)
+
+  /// Returns the insertion at the start of `b`, which is in `f`.
+  static func start(of b: IRBlock.ID, in f: IRFunction) -> InsertionPoint {
+    if let i = f.blocks[b].first {
+      return .before(i)
+    } else {
+      return .end(of: b)
+    }
+  }
 
 }

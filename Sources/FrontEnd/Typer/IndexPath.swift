@@ -1,3 +1,4 @@
+import Archivist
 import Utilities
 
 /// A list of indices representing the path to a specific location in a tree.
@@ -29,6 +30,36 @@ public struct IndexPath: Hashable, Sendable {
   /// Creates an empty path.
   public init() {
     self.representation = .compact(0, 0, 0, count: 0)
+  }
+
+  /// Creates an instance with the contents of `components`.
+  public init<S: Collection<Int>>(_ components: S) {
+    // Can we fit the components in a compact representation?
+    if components.count <= 12 {
+      var xs: UInt64 = 0
+      var j = 0
+
+      for i in components {
+        if UInt(bitPattern: i) <= 15 {
+          xs = xs | UInt64(i) << j
+          j += 4
+        } else {
+          self.representation = .regular(ContiguousArray(components))
+          return
+        }
+      }
+
+      self.representation = .compact(
+        UInt16(truncatingIfNeeded: xs),
+        UInt16(truncatingIfNeeded: xs >> 16),
+        UInt16(truncatingIfNeeded: xs >> 32),
+        count: UInt8(components.count))
+    }
+
+    // Default to the regular representation.
+    else {
+      self.representation = .regular(ContiguousArray(components))
+    }
   }
 
   /// `true` iff `self` is empty.
@@ -113,32 +144,7 @@ public struct IndexPath: Hashable, Sendable {
 extension IndexPath: ExpressibleByArrayLiteral {
 
   public init(arrayLiteral components: Int...) {
-    // Can we fit the components in a compact representation?
-    if components.count <= 12 {
-      var xs: UInt64 = 0
-      var j = 0
-
-      for i in components {
-        if UInt(bitPattern: i) <= 15 {
-          xs = xs | UInt64(i) << j
-          j += 4
-        } else {
-          self.representation = .regular(ContiguousArray(components))
-          return
-        }
-      }
-
-      self.representation = .compact(
-        UInt16(truncatingIfNeeded: xs),
-        UInt16(truncatingIfNeeded: xs >> 16),
-        UInt16(truncatingIfNeeded: xs >> 32),
-        count: UInt8(components.count))
-    }
-
-    // Default to the regular representation.
-    else {
-      self.representation = .regular(ContiguousArray(components))
-    }
+    self.init(components)
   }
 
 }
@@ -190,6 +196,23 @@ extension IndexPath: CustomStringConvertible {
 
   public var description: String {
     "[\(list: self)]"
+  }
+
+}
+
+extension IndexPath: Archivable {
+
+  public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
+    let components = try archive.readArray(of: Int.self, in: &context) { (a, _) in
+      try Int(a.readUnsignedLEB128())
+    }
+    self.init(components)
+  }
+
+  public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
+    archive.write(contentsOf: self, in: &context) { (x, a, _) in
+      a.write(unsignedLEB128: UInt(x))
+    }
   }
 
 }

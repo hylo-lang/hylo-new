@@ -1,3 +1,5 @@
+import Archivist
+
 /// Relocates a value to different storages.
 ///
 /// This instruction abstracts over either move-assignment or move-initialization, depending on the
@@ -8,6 +10,7 @@
 /// requires exclusive access on both the source and the target. The source must be initialized
 /// before the operation and is left uninitialized after. The target is contains the value that
 /// was held in the source after the operation.
+@Archivable
 public struct IRMove: Instruction {
 
   /// The operands of the instruction.
@@ -22,10 +25,10 @@ public struct IRMove: Instruction {
     self.anchor = anchor
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.source], ss[other.target]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.source], properties[other.target]]
+    self.anchor = properties.anchor(other)
   }
 
 

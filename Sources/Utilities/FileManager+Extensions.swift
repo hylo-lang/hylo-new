@@ -24,14 +24,18 @@ extension FileManager {
   }
 
   /// Creates an empty temporary directory for the duration of `action`.
-  public func withUniqueTemporaryDirectory<T>(_ action: (_ directory: URL) throws -> T) throws -> T {
+  public func withUniqueTemporaryDirectory<T>(
+    _ action: (_ directory: URL) throws -> T
+  ) throws -> T {
     let d = try createUniqueTemporaryDirectory()
     defer { try? removeItem(at: d) }
     return try action(d)
   }
 
   /// Creates an empty temporary directory for the duration of `action`.
-  public func withUniqueTemporaryDirectory<T>(_ action: (_ directory: URL) async throws -> T) async throws -> T {
+  public func withUniqueTemporaryDirectory<T>(
+    _ action: (_ directory: URL) async throws -> T
+  ) async throws -> T {
     let d = try createUniqueTemporaryDirectory()
     defer { try? removeItem(at: d) }
     return try await action(d)

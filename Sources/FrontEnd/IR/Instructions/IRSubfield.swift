@@ -1,6 +1,8 @@
+import Archivist
 import Utilities
 
 /// Computes the address of storage for a field or sub-field of a record.
+@Archivable
 public struct IRSubfield: Instruction {
 
   /// The operands of the instruction.
@@ -23,10 +25,10 @@ public struct IRSubfield: Instruction {
     self.typeOfSubfield = typeOfSubfield
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.base]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.base]]
+    self.anchor = properties.anchor(other)
     self.path = other.path
     self.typeOfSubfield = other.typeOfSubfield
   }

@@ -1,6 +1,6 @@
 negative/trait-refinement.hylo:36.1-6: error: no given instance of 'Base<B<T>>' in this scope
-given <T> B<T> is Derived {}
+given <T> => B<T> is Derived {}
 ~~~~~
 negative/trait-refinement.hylo:39.1-6: error: no given instance of 'Derived<C<T>>' in this scope
-given <T> C<T> is FurtherDerived {}
+given <T> => C<T> is FurtherDerived {}
 ~~~~~

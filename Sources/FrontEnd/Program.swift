@@ -11,7 +11,10 @@ public struct Program: Sendable {
   public private(set) var modules = OrderedDictionary<Module.Name, Module>()
 
   /// The types in the program.
-  public internal(set) var types = TypeStore()
+  ///
+  /// Updates to this property **must** be monotonic, lest identities of types stored in other
+  /// parts of the program might be invalidated.
+  public var types = TypeStore()
 
   /// The memoization caches of type inference and name resolution.
   ///
@@ -26,14 +29,14 @@ public struct Program: Sendable {
 
   /// `true` iff the program is allowed to have an only partially loaded standard library.
   ///
-  /// If set, this flag signals that the program is being used in a context where the standard
-  // library may not be fully available, such as during testing with minimal standard library. In
-  // this case, the absence of some standard library declarations won't be treated as an error.
+  /// If set, this flag signals that the program is used in a context where the standard library
+  /// may not be fully available, such as during testing with minimal standard library. In this
+  /// case, the absence of some standard library declarations won't be treated as an error.
   private var allowPartialStandardLibrary: Bool = false
 
-  /// Creates an empty program.
-  public init(allowPartialStandardLibrary: Bool = false) {
-    self.allowPartialStandardLibrary = allowPartialStandardLibrary
+  /// Creates an empty program, only for the purpose of testing iff `isForTesting` is `true`.
+  public init(forTesting isForTesting: Bool = false) {
+    self.allowPartialStandardLibrary = isForTesting
   }
 
   /// `true` if the program has errors.
@@ -71,7 +74,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns the identity of the module with the given `name` or `nil` if no such module exists.
+  /// Returns the identity of the module named `name`, if it exists in the program.
   public func identity(module name: Module.Name) -> Module.ID? {
     modules.index(forKey: name)
   }
@@ -119,13 +122,11 @@ public struct Program: Sendable {
         return ir.functions.values.endIndex
       }
 
-      let never = typer.program.types.never()
-
       // Mandatory intra-procedural passes.
       for i in work.indices {
         work[i].function.foldRedundantInstructions()
         work[i].function.simplifyControlFlow()
-        work[i].function.removeCodeAfterCallsReturning(never: never.erased)
+        work[i].function.removeCodeAfterNeverReturningCalls()
         work[i].function.removeUnreachableBlocks()
         work[i].function.removedUnusedDefinitions()
         // reifyBundles
@@ -140,9 +141,11 @@ public struct Program: Sendable {
 
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
+        if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
 
-        // This pass cannot fail.
+        // The following passes cannot fail.
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
+        work[i].function.existentializeIfExposed(emittingInto: m, using: &typer)
       }
 
       // Move all functions back.
@@ -152,7 +155,7 @@ public struct Program: Sendable {
         }
       }
 
-      // New functions may ave been introduced during the previous passes. Those that have been
+      // New functions may have been introduced during the previous passes. Those that have been
       // declared during depolymorphization must be defined in the current module unless they are
       // behind a resilience boundary. Since this process may result in further new declarations,
       // we must compute a fixed point on the number of functions.
@@ -165,16 +168,26 @@ public struct Program: Sendable {
           guard
             case .existentialized(let a) = module.ir[i].name,
             case .some(let poly) = module.ir.functions.index(forKey: a),
-            module.ir[poly].isDefined
+            module.ir[poly].isDefined && !module.ir[i].isDefined
           else { continue }
 
           typer.program.withEmitter(insertingIn: m) { (emitter) in
-            emitter.existentialize(poly, into: i)
+            emitter.existentialize(module.ir[poly], into: i)
           }
         }
 
         // New functions are those that are stored after the end of the current window.
         window = typer.program[m].ir.functions.values.indices[window.endIndex...]
+      }
+
+      // Apply mandatory inlining.
+      for i in typer.program[m].ir.functions.values.indices {
+        // Nothing to do if the function has no definition.
+        if !typer.program[m].ir[i].isDefined { continue }
+
+        var f = typer.program[m].ir[i].move()
+        f.inlineSimpleCallees(emittingInto: m, using: &typer)
+        typer.program[m].ir[i].take(definition: f)
       }
     }
   }
@@ -301,9 +314,21 @@ public struct Program: Sendable {
     tag(of: n).value is any TypeDeclaration.Type
   }
 
-  //// Returns `true` iff `n` denotes an extension or conformance declaration.
+  /// Returns `true` iff `n` denotes an extension or conformance declaration.
   public func isTypeExtendingDeclaration<T: SyntaxIdentity>(_ n: T) -> Bool {
     tag(of: n).value is any TypeExtendingDeclaration.Type
+  }
+
+  /// Returns `true` iff `n` denotes a function or variant declaration.
+  public func isFunctionOrVariantDeclaration<T: SyntaxIdentity>(_ n: T) -> Bool {
+    switch tag(of: n) {
+    case FunctionDeclaration.self:
+      return true
+    case VariantDeclaration.self:
+      return true
+    default:
+      return false
+    }
   }
 
   /// Returns `true` iff `n` introduces a name that can be overloaded.
@@ -434,12 +459,105 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `n` is a an interface for a function written in another language.
   public func isForeign(_ n: FunctionDeclaration.ID) -> Bool {
-    self[n].annotations.contains(where: { (a) in a.identifier.value == "foreign" })
+    annotation("foreign", appliedTo: n) != nil
   }
 
   /// Returns `true` iff `n` has an external implementation.
   public func isExtern(_ n: FunctionDeclaration.ID) -> Bool {
-    self[n].annotations.contains(where: { (a) in a.identifier.value == "extern" })
+    annotation("extern", appliedTo: n) != nil
+  }
+
+  /// Returns `true` if the contents of `d` is visible in all modules.
+  ///
+  /// The result is `true` if `d` is annotated with `@exposed` and/or `d` and all the scopes
+  /// enclosing it are public.
+  public func isExposed<T: ModifiableDeclaration>(_ d: T.ID) -> Bool {
+    // Is `d` explicitly exposed?
+    if (annotation("exposed", appliedTo: d) != nil) { return true }
+
+    // Otherwise, `d` and its enclosing scopes must be public.
+    if !self[d].is(.public) { return false }
+    var p = parent(containing: d)
+    while let a = p.node {
+      guard let b = self[a] as? (any ModifiableDeclaration), b.is(.public) else { return false }
+      p = parent(containing: a)
+    }
+    return p.isFile
+  }
+
+  /// Returns `true` iff `d` declares symbols that will not appear in the ABI of `m`.
+  public func isPrivate(_ d: DeclarationIdentity, in m: Module.ID) -> Bool {
+    switch tag(of: d) {
+    case BindingDeclaration.self:
+      return isPrivate(castUnchecked(d, to: BindingDeclaration.self), in: m)
+    case FunctionDeclaration.self:
+      return isPrivate(castUnchecked(d, to: FunctionDeclaration.self), in: m)
+    case FunctionBundleDeclaration.self:
+      return isPrivate(castUnchecked(d, to: FunctionBundleDeclaration.self), in: m)
+    case VariantDeclaration.self:
+      return isPrivate(parent(containing: d, as: FunctionBundleDeclaration.self)!, in: m)
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff `d` declares symbols that will not appear in the ABI of `m`.
+  public func isPrivate<T: ModifiableDeclaration>(_ d: T.ID, in m: Module.ID) -> Bool {
+    (d.module == m) && !isExposed(d)
+  }
+
+  /// Returns `true` iff `f` will not appear in the ABI of `m`.
+  public func isPrivate(_ f: IRFunction.Name, in m: Module.ID) -> Bool {
+    switch f {
+    case .lowered(let d):
+      return isPrivate(d, in: m)
+    case .initializer(let d):
+      return isPrivate(d, in: m)
+    case .synthesized(let d, _):
+      return isPrivate(d, in: m)
+    case .implementation(_, let d, _):
+      return isPrivate(d, in: m)
+    case .existentialized(let g):
+      return isPrivate(g, in: m)
+    case .slide:
+      return true
+    case .plateau:
+      return true
+    }
+  }
+
+  /// Returns `true` iff `n` is the "main" function of an executable module.
+  ///
+  /// The entry of a module is the first user-function being applied when that module is executed.
+  /// It must be a top-level public function named `main` accepting no argument and returning
+  /// either `Void` or `Int32`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public mutating func isModuleEntry(_ n: FunctionDeclaration.ID) -> Bool {
+    if parent(containing: n).isFile && (name(of: n)?.identifier == "main") {
+      let t = type(assignedTo: n)
+      if let a = types[t] as? Arrow, a.inputs.isEmpty {
+        let o = types.dealiased(a.output)
+        return o == .void || o == standardLibraryType(.int32)
+      }
+    }
+    return false
+  }
+
+  /// Returns `true` iff `m` is an executable module whose "main" function is `f`.
+  ///
+  /// The entry of a module is the first user-function being applied when that module is executed.
+  /// It must be a top-level public function named `main` accepting no argument and returning
+  /// either `Void` or `Int32`.
+  ///
+  /// - Requires: `m` is typed.
+  public mutating func isEntry(_ f: IRFunction.ID, of m: Module.ID) -> Bool {
+    let n = self[m].ir.functions.keys[f]
+    if case .lowered(let d) = n, let m = cast(d, to: FunctionDeclaration.self) {
+      return isModuleEntry(m)
+    } else {
+      return false
+    }
   }
 
   /// Returns `true` iff `n` denotes an expression.
@@ -535,7 +653,7 @@ public struct Program: Sendable {
     _ t: Struct.ID, in s: ScopeIdentity
   ) -> Bool {
     let d = types[t].declaration
-    return isInlineable(d, in: s) && storedProperties(of: d).isEmpty
+    return isLayoutVisible(d, in: s) && storedProperties(of: d).isEmpty
   }
 
   /// Returns `true` iff instances of `t` can always be assumed initialized in `s`.
@@ -553,26 +671,10 @@ public struct Program: Sendable {
     isTriviallyInitializable(types[t].abstraction, in: s)
   }
 
-  /// Returns `true` if the memory layout of `t` is visible from `scopeOfUse`.
-  public mutating func isInlineable(_ t: AnyTypeIdentity, in scopeOfUse: ScopeIdentity) -> Bool {
-    let u = types.dealiased(t)
-    switch types.tag(of: u) {
-    case Enum.self:
-      return isInlineable((types[u] as! Enum).declaration, in: scopeOfUse)
-    case Struct.self:
-      return isInlineable((types[u] as! Struct).declaration, in: scopeOfUse)
-    case Tuple.self:
-      return true
-    default:
-      return false
-    }
-  }
-
-  /// Returns `true` if the definition of `t` is visible from `scopeOfUse`.
-  public func isInlineable<T: ModifiableDeclaration>(
-    _ d: T.ID, in scopeOfUse: ScopeIdentity
-  ) -> Bool {
-    (d.module == scopeOfUse.module) || self[d].is(.inlineable)
+  /// If resilience is enabled in the module containing `d`, returns `true` if `d` is in the same
+  /// module as `scopeOfUse` or if `d` is annotated with `@frozen`; otherwise, returns `true`.
+  public func isLayoutVisible(_ d: StructDeclaration.ID, in scopeOfUse: ScopeIdentity) -> Bool {
+    true
   }
 
   /// Returns `n` if it identifies a node of type `U`; otherwise, returns `nil`.
@@ -696,12 +798,21 @@ public struct Program: Sendable {
 
   /// Returns the type assigned to `n`.
   ///
+  /// You cannot make strong assumptions about the exact shape of the returned type in general, as
+  /// it may be and/or contain aliases. You may use `type(assignedTo:assuming:)` if you need to
+  /// obtain the type assigned to a node assuming it must have a specific shape.
+  ///
   /// - Requires: The module containing `n` is typed.
   public func type<T: SyntaxIdentity>(assignedTo n: T) -> AnyTypeIdentity {
     self[n.module].type(assignedTo: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
   /// Returns the type assigned to `n`, if any.
+  ///
+  /// You cannot make strong assumptions about the exact shape of the returned type in general, as
+  /// it may be and/or contain aliases. You may use `type(assignedTo:assuming:)` if you need to
+  /// obtain the type assigned to a node assuming it must have a specific shape.
+  ///
   public func type<T: SyntaxIdentity>(maybeAssignedTo n: T) -> AnyTypeIdentity? {
     self[n.module].type(assignedTo: n)
   }
@@ -709,12 +820,15 @@ public struct Program: Sendable {
   /// Returns the type assigned to `n`, assuming it is an instance of `T`.
   ///
   /// - Requires: The module containing `n` is typed.
-  public func type<T: SyntaxIdentity, U: TypeTree>(assignedTo n: T, assuming: U.Type) -> U.ID {
+  public mutating func type<T: SyntaxIdentity, U: TypeTree>(
+    assignedTo n: T, assuming: U.Type
+  ) -> U.ID {
     let t = type(assignedTo: n)
-    if let u = types.cast(t, to: U.self) {
-      return u
+    let u = types.dealiased(t)
+    if let v = types.cast(u, to: U.self) {
+      return v
     } else {
-      unreachable("expected node of type '\(U.self)'; found '\(types.tag(of: t))'")
+      unreachable("expected node of type '\(U.self)'; found '\(types.tag(of: u))'")
     }
   }
 
@@ -946,6 +1060,14 @@ public struct Program: Sendable {
     return self[d.file].variableToBinding[d.offset]
   }
 
+  /// Returns the types of stored parts of `t` visible from `module`.
+  public mutating func storage(
+    of t: AnyTypeIdentity, visibleFrom module: Module.ID
+  ) -> [AnyTypeIdentity]? {
+    // TODO: Resilience
+    withTyper(typing: module, { (typer) in typer.storage(of: t) })
+  }
+
   /// Returns the names introduced by `d`.
   public func names(introducedBy d: BindingDeclaration.ID) -> [Name] {
     var result: [Name] = []
@@ -1092,25 +1214,25 @@ public struct Program: Sendable {
     return .init(identifier: n.identifier, labels: n.labels, introducer: self[d].effect.value)
   }
 
+  /// Returns the name of `d` after compilation iff it has an external implementation.
+  public func externName(of d: DeclarationIdentity) -> String? {
+    annotation("extern", appliedTo: d).flatMap { (a) in
+      if case .some(.string(let n)) = a.arguments.first?.value {
+        return n
+      } else {
+        return nil
+      }
+    }
+  }
+
   /// Returns the symbol associated with `n`, if any.
   ///
   /// A syntax tree has an associated symbol if it is annotated with `@_symbol(s)` in sources,
   /// where `s` is a string argument.
   public func symbol<T: SyntaxIdentity>(annotating n: T) -> String? {
-    annotations(n).first(where: { (a) in a.identifier.value == "_symbol" })
+    annotation("_symbol", appliedTo: n)
       .flatMap({ (e) in e.arguments.uniqueElement })
       .flatMap({ (e) in e.value.string })
-  }
-
-  /// If `n` is a function or subscript call, returns its callee. Otherwise, returns `nil`.
-  public func callee(_ n: ExpressionIdentity) -> ExpressionIdentity? {
-    switch tag(of: n) {
-    case Call.self:
-      return self[castUnchecked(n, to: Call.self)].callee
-    //case SubscriptCall.self:
-    default:
-      return nil
-    }
   }
 
   /// Returns the left-most tree in the qualification of `e` iff `e` is a name or new expression.
@@ -1299,6 +1421,11 @@ public struct Program: Sendable {
     } else {
       return []
     }
+  }
+
+  /// Returns the annotation named `k` that is applied to `n`, if any.
+  public func annotation<T: SyntaxIdentity>(_ k: String, appliedTo n: T) -> Annotation? {
+    annotations(n).first(where: { (a) in a.identifier.value == k })
   }
 
   /// Returns the modifiers applied to `d`.
@@ -1543,7 +1670,7 @@ extension Program {
   /// Returns the type of the given standard library entity.
   ///
   /// The module containing the standard library must have been loaded and type checked.
-  public func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
+  public mutating func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
     let d = standardLibraryDeclaration(n)
     let t = type(assignedTo: d, assuming: Metatype.self)
     return types[t].inhabitant
@@ -1556,7 +1683,7 @@ extension Program {
   public func standardLibraryDeclaration(
     _ n: StandardLibraryEntity
   ) -> DeclarationIdentity {
-    standardLibraryDeclarations[n] ?? fatalError("missing or corrupt standard library; missing \(n)")
+    standardLibraryDeclarations[n] ?? fatalError("corrupt standard library: '\(n)' is missing")
   }
 
   /// Returns the declaration of the given standard library assuming it is represented by `T`.
