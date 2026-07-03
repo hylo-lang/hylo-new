@@ -2,6 +2,8 @@
 /.build
 /.*-build
 /Packages
+/Tools/Formatter/.build
+/Tools/Formatter/.swiftpm
 
 # IDEs
 /.vscode
