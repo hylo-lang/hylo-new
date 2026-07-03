@@ -189,8 +189,6 @@ public struct Interpreter {
       return .initializeRegister(to: .init(storage: ()))
     case let x as IRAlloca:
       _ = x
-    case let x as IRAllocx:
-      _ = x
     case let x as IRApply:
       _ = x
     case let x as IRApplyBuiltin:
