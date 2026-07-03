@@ -111,7 +111,7 @@ public struct Interpreter {
   /// Identity of the next instruction to be executed.
   private var programCounter: InstructionPointer
 
-  /// True iff the program is still running.
+  /// `true` iff the program is still running.
   public private(set) var isRunning: Bool = true
 
   /// Local variables, parameters and return address.
