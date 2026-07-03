@@ -1976,6 +1976,42 @@ extension Program {
     }
   }
 
+  /// Returns the declarations that unqualified name resolution can reach from `scopeOfUse`.
+  ///
+  /// Predefined names (`Void`, `Never`, ...) are not included.
+  /// - Requires: `m` has been type checked.
+  public mutating func declarations(
+    visibleFrom scopeOfUse: ScopeIdentity, in m: Module.ID
+  ) -> [DeclarationIdentity] {
+    withTyper(typing: m) { (typer) in
+      var labels: [String] = []
+      var seen: Set<String> = []
+      func collect(_ group: some Sequence<DeclarationIdentity>) {
+        for d in group {
+          if let n = typer.program.name(of: d), seen.insert(n.identifier).inserted {
+            labels.append(n.identifier)
+          }
+        }
+      }
+
+      for s in typer.program.scopes(from: scopeOfUse) {
+        collect(typer.program.declarations(lexicallyIn: s))
+      }
+      // Skipping `f` whose declarations are already collected above.
+      let f = scopeOfUse.file
+      for s in typer.program[f.module].sourceFileIdentities where s != f {
+        collect(typer.program.declarations(lexicallyIn: ScopeIdentity(file: s)))
+      }
+      for n in typer.imports(of: f) {
+        collect(typer.program[n].topLevelDeclarations)
+      }
+
+      return labels.flatMap { (l) in
+        typer.lookup(Name(identifier: l), unqualifiedIn: scopeOfUse)
+      }
+    }
+  }
+
   /// Returns the types the argument at `holeIndex` of `call` could be expected to have, unioned over
   /// every overload of the callee viable given the other arguments.
   ///
