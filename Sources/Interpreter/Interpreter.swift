@@ -46,7 +46,7 @@ private enum InstructionEpilogue {
 
 }
 
-/// The ephermal (on non-Memory) execution state of a function call.
+/// The ephemeral (or non-`Memory`) execution state of a function call.
 private struct StackFrame {
 
   // TODO: add local variables and parameters, which require `Memory`.
