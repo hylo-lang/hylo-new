@@ -4,7 +4,7 @@ import Utilities
 public struct SubstitutionTable: Hashable, Sendable {
 
   /// A map from type variable to its assignment.
-  internal private(set) var types: [TypeVariable.ID: AnyTypeIdentity]
+  fileprivate var types: [TypeVariable.ID: AnyTypeIdentity]
 
   /// Creates an empty table.
   internal init() {
