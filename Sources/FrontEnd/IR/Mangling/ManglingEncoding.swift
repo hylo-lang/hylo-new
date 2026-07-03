@@ -76,7 +76,7 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `d` to `output`.
   private mutating func append(decl d: DeclarationIdentity, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: .node(.init(d)), in: program) { return }
+    if output.addIf(reservedOrRecorded: .node(.init(d))) { return }
 
     // First add the qualification of the declaration.
     appendQualification(of: d, to: &output)
@@ -106,7 +106,7 @@ internal struct ManglingEncoding: Sendable {
       program.unexpected(d)
     }
 
-    output.record(symbol: .node(AnySyntaxIdentity(d)), in: program)
+    output.record(symbol: .node(AnySyntaxIdentity(d)))
   }
 
   /// Demangles a (possibly qualified) entity from `source`.
@@ -216,10 +216,10 @@ internal struct ManglingEncoding: Sendable {
     var earlyExit = false
     let p = program.parent(containing: n)
     for s in program.scopes(from: p) {
-      if s.node != nil, output.addIf(reservedOrRecorded: .node(s.node!), in: program) {
+      if s.node != nil, output.addIf(reservedOrRecorded: .node(s.node!)) {
         earlyExit = true
         break
-      } else if output.addIf(reservedOrRecorded: s.asSymbol, in: program) {
+      } else if output.addIf(reservedOrRecorded: s.asSymbol) {
         earlyExit = true
         break
       } else if output.addIf(qualification: s) {
@@ -233,11 +233,11 @@ internal struct ManglingEncoding: Sendable {
     // Write the mangled representation of the qualification's suffix.
     if !earlyExit {
       append(module: p.module, to: &output)
-      output.record(symbol: .module(p.module), in: program)
+      output.record(symbol: .module(p.module))
     }
     for s in qs.reversed() {
       append(scope: s, to: &output)
-      output.record(symbol: s.asSymbol, in: program)
+      output.record(symbol: s.asSymbol)
     }
   }
 
@@ -305,7 +305,7 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `m` to `output`.
   private mutating func append(module m: Module.ID, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: .module(m), in: program) { return }
+    if output.addIf(reservedOrRecorded: .module(m)) { return }
     output.add(operator: .module)
     output.add(string: program[m].name.description)
   }
@@ -317,7 +317,7 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(scope s: ScopeIdentity, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: s.asSymbol, in: program) { return }
+    if output.addIf(reservedOrRecorded: s.asSymbol) { return }
 
     let q = output.record(qualification: s)
 
@@ -359,7 +359,7 @@ internal struct ManglingEncoding: Sendable {
       append(translationUnit: s.file, to: &output)
     }
     _ = output.record(qualification: q)
-    output.record(symbol: s.asSymbol, in: program)
+    output.record(symbol: s.asSymbol)
   }
 
   /// Writes the mangled representation of `d` to `output`.
@@ -671,7 +671,7 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `s` to `output`.
   private mutating func append(type s: AnyTypeIdentity, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: .type(s), in: program) { return }
+    if output.addIf(reservedOrRecorded: .type(s)) { return }
 
     let a = program.types[s]
     switch a {
@@ -720,7 +720,7 @@ internal struct ManglingEncoding: Sendable {
     default:
       unreachable()
     }
-    output.record(symbol: .type(s), in: program)
+    output.record(symbol: .type(s))
   }
 
   /// Demangles a type from `source`.

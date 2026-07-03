@@ -122,13 +122,11 @@ public struct Program: Sendable {
         return ir.functions.values.endIndex
       }
 
-      let never = typer.program.types.never()
-
       // Mandatory intra-procedural passes.
       for i in work.indices {
         work[i].function.foldRedundantInstructions()
         work[i].function.simplifyControlFlow()
-        work[i].function.removeCodeAfterCallsReturning(never: never.erased)
+        work[i].function.removeCodeAfterNeverReturningCalls()
         work[i].function.removeUnreachableBlocks()
         work[i].function.removedUnusedDefinitions()
         // reifyBundles

@@ -20,19 +20,21 @@ final class TypeStoreTests: XCTestCase {
     XCTAssertEqual(store[i], t)
   }
 
+  func testDemandNever() {
+    var store = TypeStore()
+    let p = store.demand(GenericParameter.nth(0, .proper))
+    let t = UniversalType(parameters: [p], head: p.erased)
+    let i = store.demand(t)
+    XCTAssertEqual(i.erased, AnyTypeIdentity.never)
+    XCTAssertEqual(store[i], t)
+  }
+
   func testDemandVariable() {
     var store = TypeStore()
     let t = TypeVariable(identifier: 123)
     let i = store.demand(t)
     XCTAssertEqual(i.erased, AnyTypeIdentity(variable: 123))
     XCTAssertEqual(store[i], t)
-  }
-
-  func testDemandNever() {
-    var store = TypeStore()
-    let t = store.never()
-    let u = store.never()
-    XCTAssertEqual(t, u)
   }
 
   func testDemand() {
