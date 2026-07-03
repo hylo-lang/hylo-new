@@ -24,19 +24,15 @@ public struct TypeStore: Sendable {
   /// The identifier of the next fresh variable.
   private var nextFreshIdentifier: Int
 
-  /// The identity of a type equal to `Hylo.Never`.
-  private var never: AnyTypeIdentity
+  /// The identity of a proper generic type parameter.
+  private var alpha: GenericParameter.ID
 
   /// Creates an empty instance.
   public init() {
     self.types = []
     self.nextFreshIdentifier = 0
-    self.never = .init(uncheckedFrom: .error)
-
-    // Create `Hylo.Never`.
-    let p = demand(GenericParameter.nth(0, .proper))
-    let u = insert(UniversalType(parameters: [p], head: p.erased))
-    self.never = .init(uncheckedFrom: u)
+    self.alpha = .init(uncheckedFrom: .error)
+    self.alpha = demand(GenericParameter.nth(0, .proper))
   }
 
   /// Returns a number less than the number of types created with this store.
@@ -83,7 +79,7 @@ public struct TypeStore: Sendable {
       return AnyTypeIdentity.error
     case let u as Tuple where u == .empty:
       return AnyTypeIdentity.void
-    case let u as UniversalType where (self[never] as! UniversalType) == u:
+    case let u as UniversalType where isNever(u):
       return AnyTypeIdentity.never
     case let u as TypeVariable:
       return AnyTypeIdentity(variable: u.identifier)
@@ -163,6 +159,11 @@ public struct TypeStore: Sendable {
     } else {
       return false
     }
+  }
+
+  /// Returns `true` iff `u` is a representation of `Hylo.Never`.
+  public func isNever(_ u: UniversalType) -> Bool {
+    (u.head == alpha) && (u.parameters.uniqueElement == alpha)
   }
 
   /// Returns `true` iff `n` is a universal type or an implication.
@@ -687,7 +688,7 @@ public struct TypeStore: Sendable {
       case AnyTypeIdentity.void.offset:
         yield Tuple.empty
       case AnyTypeIdentity.never.offset:
-        yield self[never]
+        yield UniversalType(parameters: [alpha], head: alpha.erased)
       case let i where n.isVariable:
         yield TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
       case let i:
