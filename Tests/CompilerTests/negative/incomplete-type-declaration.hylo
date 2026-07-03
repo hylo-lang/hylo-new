@@ -1,0 +1,13 @@
+// Type alias declaration
+type X = Int
+
+// Incomplete type alias declaration
+type Y
+
+// Incomplete type declaration
+type
+
+trait P {
+  // Incomplete associated type declaration
+  type
+}

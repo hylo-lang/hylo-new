@@ -1,0 +1,6 @@
+negative/illegal-nested-yield.hylo:8.7: error: subscript cannot project more than once
+      yield true
+      ^
+negative/illegal-nested-yield.hylo:4.3: note: value already projected here
+  yield false
+  ^

@@ -1,6 +1,11 @@
+import Archivist
 import BigInt
 
 /// A value in Hylo IR.
+///
+/// Instances are defined relative to the function in which they may be used, similarly to how
+/// indices are defined relative to a particular collection.
+@Archivable
 public enum IRValue: Hashable, Sendable {
 
   /// The `i`-th parameter of a function.
@@ -20,9 +25,9 @@ public enum IRValue: Hashable, Sendable {
 
   /// A reference to a lowered function.
   ///
-  /// The payload is a triple `(f, m, t)` where `f` is the identity of a function declared (but
-  /// not necessarily defined) in the module `m`, and `t` is the type of that function.
-  indirect case function(IRFunction.ID, Module.ID, AnyTypeIdentity)
+  /// The payload is a pair `(n, t)` where `n` is the name of a function declared in the module in
+  /// which this value is defined, and `t` is the type of that function.
+  indirect case function(IRFunction.Name, AnyTypeIdentity)
 
   /// A reference to a function or subscript bundle not yet reified.
   indirect case bundle(FunctionBundleDeclaration.ID, AnyTypeIdentity, AccessEffectSet)
@@ -85,8 +90,8 @@ extension IRValue: Showable {
       return "\(printer.show(t)) \(n)"
     case .floatingPoint(let n, let t):
       return "\(printer.show(t)) \(n)"
-    case .function(let n, let m, _):
-      return printer.show(printer.program[m].ir[n].name)
+    case .function(let n, _):
+      return printer.show(n)
     case .bundle(let n, _, let k):
       return "\(printer.program.debugName(of: .init(n)))@{\(list: k)}"
     case .type(let t, _):
@@ -97,4 +102,3 @@ extension IRValue: Showable {
   }
 
 }
-

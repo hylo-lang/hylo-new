@@ -48,11 +48,25 @@ public struct Driver {
   /// A map from a Hylo module to its corresponding LLVM module, populated by `lowerToLLVM(_:)`.
   private var llvmModules: [Module.ID: LLVMModuleBox] = [:]
 
+  /// The relocation model that suits the host platform when none is specified.
+  ///
+  /// On Linux, the system toolchain links position-independent executables (PIE) by default, which
+  /// requires position-independent object code; emitting code with the target's own default (which
+  /// is `static` on x86-64 Linux) produces absolute relocations that the PIE linker rejects.
+  /// Elsewhere we defer to the target's default.
+  public static var defaultRelocationModel: RelocationModel {
+    #if os(Linux)
+      return .pic
+    #else
+      return .default
+    #endif
+  }
+
   /// Creates an instance with the given properties.
   public init(
     moduleCachePath: URL? = nil, targetSpecification: TargetSpecification,
     optimization: OptimizationLevel = .none,
-    relocation: RelocationModel = .default,
+    relocation: RelocationModel = Driver.defaultRelocationModel,
     codeModel: CodeModel = .default,
     librarySearchPaths: [URL] = [], librariesToLink: [String] = []
   ) {
@@ -147,13 +161,31 @@ public struct Driver {
         target: target, optimization: optimization, relocation: relocation, codeModel: codeModel)
       var m = try program.compileToLLVM(module, target: t)
 
-      try m.verifyInDebugBuilds()
-      m.runDefaultModulePasses()
-      try m.verifyInDebugBuilds()
+      try verify(m)
+      m.runDefaultModulePasses(optimization: optimization)
+      try verify(m)
 
       llvmModules[module] = LLVMModuleBox(consume m)
     }
     return .init(elapsed: elapsed, containsError: program[module].containsError)
+  }
+
+  /// Applies LLVM IR verification passes to `module` iff this file has been compiled in debug
+  /// mode; does nothing otherwise.
+  ///
+  /// - Throws: if the contents of `module` failed verification.
+  private func verify(_ module: borrowing SwiftyLLVM.Module) throws {
+    do {
+      try module.verifyInDebugBuilds()
+    } catch let e as LLVMError {
+      throw Error(
+        message: """
+        LLVM verification failed with the following message: \(e.description)
+
+        Module contents:
+        \(module.description)
+        """)
+    }
   }
 
   /// Generates an executable from `module` and its dependencies.
@@ -215,9 +247,7 @@ public struct Driver {
   /// fingerprint matches the fingerprint of the source files in `root`. Otherwise, the module is
   /// compiled from sources and an archive is stored at `moduleCachePath`. If `moduleCachePath` is
   /// not set, the module is unconditionally compiled from sources and no archive is stored.
-  public mutating func load(
-    _ module: Module.Name, withSourcesAt root: URL
-  ) async throws {
+  public mutating func load(_ module: Module.Name, withSourcesAt root: URL) async throws {
     // Compute a fingerprint of all source files.
     var sources: [SourceFile] = []
     try SourceFile.forEach(in: root) { (s) in
@@ -258,6 +288,12 @@ public struct Driver {
     await assignTypes(of: m)
     try throwIfContainsError(m)
 
+    await lower(m)
+    try throwIfContainsError(m)
+
+    await applyTransformationPasses(m)
+    try throwIfContainsError(m)
+
     if cachingIsEnabled {
       let a = try program.archive(module: m)
       let f = moduleCachePath!.appending(component: module + ".hylomodule")
@@ -270,11 +306,10 @@ public struct Driver {
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    let sourceRoot: URL
     #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
-    sourceRoot = bundledStandardLibrarySources
+    let sourceRoot = bundledStandardLibrarySources
     #else
-    sourceRoot = localStandardLibrarySources
+    let sourceRoot = localStandardLibrarySources
     #endif
     try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
   }

@@ -1,4 +1,7 @@
+import Archivist
+
 /// Creates a witness table.
+@Archivable
 public struct IRWitnessTable: Instruction {
 
   /// The operands of the instruction.
@@ -11,16 +14,16 @@ public struct IRWitnessTable: Instruction {
   public let witnessType: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
-  public init(witnessType: AnyTypeIdentity, members: [IRValue], anchor: Anchor) {
-    self.operands = members
+  public init(witnessType: AnyTypeIdentity, operands: [IRValue], anchor: Anchor) {
+    self.operands = operands
     self.anchor = anchor
     self.witnessType = witnessType
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = other.operands.map({ (o) in ss[o] })
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in properties[o] })
+    self.anchor = properties.anchor(other)
     self.witnessType = other.witnessType
   }
 

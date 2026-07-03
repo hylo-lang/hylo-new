@@ -1,4 +1,7 @@
+import Archivist
+
 /// The type of an entity in Hylo IR.
+@Archivable
 public enum IRType: Hashable, Sendable {
 
   /// The type of a place

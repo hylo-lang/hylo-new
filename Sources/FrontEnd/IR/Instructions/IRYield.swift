@@ -1,3 +1,5 @@
+import Archivist
+
 /// Projects a value out of the current function.
 ///
 /// This instruction is only about control flow. Return values are stored in the return registers
@@ -5,6 +7,7 @@
 ///
 /// Refined IR requires that the return register of the function be definitely initialized before
 /// `return` is executed.
+@Archivable
 public struct IRYield: Instruction {
 
   /// The operands of the instruction.
@@ -19,10 +22,10 @@ public struct IRYield: Instruction {
     self.anchor = anchor
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.projectee]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.projectee]]
+    self.anchor = properties.anchor(other)
   }
 
   /// The value being projected.

@@ -118,9 +118,9 @@ extension TypeArguments: Archivable {
   }
 
   public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
-    try contents.elements.write(to: &archive) { (e, a) in
-      try e.key.write(to: &a, in: &context)
-      try e.value.write(to: &a, in: &context)
+    try archive.write(contentsOf: contents.elements, in: &context) { (e, a, c) in
+      try e.key.write(to: &a, in: &c)
+      try e.value.write(to: &a, in: &c)
     }
   }
 

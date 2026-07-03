@@ -65,4 +65,13 @@ extension Sequence {
     joinedString(separator: separator) { String(describing: $0) }
   }
 
+  /// Returns the element in `self` with the smallest value measured by `p`, if any.
+  /// 
+  /// If there is more than one smallest element, it is unspecified which one is returned.
+  ///
+  /// - Complexity: O(n)
+  public func min<R: Comparable>(measuredBy p: (Element) -> R) -> Element? {
+    self.min(by: { (a, b) in p(a) < p(b) })
+  }
+
 }

@@ -102,6 +102,9 @@ public struct Typer {
     /// The cache of `Typer.declaredType(of:)` for predefined givens.
     fileprivate var predefinedGivens: [Given: AnyTypeIdentity]
 
+    /// The cache of `Typer.standardLibraryType(_:)`.
+    fileprivate var standardLibraryEntityToType: [Program.StandardLibraryEntity: AnyTypeIdentity]
+
     /// The cache of `Typer.canDeriveCoercion(_:_:applying:)`.
     fileprivate var canDeriveCoercion: [Given: [TypePair: (Bool, Bool)]]
 
@@ -121,6 +124,7 @@ public struct Typer {
       self.witnessToAliases = [:]
       self.declarationToTentativeType = [:]
       self.predefinedGivens = [:]
+      self.standardLibraryEntityToType = [:]
       self.canDeriveCoercion = [:]
     }
 
@@ -270,8 +274,11 @@ public struct Typer {
       }
     }
 
+    /// Nothing to do if the function has no body; missing definitions are diagnosed elsewhere.
+    guard let body = program[d].body else { return captures }
+
     // Visit the syntax tree to collect all captures.
-    var work = program[d].body!.reversed().map({ (s) in (s.erased, false) })
+    var work = body.reversed().map({ (s) in (s.erased, false) })
     while let (n, isMarkedForMutation) = work.popLast() {
       switch program.tag(of: n) {
       case InoutExpression.self:
@@ -1947,11 +1954,9 @@ public struct Typer {
     case InoutExpression.self:
       return inferredType(of: castUnchecked(e, to: InoutExpression.self), in: &context)
     case IntegerLiteral.self:
-      return inferredType(of: castUnchecked(e, to: IntegerLiteral.self), in: &context, 
-        conversionLabel: "integer_literal", defaultInferredType: .int)
+      return inferredType(of: castUnchecked(e, to: IntegerLiteral.self), in: &context)
     case FloatingPointLiteral.self:
-      return inferredType(of: castUnchecked(e, to: FloatingPointLiteral.self), in: &context,
-        conversionLabel: "floating_point_literal", defaultInferredType: .float64)
+      return inferredType(of: castUnchecked(e, to: FloatingPointLiteral.self), in: &context)
     case Lambda.self:
       return inferredType(of: castUnchecked(e, to: Lambda.self), in: &context)
     case NameExpression.self:
@@ -2046,7 +2051,7 @@ public struct Typer {
       switch integerConstant(a.value) {
       case .some(let i) where i >= 0:
         let x = program.types[t].inhabitant
-        let y = program.types.tuple(of: Array(repeating: x, count: i))
+        let y = program.types.buffer(x, count: i)
         let z = demand(Metatype(inhabitant: y)).erased
         return context.obligations.assume(e, hasType: z, at: program[e].site)
       case .some:
@@ -2240,10 +2245,9 @@ public struct Typer {
   }
 
   /// Returns the inferred type of a primitive literal `e`, ensuring `e` is elaborated to a call 
-  /// to the inferred type's `.new(<conversionLabel>: e)` initializer.
-  private mutating func inferredType<Literal: LiteralExpression>(
-    of e: Literal.ID, in context: inout InferenceContext, conversionLabel: String,
-    defaultInferredType: Program.StandardLibraryEntity
+  /// to `.new(x: e)`, where `x` is the constructor label of `T`.
+  private mutating func inferredType<T: LiteralExpression>(
+    of e: T.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
     // Did we already elaborate this expression?
     if let t = program[e.module].type(assignedTo: e) {
@@ -2256,7 +2260,7 @@ public struct Typer {
       let p = program.parent(containing: e)
 
       let literal = program[e.module].insert(program[e], in: p)
-      program[e.module].setType(demand(Literal.literalType).erased, for: literal)
+      program[e.module].setType(demand(T.literalType).erased, for: literal)
 
       let q = program[e.module].insert(
         ImplicitQualification(site: s), in: p)
@@ -2268,11 +2272,11 @@ public struct Typer {
         .init(e),
         with: Call(
           callee: .init(m),
-          arguments: [.init(label: Parsed(conversionLabel, at: s), value: .init(literal))],
+          arguments: [.init(label: Parsed(T.constructorLabel, at: s), value: .init(literal))],
           style: .parenthesized,
           site: program[e].site))
 
-      let qualification = context.expectedType ?? standardLibraryType(defaultInferredType)
+      let qualification = context.expectedType ?? standardLibraryType(T.defaultType)
       return context.withSubcontext(expectedType: qualification) { (ctx) in
         inferredType(of: c, in: &ctx)
       }
@@ -4095,8 +4099,7 @@ public struct Typer {
       return [.init(reference: .builtin(.alias), type: u.erased)]
 
     case "Never":
-      let t = program.types.never()
-      let u = demand(Metatype(inhabitant: t.erased))
+      let u = demand(Metatype(inhabitant: .never))
       return [.init(reference: .builtin(.alias), type: u.erased)]
 
     case "Void":
@@ -4616,15 +4619,7 @@ public struct Typer {
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
-    guard program.containsStandardLibrary else { return false }
-    switch program.types.dealiased(t) {
-    case standardLibraryType(.int),
-        standardLibraryType(.int32),
-        standardLibraryType(.int64):
-      return true
-    default:
-      return false
-    }
+    isStandardLibraryType(t, in: [.int, .int32, .int64])
   }
 
   /// Returns `true` iff `t` is a standard library floating point type (e.g., `Hylo.Float32`).
@@ -4632,14 +4627,18 @@ public struct Typer {
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryFloatingPointType(_ t: AnyTypeIdentity) -> Bool {
+    isStandardLibraryType(t, in: [.float32, .float64])
+  }
+
+  /// Returns `true` iff `t` is one of the standard library types `ts`.
+  private mutating func isStandardLibraryType(
+    _ t: AnyTypeIdentity,
+    in ts: [Program.StandardLibraryEntity]
+  ) -> Bool {
     guard program.containsStandardLibrary else { return false }
-    switch program.types.dealiased(t) {
-    case standardLibraryType(.float32),
-        standardLibraryType(.float64):
-      return true
-    default:
-      return false
-    }
+
+    let u = program.types.dealiased(t)
+    return ts.contains(where: { (v) in standardLibraryType(v) == u })
   }
 
   /// Returns the type of the given standard library entity.
@@ -4652,6 +4651,8 @@ public struct Typer {
   private mutating func standardLibraryType(
     _ n: Program.StandardLibraryEntity
   ) -> AnyTypeIdentity {
+    if let t = cache.standardLibraryEntityToType[n] { return t }
+
     let d = program.standardLibraryDeclaration(n)
 
     let t: AnyTypeIdentity
@@ -4664,7 +4665,9 @@ public struct Typer {
     }
 
     let m = (program.types[t] as? Metatype) ?? fatalError("missing or corrupt standard library")
-    return m.inhabitant
+    let result = m.inhabitant
+    cache.standardLibraryEntityToType[n] = result
+    return result
   }
 
   // MARK: Helpers

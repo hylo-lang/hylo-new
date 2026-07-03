@@ -50,21 +50,21 @@ jobs:
       ARTIFACT_NAME: hylo-${{ github.ref_name }}-${{ matrix.target }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Set up Swift
         uses: SwiftyLab/setup-swift@latest
         with:
-          swift-version: "6.2.4"
+          swift-version: "6.3.2"
 
       - name: Set up LLVM
         uses: hylo-lang/get-llvm@v0.3.0
         id: get-llvm
         with:
           llvmVersion: "20.1.6"
-          llvmBuildRelease: "20260309-221030"
+          llvmBuildRelease: "20260521-114955"
           llvmBuildConfig: MinSizeRel
           addToPkgConfigPath: true
           addToPath: true

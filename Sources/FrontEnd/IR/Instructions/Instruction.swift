@@ -1,5 +1,7 @@
+import Archivist
+
 /// An instruction in Hylo IR.
-public protocol Instruction: Hashable, Showable, Sendable {
+public protocol Instruction: Hashable, Showable, Archivable, Sendable {
 
   /// The operands of the instruction.
   var operands: [IRValue] { get }
@@ -13,10 +15,10 @@ public protocol Instruction: Hashable, Showable, Sendable {
   /// `true` iff `self` extends the lifetime of its operands.
   var isExtendingOperandLifetimes: Bool { get }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  init(_ other: Self, substituting ss: IRSubstitutionTable)
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  init(_ other: Self, substituting properties: borrowing IRSubstitutionTable)
 
-  /// Asserts that the well-formedness conditions of the instruction hold.
+  /// Asserts the well-formedness conditions of the instruction.
   func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool
 
 }
@@ -25,6 +27,16 @@ extension Instruction {
 
   /// The identity of an instance of `Self`.
   public typealias ID = ConcreteInstructionIdentity<Self>
+
+  /// Creates a copy of `other`, substituting its properties with `properties`, iff `other` is an
+  /// instance of `Self`.
+  public init?(_ other: any Instruction, substituting properties: borrowing IRSubstitutionTable) {
+    if let o = other as? Self {
+      self.init(o, substituting: properties)
+    } else {
+      return nil
+    }
+  }
 
   /// `true` iff `self` is a terminator instruction.
   public var isTerminator: Bool {
@@ -41,6 +53,11 @@ extension Instruction {
 
   public var isExtendingOperandLifetimes: Bool {
     false
+  }
+
+  /// Returns `true` iff `self` has the same representation as `other`.
+  public func equals(_ other: any Instruction) -> Bool {
+    self == other as? Self
   }
 
   /// Returns `self` in which properties have been replaced with their substitution in `ss`.

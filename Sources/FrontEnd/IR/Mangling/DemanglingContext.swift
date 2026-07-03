@@ -54,7 +54,9 @@ internal struct DemanglingContext {
       return String(strings[Int(n.rawValue)])
 
     case let n:
-      guard let j = stream.index(stream.startIndex, offsetBy: Int(n - 2), limitedBy: stream.endIndex) else { return nil }
+      guard
+        let j = stream.index(stream.startIndex, offsetBy: Int(n - 2), limitedBy: stream.endIndex)
+      else { return nil }
       let r = stream[..<j]
       strings.append(r)
       stream = stream[j...]

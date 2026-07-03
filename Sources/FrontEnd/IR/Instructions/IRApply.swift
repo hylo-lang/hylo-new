@@ -1,9 +1,11 @@
+import Archivist
 import Utilities
 
 /// Invokes an IR function.
 ///
 /// This instruction does not define any register. The return value of the function being applied
 /// is stored in the last argument of the function, which is always a `set` access.
+@Archivable
 public struct IRApply: Instruction {
 
   /// The operands of the instruction.
@@ -23,10 +25,10 @@ public struct IRApply: Instruction {
     self.anchor = anchor
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = other.operands.map({ (o) in ss[o] })
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in properties[o] })
+    self.anchor = properties.anchor(other)
   }
 
   /// The function being applied.

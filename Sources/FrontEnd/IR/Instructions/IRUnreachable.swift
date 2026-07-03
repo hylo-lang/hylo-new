@@ -1,6 +1,7 @@
 import Archivist
 
 /// Marks the execution path as unreachable.
+@Archivable
 public struct IRUnreachable: Terminator {
 
   /// The region of the code corresponding to this instruction.
@@ -11,9 +12,9 @@ public struct IRUnreachable: Terminator {
     self.anchor = anchor
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self = other
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.anchor = properties.anchor(other)
   }
 
 }

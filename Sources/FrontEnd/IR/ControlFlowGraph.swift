@@ -71,9 +71,6 @@ public struct ControlFlowGraph: Sendable {
     }
   }
 
-  /// A collection where the vertex at index `i + 1` is predecessor of the vertex at index `i`.
-  internal typealias PredecessorPath = [IRBlock.ID]
-
 }
 
 extension ControlFlowGraph: CustomStringConvertible {

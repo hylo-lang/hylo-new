@@ -1,3 +1,5 @@
+import Archivist
+
 /// Writes a value to memory.
 ///
 /// The target refers to storage capable of holding the value being stored.
@@ -9,6 +11,7 @@
 /// For machine types, we always copy the values, so no consume semantics.
 /// 
 /// Regardless of the type being stored, the target is in an initialized state after the operation.
+@Archivable
 public struct IRStore: Instruction {
 
   /// The operands of the instruction.
@@ -23,10 +26,10 @@ public struct IRStore: Instruction {
     self.anchor = anchor
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = [ss[other.value], ss[other.target]]
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = [properties[other.value], properties[other.target]]
+    self.anchor = properties.anchor(other)
   }
 
   /// The value to write.

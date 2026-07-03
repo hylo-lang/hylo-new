@@ -1,0 +1,12 @@
+negative/incomplete-type-declaration.hylo:5.7: error: expected '='
+type Y
+      ^
+negative/incomplete-type-declaration.hylo:8.5: error: expected '='
+type
+    ^
+negative/incomplete-type-declaration.hylo:8.5: error: expected identifier
+type
+    ^
+negative/incomplete-type-declaration.hylo:12.7: error: expected identifier
+  type
+      ^

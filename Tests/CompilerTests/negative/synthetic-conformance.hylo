@@ -14,10 +14,10 @@ struct B is Deinitializable {
 }
 
 // Conformance is synthesizable using the where clause.
-given <X where X is Deinitializable> Box<X> is Deinitializable {}
+given <X where X is Deinitializable> => Box<X> is Deinitializable {}
 
 // Conformance is not synthesizable.
-given <X> Box<X> is Deinitializable {}
+given <X> => Box<X> is Deinitializable {}
 
 // A struct whose contents isn't structurally deinitializable.
 struct NotStructurallyDeinitializable is Deinitializable {

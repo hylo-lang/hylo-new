@@ -54,4 +54,9 @@ public struct TraitRequirements {
     all[firstMemberIndex...]
   }
 
+  /// Returns the position of `d` iff it is a requirement in `self`.
+  public func index(of d: DeclarationIdentity) -> Int? {
+    all.firstIndex(of: d)
+  }
+
 }

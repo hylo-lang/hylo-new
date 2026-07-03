@@ -15,10 +15,10 @@ public struct IRBranch: Terminator {
     self.successors = [target]
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.anchor = other.anchor
-    self.successors = [ss[other.target]]
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.anchor = properties.anchor(other)
+    self.successors = [properties[other.target]]
   }
 
   /// The target of the branch.
@@ -44,6 +44,24 @@ extension IRBranch: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     "br %b\(target.rawValue)"
+  }
+
+}
+
+extension IRBranch: Archivable {
+
+  public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
+    self.anchor = try archive.read(Anchor.self, in: &context)
+    self.successors = try archive.readArray(of: IRBlock.ID.self, in: &context) { (a, c) in
+      try a.read(IRBlock.ID.self, in: &c)
+    }
+  }
+
+  public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
+    try archive.write(anchor, in: &context)
+    try archive.write(contentsOf: successors, in: &context) { (x, a, c) in
+      try a.write(x, in: &c)
+    }
   }
 
 }

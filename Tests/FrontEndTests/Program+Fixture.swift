@@ -1,10 +1,11 @@
 import FrontEnd
+import StandardLibrary
 
 extension Program {
 
   /// A test program.
   static var test: Program {
-    var p = Program()
+    var p = Program(forTesting: true)
 
     let m0 = p.demandModule(.init("M0"))
     _ = p[m0].addSource(
@@ -33,38 +34,44 @@ extension Program {
     return p
   }
 
-  /// An instance with a minimal standard library, ready for testing.
-  static func testProgramWithMinimalStandardLibrary() async -> Program {
-    var r = Program(allowPartialStandardLibrary: true)
-    let standardLibraryModule = r.demandModule(Module.standardLibraryName)
-    _ = r[standardLibraryModule].addSource(
+  /// Creates an instance with a minimal standard library, ready for testing.
+  static func withMinimalStandardLibrary() async -> Program {
+    var p = Program(forTesting: true)
+    let m = p.demandModule(Module.standardLibraryName)
+    _ = p[m].addSource(
       """
       @_symbol("Bool")
-      public struct Bool {
-        public memberwise init
-      }
+      public struct Bool { public memberwise init  }
+
       @_symbol("Int")
-      public struct Int {
-        public memberwise init
-      }
+      public struct Int { public memberwise init }
+
       @_symbol("Int64")
-      public struct Int64 {
-        public memberwise init
-      }
+      public struct Int64 { public memberwise init }
       """)
-    return await r.typeChecked()
+    return await p.typeChecked()
   }
 
-  /// Adds a new module named `name` with source `source`, making it depend on the
-  /// standard library, and returns its identity.
-  mutating func addModule(named name: String, source: SourceFile) -> Module.ID {
+  /// Creates an instance with the standard library loaded and type checked.
+  static func withStandardLibrary() async throws -> Program {
+    var p = Program(forTesting: true)
+    let m = p.demandModule(Module.standardLibraryName)
+    try SourceFile.forEach(in: StandardLibrary.localStandardLibrarySources) { (s) in
+      p[m].addSource(s)
+    }
+    return await p.typeChecked()
+  }
+
+  /// Adds and returns the identity of a new module named `name`, having a single source file with
+  /// the contents of `source`, and depending on the standard library.
+  mutating func addUserModule(named name: String, source: SourceFile) -> Module.ID {
     let m = demandModule(Module.Name(name))
     _ = self[m].addSource(source)
     self[m].addDependency(Module.standardLibraryName)
     return m
   }
 
-  /// Returns `self` with the scoping relationships computed.
+  /// Returns `self` with the scoping relationships computed in all modules.
   func scoped() async -> Self {
     var q = self
     for m in moduleIdentities {
@@ -73,7 +80,7 @@ extension Program {
     return q
   }
 
-  /// Returns `self` with the types checked.
+  /// Returns `self` with all modules type checked.
   func typeChecked() async -> Self {
     var q = await self.scoped()
     for m in moduleIdentities {

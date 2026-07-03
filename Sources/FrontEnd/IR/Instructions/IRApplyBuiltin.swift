@@ -1,6 +1,9 @@
+import Archivist
+
 /// Invokes a function of the `Builtin` module.
 ///
 /// Unlike `apply`, this instruction does produce a result.
+@Archivable
 public struct IRApplyBuiltin: Instruction {
 
   /// The operands of the instruction.
@@ -26,10 +29,10 @@ public struct IRApplyBuiltin: Instruction {
     self.type = .value(returnTypeOfCallee)
   }
 
-  /// Creates a copy of `other`, substituting its properties with `ss`.
-  public init(_ other: Self, substituting ss: IRSubstitutionTable) {
-    self.operands = other.operands.map({ (o) in ss[o] })
-    self.anchor = other.anchor
+  /// Creates a copy of `other`, substituting its properties with `properties`.
+  public init(_ other: Self, substituting properties: IRSubstitutionTable) {
+    self.operands = other.operands.map({ (o) in properties[o] })
+    self.anchor = properties.anchor(other)
     self.callee = other.callee
     self.type = other.type
   }
