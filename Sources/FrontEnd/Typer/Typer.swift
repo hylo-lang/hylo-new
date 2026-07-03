@@ -4568,7 +4568,7 @@ public struct Typer {
   /// are contained in `bound` (unless it is `nil`).
   ///
   /// If `bound` is not `nil`, it is a scope equal to or ancestor of `scopeOfUse`.
-  private mutating func lookup(
+  internal mutating func lookup(
     _ name: Name, unqualifiedIn scopeOfUse: ScopeIdentity, containedIn bound: ScopeIdentity? = nil
   ) -> [DeclarationIdentity] {
     var result: [DeclarationIdentity] = []
@@ -4784,7 +4784,7 @@ public struct Typer {
   }
 
   /// Returns the modules that are imported by `f`, which is in the module being typed.
-  private mutating func imports(of f: SourceFile.ID) -> [Module.ID] {
+  internal mutating func imports(of f: SourceFile.ID) -> [Module.ID] {
     if let table = cache.sourceToImports[f.offset] {
       return table
     } else {
