@@ -648,9 +648,37 @@ internal struct IREmitter {
       }
     }
 
+    // Are we lowering a memberwise initialization?
+    else if program.isMemberwiseInitialization(e) {
+      lower(memberwiseInitialization: e, of: target)
+    }
+
     // Are we lowering an ordinary call?
     else {
       lower(call: e, output: target)
+    }
+  }
+
+  /// Generates the IR for initializing `target` in place with the arguments of `e`, which is the
+  /// application of a memberwise initializer.
+  private mutating func lower(memberwiseInitialization e: Call.ID, of target: IRValue) {
+    // Memberwise initializers are for structs.
+    let t = currentFunction.result(of: target)!.type
+    let s = program.cast(program.declaration(of: t)!, to: StructDeclaration.self)!
+
+    // Construct each property in place.
+    var i = 0
+    program.forEachStoredProperty(of: s) { (v, p) in
+      let a = program[e].arguments[i].value
+      let x = lowering(a, { $0._subfield(target, at: p) })
+      lower(store: a, to: x)
+      i += 1
+    }
+    assert(i == program[e].arguments.count)
+
+    // Mark the value initialized if it has no property.
+    if i == 0 {
+      lowering(e, { $0._assume_state(target, initialized: true) })
     }
   }
 
