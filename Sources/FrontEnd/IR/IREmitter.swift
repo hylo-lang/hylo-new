@@ -1396,9 +1396,12 @@ internal struct IREmitter {
       tp.accumulatedGenericParameters(visibleFrom: scopeOfDeclaration)
     }
 
+    let anchor = program.anchorForDiagnostics(about: d)
     let (terms, output) = prototype(functionOrConformance: d)
     return program[module].ir.addFunction(
-      IRFunction(name: name, output: output, typeParameters: types, termParameters: terms))
+      IRFunction(
+        name: name, anchor: anchor, output: output,
+        typeParameters: types, termParameters: terms))
   }
 
   /// Returns the identity of the function lowering the implementation of `requirement` for the
@@ -1415,9 +1418,12 @@ internal struct IREmitter {
     if let i = program[module].ir.functions.index(forKey: name) {
       return i
     } else {
-      let (ps, o) = prototype(functionOrConformance: requirement, applying: arguments)
+      let anchor = program.anchorForDiagnostics(about: .init(conformance))
+      let (terms, output) = prototype(functionOrConformance: requirement, applying: arguments)
       return program[module].ir.addFunction(
-        IRFunction(name: name, output: o, typeParameters: [], termParameters: ps))
+        IRFunction(
+          name: name, anchor: anchor, output: output,
+          typeParameters: [], termParameters: terms))
     }
   }
 
@@ -1447,9 +1453,10 @@ internal struct IREmitter {
     let o = program.types.dealiased(program.types[e].inhabitant)
     ps.append(.init(type: o, access: .set, declaration: nil))
 
+    let anchor = program.anchorForDiagnostics(about: .init(d))
     return program[module].ir.addFunction(
       IRFunction(
-        name: name, output: .indirect, typeParameters: ts, termParameters: ps))
+        name: name, anchor: anchor, output: .indirect, typeParameters: ts, termParameters: ps))
   }
 
   /// Returns the IR variable lowering the global binding `d`, declaring it if necessary.
@@ -1468,8 +1475,9 @@ internal struct IREmitter {
     // Declare the global's initializer.
     let t = program.types.dealiased(program.type(assignedTo: d))
     let o = IRParameter(type: t, access: .set, declaration: nil)
+    let a = program.anchorForDiagnostics(about: .init(d))
     let i = IRFunction(
-      name: .initializer(d), output: .indirect, typeParameters: [], termParameters: [o])
+      name: .initializer(d), anchor: a, output: .indirect, typeParameters: [], termParameters: [o])
     let f = program[module].ir.addFunction(i)
 
     // Declare the global itself.

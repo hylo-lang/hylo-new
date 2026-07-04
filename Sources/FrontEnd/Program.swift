@@ -1587,6 +1587,11 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns an anchor suitable to generate debug information related to `d` as a whole.
+  public func anchorForDiagnostics(about d: DeclarationIdentity) -> Anchor {
+    .init(site: spanForDiagnostic(about: d), scope: parent(containing: d))
+  }
+
   /// Returns `message` with placeholders replaced by their corresponding values in `arguments`.
   ///
   /// Use this method to generate strings containing one or several elements whose description is

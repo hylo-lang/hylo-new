@@ -178,7 +178,8 @@ extension IREmitter {
     }
 
     ps.append(contentsOf: poly.termParameters)
-    let mono = IRFunction(name: n, output: poly.output, typeParameters: [], termParameters: ps)
+    let mono = IRFunction(
+      name: n, anchor: poly.anchor, output: poly.output, typeParameters: [], termParameters: ps)
     return program[module].ir.addFunction(mono)
   }
 
