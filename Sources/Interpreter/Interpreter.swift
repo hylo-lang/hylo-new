@@ -73,10 +73,10 @@ private struct Stack {
     frames.append(f)
   }
 
-  /// Removes the top frame and returns next instruction to be executed.
-  public mutating func pop() -> InstructionPointer {
+  /// Removes the top frame.
+  public mutating func pop() {
+    precondition(!isEmpty)
     frames.removeLast()
-    return frames.last!.programCounter
   }
 
   /// The top stack frame.
@@ -226,7 +226,8 @@ public struct Interpreter {
     case let x as IRProperty:
       _ = x
     case is IRReturn:
-      return .jump(to: popStackFrame())
+      callStack.pop()
+      return .jump(to: programCounter)
     case let x as IRStore:
       _ = x
     case let x as IRSubfield:
@@ -246,16 +247,6 @@ public struct Interpreter {
     }
     unreachable("Unimplemented processing of instruction")
 
-  }
-
-  /// Removes topmost stack frame and return code pointer to next instruction of any
-  /// previous stack frame.
-  ///
-  /// - Precondition: the program is running.
-  private mutating func popStackFrame() -> InstructionPointer {
-    // precondition(topOfStack.allocations.isEmpty,
-    //     "Function returns before deallocating all local variable storage")
-    return callStack.pop()
   }
 
   /// Moves the program counter to the next instruction.
