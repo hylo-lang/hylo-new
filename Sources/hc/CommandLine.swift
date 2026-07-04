@@ -215,9 +215,19 @@ private typealias Module = FrontEnd.Module
       try await perform("generating executable", for: module) {
         try driver.generateExecutable(from: module, writingTo: binaryFile(product))
       }
-    } catch let e as CompilationError {
+    }
+
+    // Catch compiler failures.
+    catch let e as CompilationError {
       render(e.diagnostics.elements)
       CommandLine.exit(withError: ExitCode.failure)
+    }
+
+    // Catch linker failures.
+    catch let e as Process.NonzeroExit {
+      var stderr = StandardError()
+      print(e.standardError, to: &stderr)
+      CommandLine.exit(withError: ExitCode(e.exitCode))
     }
 
     /// Performs `action`, logs its duration, and exits with diagnostics if it resulted in an error.
