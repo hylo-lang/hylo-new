@@ -1060,12 +1060,12 @@ public struct Program: Sendable {
     return self[d.file].variableToBinding[d.offset]
   }
 
-  /// Returns the types of stored parts of `t` visible from `module`.
-  public mutating func storage(
+  /// Returns the types of stored properties of `t` visible from `module`.
+  public mutating func fields(
     of t: AnyTypeIdentity, visibleFrom module: Module.ID
   ) -> [AnyTypeIdentity]? {
     // TODO: Resilience
-    withTyper(typing: module, { (typer) in typer.storage(of: t) })
+    withTyper(typing: module, { (typer) in typer.fields(of: t) })
   }
 
   /// Returns the names introduced by `d`.

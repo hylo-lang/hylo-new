@@ -463,7 +463,7 @@ extension Program {
     for p in s.path {
       let m = metadata(of: u, in: &ctx.module)
       indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).v)
-      u = storage(of: u, visibleFrom: ctx.module.hylo)![p]
+      u = fields(of: u, visibleFrom: ctx.module.hylo)![p]
     }
 
     let b = ctx.value[s.base]!
@@ -1042,8 +1042,8 @@ extension Program {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
       // TODO: Resilience
       let m = program.types[t].declaration.module
-      let properties = program.storage(of: t.erased, visibleFrom: m)!
-      return program.metadata(record: n, rows: properties, in: &ctx)
+      let properties = program.fields(of: t.erased, visibleFrom: m)!
+      return program.metadata(record: n, fields: properties, in: &ctx)
     }
   }
 
@@ -1054,7 +1054,7 @@ extension Program {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
       let (properties, isOpenEnded) = program.types.members(of: t)
       precondition(!isOpenEnded, "no LLVM representation of type '\(program.show(t))'")
-      return program.metadata(record: n, rows: properties, in: &ctx)
+      return program.metadata(record: n, fields: properties, in: &ctx)
     }
   }
 
@@ -1091,11 +1091,11 @@ extension Program {
     return metadata(of: p, in: &ctx)
   }
 
-  /// Returns the LLVM type representation of a record type having the given name and rows.
+  /// Returns the LLVM type representation of a record type having the given name and fields.
   private mutating func metadata(
-    record name: String, rows: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
+    record name: String, fields: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
-    let layout = record(rows: rows, in: &ctx)
+    let layout = record(fields: fields, in: &ctx)
     let definition = ctx.llvm.structType(named: name, layout.fields, packed: true)
 
     assert(ctx.llvm.layout.storageSize(of: definition) <= layout.size.fixed!)
@@ -1103,19 +1103,19 @@ extension Program {
     return TypeMetadata(llvm: definition, layout: layout)
   }
 
-  /// Returns the standard layout of a record type having the given rows.
+  /// Returns the standard layout of a record type having the given fields.
   private mutating func record(
-    rows: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
+    fields: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
   ) -> ConcreteLayout {
-    let rs = rows.map({ (u) in metadata(of: u, in: &ctx) })
-    let ps = rows.indices.sorted { (a, b) in
+    let rs = fields.map({ (u) in metadata(of: u, in: &ctx) })
+    let ps = fields.indices.sorted { (a, b) in
       let lhs = rs[a].layout.alignment
       let rhs = rs[b].layout.alignment
       return (rhs < lhs) || ((lhs == rhs) && (a < b))
     }
 
-    var fields: [LLVMType] = []
-    var rowToField = Array(repeating: -1, count: rs.count)
+    var elements: [LLVMType] = []
+    var fieldToElement = Array(repeating: -1, count: rs.count)
     var size = 0
 
     for p in ps {
@@ -1128,17 +1128,17 @@ extension Program {
       // Add padding if necessary.
       if next != size {
         let padding = next - size
-        fields.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).t)
+        elements.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).t)
       }
 
-      rowToField[p] = fields.count
-      fields.append(rs[p].llvm)
+      fieldToElement[p] = elements.count
+      elements.append(rs[p].llvm)
       size = next + fieldSize
     }
 
     let a = rs.last?.layout.alignment ?? 1
     return ConcreteLayout(
-      fields: fields, propertyToField: rowToField, size: .fixed(size), alignment: a)
+      fields: elements, propertyToField: fieldToElement, size: .fixed(size), alignment: a)
   }
 
   /// Returns the LLVM IR type of the entity declared by `d`, which is a property of an opaque

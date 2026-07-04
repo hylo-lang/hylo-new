@@ -21,7 +21,7 @@ internal struct AbstractObject<Domain: AbstractDomain>: Hashable, Sendable {
     _ offset: Int, computingLayoutWith typer: inout Typer,
     _ action: (inout AbstractObject, inout Typer) -> T
   ) -> T {
-    let layout = typer.storage(of: type) ?? []
+    let layout = typer.fields(of: type) ?? []
     var parts: [Value]
 
     if case .mixed(let ps) = value {

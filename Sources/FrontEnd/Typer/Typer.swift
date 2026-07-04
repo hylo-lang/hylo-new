@@ -168,21 +168,19 @@ public struct Typer {
 
   /// Returns the types of stored parts of `t`.
   ///
-  /// The result lists the types of the fields in `t`, which correspond to the stored properties
-  /// declared in a struct, the cases declared in an enum, or the members of a tuple.
-  public mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
-    let u = program.types.dealiased(t)
-    switch program.types.tag(of: u) {
+  /// The result contains the types of the parts that may be stored in an instance of `t`, which
+  /// coincides with the result of `fields(of: t)` iff instances of `t` are structs or tuples. In
+  /// the case of an enum, the result lists the types of the cases.
+  private mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
+    switch program.types.tag(of: t) {
     case Enum.self:
       return storage(of: program.types.castUnchecked(t, to: Enum.self))
-    case Struct.self:
-      return storage(of: program.types.castUnchecked(t, to: Struct.self))
+    case TypeAlias.self:
+      return storage(of: program.types.castUnchecked(t, to: TypeAlias.self))
     case TypeApplication.self:
       return storage(of: program.types.castUnchecked(t, to: TypeApplication.self))
-    case Tuple.self:
-      return program.types.members(of: program.types.castUnchecked(t, to: Tuple.self)).types
     default:
-      return nil
+      return fields(of: t)
     }
   }
 
@@ -202,10 +200,8 @@ public struct Typer {
   }
 
   /// Returns the types of stored parts of `t`.
-  private mutating func storage(of t: Struct.ID) -> [AnyTypeIdentity] {
-    program.storedProperties(of: program.types[t].declaration).map { (v) in
-      typeOfName(referringTo: .init(v), statically: false)
-    }
+  private mutating func storage(of t: TypeAlias.ID) -> [AnyTypeIdentity]? {
+    storage(of: program.types[t].aliasee)
   }
 
   /// Returns the types of stored parts of `t`.
@@ -218,12 +214,61 @@ public struct Typer {
     }
   }
 
-  /// Returns the type of the part at `p` relative to a root of type `t`, or `nil` if `p` is not
-  /// a valid field path in `t`.
+  /// Returns the types of fields of `t` iff it is a struct or a tuple.
+  ///
+  /// The result is `nil` unless instances of `t` are structs a tuples. In this case, the result
+  /// lists the types of the stored properties of those instances.
+  public mutating func fields(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
+    switch program.types.tag(of: t) {
+    case Struct.self:
+      return fields(of: program.types.castUnchecked(t, to: Struct.self))
+    case Tuple.self:
+      return fields(of: program.types.castUnchecked(t, to: Tuple.self))
+    case TypeAlias.self:
+      return fields(of: program.types.castUnchecked(t, to: TypeAlias.self))
+    case TypeApplication.self:
+      return fields(of: program.types.castUnchecked(t, to: TypeApplication.self))
+    default:
+      return nil
+    }
+  }
+
+  /// Returns the types of the fields of `t`.
+  private mutating func fields(of t: Struct.ID) -> [AnyTypeIdentity] {
+    program.storedProperties(of: program.types[t].declaration).map { (v) in
+      let u = typeOfName(referringTo: .init(v), statically: false)
+      return program.types.dealiased(u)
+    }
+  }
+
+  /// Returns the types of the fields of `t`.
+  private mutating func fields(of t: Tuple.ID) -> [AnyTypeIdentity]? {
+    program.types.members(of: t).types.map { (u) in
+      program.types.dealiased(u)
+    }
+  }
+
+  /// Returns the types of the fields of `t` iff it is a struct or a tuple.
+  private mutating func fields(of t: TypeAlias.ID) -> [AnyTypeIdentity]? {
+    fields(of: program.types[t].aliasee)
+  }
+
+  /// Returns the types of the fields of `t` iff it is a struct or a tuple.
+  private mutating func fields(of t: TypeApplication.ID) -> [AnyTypeIdentity]? {
+    if let ts = fields(of: program.types[t].abstraction) {
+      let a = program.types[t].arguments
+      return ts.map({ (u) in program.types.substitute(a, in: u) })
+    } else {
+      return nil
+    }
+  }
+
+  /// Returns the type of the property at `p` relative to a root of type `t`, or `nil` if `p` is
+  /// not a valid field path in `t`.
   public mutating func field(of t: AnyTypeIdentity, at p: IndexPath) -> AnyTypeIdentity? {
     var u = t
     for i in p {
-      if let s = storage(of: u), UInt(bitPattern: i) < s.count {
+      if let s = fields(of: u), UInt(bitPattern: i) < s.count {
         u = s[i]
       } else {
         return nil
