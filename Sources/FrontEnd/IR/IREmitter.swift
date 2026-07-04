@@ -2058,9 +2058,8 @@ internal struct IREmitter {
   internal mutating func _property(
     _ property: DeclarationIdentity, of record: IRValue, withType propertyType: AnyTypeIdentity
   ) -> IRValue {
-    let s = IRProperty(
-      record: record, property: property, propertyType: propertyType,
-      anchor: currentAnchor)
+    let t = program.types.dealiased(propertyType)
+    let s = IRProperty(record: record, property: property, propertyType: t, anchor: currentAnchor)
     return insert(s)!
   }
 
