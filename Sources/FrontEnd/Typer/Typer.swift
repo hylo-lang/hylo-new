@@ -1309,10 +1309,17 @@ public struct Typer {
 
     // The enclosing scope is an enum declaration.
     let o = typeOfSelf(in: program.parent(containing: d, as: EnumDeclaration.self)!)
-    let i = declaredTypes(of: program[d].parameters, defaultConvention: .sink)
-    let a = demand(Arrow(effect: .let, environment: .void, inputs: i, output: o)).erased
-    program[d.module].setType(a, for: d)
-    return a
+
+    // The case denotes a constant if it has no associated value and a constructor otherwise.
+    if program[d].parameters.isEmpty {
+      program[d.module].setType(o, for: d)
+      return o
+    } else {
+      let i = declaredTypes(of: program[d].parameters, defaultConvention: .sink)
+      let a = demand(Arrow(effect: .let, environment: .void, inputs: i, output: o)).erased
+      program[d.module].setType(a, for: d)
+      return a
+    }
   }
 
   /// Returns the declared type of `d` without checking.

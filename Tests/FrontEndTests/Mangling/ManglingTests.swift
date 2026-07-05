@@ -25,7 +25,7 @@ final class ManglingTests: XCTestCase {
         }
 
         enum MyEnum<T> {
-          case one()
+          case one
           case two(x: T)
         }
         """)
@@ -67,7 +67,7 @@ final class ManglingTests: XCTestCase {
         given Void is W { type X = Void }
 
         enum MyEnum<T> {
-          case one()
+          case one
           case two(x: T)
         }
 
