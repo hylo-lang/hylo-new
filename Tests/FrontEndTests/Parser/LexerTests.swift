@@ -224,6 +224,19 @@ final class LexerTests: XCTestCase {
     XCTAssertNil(scanner.next())
   }
 
+  func testIdentifierCharacterClasses() {
+    // The public predicates used by clients (e.g. the LSP's identifier scan) follow the lexer's
+    // identifier rules: letters and the underscore start one; those plus *decimal* digits
+    // continue one. `Character.isNumber` is broader than a decimal digit and must not qualify.
+    XCTAssertTrue("a".first!.isIdentifierHead)
+    XCTAssertTrue("_".first!.isIdentifierHead)
+    XCTAssertFalse("1".first!.isIdentifierHead)
+    XCTAssertTrue("1".first!.isIdentifierTail)
+    XCTAssertTrue("é".first!.isIdentifierTail)
+    XCTAssertFalse("½".first!.isIdentifierTail)
+    XCTAssertFalse(".".first!.isIdentifierTail)
+  }
+
 }
 
 private func assertNext(

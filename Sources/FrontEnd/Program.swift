@@ -1979,6 +1979,11 @@ extension Program {
   /// Returns the declarations that unqualified name resolution can reach from `scopeOfUse`.
   ///
   /// Predefined names (`Void`, `Never`, ...) are not included.
+  ///
+  /// - Complexity: one memoized `lookup` walk per distinct visible identifier — fidelity is
+  ///   bought with O(identifiers × scopes) dictionary lookups. Fast enough while callers rebuild
+  ///   the program per query anyway; an enumeration primitive inside the `Typer` would be the
+  ///   next step if this ever dominates.
   /// - Requires: `m` has been type checked.
   public mutating func declarations(
     visibleFrom scopeOfUse: ScopeIdentity, in m: Module.ID

@@ -337,12 +337,12 @@ public struct Lexer: IteratorProtocol, Sequence {
 extension Character {
 
   /// `true` iff `self` is a letter or the underscore.
-  fileprivate var isIdentifierHead: Bool {
+  public var isIdentifierHead: Bool {
     self.isLetter || self == "_"
   }
 
   /// `true` iff `self` is a letter, a decimal digit, or the underscore.
-  fileprivate var isIdentifierTail: Bool {
+  public var isIdentifierTail: Bool {
     self.isIdentifierHead || self.isDecimalDigit
   }
 

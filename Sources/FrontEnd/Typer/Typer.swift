@@ -4077,7 +4077,7 @@ public struct Typer {
   }
 
   /// Returns candidates for resolving `n` without qualification in `scopeOfUse`.
-  private mutating func resolve(
+  internal mutating func resolve(
     _ n: Name, unqualifiedIn scopeOfUse: ScopeIdentity
   ) -> [NameResolutionCandidate] {
     var candidates: [NameResolutionCandidate] = []
@@ -4269,7 +4269,7 @@ public struct Typer {
     }
   }
 
-/// Returns the types the argument at `holeIndex` of `call` could be expected to have, unioned over
+  /// Returns the types the argument at `holeIndex` of `call` could be expected to have, unioned over
   /// every overload of the callee that remains viable given the other arguments.
   ///
   /// This drives leading-dot completion in an argument position (`a(.<cursor>)`). A bare implicit
