@@ -114,6 +114,14 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings),
 
+    .target(
+      name: "Interpreter",
+      dependencies: [
+        "FrontEnd",
+        .product(name: "Collections", package: "swift-collections"),
+      ],
+      swiftSettings: commonSwiftSettings),
+
     .testTarget(
       name: "CompilerTests",
       dependencies: [
@@ -153,6 +161,16 @@ let package = Package(
       name: "UtilitiesTests",
       dependencies: [
         .target(name: "Utilities")
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
+      name: "InterpreterTests",
+      dependencies: [
+        "Interpreter", "FrontEnd",
+      ],
+      resources: [
+        .copy("InterpreterTestPrograms")
       ],
       swiftSettings: commonSwiftSettings),
 
