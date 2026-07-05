@@ -756,6 +756,19 @@ public struct Program: Sendable {
     }
   }
 
+  /// If `n` refers to an enum case without an associated value, returns the declaration of that
+  /// case; otherwise, returns `nil`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func asConstantCase(_ n: NameExpression.ID) -> EnumCaseDeclaration.ID? {
+    guard
+      case .direct(let d) = declaration(referredToBy: n),
+      let c = cast(d, to: EnumCaseDeclaration.self)
+    else { return nil }
+
+    return self[c].parameters.isEmpty ? c : nil
+  }
+
   /// Returns the built-in function referred to by `n`, if any.
   public func asBuiltinFunction(_ n: ExpressionIdentity) -> BuiltinFunction? {
     if let e = cast(n, to: NameExpression.self) {

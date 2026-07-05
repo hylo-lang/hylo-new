@@ -1711,7 +1711,7 @@ public struct Typer {
   }
 
   /// Returns the type used to represent an instance of the given case.
-  private mutating func underlyingType(of d: EnumCaseDeclaration.ID) -> AnyTypeIdentity {
+  public mutating func underlyingType(of d: EnumCaseDeclaration.ID) -> AnyTypeIdentity {
     let elements = declaredTypes(of: program[d].parameters, defaultConvention: .sink).map(\.type)
     return program.types.tuple(of: elements)
   }

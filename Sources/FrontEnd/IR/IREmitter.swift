@@ -739,8 +739,15 @@ internal struct IREmitter {
 
   /// Implements `lower(store:to:)` for name expressions.
   private mutating func lower(store e: NameExpression.ID, to target: IRValue) {
-    let v = lowered(lvalue: e)
-    lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
+    if let d = program.asConstantCase(e) {
+      lowering(e) { (me) in
+        let x = me._case(d, of: target)
+        me._assume_state(x, initialized: true)
+      }
+    } else {
+      let v = lowered(lvalue: e)
+      lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
+    }
   }
 
   /// Implements `lower(store:to:)` for static calls.
@@ -1939,6 +1946,15 @@ internal struct IREmitter {
   /// Inserts a `br` instruction.
   internal mutating func _br(_ target: IRBlock.ID) {
     insert(IRBranch(target: target, anchor: currentAnchor))
+  }
+
+  /// Inserts a `case` instruction.
+  internal mutating func _case(
+    _ d: EnumCaseDeclaration.ID, of s: IRValue
+  ) -> IRValue {
+    let t = program.withTyper(typing: module, { (tp) in tp.underlyingType(of: d) })
+    let s = IRCase(source: s, payload: d, payloadType: t, anchor: currentAnchor)
+    return insert(s)!
   }
 
   /// Inserts a `condbr` instruction.
