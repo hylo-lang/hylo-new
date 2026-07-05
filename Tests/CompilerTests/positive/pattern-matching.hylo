@@ -2,8 +2,8 @@
 
 enum A<T> {
   case one()
-  case two(x: sink T)
-  case three(_ y: sink T)
+  case two(x: T)
+  case three(_ y: T)
 }
 
 struct B<U> {

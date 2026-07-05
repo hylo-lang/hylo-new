@@ -26,7 +26,7 @@ final class ManglingTests: XCTestCase {
 
         enum MyEnum<T> {
           case one()
-          case two(x: sink T)
+          case two(x: T)
         }
         """)
     p = await p.typeChecked()
@@ -68,7 +68,7 @@ final class ManglingTests: XCTestCase {
 
         enum MyEnum<T> {
           case one()
-          case two(x: sink T)
+          case two(x: T)
         }
 
         struct B<X> {

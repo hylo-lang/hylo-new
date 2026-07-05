@@ -2,7 +2,7 @@
 
 enum A<T> {
   case one()
-  case two(x: sink T)
+  case two(x: T)
 }
 
 fun check<T>(x: T) {}

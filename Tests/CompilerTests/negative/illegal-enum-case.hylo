@@ -6,4 +6,5 @@ struct A {
 
 enum B {
   case one(x: Void) = ()
+  case two(x: let Void)
 }

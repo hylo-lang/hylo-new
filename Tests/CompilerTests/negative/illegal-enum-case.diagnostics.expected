@@ -4,3 +4,6 @@ negative/illegal-enum-case.hylo:4.3: error: declaration is not allowed here
 negative/illegal-enum-case.hylo:8.21-22: error: enum case with parameters cannot have an explicit definition
   case one(x: Void) = ()
                     ^
+negative/illegal-enum-case.hylo:9.15-18: error: access effect is not allowed here
+  case two(x: let Void)
+              ~~~
