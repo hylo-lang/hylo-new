@@ -972,6 +972,8 @@ extension Program {
     switch types.tag(of: t) {
     case Arrow.self:
       metadata(of: types.castUnchecked(t, to: Arrow.self), in: &ctx)
+    case Enum.self:
+      metadata(of: types.castUnchecked(t, to: Enum.self), in: &ctx)
     case GenericParameter.self:
       metadata(of: types.castUnchecked(t, to: GenericParameter.self), in: &ctx)
     case MachineType.self:
@@ -999,6 +1001,21 @@ extension Program {
       let a = ctx.llvm.layout.preferredAlignment(of: v)
       let l = ConcreteLayout(fields: [], propertyToField: [], size: .fixed(s), alignment: a)
       return TypeMetadata(llvm: v, layout: l)
+    }
+  }
+
+  /// Returns the LLVM type representation of the Hylo type `t`.
+  private mutating func metadata(
+    of t: Enum.ID, in ctx: inout ModuleGenerationContext
+  ) -> TypeMetadata {
+    // Is there a raw representation?
+    if self[types[t].declaration].representation != nil {
+      unimplemented("enum raw representation")
+    }
+
+    return metadata(of: t, in: &ctx) { (program, ctx, t, n) in
+      program.metadata(
+        enum: n, cases: program.storage(of: t.erased, visibleFrom: ctx.hylo)!, in: &ctx)
     }
   }
 
@@ -1101,6 +1118,44 @@ extension Program {
     assert(ctx.llvm.layout.storageSize(of: definition) <= layout.size.fixed!)
     assert(ctx.llvm.layout.abiAlignment(of: definition) <= layout.alignment)
     return TypeMetadata(llvm: definition, layout: layout)
+  }
+
+  /// Returns the LLVM type representation of a sum type having the given name and cases.
+  private mutating func metadata(
+    enum name: String, cases: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
+  ) -> TypeMetadata {
+    // Trivial if there are less than two cases.
+    if cases.count <= 1 {
+      return metadata(record: name, fields: Array(contentsOf: cases.uniqueElement), in: &ctx)
+    }
+
+    // Otherwise, construct a pair leading with the tag.
+    else {
+      var payloadSize = 0
+      var payloadAlignment = 1
+      for c in cases {
+        let m = metadata(of: c, in: &ctx)
+        payloadSize = max(payloadSize, m.layout.size.fixed!)
+        payloadAlignment = max(payloadAlignment, m.layout.alignment)
+      }
+
+      // Pad the size of the tag to satisfy the alignment of the payload.
+      let tag = ctx.integerTypeToRepresent(cases.count)
+      let tagSize = ctx.llvm.layout.storageSize(of: tag).rounded(
+        upToNearestMultipleOf: payloadAlignment)
+
+      let fields: [LLVMType] = [
+        ctx.llvm.arrayType(tagSize, ctx.llvm.i8).t,
+        ctx.llvm.arrayType(payloadSize, ctx.llvm.i8).t
+      ]
+
+      let pair = ctx.llvm.structType(named: name, fields, packed: true)
+      let layout = ConcreteLayout(
+        fields: fields, propertyToField: [0, 1],
+        size: .fixed(tagSize + payloadSize),
+        alignment: max(payloadAlignment, ctx.llvm.layout.preferredAlignment(of: tag)))
+      return .init(llvm: pair, layout: layout)
+    }
   }
 
   /// Returns the standard layout of a record type having the given fields.

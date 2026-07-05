@@ -171,7 +171,7 @@ public struct Typer {
   /// The result contains the types of the parts that may be stored in an instance of `t`, which
   /// coincides with the result of `fields(of: t)` iff instances of `t` are structs or tuples. In
   /// the case of an enum, the result lists the types of the cases.
-  private mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
+  public mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
     switch program.types.tag(of: t) {
     case Enum.self:
       return storage(of: program.types.castUnchecked(t, to: Enum.self))

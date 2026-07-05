@@ -1060,7 +1060,15 @@ public struct Program: Sendable {
     return self[d.file].variableToBinding[d.offset]
   }
 
-  /// Returns the types of stored properties of `t` visible from `module`.
+  /// Returns the types of stored parts of `t` iff its layout is visible from `module`.
+  public mutating func storage(
+    of t: AnyTypeIdentity, visibleFrom module: Module.ID
+  ) -> [AnyTypeIdentity]? {
+    // TODO: Resilience
+    withTyper(typing: module, { (typer) in typer.storage(of: t) })
+  }
+
+  /// Returns the types of the fields of `t` iff its layout is visible from `module`.
   public mutating func fields(
     of t: AnyTypeIdentity, visibleFrom module: Module.ID
   ) -> [AnyTypeIdentity]? {
