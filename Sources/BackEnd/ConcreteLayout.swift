@@ -53,7 +53,7 @@ internal struct ConcreteLayout {
   /// because it is opaque or because it is a machine type.
   internal let fields: [LLVMType]
 
-  /// A map from the index of a sotred property to the index of its corresponding LLVM field, or
+  /// A map from the index of a stored property to the index of its corresponding LLVM field, or
   /// `-1` if that property's representation is erased.
   ///
   /// - Invariant: the length of `propertyToField` is greater than or equal to that of `fields`.
