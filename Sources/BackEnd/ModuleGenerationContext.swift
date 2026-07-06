@@ -61,7 +61,7 @@ internal struct ModuleGenerationContext: ~Copyable {
 
   /// The header of the structure representing information stored in all type witnesses.
   ///
-  /// A type witness is a 4-tuple optionally followed by a buffer of pointer containing:
+  /// A type witness is a 4-tuple optionally followed by a buffer of pointers containing:
   /// - A string describing the type being witnessed;
   /// - The size of the type, as a 32-bit unsigned integer;
   /// - The alignment of the type, as a 16-bit unsigned ingeter;

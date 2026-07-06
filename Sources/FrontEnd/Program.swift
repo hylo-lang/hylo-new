@@ -597,6 +597,18 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `true` iff `n` is the application of a memberwise initializer.
+  public func isMemberwiseInitialization(_ n: Call.ID) -> Bool {
+    if
+      let f = cast(self[n].callee, to: New.self),
+      case .some(.direct(let d)) = declaration(maybeReferredToBy: self[f].target)
+    {
+      return isMemberwiseInitializer(d)
+    } else {
+      return false
+    }
+  }
+
   /// Returns `true` iff `w` denotes a synthetic conformance that does not involve any user code.
   ///
   /// The result is a conservative overapproximation which does not take arguments to conditional
@@ -852,9 +864,8 @@ public struct Program: Sendable {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
-  /// Returns the declaration referred to by `n`, if any.
-  ///
-  /// - Note: This may only return non-nil after type-checking.
+  /// Returns the declaration referred to by `n` iff the module containing `n` is typed; otherwise,
+  /// returns `nil`.
   public func declaration(maybeReferredToBy n: NameExpression.ID) -> DeclarationReference? {
     self[n.module].declaration(referredToBy: n)
   }
@@ -1071,6 +1082,22 @@ public struct Program: Sendable {
   public func bindingDeclaration(containing d: VariableDeclaration.ID) -> BindingDeclaration.ID? {
     assert(isScoped(d.file), "unscoped module")
     return self[d.file].variableToBinding[d.offset]
+  }
+
+  /// Returns the declaration of the type of which `t` is an instance, if any.
+  public func declaration(of t: AnyTypeIdentity) -> DeclarationIdentity? {
+    switch types.tag(of: t) {
+    case Enum.self:
+      return .init(types[types.castUnchecked(t, to: Enum.self)].declaration)
+    case Struct.self:
+      return .init(types[types.castUnchecked(t, to: Struct.self)].declaration)
+    case TypeAlias.self:
+      return declaration(of: types[types.castUnchecked(t, to: TypeAlias.self)].aliasee)
+    case TypeApplication.self:
+      return declaration(of: types[types.castUnchecked(t, to: TypeApplication.self)].abstraction)
+    default:
+      return nil
+    }
   }
 
   /// Returns the types of stored parts of `t` iff its layout is visible from `module`.

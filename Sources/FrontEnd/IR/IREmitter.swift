@@ -325,9 +325,12 @@ internal struct IREmitter {
   private mutating func lower(_ d: FunctionBundleDeclaration.ID) {
     for m in program[d].variants {
       let f = demandLoweredDeclaration(functionOrConformance: .init(m))
-      assert(!program[module].ir[f].isDefined, "function already lowered")
-      defining(f, at: program.anchor(introducerOf: m)) { (me) in
-        me.lowerDefinition(me.program[m].body, of: m)
+      if let body = program[m].body {
+        defining(f, at: program.anchor(introducerOf: m)) { (me) in
+          me.lowerDefinition(body, of: m)
+        }
+      } else {
+        assert(!program.requiresDefinition(.init(m)), "ill-formed syntax")
       }
     }
   }
@@ -335,23 +338,20 @@ internal struct IREmitter {
   /// Generates the IR of `d`.
   private mutating func lower(_ d: FunctionDeclaration.ID) {
     let f = demandLoweredDeclaration(functionOrConformance: .init(d))
-    defining(f, at: program.anchor(introducerOf: d)) { (me) in
-      me.lowerDefinition(me.program[d].body, of: d)
+    if let body = program[d].body {
+      defining(f, at: program.anchor(introducerOf: d)) { (me) in
+        me.lowerDefinition(body, of: d)
+      }
+    } else {
+      assert(!program.requiresDefinition(.init(d)), "ill-formed syntax")
     }
   }
 
   /// Generates the definition of `d`, whose body is `definition`, assuming the insertion context
   /// is configured to generate IR into the lowered form of `d`.
   private mutating func lowerDefinition<T: Declaration & Scope>(
-    _ definition: [StatementIdentity]?, of d: T.ID
+    _ definition: [StatementIdentity], of d: T.ID
   ) {
-    // Is there a body to lower?
-    guard let body = definition else {
-      assert(!program.requiresDefinition(.init(d)), "ill-formed syntax")
-      // TODO: FFI
-      return
-    }
-
     // Setup the function's parameters.
     for (i, p) in currentFunction.termParameters.enumerated() {
       let v = IRValue.parameter(i)
@@ -382,12 +382,12 @@ internal struct IREmitter {
       }
     }
 
-    switch lower(statements: body) {
+    switch lower(statements: definition) {
     case .return(let r):
       lowering(r, { $0._return() })
 
     case .next:
-      lowering(after: body.last!, { (me) in
+      lowering(after: definition.last!, { (me) in
         // If the function returns `Void`, assume the return register is initialized to deal with
         // elided return statements.
         if me.currentFunction.isProcedure {
@@ -648,9 +648,37 @@ internal struct IREmitter {
       }
     }
 
+    // Are we lowering a memberwise initialization?
+    else if program.isMemberwiseInitialization(e) {
+      lower(memberwiseInitialization: e, of: target)
+    }
+
     // Are we lowering an ordinary call?
     else {
       lower(call: e, output: target)
+    }
+  }
+
+  /// Generates the IR for initializing `target` in place with the arguments of `e`, which is the
+  /// application of a memberwise initializer.
+  private mutating func lower(memberwiseInitialization e: Call.ID, of target: IRValue) {
+    // Memberwise initializers are for structs.
+    let t = currentFunction.result(of: target)!.type
+    let s = program.cast(program.declaration(of: t)!, to: StructDeclaration.self)!
+
+    // Construct each property in place.
+    var i = 0
+    program.forEachStoredProperty(of: s) { (v, p) in
+      let a = program[e].arguments[i].value
+      let x = lowering(a, { $0._subfield(target, at: p) })
+      lower(store: a, to: x)
+      i += 1
+    }
+    assert(i == program[e].arguments.count)
+
+    // Mark the value initialized if it has no property.
+    if i == 0 {
+      lowering(e, { $0._assume_state(target, initialized: true) })
     }
   }
 

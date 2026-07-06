@@ -1,0 +1,10 @@
+//! stage:llvm
+
+struct S is Deinitializable {
+  let x: Int
+  memberwise init
+}
+
+public fun main() {
+  _ = S(x: 123)
+}
