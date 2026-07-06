@@ -740,10 +740,7 @@ internal struct IREmitter {
   /// Implements `lower(store:to:)` for name expressions.
   private mutating func lower(store e: NameExpression.ID, to target: IRValue) {
     if let d = program.asConstantCase(e) {
-      lowering(e) { (me) in
-        let x = me._case(d, of: target)
-        me._assume_state(x, initialized: true)
-      }
+      lowering(e, { $0._emitInitialize(target, withConstantCase: d) })
     } else {
       let v = lowered(lvalue: e)
       lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
@@ -1246,12 +1243,14 @@ internal struct IREmitter {
 
   /// Implements `lower(lvalue:)` for name expressions.
   private mutating func lowered(lvalue e: NameExpression.ID) -> IRValue {
+    let t = program.type(assignedTo: e)
+
     switch program.declaration(referredToBy: e) {
     case .direct(let d):
       if program.isTypeDeclaration(d) {
         return lowering(e, { $0._emitTypeWitnesse(expressedBy: .init(e)) })
       } else {
-        return lowering(e, { $0._emit(referenceTo: d) })
+        return lowering(e, { $0._emit(useOf: d, typed: t) })
       }
 
     case .member(let d):
@@ -1262,7 +1261,6 @@ internal struct IREmitter {
       if let i = storedPropertyIndex(of: d, in: program.parent(containing: e)) {
         return lowering(e, { $0._subfield(q, at: [i]) })
       } else {
-        let t = program.type(assignedTo: e)
         return lowering(e, { $0._property(d, of: q, withType: t) })
       }
 
@@ -2200,7 +2198,8 @@ internal struct IREmitter {
   /// If `applyNullary` is `true` and `d` refers to a nullary conformance declaration, the result
   /// is an application of corresponding lowered function.
   private mutating func _emit(
-    referenceTo d: DeclarationIdentity, applyingNullary applyNullary: Bool = true
+    useOf d: DeclarationIdentity, typed t: AnyTypeIdentity,
+    applyingNullary applyNullary: Bool = true
   ) -> IRValue {
     // Is `d` already inserted into the local symbol table?
     if let s = currentFunction.binding(d) {
@@ -2213,7 +2212,6 @@ internal struct IREmitter {
       if let v = program.cast(d, to: VariableDeclaration.self) {
         // The only way to get here is if `v` has not been defined yet.
         let s = insertionContext.anchor!.site
-        let t = program.type(assignedTo: v)
         report(.init(.error, "use of '\(program[v].identifier)' before its declaration", at: s))
         return .poison(program.types.ir(place: t))
       }
@@ -2225,6 +2223,11 @@ internal struct IREmitter {
     case ConformanceDeclaration.self:
       let c = program.castUnchecked(d, to: ConformanceDeclaration.self)
       return _emit(referenceTo: c, applyingNullary: applyNullary)
+
+    case EnumCaseDeclaration.self:
+      let x0 = _alloca(t)
+      _emitInitialize(x0, withConstantCase: program.castUnchecked(d, to: EnumCaseDeclaration.self))
+      return x0
 
     case VariableDeclaration.self:
       // Since `d` wasn't in the local symbol table, we can assume it's a global symbol.
@@ -2317,7 +2320,7 @@ internal struct IREmitter {
     case .identity(let e):
       result = lowered(lvalue: e)
     case .reference(let d):
-      result = _emit(referenceTo: d, applyingNullary: false)
+      result = _emit(useOf: d, typed: w.type, applyingNullary: false)
     case .typeApplication(let f, let a):
       let x0 = _emit(witness: f)
       result = _type_apply(x0, to: a)
@@ -2465,11 +2468,20 @@ internal struct IREmitter {
     }
   }
 
-  // Generates the IR for storing `source` into `target`.
+  /// Generates the IR for storing `source` into `target`.
   internal mutating func _emitInitialize(_ target: IRValue, with source: IRValue) {
     let x0 = _access([.set], from: target)
     _store(source, to: x0)
     _end(IRAccess.self, openedBy: x0)
+  }
+
+  /// Generates the for initializing `target` with an instance of the enum case declared by `d`.
+  private mutating func _emitInitialize(
+    _ target: IRValue, withConstantCase d: EnumCaseDeclaration.ID
+  ) {
+    assert(program[d].parameters.isEmpty)
+    let x0 = _case(d, of: target)
+    _assume_state(x0, initialized: true)
   }
 
   /// Generates the IR for deinitializing `source` and returns `true` iff `source` or its parts can

@@ -157,6 +157,10 @@ extension Program {
       return ctx.ir.instruction(after: i)
     case IRBranch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRBranch.self), in: &ctx)
+    case IRCase.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRCase.self), in: &ctx)
+    case IRCase.End.self:
+      return ctx.ir.instruction(after: i)
     case IRConditionalBranch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRConditionalBranch.self), in: &ctx)
     case IRGlobalAccess.self:
@@ -245,6 +249,21 @@ extension Program {
     let a = ctx.demandBasicBlock(s.target)
     ctx.module.llvm.insertBr(to: a, at: ctx.insertionPoint!)
     return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRCase.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let m = metadata(of: ctx.ir.result(of: s.source)!.type, in: &ctx.module)
+    let t = StructType.UnsafeReference(m.llvm)!
+
+    let x = ctx.module.llvm.insertGetStructElementPointer(
+      of: ctx.value[s.source]!, typed: t, index: 1, at: ctx.insertionPoint!)
+    let v = IRValue.register(i.erased)
+    ctx.value[v] = x.v
+    return ctx.ir.instruction(after: i.erased)
   }
 
   /// Generates the LLVM IR code corresponding to `i`.
@@ -1058,8 +1077,7 @@ extension Program {
   ) -> TypeMetadata {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
       // TODO: Resilience
-      let m = program.types[t].declaration.module
-      let properties = program.fields(of: t.erased, visibleFrom: m)!
+      let properties = program.fields(of: t.erased, visibleFrom: ctx.hylo)!
       return program.metadata(record: n, fields: properties, in: &ctx)
     }
   }
