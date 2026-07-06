@@ -1806,8 +1806,7 @@ public struct Typer {
   private mutating func ascribe(
     _ k: AccessEffect, _ t: AnyTypeIdentity, to p: ExtractorPattern.ID
   ) {
-    let m = demand(Metatype(inhabitant: t)).erased
-    guard let (_, ps) = extractor(referredToBy: p, matching: m) else {
+    guard let (_, ps) = extractor(referredToBy: p, matching: t) else {
       program[p.module].setType(.error, for: p)
       return
     }
@@ -2273,15 +2272,12 @@ public struct Typer {
   private mutating func inferredType(
     of e: ImplicitQualification.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    if let t = context.expectedType {
-      context.obligations.assume(e, hasType: t, at: program[e].site)
-      return t
-    }
-
     // We may have already inferred the type of this tree if it occurs in the expression of some
     // callee (see `inferredType(calleeOf:in:)`). In that case, we must reuse what was inferred.
-    else if let t = context.obligations.syntaxToType[e.erased] {
+    if let t = context.obligations.syntaxToType[e.erased] {
       return t
+    } else if let t = context.expectedType {
+      return context.obligations.assume(e, hasType: t, at: program[e].site)
     } else {
       report(.init(.error, "no context to resolve implicit qualification", at: program[e].site))
       return .error
@@ -2833,6 +2829,24 @@ public struct Typer {
       return inferredType(of: s, occurringAsStatement: isStatement, in: &context)
     } else {
       program.unexpected(b)
+    }
+  }
+
+  /// Returns the inferred type `q`, which is the qualification of some name expression occurring
+  /// in `context`.
+  private mutating func inferredType(
+    of q: ExpressionIdentity, qualifyingNameOccurringIn context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    let expected = context.expectedType.flatMap { (t) in
+      if program.tag(of: q) == ImplicitQualification.self {
+        return program.types.demand(Metatype(inhabitant: t)).erased
+      } else {
+        return nil
+      }
+    }
+
+    return context.withSubcontext(expectedType: expected) { (ctx) in
+      inferredType(of: q, in: &ctx)
     }
   }
 
@@ -3966,7 +3980,7 @@ public struct Typer {
 
     // Qualified case.
     if let m = program[e].qualification {
-      let q = inferredType(of: m, in: &context)
+      let q = inferredType(of: m, qualifyingNameOccurringIn: &context)
 
       // Is the qualification a unification variable?
       if q.isVariable || program.types.isMetatype(q, of: \.isVariable) {
