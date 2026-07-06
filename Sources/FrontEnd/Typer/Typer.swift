@@ -168,21 +168,19 @@ public struct Typer {
 
   /// Returns the types of stored parts of `t`.
   ///
-  /// The result lists the types of the fields in `t`, which correspond to the stored properties
-  /// declared in a struct, the cases declared in an enum, or the members of a tuple.
+  /// The result contains the types of the parts that may be stored in an instance of `t`, which
+  /// coincides with the result of `fields(of: t)` iff instances of `t` are structs or tuples. In
+  /// the case of an enum, the result lists the types of the cases.
   public mutating func storage(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
-    let u = program.types.dealiased(t)
-    switch program.types.tag(of: u) {
+    switch program.types.tag(of: t) {
     case Enum.self:
       return storage(of: program.types.castUnchecked(t, to: Enum.self))
-    case Struct.self:
-      return storage(of: program.types.castUnchecked(t, to: Struct.self))
+    case TypeAlias.self:
+      return storage(of: program.types.castUnchecked(t, to: TypeAlias.self))
     case TypeApplication.self:
       return storage(of: program.types.castUnchecked(t, to: TypeApplication.self))
-    case Tuple.self:
-      return program.types.members(of: program.types.castUnchecked(t, to: Tuple.self)).types
     default:
-      return nil
+      return fields(of: t)
     }
   }
 
@@ -202,10 +200,8 @@ public struct Typer {
   }
 
   /// Returns the types of stored parts of `t`.
-  private mutating func storage(of t: Struct.ID) -> [AnyTypeIdentity] {
-    program.storedProperties(of: program.types[t].declaration).map { (v) in
-      typeOfName(referringTo: .init(v), statically: false)
-    }
+  private mutating func storage(of t: TypeAlias.ID) -> [AnyTypeIdentity]? {
+    storage(of: program.types[t].aliasee)
   }
 
   /// Returns the types of stored parts of `t`.
@@ -218,12 +214,61 @@ public struct Typer {
     }
   }
 
-  /// Returns the type of the part at `p` relative to a root of type `t`, or `nil` if `p` is not
-  /// a valid field path in `t`.
+  /// Returns the types of fields of `t` iff it is a struct or a tuple.
+  ///
+  /// The result is `nil` unless instances of `t` are structs a tuples. In this case, the result
+  /// lists the types of the stored properties of those instances.
+  public mutating func fields(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
+    switch program.types.tag(of: t) {
+    case Struct.self:
+      return fields(of: program.types.castUnchecked(t, to: Struct.self))
+    case Tuple.self:
+      return fields(of: program.types.castUnchecked(t, to: Tuple.self))
+    case TypeAlias.self:
+      return fields(of: program.types.castUnchecked(t, to: TypeAlias.self))
+    case TypeApplication.self:
+      return fields(of: program.types.castUnchecked(t, to: TypeApplication.self))
+    default:
+      return nil
+    }
+  }
+
+  /// Returns the types of the fields of `t`.
+  private mutating func fields(of t: Struct.ID) -> [AnyTypeIdentity] {
+    program.storedProperties(of: program.types[t].declaration).map { (v) in
+      let u = typeOfName(referringTo: .init(v), statically: false)
+      return program.types.dealiased(u)
+    }
+  }
+
+  /// Returns the types of the fields of `t`.
+  private mutating func fields(of t: Tuple.ID) -> [AnyTypeIdentity]? {
+    program.types.members(of: t).types.map { (u) in
+      program.types.dealiased(u)
+    }
+  }
+
+  /// Returns the types of the fields of `t` iff it is a struct or a tuple.
+  private mutating func fields(of t: TypeAlias.ID) -> [AnyTypeIdentity]? {
+    fields(of: program.types[t].aliasee)
+  }
+
+  /// Returns the types of the fields of `t` iff it is a struct or a tuple.
+  private mutating func fields(of t: TypeApplication.ID) -> [AnyTypeIdentity]? {
+    if let ts = fields(of: program.types[t].abstraction) {
+      let a = program.types[t].arguments
+      return ts.map({ (u) in program.types.substitute(a, in: u) })
+    } else {
+      return nil
+    }
+  }
+
+  /// Returns the type of the property at `p` relative to a root of type `t`, or `nil` if `p` is
+  /// not a valid field path in `t`.
   public mutating func field(of t: AnyTypeIdentity, at p: IndexPath) -> AnyTypeIdentity? {
     var u = t
     for i in p {
-      if let s = storage(of: u), UInt(bitPattern: i) < s.count {
+      if let s = fields(of: u), UInt(bitPattern: i) < s.count {
         u = s[i]
       } else {
         return nil
@@ -1264,10 +1309,17 @@ public struct Typer {
 
     // The enclosing scope is an enum declaration.
     let o = typeOfSelf(in: program.parent(containing: d, as: EnumDeclaration.self)!)
-    let i = declaredTypes(of: program[d].parameters, defaultConvention: .sink)
-    let a = demand(Arrow(effect: .let, environment: .void, inputs: i, output: o)).erased
-    program[d.module].setType(a, for: d)
-    return a
+
+    // The case denotes a constant if it has no associated value and a constructor otherwise.
+    if program[d].parameters.isEmpty {
+      program[d.module].setType(o, for: d)
+      return o
+    } else {
+      let i = declaredTypes(of: program[d].parameters, defaultConvention: .sink)
+      let a = demand(Arrow(effect: .let, environment: .void, inputs: i, output: o)).erased
+      program[d.module].setType(a, for: d)
+      return a
+    }
   }
 
   /// Returns the declared type of `d` without checking.
@@ -1659,7 +1711,7 @@ public struct Typer {
   }
 
   /// Returns the type used to represent an instance of the given case.
-  private mutating func underlyingType(of d: EnumCaseDeclaration.ID) -> AnyTypeIdentity {
+  public mutating func underlyingType(of d: EnumCaseDeclaration.ID) -> AnyTypeIdentity {
     let elements = declaredTypes(of: program[d].parameters, defaultConvention: .sink).map(\.type)
     return program.types.tuple(of: elements)
   }
@@ -1754,8 +1806,7 @@ public struct Typer {
   private mutating func ascribe(
     _ k: AccessEffect, _ t: AnyTypeIdentity, to p: ExtractorPattern.ID
   ) {
-    let m = demand(Metatype(inhabitant: t)).erased
-    guard let (_, ps) = extractor(referredToBy: p, matching: m) else {
+    guard let (_, ps) = extractor(referredToBy: p, matching: t) else {
       program[p.module].setType(.error, for: p)
       return
     }
@@ -2221,15 +2272,12 @@ public struct Typer {
   private mutating func inferredType(
     of e: ImplicitQualification.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
-    if let t = context.expectedType {
-      context.obligations.assume(e, hasType: t, at: program[e].site)
-      return t
-    }
-
     // We may have already inferred the type of this tree if it occurs in the expression of some
     // callee (see `inferredType(calleeOf:in:)`). In that case, we must reuse what was inferred.
-    else if let t = context.obligations.syntaxToType[e.erased] {
+    if let t = context.obligations.syntaxToType[e.erased] {
       return t
+    } else if let t = context.expectedType {
+      return context.obligations.assume(e, hasType: t, at: program[e].site)
     } else {
       report(.init(.error, "no context to resolve implicit qualification", at: program[e].site))
       return .error
@@ -2781,6 +2829,24 @@ public struct Typer {
       return inferredType(of: s, occurringAsStatement: isStatement, in: &context)
     } else {
       program.unexpected(b)
+    }
+  }
+
+  /// Returns the inferred type `q`, which is the qualification of some name expression occurring
+  /// in `context`.
+  private mutating func inferredType(
+    of q: ExpressionIdentity, qualifyingNameOccurringIn context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    let expected = context.expectedType.flatMap { (t) in
+      if program.tag(of: q) == ImplicitQualification.self {
+        return program.types.demand(Metatype(inhabitant: t)).erased
+      } else {
+        return nil
+      }
+    }
+
+    return context.withSubcontext(expectedType: expected) { (ctx) in
+      inferredType(of: q, in: &ctx)
     }
   }
 
@@ -3914,7 +3980,7 @@ public struct Typer {
 
     // Qualified case.
     if let m = program[e].qualification {
-      let q = inferredType(of: m, in: &context)
+      let q = inferredType(of: m, qualifyingNameOccurringIn: &context)
 
       // Is the qualification a unification variable?
       if q.isVariable || program.types.isMetatype(q, of: \.isVariable) {

@@ -105,7 +105,7 @@ public struct Token: Hashable, Sendable {
 
   /// `true` iff `self` is a reserved keyword.
   public var isKeyword: Bool {
-    (tag.rawValue >= Tag.false.rawValue) && (tag.rawValue <= Tag.type.rawValue)
+    (tag.rawValue >= Tag.auto.rawValue) && (tag.rawValue <= Tag.yield.rawValue)
   }
 
   /// `true` iff `self` is a binding introducer.

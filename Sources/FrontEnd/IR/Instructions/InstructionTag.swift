@@ -33,6 +33,8 @@ public struct InstructionTag: Sendable {
     IRApply.self,
     IRApplyBuiltin.self,
     IRAssumeState.self,
+    IRCase.self,
+    IRCase.End.self,
     IRBranch.self,
     IRConditionalBranch.self,
     IRGlobalAccess.self,

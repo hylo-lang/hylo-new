@@ -1,7 +1,7 @@
 import Archivist
 import Utilities
 
-/// Returns the address of a property stored in an opaque record.
+/// Accesses a property stored in an opaque record.
 @Archivable
 public struct IRProperty: Instruction {
 

@@ -157,6 +157,10 @@ extension Program {
       return ctx.ir.instruction(after: i)
     case IRBranch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRBranch.self), in: &ctx)
+    case IRCase.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRCase.self), in: &ctx)
+    case IRCase.End.self:
+      return ctx.ir.instruction(after: i)
     case IRConditionalBranch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRConditionalBranch.self), in: &ctx)
     case IRGlobalAccess.self:
@@ -245,6 +249,21 @@ extension Program {
     let a = ctx.demandBasicBlock(s.target)
     ctx.module.llvm.insertBr(to: a, at: ctx.insertionPoint!)
     return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRCase.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let m = metadata(of: ctx.ir.result(of: s.source)!.type, in: &ctx.module)
+    let t = StructType.UnsafeReference(m.llvm)!
+
+    let x = ctx.module.llvm.insertGetStructElementPointer(
+      of: ctx.value[s.source]!, typed: t, index: 1, at: ctx.insertionPoint!)
+    let v = IRValue.register(i.erased)
+    ctx.value[v] = x.v
+    return ctx.ir.instruction(after: i.erased)
   }
 
   /// Generates the LLVM IR code corresponding to `i`.
@@ -463,7 +482,7 @@ extension Program {
     for p in s.path {
       let m = metadata(of: u, in: &ctx.module)
       indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).v)
-      u = storage(of: u, visibleFrom: ctx.module.hylo)![p]
+      u = fields(of: u, visibleFrom: ctx.module.hylo)![p]
     }
 
     let b = ctx.value[s.base]!
@@ -972,6 +991,8 @@ extension Program {
     switch types.tag(of: t) {
     case Arrow.self:
       metadata(of: types.castUnchecked(t, to: Arrow.self), in: &ctx)
+    case Enum.self:
+      metadata(of: types.castUnchecked(t, to: Enum.self), in: &ctx)
     case GenericParameter.self:
       metadata(of: types.castUnchecked(t, to: GenericParameter.self), in: &ctx)
     case MachineType.self:
@@ -999,6 +1020,21 @@ extension Program {
       let a = ctx.llvm.layout.preferredAlignment(of: v)
       let l = ConcreteLayout(fields: [], propertyToField: [], size: .fixed(s), alignment: a)
       return TypeMetadata(llvm: v, layout: l)
+    }
+  }
+
+  /// Returns the LLVM type representation of the Hylo type `t`.
+  private mutating func metadata(
+    of t: Enum.ID, in ctx: inout ModuleGenerationContext
+  ) -> TypeMetadata {
+    // Is there a raw representation?
+    if self[types[t].declaration].representation != nil {
+      unimplemented("enum raw representation")
+    }
+
+    return metadata(of: t, in: &ctx) { (program, ctx, t, n) in
+      program.metadata(
+        enum: n, cases: program.storage(of: t.erased, visibleFrom: ctx.hylo)!, in: &ctx)
     }
   }
 
@@ -1041,9 +1077,8 @@ extension Program {
   ) -> TypeMetadata {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
       // TODO: Resilience
-      let m = program.types[t].declaration.module
-      let properties = program.storage(of: t.erased, visibleFrom: m)!
-      return program.metadata(record: n, rows: properties, in: &ctx)
+      let properties = program.fields(of: t.erased, visibleFrom: ctx.hylo)!
+      return program.metadata(record: n, fields: properties, in: &ctx)
     }
   }
 
@@ -1054,7 +1089,7 @@ extension Program {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
       let (properties, isOpenEnded) = program.types.members(of: t)
       precondition(!isOpenEnded, "no LLVM representation of type '\(program.show(t))'")
-      return program.metadata(record: n, rows: properties, in: &ctx)
+      return program.metadata(record: n, fields: properties, in: &ctx)
     }
   }
 
@@ -1091,11 +1126,11 @@ extension Program {
     return metadata(of: p, in: &ctx)
   }
 
-  /// Returns the LLVM type representation of a record type having the given name and rows.
+  /// Returns the LLVM type representation of a record type having the given name and fields.
   private mutating func metadata(
-    record name: String, rows: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
+    record name: String, fields: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
-    let layout = record(rows: rows, in: &ctx)
+    let layout = record(fields: fields, in: &ctx)
     let definition = ctx.llvm.structType(named: name, layout.fields, packed: true)
 
     assert(ctx.llvm.layout.storageSize(of: definition) <= layout.size.fixed!)
@@ -1103,19 +1138,57 @@ extension Program {
     return TypeMetadata(llvm: definition, layout: layout)
   }
 
-  /// Returns the standard layout of a record type having the given rows.
+  /// Returns the LLVM type representation of a sum type having the given name and cases.
+  private mutating func metadata(
+    enum name: String, cases: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
+  ) -> TypeMetadata {
+    // Trivial if there are less than two cases.
+    if cases.count <= 1 {
+      return metadata(record: name, fields: Array(contentsOf: cases.uniqueElement), in: &ctx)
+    }
+
+    // Otherwise, construct a pair leading with the tag.
+    else {
+      var payloadSize = 0
+      var payloadAlignment = 1
+      for c in cases {
+        let m = metadata(of: c, in: &ctx)
+        payloadSize = max(payloadSize, m.layout.size.fixed!)
+        payloadAlignment = max(payloadAlignment, m.layout.alignment)
+      }
+
+      // Pad the size of the tag to satisfy the alignment of the payload.
+      let tag = ctx.integerTypeToRepresent(cases.count)
+      let tagSize = ctx.llvm.layout.storageSize(of: tag).rounded(
+        upToNearestMultipleOf: payloadAlignment)
+
+      let fields: [LLVMType] = [
+        ctx.llvm.arrayType(tagSize, ctx.llvm.i8).t,
+        ctx.llvm.arrayType(payloadSize, ctx.llvm.i8).t
+      ]
+
+      let pair = ctx.llvm.structType(named: name, fields, packed: true)
+      let layout = ConcreteLayout(
+        fields: fields, propertyToField: [0, 1],
+        size: .fixed(tagSize + payloadSize),
+        alignment: max(payloadAlignment, ctx.llvm.layout.preferredAlignment(of: tag)))
+      return .init(llvm: pair, layout: layout)
+    }
+  }
+
+  /// Returns the standard layout of a record type having the given fields.
   private mutating func record(
-    rows: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
+    fields: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
   ) -> ConcreteLayout {
-    let rs = rows.map({ (u) in metadata(of: u, in: &ctx) })
-    let ps = rows.indices.sorted { (a, b) in
+    let rs = fields.map({ (u) in metadata(of: u, in: &ctx) })
+    let ps = fields.indices.sorted { (a, b) in
       let lhs = rs[a].layout.alignment
       let rhs = rs[b].layout.alignment
       return (rhs < lhs) || ((lhs == rhs) && (a < b))
     }
 
-    var fields: [LLVMType] = []
-    var rowToField = Array(repeating: -1, count: rs.count)
+    var elements: [LLVMType] = []
+    var fieldToElement = Array(repeating: -1, count: rs.count)
     var size = 0
 
     for p in ps {
@@ -1128,17 +1201,17 @@ extension Program {
       // Add padding if necessary.
       if next != size {
         let padding = next - size
-        fields.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).t)
+        elements.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).t)
       }
 
-      rowToField[p] = fields.count
-      fields.append(rs[p].llvm)
+      fieldToElement[p] = elements.count
+      elements.append(rs[p].llvm)
       size = next + fieldSize
     }
 
     let a = rs.last?.layout.alignment ?? 1
     return ConcreteLayout(
-      fields: fields, propertyToField: rowToField, size: .fixed(size), alignment: a)
+      fields: elements, propertyToField: fieldToElement, size: .fixed(size), alignment: a)
   }
 
   /// Returns the LLVM IR type of the entity declared by `d`, which is a property of an opaque

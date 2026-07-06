@@ -16,6 +16,8 @@ extension IRFunction {
       switch tag(of: i) {
       case IRAccess.self:
         close(IRAccess.self, i, computingLivenessWith: g)
+      case IRCase.self:
+        close(IRCase.self, i, computingLivenessWith: g)
       case IRProject.self:
         close(IRProject.self, i, computingLivenessWith: g)
       default:

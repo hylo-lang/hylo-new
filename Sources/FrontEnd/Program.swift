@@ -756,6 +756,19 @@ public struct Program: Sendable {
     }
   }
 
+  /// If `n` refers to an enum case without an associated value, returns the declaration of that
+  /// case; otherwise, returns `nil`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func asConstantCase(_ n: NameExpression.ID) -> EnumCaseDeclaration.ID? {
+    guard
+      case .direct(let d) = declaration(referredToBy: n),
+      let c = cast(d, to: EnumCaseDeclaration.self)
+    else { return nil }
+
+    return self[c].parameters.isEmpty ? c : nil
+  }
+
   /// Returns the built-in function referred to by `n`, if any.
   public func asBuiltinFunction(_ n: ExpressionIdentity) -> BuiltinFunction? {
     if let e = cast(n, to: NameExpression.self) {
@@ -1060,12 +1073,20 @@ public struct Program: Sendable {
     return self[d.file].variableToBinding[d.offset]
   }
 
-  /// Returns the types of stored parts of `t` visible from `module`.
+  /// Returns the types of stored parts of `t` iff its layout is visible from `module`.
   public mutating func storage(
     of t: AnyTypeIdentity, visibleFrom module: Module.ID
   ) -> [AnyTypeIdentity]? {
     // TODO: Resilience
     withTyper(typing: module, { (typer) in typer.storage(of: t) })
+  }
+
+  /// Returns the types of the fields of `t` iff its layout is visible from `module`.
+  public mutating func fields(
+    of t: AnyTypeIdentity, visibleFrom module: Module.ID
+  ) -> [AnyTypeIdentity]? {
+    // TODO: Resilience
+    withTyper(typing: module, { (typer) in typer.fields(of: t) })
   }
 
   /// Returns the names introduced by `d`.

@@ -106,6 +106,10 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRAssumeState.self), from: &f)
       case IRBranch.self:
         pc = interpret(f.castUnchecked(i, to: IRBranch.self), from: &f)
+      case IRCase.self:
+        pc = interpret(f.castUnchecked(i, to: IRCase.self), from: &f)
+      case IRCase.End.self:
+        pc = interpret(f.castUnchecked(i, to: IRCase.End.self), from: &f)
       case IRConditionalBranch.self:
         pc = interpret(f.castUnchecked(i, to: IRConditionalBranch.self), from: &f)
       case IRGlobalAccess.self:
@@ -326,6 +330,46 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRBranch.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRCase.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+    let a = context.locals[s.source]!.place!
+    let v = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) in
+      if case .uniform(let s) = o.value {
+        return s
+      } else {
+        unreachable("expected uniform state")
+      }
+    }
+
+    context.declare(i, from: f, initially: v)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRCase.End.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let source = f.at(i).start
+    let opener = f.at(f.start(of: i))
+
+    let a = context.locals[source]!.place!
+    let b = context.locals[opener.source]!.place!
+    let v = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o.value })
+    if case .uniform = v {
+      context.updateValue(v, at: b, computingLayoutWith: &typer)
+    } else {
+      assert(initializedParts(v).isEmpty, "expected uniform state")
+      context.updateValue(.uniform(.uninitialized), at: b, computingLayoutWith: &typer)
+    }
+
+    context.memory[source] = nil
+    context.locals[source] = nil
     return f.instruction(after: i.erased)
   }
 

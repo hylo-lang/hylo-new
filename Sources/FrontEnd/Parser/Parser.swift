@@ -337,11 +337,48 @@ public struct Parser {
   private mutating func parseOptionalEnumCasePayload(
     in file: inout Module.SourceContainer
   ) throws -> [ParameterDeclaration.ID] {
+    // Is there an associated value?
     if next(is: .leftParenthesis) {
-      return try parseParenthesizedParameterList(in: &file)
-    } else {
-      return []
+      let (ps, _) = try inParentheses { (m0) in
+        try m0.commaSeparated(until: Token.hasTag(.rightParenthesis)) { (m1) in
+          try m1.parseEnumCaseParameterDeclaration(in: &file)
+        }
+      }
+      return ps
     }
+
+    // No associated value.
+    else { return [] }
+  }
+
+  /// Parses the declaration of an enum case parameter.
+  private mutating func parseEnumCaseParameterDeclaration(
+    in file: inout Module.SourceContainer
+  ) throws -> ParameterDeclaration.ID {
+    let start = nextTokenStart()
+    let (label, identifier) = try parseLabelAndIdentifier()
+
+    // Enum case parameters are implicitly `sink`.
+    _ = try take(.colon) ?? expected("ascription")
+    if let k = parseOptionalAccessEffect() {
+      report(.init("access effect is not allowed here", at: k.site))
+    }
+
+    let a = try parseExpression(in: &file)
+    let s = file[a].site
+    let k = Parsed<AccessEffect>(.sink, at: .empty(at: s.start))
+    let ascription = file.insert(RemoteTypeExpression(access: k, projectee: a, site: s))
+
+    let defaultValue = try parseOptionalInitializerExpression(in: &file)
+
+    return file.insert(
+      ParameterDeclaration(
+        label: label,
+        identifier: identifier,
+        ascription: ascription,
+        defaultValue: defaultValue,
+        lazyModifier: nil,
+        site: span(from: start)))
   }
 
   /// Parses an enum declaration.
@@ -971,23 +1008,7 @@ public struct Parser {
     in file: inout Module.SourceContainer
   ) throws -> ParameterDeclaration.ID {
     let start = nextTokenStart()
-    let label: Parsed<String>?
-    let identifier: Parsed<String>
-
-    switch (take(if: \.isArgumentLabel), take(.name)) {
-    case (let x, .some(let y)):
-      identifier = Parsed(y)
-      label = x.map({ (t) in (t.tag == .underscore) ? identifier : Parsed(t) })
-
-    case (.some(let n), nil):
-      if n.isKeyword { report(.init("'\(n.text)' is not a valid identifier", at: n.site)) }
-      identifier = Parsed(n)
-      label = nil
-
-    case (nil, nil):
-      throw expected("parameter declaration")
-    }
-
+    let (label, identifier) = try parseLabelAndIdentifier()
     let ascription = try parseOptionalParameterAscription(in: &file)
     let defaultValue = try parseOptionalInitializerExpression(in: &file)
 
@@ -999,6 +1020,22 @@ public struct Parser {
         defaultValue: defaultValue,
         lazyModifier: ascription?.lazyModifier,
         site: span(from: start)))
+  }
+
+  /// Parses the label and identifier of a parameter declaration.
+  private mutating func parseLabelAndIdentifier() throws -> (Parsed<String>?, Parsed<String>) {
+    switch (take(if: \.isArgumentLabel), take(.name)) {
+    case (let x, .some(let y)):
+      let identifier = Parsed<String>(y)
+      return (x.map({ (t) in (t.tag == .underscore) ? identifier : Parsed(t) }), identifier)
+
+    case (.some(let n), .none):
+      if n.isKeyword { report(.init("'\(n.text)' is not a valid identifier", at: n.site)) }
+      return (nil, Parsed<String>(n))
+
+    case (nil, nil):
+      throw expected("parameter declaration")
+    }
   }
 
   /// Parses the body of an abstraction introduced by `head` iff the next token is a left brace.
