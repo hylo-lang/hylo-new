@@ -115,7 +115,7 @@ private struct Stack {
     }
   }
 
-  /// Number of frames in call stack.
+  /// Number of frames in the call stack.
   public var count: Int {
     frames.count
   }
