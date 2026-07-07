@@ -115,8 +115,9 @@ final class VisibleDeclarationsTests: XCTestCase {
 
   func testImportedModuleTopLevelIsVisible() async throws {
     // The walk ends with the imports of the file, which include the standard library implicitly.
-    var p = await Program.testProgramWithMinimalStandardLibrary()
-    let m = p.addModule(named: "Main", source: "public fun main() {}")
+    var p = await Program.withMinimalStandardLibrary()
+    let m = p.addUserModule(named: "Main", source: "public fun main() {}")
+
     p = await p.typeChecked()
 
     let f = try XCTUnwrap(p[m].sourceFileIdentities.first)
