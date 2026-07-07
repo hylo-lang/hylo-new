@@ -18,7 +18,7 @@ private struct InstructionPointer {
     instructionInFunction = i
   }
 
-  /// Creates an intance pointing to entry instruction of `f` defined in `p`.
+  /// Creates an instance pointing to entry instruction of `f` defined in `p`.
   public init(toEntryOf f: GlobalFunctionID, definedIn p: Program) {
     precondition(p[f.module].functions[f.function].isDefined)
     let i = f.entry(declaredIn: p)!
@@ -185,16 +185,13 @@ public struct Interpreter {
   public mutating func step() throws {
     let r = try applyCurrentInstruction()
 
-    if case .initializeRegister(let v) = r {
-      topOfStack.registers[programCounter.instructionInFunction] = v
-    }
-
     if case .jump(let pc) = r {
       programCounter = pc
-      return
+    } else if case .initializeRegister(let v) = r {
+      topOfStack.registers[programCounter.instructionInFunction] = v
+      try advanceProgramCounter()
     }
 
-    try advanceProgramCounter()
   }
 
 
