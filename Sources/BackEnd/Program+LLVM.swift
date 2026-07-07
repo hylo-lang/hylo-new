@@ -1115,7 +1115,7 @@ extension Program {
           fields: [], propertyToField: Array(fs.indices), size: .fixed(s), alignment: a)
         return TypeMetadata(llvm: v, layout: l)
       } else {
-        fatalError()
+        fatalError("no LLVM metadata representation of the type '\(program.show(t))'")
       }
     }
   }
