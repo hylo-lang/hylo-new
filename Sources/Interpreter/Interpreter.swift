@@ -3,14 +3,27 @@ import Utilities
 
 /// The position of an instruction in the program.
 private struct InstructionPointer {
-  /// The module containing `self`.
-  var module: Module.ID
 
-  /// The function in `module` indicated by `self`.
-  var functionInModule: IRFunction.ID
+  /// A defined function in program.
+  public let functionInProgram: GlobalFunctionID
 
   /// The position relative to `functionInModule` indicated by `self`.
   var instructionInFunction: AnyInstructionIdentity
+
+  /// Creates an instance pointing to `i` in `f`.
+  ///
+  /// - Precondition: `f` is defined.
+  public init(_ i: AnyInstructionIdentity, in f: GlobalFunctionID) {
+    functionInProgram = f
+    instructionInFunction = i
+  }
+
+  /// Creates an intance pointing to entry instruction of `f` defined in `p`.
+  public init(toEntryOf f: GlobalFunctionID, definedIn p: Program) {
+    precondition(p[f.module].functions[f.function].isDefined)
+    let i = f.entry(declaredIn: p)!
+    self = .init(i, in: f)
+  }
 
 }
 
@@ -22,6 +35,13 @@ private struct GlobalFunctionID {
 
   /// The function in `module` indicated by `self`.
   public let function: IRFunction.ID
+
+  /// Entry instruction of `self` declared in `p`.
+  public func entry(declaredIn p: Program) -> AnyInstructionIdentity? {
+    let f = p[module].functions[function]
+    guard let e = f.entry else { return nil }
+    return f.blocks[e].first!
+  }
 
 }
 
@@ -54,8 +74,8 @@ private struct StackFrame {
   /// The results of instructions.
   public var registers: [AnyInstructionIdentity: Value] = [:]
 
-  /// Next instruction in the function.
-  public var programCounter: InstructionPointer
+  /// The next instruction to execute.
+  public var currentStep: InstructionPointer
 
 }
 
@@ -65,11 +85,11 @@ private struct Stack {
   /// Local variables, parameters, and return addresses.
   private var frames: [StackFrame] = []
 
-  /// Adds a new call frame for a function invocation with `parameters`,
-  /// starting execution at `entry`.
-  public mutating func push(entry: InstructionPointer) {
+  /// Adds a frame for a call to the nullary `f` defined in `p`.
+  public mutating func enter(_ f: GlobalFunctionID, definedIn p: Program) {
     // TODO: support parameters.
-    let f = StackFrame(programCounter: entry)
+    let s = InstructionPointer(toEntryOf: f, definedIn: p)
+    let f = StackFrame(currentStep: s)
     frames.append(f)
   }
 
@@ -112,10 +132,10 @@ public struct Interpreter {
   /// Next instruction to be executed.
   private var programCounter: InstructionPointer {
     _read {
-      yield topOfStack.programCounter
+      yield topOfStack.currentStep
     }
     _modify {
-      yield &topOfStack.programCounter
+      yield &topOfStack.currentStep
     }
   }
 
@@ -140,8 +160,8 @@ public struct Interpreter {
   /// - Precondition: the program is running.
   public var currentInstruction: any Instruction {
     _read {
-      yield program[programCounter.module]
-        .functions[programCounter.functionInModule]
+      yield program[programCounter.functionInProgram.module]
+        .functions[programCounter.functionInProgram.function]
         .at(programCounter.instructionInFunction)
     }
   }
@@ -151,20 +171,14 @@ public struct Interpreter {
   /// - Precondition: `p.entry != nil`
   public init(_ p: Program) {
     program = p
-    let e = program.entry
-    let f = program[e.module].functions[e.function]
-    let i = f.blocks[f.entry!].first!
 
-    let pc = InstructionPointer(
-      module: e.module,
-      functionInModule: e.function,
-      instructionInFunction: i
-    )
-    /// The program counter of bottom-most frame would never be used, so we
-    /// fill it with something arbitrary.
-    callStack.push(entry: pc)
+    let f = p.entry
 
-    callStack.push(entry: pc)
+    // The bottom frame is there to emulate `main` is called from some function.
+    // As this frame would never be used, we fill it with something arbitrary.
+    callStack.enter(f, definedIn: p)
+    // Frame for `main`.
+    callStack.enter(f, definedIn: p)
   }
 
   /// Executes a single instruction.
@@ -252,8 +266,8 @@ public struct Interpreter {
   /// Moves the program counter to the next instruction.
   private mutating func advanceProgramCounter() throws {
     guard
-      let i = program[programCounter.module]
-        .functions[programCounter.functionInModule]
+      let i = program[programCounter.functionInProgram.module]
+        .functions[programCounter.functionInProgram.function]
         .instruction(after: programCounter.instructionInFunction)
     else { throw IRError() }
     programCounter.instructionInFunction = i
