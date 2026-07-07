@@ -1,6 +1,6 @@
 //! exit-status:42
 
-// A type larger than the size of a pointer should be passed correctly as a function parameter.
+// A type larger than a pointer should be passed correctly.
 struct Triple /* todo is Deinitializable */ {
   let (a, b, c): {Int32, Int32, Int32}
   memberwise init
