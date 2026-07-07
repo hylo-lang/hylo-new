@@ -21,7 +21,7 @@ private struct InstructionPointer {
   /// Creates an instance pointing to entry instruction of `f` defined in `p`.
   public init(toEntryOf f: GlobalFunctionID, definedIn p: Program) {
     precondition(p[f.module].functions[f.function].isDefined)
-    let i = f.entry(declaredIn: p)!
+    let i = p.entry(f)!
     self = .init(i, in: f)
   }
 
@@ -36,11 +36,15 @@ private struct GlobalFunctionID {
   /// The function in `module` indicated by `self`.
   public let function: IRFunction.ID
 
-  /// Entry instruction of `self` declared in `p`.
-  public func entry(declaredIn p: Program) -> AnyInstructionIdentity? {
-    let f = p[module].functions[function]
-    guard let e = f.entry else { return nil }
-    return f.blocks[e].first!
+}
+
+extension Program {
+
+  /// Returns first instruction of `f`.
+  fileprivate func entry(_ f: GlobalFunctionID) -> AnyInstructionIdentity? {
+    let fn = self[f.module].functions[f.function]
+    guard let e = fn.entry else { return nil }
+    return fn.blocks[e].first!
   }
 
 }
@@ -193,7 +197,6 @@ public struct Interpreter {
     }
 
   }
-
 
   /// Applies the `Memory` and I/O effects of the current instruction and returns its epilogue.
   private mutating func applyCurrentInstruction() throws -> InstructionEpilogue {
