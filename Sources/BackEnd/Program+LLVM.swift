@@ -654,7 +654,7 @@ extension Program {
       // The result is returned by output parameter.
       else {
         let n = inputs.count
-        let t = ctx.llvm.functionType(from: Array(inputs, terminatedBy: o.llvm), to: o.llvm)
+        let t = ctx.llvm.functionType(from: Array(inputs, terminatedBy: ctx.llvm.ptr.t))
         return .init(
           signature: t,
           mapping: .init(inputs: inputMap, output: .init(type: o, convention: .byReference(n))))
