@@ -186,6 +186,17 @@ public struct Parser {
         }
       }
 
+    case "c_ffi":
+      if let (x, xs) = arguments.headAndTail {
+        if case .number = x.value {
+          report(expected("string argument", at: x.site))
+        } else if let y = xs.first {
+          report(.init("'@c_ffi' accepts exactly 1 argument", at: y.site))
+        }
+      } else {
+        report(.init("'@c_ffi' requires exactly 1 argument", at: identifier.site))
+      }
+
     default:
       break
     }

@@ -624,8 +624,26 @@ public struct Typer {
     check(program[d].parameters)
     check(body: program[d].body, of: .init(d), expectingOutputType: a.output)
     checkCaptures(of: d)
+    checkCFFI(d)
 
     // TODO: Redeclarations
+  }
+
+  /// Reports diagnostics iff `d` is annotated with `@c_ffi` and cannot be implemented by a C
+  /// function using the indirect calling convention.
+  private mutating func checkCFFI(_ d: FunctionDeclaration.ID) {
+    guard program.isCFFI(d) else { return }
+    let s = program.spanForDiagnostic(about: d)
+
+    if program[d].body != nil {
+      report(.init(.error, "'@c_ffi' cannot be applied to a function with a body", at: s))
+    }
+    if program.isExtern(d) {
+      report(.init(.error, "'@c_ffi' cannot be combined with '@extern'", at: s))
+    }
+    if !accumulatedGenericParameters(visibleFrom: .init(node: d)).isEmpty {
+      report(.init(.error, "'@c_ffi' cannot be applied to a generic function", at: s))
+    }
   }
 
   /// Type checks `body` as the definition of `d`, which declares a function or susbscript that

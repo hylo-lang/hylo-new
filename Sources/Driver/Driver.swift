@@ -62,6 +62,14 @@ public struct Driver {
     #endif
   }
 
+  #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
+  /// The root folder of the standard library's sources.
+  let chosenStandardLibraryRoot = bundledStandardLibrarySources
+  #else
+  /// The root folder of the standard library's sources.
+  let chosenStandardLibraryRoot = localStandardLibrarySources
+  #endif
+
   /// Creates an instance with the given properties.
   public init(
     moduleCachePath: URL? = nil, targetSpecification: TargetSpecification,
@@ -234,11 +242,26 @@ public struct Driver {
   public func writeObjectFiles(
     for modules: [Module.ID], into destinationDirectory: URL
   ) throws -> [URL] {
-    try modules.map { (m) in
+    var objectFiles = try modules.map { (m) in
       let o = destinationDirectory.appendingPathComponent(moduleName(m) + ".o", isDirectory: false)
       try llvmModules[m]!.module.write(.objectFile, to: o.path)
       return o
     }
+
+    if !noStandardLibrary {
+      let shimsObject = destinationDirectory.appendingPathComponent(
+        "stdlib_shims.o", isDirectory: false)
+      _ = try Process.executionOutput(
+        try Host.findNativeExecutable(invokedAs: "clang"),
+        arguments: [
+          "-c", "-fPIC",
+          chosenStandardLibraryRoot.appendingPathComponent(cShimSource).path,
+          "-o", shimsObject.path,
+        ])
+      objectFiles.append(shimsObject)
+    }
+
+    return objectFiles
   }
 
   /// Loads `module`, whose sources are in `root`, into `program`.
@@ -306,12 +329,7 @@ public struct Driver {
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
-    let sourceRoot = bundledStandardLibrarySources
-    #else
-    let sourceRoot = localStandardLibrarySources
-    #endif
-    try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
+    try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.

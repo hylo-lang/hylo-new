@@ -468,6 +468,11 @@ public struct Program: Sendable {
     annotation("extern", appliedTo: n) != nil
   }
 
+  /// Returns `true` iff `n` is implemented by a C function using the indirect calling convention.
+  public func isCFFI(_ n: FunctionDeclaration.ID) -> Bool {
+    annotation("c_ffi", appliedTo: n) != nil
+  }
+
   /// Returns `true` if the contents of `d` is visible in all modules.
   ///
   /// The result is `true` if `d` is annotated with `@exposed` and/or `d` and all the scopes
@@ -1274,6 +1279,21 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns the name of the C function implementing `d` iff `d` is annotated with `@c_ffi`.
+  ///
+  /// The returned function follows the indirect calling convention: it accepts one pointer for
+  /// each non-erased parameter of `d`, in order, followed by a pointer to the storage receiving
+  /// the result, and returns `void`.
+  public func cFFIName(of d: DeclarationIdentity) -> String? {
+    annotation("c_ffi", appliedTo: d).flatMap { (a) in
+      if case .some(.string(let n)) = a.arguments.first?.value {
+        return n
+      } else {
+        return nil
+      }
+    }
+  }
+
   /// Returns the symbol associated with `n`, if any.
   ///
   /// A syntax tree has an associated symbol if it is annotated with `@_symbol(s)` in sources,
@@ -1497,7 +1517,8 @@ public struct Program: Sendable {
     switch tag(of: d) {
     case FunctionDeclaration.self:
       let f = castUnchecked(d, to: FunctionDeclaration.self)
-      return !isRequirement(f) && !isForeign(f) && !isExtern(f) && !self[f].isMemberwiseInitializer
+      return !isRequirement(f) && !isForeign(f) && !isExtern(f) && !isCFFI(f)
+        && !self[f].isMemberwiseInitializer
     default:
       return !isRequirement(d)
     }

@@ -1,0 +1,31 @@
+@c_ffi("c_print_int_indirect")
+fun print(n: Int) -> Void
+
+struct Point is Deinitializable {
+  var x: Int
+  var y: Int
+
+  memberwise init
+
+  @c_ffi("c_point_add_indirect")
+  fun infix+(other: Point) -> Point
+
+  fun deinit() sink {
+    _ = &self.x
+    _ = &self.y
+  }
+
+}
+
+public fun main() -> Int32 {
+  print(42)
+
+  sink let p = Point(x: 1, y: 2)
+  sink let q = Point(x: 3, y: 4)
+  sink let r = p + q
+
+  print(r.x)
+  print(r.y)
+
+  return 2
+}

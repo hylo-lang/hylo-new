@@ -15,3 +15,6 @@ public let localStandardLibrarySources = URL(fileURLWithPath: #filePath)
 /// its sources are compiled with the flag `USE_BUNDLED_STANDARD_LIBRARY` set.
 public let bundledStandardLibrarySources = Bundle.module.url(
   forResource: "Sources", withExtension: nil)!
+
+/// The file name of the standard library's C shim source file within the standard library root.
+package let cShimSource = "shims.c"
