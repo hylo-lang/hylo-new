@@ -1,0 +1,39 @@
+// The parts of the receiver of a custom deinitializer are deinitialized individually; a part
+// with a trivial conformance to `Deinitializable` is simply marked uninitialized.
+struct HasTrivialPart is Deinitializable {
+  var x: Int
+
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+// A part with a custom deinitializer is destroyed through its own witness of `Deinitializable`.
+struct HasPartWithCustomDeinit is Deinitializable {
+  var y: HasTrivialPart
+
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+// A receiver without stored parts is simply marked uninitialized.
+struct HasNoParts is Deinitializable {
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+// The stored parts of an enum cannot be enumerated; deinitialization of the receiver falls back
+// to the witness of `Deinitializable`. Note that this lowering applies the deinitializer to
+// itself recursively; hence no instance is created at run-time.
+enum EnumFallsBackToWitness is Deinitializable {
+  case a
+
+  fun deinit() sink {}
+}
+
+public fun main() -> Int32 {
+  let b = HasPartWithCustomDeinit(y: HasTrivialPart(x: 2))
+  return 0
+}

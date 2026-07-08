@@ -216,7 +216,7 @@ public struct Typer {
 
   /// Returns the types of fields of `t` iff it is a struct or a tuple.
   ///
-  /// The result is `nil` unless instances of `t` are structs a tuples. In this case, the result
+  /// The result is `nil` unless instances of `t` are structs or tuples. In this case, the result
   /// lists the types of the stored properties of those instances.
   public mutating func fields(of t: AnyTypeIdentity) -> [AnyTypeIdentity]? {
     switch program.types.tag(of: t) {

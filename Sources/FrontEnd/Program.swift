@@ -411,6 +411,18 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `true` iff `n` declares a custom deinitializer, i.e., a member function implementing
+  /// `Deinitializable.deinit` for the type declaring it.
+  public func isDeinitializer<T: SyntaxIdentity>(_ n: T) -> Bool {
+    if let d = cast(n, to: FunctionDeclaration.self) {
+      return isMemberFunction(d)
+        && (self[d].identifier.value == .simple("deinit"))
+        && (self[d].effect.value == .sink)
+    } else {
+      return false
+    }
+  }
+
   /// Returns `true` iff `n` declares a static member entity.
   public func isStatic<T: SyntaxIdentity>(_ n: T) -> Bool {
     // Note: the following relies on the fact that non-member declarations can't be `static`, which

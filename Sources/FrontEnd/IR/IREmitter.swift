@@ -2515,13 +2515,18 @@ internal struct IREmitter {
   /// Generates the IR for deinitializing `source` and returns `true` iff `source` or its parts can
   /// be deinitialized. Otherwise, inserts a trap and returns `false`.
   ///
-  /// If `s` is instance of a structural type (e.g., a tuple), the method attempts to deinitialize
-  /// each part inidividually rather than the whole. Otherwise, deinitialization is done using a
-  /// witness of `Deinitializable`.
+  /// If `source` is instance of a structural type (e.g., a tuple) or the receiver of the custom
+  /// deinitializer being lowered, the method attempts to deinitialize each part individually
+  /// rather than the whole. Otherwise, deinitialization is done using a witness of
+  /// `Deinitializable`.
   @discardableResult
   internal mutating func _emitDeinitialize(_ source: IRValue) -> Bool {
     let (t, _) = currentFunction.result(of: source) ?? badOperand()
-    return _emitDeinitialize(source, instanceOf: t)
+    if currentFunction.isReceiverOfDeinitializer(source, using: program) {
+      return _emitDeinitialize(storageOf: source, instanceOf: t)
+    } else {
+      return _emitDeinitialize(source, instanceOf: t)
+    }
   }
 
   /// Implements `_emitDeinitialize(_:)` for arbitrary types.
@@ -2570,6 +2575,35 @@ internal struct IREmitter {
 
       return true
     }
+  }
+
+  /// Implements `_emitDeinitialize(_:)` for values whose stored parts are deinitialized
+  /// individually rather than with a witness of `Deinitializable`.
+  ///
+  /// This method is used to deinitialize the receiver of a custom deinitializer. It falls back to
+  /// `_emitDeinitialize(_:instanceOf:)` if the stored parts of `s` cannot be enumerated (e.g., 
+  /// `t` is an enum).
+  private mutating func _emitDeinitialize(
+    storageOf s: IRValue, instanceOf t: AnyTypeIdentity
+  ) -> Bool {
+    let fields = program.withTyper(typing: module) { (tp) in tp.fields(of: t) }
+
+    guard let fs = fields else {
+      return _emitDeinitialize(s, instanceOf: t)
+    }
+
+    // Is the storage empty?
+    if fs.isEmpty {
+      _assume_state(s, initialized: false)
+      return true
+    }
+
+    // Otherwise, deinitialize each stored part individually.
+    for i in fs.indices {
+      let x = _subfield(s, at: [i])
+      if !_emitDeinitialize(x) { return false }
+    }
+    return true
   }
 
   /// Implements `_emitDeinitialize(_:)` for tuples..
@@ -2818,6 +2852,23 @@ internal struct IREmitter {
     program.withTyper(typing: s.module) { (tp) in
       tp.accumulatedGenericParameters(visibleFrom: s)
     }
+  }
+
+}
+
+extension IRFunction {
+
+  /// Returns `true` iff `self` lowers a custom deinitializer and `v` is its receiver, using
+  /// `program` to examine declarations.
+  fileprivate func isReceiverOfDeinitializer(_ v: IRValue, using program: Program) -> Bool {
+    guard
+      case .parameter(let i) = v,
+      case .lowered(let d) = name,
+      let f = program.cast(d, to: FunctionDeclaration.self),
+      program.isDeinitializer(f),
+      let s = program[f].parameters.first
+    else { return false }
+    return termParameters[i].declaration == DeclarationIdentity(s)
   }
 
 }
