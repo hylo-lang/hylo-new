@@ -1,0 +1,39 @@
+// A receiver without stored parts is simply marked uninitialized.
+struct HasNoParts is Deinitializable {
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+// The parts of the receiver of a custom deinitializer are deinitialized individually; a part
+// with a trivial conformance to `Deinitializable` is simply marked uninitialized.
+struct HasTrivialPart is Deinitializable {
+  var x: Int
+
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+// A part with a custom deinitializer is destroyed through its own witness of `Deinitializable`.
+struct HasPartWithCustomDeinit is Deinitializable {
+  var y: HasTrivialPart
+
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+// TODO: This doesn't work yet.
+enum EnumWithTrivialPayloads is Deinitializable {
+  case a
+  case b(_ x: Int)
+
+  fun deinit() sink {}
+}
+
+public fun main() -> Int32 {
+  let b = HasPartWithCustomDeinit(y: HasTrivialPart(x: 2))
+
+  return 0
+}
