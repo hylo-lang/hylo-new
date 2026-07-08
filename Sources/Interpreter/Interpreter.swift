@@ -4,22 +4,22 @@ import Utilities
 /// The position of an instruction in the program.
 private struct InstructionPointer {
 
-  /// A defined function in program.
-  public let functionInProgram: GlobalFunctionID
+  /// The function containing the instruction.
+  public let container: GlobalFunctionIdentity
 
-  /// The position relative to `functionInModule` indicated by `self`.
-  var instructionInFunction: AnyInstructionIdentity
+  /// The instruction designated by `self`, relative to `container`.
+  var step: AnyInstructionIdentity
 
   /// Creates an instance pointing to `i` in `f`.
   ///
   /// - Precondition: `f` is defined.
-  public init(_ i: AnyInstructionIdentity, in f: GlobalFunctionID) {
-    functionInProgram = f
-    instructionInFunction = i
+  public init(_ i: AnyInstructionIdentity, in f: GlobalFunctionIdentity) {
+    container = f
+    step = i
   }
 
-  /// Creates an instance pointing to entry instruction of `f` defined in `p`.
-  public init(toEntryOf f: GlobalFunctionID, definedIn p: Program) {
+  /// Creates an instance pointing to the first instruction of `f` defined in `p`.
+  public init(interpreting f: GlobalFunctionIdentity, definedIn p: Program) {
     precondition(p[f.module].functions[f.function].isDefined)
     let i = p.entry(f)!
     self = .init(i, in: f)
@@ -28,7 +28,7 @@ private struct InstructionPointer {
 }
 
 /// A unique function in a `Program`.
-private struct GlobalFunctionID {
+private struct GlobalFunctionIdentity {
 
   /// The module containing `self`.
   public let module: Module.ID
@@ -41,7 +41,7 @@ private struct GlobalFunctionID {
 extension Program {
 
   /// Returns first instruction of `f`.
-  fileprivate func entry(_ f: GlobalFunctionID) -> AnyInstructionIdentity? {
+  fileprivate func entry(_ f: GlobalFunctionIdentity) -> AnyInstructionIdentity? {
     let fn = self[f.module].functions[f.function]
     guard let e = fn.entry else { return nil }
     return fn.blocks[e].first!
@@ -89,10 +89,10 @@ private struct Stack {
   /// Local variables, parameters, and return addresses.
   private var frames: [StackFrame] = []
 
-  /// Adds a frame for a call to the nullary `f` defined in `p`.
-  public mutating func enter(_ f: GlobalFunctionID, definedIn p: Program) {
+  /// Adds a frame for a call to the nullary `f`, a nullary function defined in `p`.
+  public mutating func enter(_ f: GlobalFunctionIdentity, definedIn p: Program) {
     // TODO: support parameters.
-    let s = InstructionPointer(toEntryOf: f, definedIn: p)
+    let s = InstructionPointer(interpreting: f, definedIn: p)
     let f = StackFrame(currentStep: s)
     frames.append(f)
   }
@@ -115,7 +115,7 @@ private struct Stack {
     }
   }
 
-  /// Number of frames in the call stack.
+  /// The depth of call stack.
   public var count: Int {
     frames.count
   }
@@ -130,10 +130,10 @@ private struct Stack {
 /// A virtual machine that executes Hylo's in-memory IR representation.
 public struct Interpreter {
 
-  /// The program to be executed.
+  /// The program being executed.
   private let program: Program
 
-  /// Next instruction to be executed.
+  /// The next instruction to execute.
   private var programCounter: InstructionPointer {
     _read {
       yield topOfStack.currentStep
@@ -164,9 +164,9 @@ public struct Interpreter {
   /// - Precondition: the program is running.
   public var currentInstruction: any Instruction {
     _read {
-      yield program[programCounter.functionInProgram.module]
-        .functions[programCounter.functionInProgram.function]
-        .at(programCounter.instructionInFunction)
+      yield program[programCounter.container.module]
+        .functions[programCounter.container.function]
+        .at(programCounter.step)
     }
   }
 
@@ -192,7 +192,7 @@ public struct Interpreter {
     if case .jump(let pc) = r {
       programCounter = pc
     } else if case .initializeRegister(let v) = r {
-      topOfStack.registers[programCounter.instructionInFunction] = v
+      topOfStack.registers[programCounter.step] = v
       try advanceProgramCounter()
     }
 
@@ -266,17 +266,17 @@ public struct Interpreter {
   /// Moves the program counter to the next instruction.
   private mutating func advanceProgramCounter() throws {
     guard
-      let i = program[programCounter.functionInProgram.module]
-        .functions[programCounter.functionInProgram.function]
-        .instruction(after: programCounter.instructionInFunction)
+      let i = program[programCounter.container.module]
+        .functions[programCounter.container.function]
+        .instruction(after: programCounter.step)
     else { throw IRError() }
-    programCounter.instructionInFunction = i
+    programCounter.step = i
   }
 }
 
 extension Program {
   /// The function whose invocation executes the whole program.
-  fileprivate var entry: GlobalFunctionID {
+  fileprivate var entry: GlobalFunctionIdentity {
     let entryModule = identity(module: "Main")!
     let entryFunctionDeclaration = cast(
       select(
