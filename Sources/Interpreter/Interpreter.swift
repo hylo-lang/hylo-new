@@ -18,7 +18,7 @@ private struct InstructionPointer {
     step = i
   }
 
-  /// Creates an instance pointing to the first instruction of `f` defined in `p`.
+  /// Creates an instance pointing to the first instruction of `f`, which is defined in `p`.
   public init(interpreting f: GlobalFunctionIdentity, definedIn p: Program) {
     precondition(p[f.module].functions[f.function].isDefined)
     let i = p.entry(f)!
