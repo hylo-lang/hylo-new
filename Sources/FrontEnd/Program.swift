@@ -107,6 +107,7 @@ public struct Program: Sendable {
     // Generate raw IR from the syntax tree.
     var emitter = IREmitter(insertingIn: m, of: consume self)
     emitter.incorporateTopLevelDeclarations()
+    emitter.implementSynthesizedFunctions()
     self = emitter.release()
   }
 

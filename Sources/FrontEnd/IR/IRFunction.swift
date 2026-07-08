@@ -33,6 +33,26 @@ public struct IRFunction: Sendable {
     /// The identity of a plateau resulting from subscript decomposition.
     indirect case plateau(IRFunction.Name, Int)
 
+    /// Returns `true` iff `self` is the name of a function that implements `d` in Hylo IR.
+    public func isLoweredForm(of d: DeclarationIdentity) -> Bool {
+      switch self {
+      case .lowered(let x):
+        return d == x
+      case .initializer(let x):
+        return d == x
+      case .synthesized(let x, _):
+        return d == x
+      case .implementation(let x, _, _):
+        return d == x
+      case .existentialized(let n):
+        return n.isLoweredForm(of: d)
+      case .slide(let n, _):
+        return n.isLoweredForm(of: d)
+      case .plateau(let n, _):
+        return n.isLoweredForm(of: d)
+      }
+    }
+
   }
 
   /// The way in which an IR function returns its result.

@@ -34,6 +34,81 @@ internal struct IREmitter {
     }
   }
 
+  /// Generates the definitions of synthesized functions.
+  internal mutating func implementSynthesizedFunctions() {
+    // TODO: Remove once the standard library compiles.
+    if program[module].isStandardLibrary { return }
+
+    for f in program[module].ir.functions.values.indices {
+      guard case .synthesized(let d, let a) =  program[module].ir[f].name else { continue }
+
+      switch d {
+      case program.standardLibraryDeclaration(.deinitializableDeinit):
+        implementSynthesizedDeinitializer(f, for: a)
+      default:
+        continue // TODO
+      }
+    }
+  }
+
+  /// Generates the body of `f`, which is a synthetic implementation of `Deinitializable.deinit` in
+  /// some conformance declaration.
+  private mutating func implementSynthesizedDeinitializer(
+    _ f: IRFunction.ID, for a: TypeArguments
+  ) {
+    // Nothing to do if the function has already been defined.
+    if program[module].ir[f].isDefined { return }
+
+    // Otherwise, generate an implementation.
+    defining(f, at: program[module].ir[f].anchor) { (me) in
+      // The first parameter of `f` is a witness of `Deinitializable` and the second parameter is
+      // the instance to deinitialize.
+      let receiver = me.currentFunction.termParameters[1].type
+
+      // Is the receiver trivial to deinitialize?
+      if case .trivial = me.witnessOfDeinitializable(for: receiver) {
+        me._assume_state(.parameter(1), initialized: false)
+      }
+
+      // Is the receiver an instance of a struct or enum?
+      else if let d = me.program.declaration(of: receiver) {
+        switch me.program.tag(of: d) {
+        case StructDeclaration.self:
+          let s = me.program.castUnchecked(d, to: StructDeclaration.self)
+          if me.program.storedProperties(of: s).isEmpty {
+            me._assume_state(.parameter(1), initialized: false)
+          } else {
+            me.program.forEachStoredProperty(of: s) { (m, p) in
+              let x = me._subfield(.parameter(1), at: p)
+              let t = me.program.type(assignedTo: m, assuming: RemoteType.self)
+              let u = me.program.types.substitute(a, in: me.program.types[t].projectee)
+              let v = me.program.types.dealiased(u)
+              _ = me._emitDeinitialize(x, instanceOf: v)
+            }
+          }
+
+        case EnumDeclaration.self:
+          break // TODO
+
+        default:
+          break // TODO
+        }
+      }
+
+      // Give up if it's none of the above.
+      else {
+        unimplemented(
+          """
+          synthetic implementation of 'Deinitializable.deinit(:)' for \
+          '\(me.program.show(receiver))'
+          """)
+      }
+
+      me._assume_state(me.currentFunction.returnRegister!, initialized: true)
+      me._return()
+    }
+  }
+
   // MARK: Lowering
 
   /// Generates the IR of `d`.
@@ -990,8 +1065,8 @@ internal struct IREmitter {
         }
       }
 
-    default:
-      unreachable()
+    case .synthetic:
+      unreachable("cannot generate callee from a reference to a synthetic definition")
     }
   }
 
@@ -2546,7 +2621,7 @@ internal struct IREmitter {
 
   /// Implements `_emitDeinitialize(_:)` for types that cannot be decomposed structurally.
   private mutating func _emitDeinitialize(
-    whole s: IRValue, instanceOf t: AnyTypeIdentity
+    whole: IRValue, instanceOf t: AnyTypeIdentity
   ) -> Bool {
     switch witnessOfDeinitializable(for: t) {
     case .none:
@@ -2554,19 +2629,48 @@ internal struct IREmitter {
       return false
 
     case .trivial:
-      _assume_state(s, initialized: false)
+      _assume_state(whole, initialized: false)
       return true
 
     case .nontrivial(let w):
+      let r = program.standardLibraryDeclaration(.deinitializableDeinit)
+
+      // Can we dispatch statically?
+      if let d = w.declaration, let c = program.cast(d, to: ConformanceDeclaration.self) {
+        let table = program.implementations(definedBy: c)
+        if let implementation = table.member(implementing: r) {
+          // Make sure we're not applying the function being lowered recursively, which may happen
+          // if `s` is the receiver of a function implementing `Deinitializable.deinit` for the
+          // witness that's been resolved.
+          if let j = implementation.target, currentFunction.name.isLoweredForm(of: j) {
+            let m = """
+              implicit deinitialization of instances of '\(program.show(t))' causes infinite \
+              recursion in this context
+              """
+            report(.init(.error, m, at: currentAnchor.site))
+            _ = _apply_builtin(.trap, to: [])
+            return false
+          } else if !implementation.isSynthetic {
+            let o = _alloca(.void)
+            let f = loweredCallee(
+              implementation, qualifiedBy: nil, markedForMutationBy: nil,
+              output: o, at: currentAnchor)
+            let xs = Array(whole, prependedTo: f.arguments)
+            _ = _apply(f.value, xs, into: f.result, afterFormingAccesses: true)
+            return true
+          }
+        }
+      }
+
+      // Emit a call to the witness.
       let deinitializable = _emit(witness: w)
-      let member = program.standardLibraryDeclaration(.deinitializableDeinit)
       let t0 = program.types.demand(
         Arrow(inputs: [.init(access: .sink, type: t)], output: .void))
 
       let x0 = _alloca(.void)
-      let x1 = _access([.sink], from: s)
+      let x1 = _access([.sink], from: whole)
       let x2 = _access([.set], from: x0)
-      let x3 = _property(member, of: deinitializable, withType: t0.erased)
+      let x3 = _property(r, of: deinitializable, withType: t0.erased)
       let x4 = _access([.let], from: x3)
 
       _ = _apply(x4, [x1], into: x2, afterFormingAccesses: false)
@@ -2579,7 +2683,7 @@ internal struct IREmitter {
     }
   }
 
-  /// Implements `_emitDeinitialize(_:)` for tuples..
+  /// Implements `_emitDeinitialize(_:)` for tuples.
   private mutating func _emitDeinitialize(tuple s: IRValue, instanceOf t: Tuple.ID) -> Bool {
     // Is the tuple empty?
     let (ms, _) = program.types.members(of: t)

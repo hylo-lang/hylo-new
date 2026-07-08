@@ -1,0 +1,9 @@
+struct S is Deinitializable {
+  let x: Int
+  memberwise init
+  fun deinit() sink {}
+}
+
+public fun main() {
+  _ = S(x: 1)
+}
