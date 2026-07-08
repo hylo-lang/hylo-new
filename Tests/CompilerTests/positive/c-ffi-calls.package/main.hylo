@@ -2,6 +2,7 @@
 fun print(n: Int) -> Void
 
 struct Point is Deinitializable {
+
   var x: Int
   var y: Int
 
@@ -17,15 +18,20 @@ struct Point is Deinitializable {
 
 }
 
-public fun main() -> Int32 {
-  print(42)
+extension Int {
 
+  @c_ffi("c_add_int_indirect")
+  fun infix+(other: Int) -> Int
+
+  @c_ffi("c_int_to_i32_indirect")
+  fun toi32() -> Int32
+
+}
+
+public fun main() -> Int32 {
   sink let p = Point(x: 1, y: 2)
   sink let q = Point(x: 3, y: 4)
   sink let r = p + q
 
-  print(r.x)
-  print(r.y)
-
-  return 2
+  return (r.x + r.y).toi32()
 }
