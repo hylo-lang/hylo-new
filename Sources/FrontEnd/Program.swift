@@ -1375,9 +1375,7 @@ public struct Program: Sendable {
   /// Calls `action` for each stored property declaration in `d`.
   ///
   /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in a record value having the type declared by `d`. That position is the offset of the
-  /// property in the flattened list of all the stored properties of `d`, consistent with the
-  /// fields of the record type of instances of `d`.
+  /// in a record value having the type declared by `d`.
   public func forEachStoredProperty(
     of d: StructDeclaration.ID,
     do action: (VariableDeclaration.ID, IndexPath) -> Void
