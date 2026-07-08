@@ -2551,6 +2551,13 @@ internal struct IREmitter {
       return true
 
     case .nontrivial(let w):
+      // If `s` is the receiver of the very deinit implementing `t`'s conformance, applying the
+      // witness would call the current function recursively; the receiver's parts are destroyed
+      // individually instead.
+      if case .parameter = s, currentFunctionIsDeinit(referredToBy: w) {
+        return _emitDeinitialize(members: s, instanceOf: t)
+      }
+
       let deinitializable = _emit(witness: w)
       let member = program.standardLibraryDeclaration(.deinitializableDeinit)
       let t0 = program.types.demand(
@@ -2570,6 +2577,40 @@ internal struct IREmitter {
 
       return true
     }
+  }
+
+  /// Returns `true` iff the function being lowered is the implementation of the `deinit`
+  /// requirement in the conformance referred to by `w`.
+  private mutating func currentFunctionIsDeinit(referredToBy w: WitnessExpression) -> Bool {
+    guard
+      case .lowered(let d) = currentFunction.name,
+      let c = w.declaration.flatMap({ (x) in program.cast(x, to: ConformanceDeclaration.self) })
+    else { return false }
+    let r = program.standardLibraryDeclaration(.deinitializableDeinit)
+    return program.implementations(definedBy: c).member(implementing: r)?.target == d
+  }
+
+  /// Implements `_emitDeinitialize(_:)` by deinitializing each stored part of `s` individually.
+  private mutating func _emitDeinitialize(
+    members s: IRValue, instanceOf t: AnyTypeIdentity
+  ) -> Bool {
+    guard let ms = program.withTyper(typing: module, { (tp) in tp.fields(of: t) }) else {
+      _ = _apply_builtin(.trap, to: [])
+      return false
+    }
+
+    // Is the record empty?
+    if ms.isEmpty {
+      _assume_state(s, initialized: false)
+      return true
+    }
+
+    // Otherwise, deinitialize each stored part individually.
+    for (i, m) in ms.enumerated() {
+      let s = _subfield(s, at: [i])
+      if !_emitDeinitialize(s, instanceOf: m) { return false }
+    }
+    return true
   }
 
   /// Implements `_emitDeinitialize(_:)` for tuples..

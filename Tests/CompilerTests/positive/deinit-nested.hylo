@@ -1,0 +1,23 @@
+// Deinitializing the receiver of `Outer.deinit` member-wise must still deinitialize `i` through
+// `Inner`'s witness, running `Inner.deinit`.
+
+struct Inner is Deinitializable {
+  var n: Int
+
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+struct Outer is Deinitializable {
+  var i: Inner
+
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+public fun main() -> Int32 {
+  let o = Outer(i: Inner(n: 1))
+  return 0
+}

@@ -1,0 +1,16 @@
+// The receiver is still fully initialized when this deinit returns, so deinitialization is
+// inserted at its exit. That deinitialization must not go through the Deinitializable witness,
+// which would call the deinit recursively.
+
+struct Wrapper is Deinitializable {
+  var value: Int
+
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+public fun main() -> Int32 {
+  let w = Wrapper(value: 1)
+  return 0
+}

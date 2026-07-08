@@ -1,0 +1,17 @@
+// The value dies as an unused sink parameter, so its deinitialization is inserted at the return
+// of an ordinary function rather than at the end of `main`.
+
+struct Wrapper is Deinitializable {
+  var value: Int
+
+  memberwise init
+
+  fun deinit() sink {}
+}
+
+fun take(_ w: sink Wrapper) {}
+
+public fun main() -> Int32 {
+  take(w: Wrapper(value: 1))
+  return 0
+}
