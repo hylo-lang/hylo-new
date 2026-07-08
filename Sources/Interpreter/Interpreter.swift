@@ -68,6 +68,9 @@ private enum InstructionEpilogue {
   /// Control is transferred to the given instruction.
   case jump(to: InstructionPointer)
 
+  /// Control is transferred back to the caller.
+  case `return`
+
 }
 
 /// The ephemeral (or non-`Memory`) execution state of a function call.
@@ -144,7 +147,7 @@ public struct Interpreter {
   }
 
   /// `true` iff the program is still running.
-  public var isRunning: Bool { callStack.count > 1 }
+  public var isRunning: Bool { !callStack.isEmpty }
 
   /// Local variables, parameters and return address.
   private var callStack = Stack()
@@ -175,27 +178,18 @@ public struct Interpreter {
   /// - Precondition: `p.entry != nil`
   public init(_ p: Program) {
     program = p
-
-    let f = p.entry
-
-    // The bottom frame is there to emulate `main` is called from some function.
-    // As this frame would never be used, we fill it with something arbitrary.
-    callStack.enter(f, definedIn: p)
-    // Frame for `main`.
-    callStack.enter(f, definedIn: p)
+    callStack.enter(p.entry, definedIn: p)
   }
 
   /// Executes a single instruction.
   public mutating func step() throws {
-    let r = try applyCurrentInstruction()
-
-    if case .jump(let pc) = r {
-      programCounter = pc
-    } else if case .initializeRegister(let v) = r {
+    switch try applyCurrentInstruction() {
+    case .jump(let pc): programCounter = pc
+    case .return: callStack.pop()
+    case .initializeRegister(let v):
       topOfStack.registers[programCounter.step] = v
       try advanceProgramCounter()
     }
-
   }
 
   /// Applies the `Memory` and I/O effects of the current instruction and returns its epilogue.
@@ -240,8 +234,7 @@ public struct Interpreter {
     case let x as IRProperty:
       _ = x
     case is IRReturn:
-      callStack.pop()
-      return .jump(to: programCounter)
+      return .return
     case let x as IRStore:
       _ = x
     case let x as IRSubfield:
