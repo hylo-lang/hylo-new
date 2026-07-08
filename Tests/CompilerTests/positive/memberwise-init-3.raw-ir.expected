@@ -1,0 +1,21 @@
+fun main(set %p0: Void) {
+%b0:
+  %r0 = alloca Pair, #preferred
+  %r1 = subfield %r0 at 0 as Int
+  %r2 = subfield %r1 at 0 as word
+  %r3 = access [set] %r2
+  %r4 = store word 1 to %r3
+  %r5 = end %r3
+  %r6 = subfield %r0 at 1 as Int
+  %r7 = subfield %r6 at 0 as word
+  %r8 = access [set] %r7
+  %r9 = store word 2 to %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r0
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = access [set] %p0
+  %r15 = assume_state %r14 initialized
+  %r16 = end %r14
+  %r17 = return
+}

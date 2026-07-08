@@ -1380,9 +1380,13 @@ public struct Program: Sendable {
     of d: StructDeclaration.ID,
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
+    var i = 0
     for m in self[d].members {
       if let b = cast(m, to: BindingDeclaration.self) {
-        forEachVariable(introducedBy: self[self[b].pattern].pattern, do: action)
+        forEachVariable(introducedBy: self[self[b].pattern].pattern) { (v, _) in
+          action(v, [i])
+          i += 1
+        }
       }
     }
   }
