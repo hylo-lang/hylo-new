@@ -1063,7 +1063,10 @@ public struct Parser {
     // If we parsed an empty body and we're in the body of a function or initializer, then insert
     // a return statement.
     if ss.isEmpty && (head != .subscript) {
-      let r = file.insert(Return(introducer: nil, value: nil, site: .empty(at: position)))
+      // `position` is immediately after the last consumed token, which was a right brace.
+      let e = tokens.source.index(before: position.index)
+      let p = SourcePosition(e, in: tokens.source)
+      let r = file.insert(Return(introducer: nil, value: nil, site: .empty(at: p)))
       ss.append(.init(r))
     }
 
@@ -2644,7 +2647,12 @@ public struct Parser {
     }
   }
 
-  /// Parses an instance of `T` enclosed in `delimiters`.
+  /// Parses an instance of `T` enclosed in `delimiters`, returning the parsed instance along with
+  /// the right delimiter.
+  ///
+  /// The result is an instance of `T` parsed immediately after the left delimiter and immediately
+  /// before the right delimiter. The method throws if it cannot consume the left delimiter but
+  /// only reports an error if it cannot consume the right one.
   private mutating func between<T>(
     _ delimiters: (left: Token.Tag, right: Token.Tag),
     _ parse: (inout Self) throws -> T
