@@ -41,6 +41,8 @@ private struct GlobalFunctionIdentity {
 extension Program {
 
   /// Returns first instruction of `f`.
+  ///
+  /// - Precondition: `self` is sufficiently lowered for interpretation.
   fileprivate func firstInstruction(_ f: GlobalFunctionIdentity) -> AnyInstructionIdentity {
     let fn = self[f.module].functions[f.function]
     return fn.blocks[fn.entry!].first!
