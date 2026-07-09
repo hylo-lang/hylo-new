@@ -4243,15 +4243,15 @@ public struct Typer {
   ) -> [NameResolutionCandidate] {
     if q.isVariable { return [] }
 
-    // `qualificationForSelection` normalizes the receiver type (a `let`/`inout` projection unwraps
-    // to its projectee, a metatype to its inhabitant). The static/instance choice is the caller's,
-    // not derived from `q`, so the two cannot silently disagree.
     let r = qualificationForSelection(on: q).type
 
     var candidates: [NameResolutionCandidate] = []
-    candidates.append(contentsOf: nativeMembers(of: r, resolvedStatically: s))
-    candidates.append(contentsOf: extensionMembers(of: r, visibleFrom: scopeOfUse, resolvedStatically: s))
-    candidates.append(contentsOf: inheritedMembers(of: r, visibleFrom: scopeOfUse, resolvedStatically: s))
+    candidates.append(contentsOf:
+      nativeMembers(of: r, resolvedStatically: s))
+    candidates.append(contentsOf:
+      extensionMembers(of: r, visibleFrom: scopeOfUse, resolvedStatically: s))
+    candidates.append(contentsOf:
+      inheritedMembers(of: r, visibleFrom: scopeOfUse, resolvedStatically: s))
 
     return Self.uniqueCandidates(candidates)
   }
@@ -4271,7 +4271,7 @@ public struct Typer {
 
   /// Returns the natives members of `q`.
   /// 
-  /// Static members are returned iff `selectionIsStatic` is true.
+  /// Static members are included iff `selectionIsStatic` is true.
   private mutating func nativeMembers(
     of q: AnyTypeIdentity, resolvedStatically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
@@ -4294,7 +4294,7 @@ public struct Typer {
 
   /// Returns the members of `q` that are inherited by extension and visible from `scopeOfUse`.
   /// 
-  /// Static members are returned iff `selectionIsStatic` is true.
+  /// Static members are included iff `selectionIsStatic` is true.
   private mutating func extensionMembers(
     of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, 
     resolvedStatically selectionIsStatic: Bool
@@ -4322,8 +4322,8 @@ public struct Typer {
 
   /// Returns a candidate for every trait requirement reachable on `q` through conformances visible
   /// from `scopeOfUse`.
-  /// 
-  /// Static members are returned iff `selectionIsStatic` is true.
+  ///
+  /// Static members are included iff `selectionIsStatic` is true.
   private mutating func inheritedMembers(
     of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, resolvedStatically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
