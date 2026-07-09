@@ -8,14 +8,14 @@ private struct InstructionPointer {
   public let container: GlobalFunctionIdentity
 
   /// The instruction designated by `self`, relative to `container`.
-  var step: AnyInstructionIdentity
+  var position: AnyInstructionIdentity
 
   /// Creates an instance pointing to `i` in `f`.
   ///
   /// - Precondition: `f` is defined.
   public init(_ i: AnyInstructionIdentity, in f: GlobalFunctionIdentity) {
     container = f
-    step = i
+    position = i
   }
 
   /// Creates an instance pointing to the first instruction of `f`, which is defined in `p`.
@@ -168,7 +168,7 @@ public struct Interpreter {
     _read {
       yield program[programCounter.container.module]
         .functions[programCounter.container.function]
-        .at(programCounter.step)
+        .at(programCounter.position)
     }
   }
 
@@ -186,7 +186,7 @@ public struct Interpreter {
     case .jump(let pc): programCounter = pc
     case .return: callStack.pop()
     case .initializeRegister(let v):
-      topOfStack.registers[programCounter.step] = v
+      topOfStack.registers[programCounter.position] = v
       try advanceProgramCounter()
     }
   }
@@ -260,9 +260,9 @@ public struct Interpreter {
     guard
       let i = program[programCounter.container.module]
         .functions[programCounter.container.function]
-        .instruction(after: programCounter.step)
+        .instruction(after: programCounter.position)
     else { throw IRError() }
-    programCounter.step = i
+    programCounter.position = i
   }
 }
 
