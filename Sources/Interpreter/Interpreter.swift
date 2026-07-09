@@ -21,7 +21,7 @@ private struct InstructionPointer {
   /// Creates an instance pointing to the first instruction of `f`, which is defined in `p`.
   public init(interpreting f: GlobalFunctionIdentity, definedIn p: Program) {
     precondition(p[f.module].functions[f.function].isDefined)
-    let i = p.entry(f)!
+    let i = p.firstInstruction(f)
     self = .init(i, in: f)
   }
 
@@ -41,10 +41,9 @@ private struct GlobalFunctionIdentity {
 extension Program {
 
   /// Returns first instruction of `f`.
-  fileprivate func entry(_ f: GlobalFunctionIdentity) -> AnyInstructionIdentity? {
+  fileprivate func firstInstruction(_ f: GlobalFunctionIdentity) -> AnyInstructionIdentity {
     let fn = self[f.module].functions[f.function]
-    guard let e = fn.entry else { return nil }
-    return fn.blocks[e].first!
+    return fn.blocks[fn.entry!].first!
   }
 
 }
