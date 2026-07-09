@@ -288,35 +288,7 @@ final class CompilerTests: XCTestCase {
       driver.program[m].addDependency(Module.standardLibraryName)
     }
 
-    var expectedDiagnostics: [FileName: String] = [:]
-
-    func addHyloSourceFile(at u: URL) throws {
-      let source = try SourceFile(contentsOf: u)
-      driver.program[m].addSource(source)
-
-      let v = u.deletingPathExtension().appendingPathExtension("diagnostics.expected")
-      let expected = try? String(contentsOf: v, encoding: .utf8)
-      expectedDiagnostics[source.name] = expected
-    }
-
-    var cSources: [URL] = []
-
-    if input.isPackage {
-      let items = FileManager.default.enumerator(
-        at: input.root,
-        includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles, .skipsPackageDescendants])!
-
-      for case let u as URL in items {
-        if u.pathExtension == "hylo" {
-          try addHyloSourceFile(at: u)
-        } else if u.pathExtension == "c" {
-          cSources.append(u)
-        }
-      }
-    } else {
-      try addHyloSourceFile(at: input.root)
-    }
+    let (cSources, expectedDiagnostics) = try collectSources(input: input, m: &driver.program[m])
 
     var artifacts = Artifacts()
     do {
@@ -335,6 +307,43 @@ final class CompilerTests: XCTestCase {
       module: m,
       expectedDiagnostics: expectedDiagnostics,
       artifacts: artifacts)
+  }
+
+  /// Collects the Hylo sources into `m`, and returns the C sources and expected diagnostics per
+  /// Hylo source file.
+  func collectSources(
+    input: TestDescription, m: inout Module
+  ) throws -> (cSources: [URL], expectedDiagnostics: [FileName: String]) {
+    var expectedDiagnostics: [FileName: String] = [:]
+    var cSources: [URL] = []
+
+    func addHyloSourceFile(at u: URL) throws {
+      let source = try SourceFile(contentsOf: u)
+      m.addSource(source)
+
+      let v = u.deletingPathExtension().appendingPathExtension("diagnostics.expected")
+      let expected = try? String(contentsOf: v, encoding: .utf8)
+      expectedDiagnostics[source.name] = expected
+    }
+
+    if input.isPackage {
+      let items = FileManager.default.enumerator(
+        at: input.root,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles, .skipsPackageDescendants])!
+
+      for case let u as URL in items {
+        if u.pathExtension == "hylo" {
+          try addHyloSourceFile(at: u)
+        } else if u.pathExtension == "c" {
+          cSources.append(u)
+        }
+      }
+    } else {
+      try addHyloSourceFile(at: input.root)
+    }
+
+    return (cSources, expectedDiagnostics)
   }
 
   /// Compiles `m`, which is a module whose source have been parsed with `driver`, until `stage`,
