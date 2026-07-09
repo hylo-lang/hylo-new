@@ -107,9 +107,7 @@ final class ProgramTests: XCTestCase {
   }
 
   func testQueryGivenFromCheckedProgram() async throws {
-    var p = Program(forTesting: true)
-    let m = p.demandModule("Main")
-    let (_, f) = p[m].addSource(
+    var (p, m, s) = try await Program.typeCheckedForTesting(
       """
       trait P {}
       struct A { given w1: B is P {} }
@@ -117,11 +115,8 @@ final class ProgramTests: XCTestCase {
       given w2: A is P {}
       """)
 
-    await p.assignScopes(m)
-    p.assignTypes(m, loggingInferenceWhere: nil)
-
     // Query givens visible from the top-level scope of the file.
-    let givens = p.givens(in: m, visibleFrom: .init(file: f))
+    let givens = p.givens(in: m, visibleFrom: .init(file: s))
 
     // The visible given should be the top-level `w2`.
     if case .user(let g) = givens.uniqueElement {
@@ -201,12 +196,8 @@ final class ProgramTests: XCTestCase {
   }
 
   func testDeclarationMaybeReferredToByNil() async throws {
-    var p = Program(forTesting: true)
-    let m = p.demandModule("Main")
-    _ = p[m].addSource("let x = nonexistent.y ; let z = x")
-
-    await p.assignScopes(m)
-    p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
+    let (p, _, _) = try await Program.typeCheckedForTesting(
+      "let x = nonexistent.y ; let z = x", assertingNoDiagnostics: false)
 
     func isVariable(referringTo name: String) -> (AnySyntaxIdentity) -> Bool {
       { (n: AnySyntaxIdentity) -> Bool in
@@ -236,16 +227,78 @@ final class ProgramTests: XCTestCase {
   }
 
   func testTypeMaybeAssignedNil() async throws {
-    var p = Program(forTesting: true)
-    let m = p.demandModule("Main")
-    _ = p[m].addSource("let (ill, typed) = ((), (), ())")
+    let (p, _, _) = try await Program.typeCheckedForTesting(
+      "let (ill, typed) = ((), (), ())",
+      assertingNoDiagnostics: false)
 
-    await p.assignScopes(m)
-    p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
-    
     // `ill` should not have a type; it's not assigned.
     let e = try XCTUnwrap(p.select(.name("ill")).first)
     XCTAssertNil(p.type(maybeAssignedTo: e))
   }
 
+  func testTypeOfSelfIsTheEnclosingTypeWithinAStructScope() async throws {
+    // "Self" inside a struct's body denotes an instance of that struct.
+    var (p, _, _) = try await Program.typeCheckedForTesting(
+      """
+      struct A {
+        public memberwise init
+      }
+      """)
+
+    let d = try XCTUnwrap(
+      p.select(.and(
+        .tag(StructDeclaration.self),
+        .name(.init(identifier: "A")))).first, "no struct named 'A'")
+
+    // The type of `Self` should be spelled as the underlying type.
+    let t = try XCTUnwrap(p.typeOfSelf(in: .init(uncheckedFrom: d.erased)))
+    XCTAssertEqual(p.show(t), "A")
+  }
+
+  func testTypeOfSelfIsNilAtFileScope() async throws {
+    // "Self" is not legal at the top level of a file, where no type encloses the use.
+    var (p, _, s ) = try await Program.typeCheckedForTesting(
+      """
+      struct A {
+        public memberwise init
+      }
+      """)
+
+    XCTAssertNil(p.typeOfSelf(in: .init(file: s)))
+  }
+
+}
+
+extension Program {
+
+  /// Creates a program from a single source file `s`, returning the program, the fixture's module 
+  /// and source file identity.
+  ///
+  /// Throws if `assertNoDiagnostics` is true and the program contains an error.
+  static func typeCheckedForTesting(
+    _ s: SourceFile, assertingNoDiagnostics: Bool = true
+  ) async throws -> (Program, Module.ID, SourceFile.ID) {
+    var p = Program(forTesting: true)
+    let m = p.demandModule("Main")
+    let s = p[m].addSource(s).identity
+
+    await p.assignScopes(m)
+    p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
+
+    if assertingNoDiagnostics && p.containsError {
+      throw CompilationError(DiagnosticSet(p.diagnostics))
+    }
+    return (p, m, s)
+  }
+
+}
+
+/// An error that occurred during compilation.
+struct CompilationError: Error {
+  let diagnostics: DiagnosticSet
+
+  /// The diagnostics of the error.
+  init(_ diagnostics: DiagnosticSet) {
+    self.diagnostics = diagnostics
+  }
 }

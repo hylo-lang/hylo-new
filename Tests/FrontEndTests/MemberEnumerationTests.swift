@@ -2,17 +2,14 @@ import FrontEnd
 import XCTest
 
 /// Tests for `Program.members(of:in:visibleFrom:static:)`, the member-listing query used by LSP.
-final class MemberListingTests: XCTestCase {
+final class MemberEnumerationTests: XCTestCase {
 
-  func testListsNativeConformanceAndExtensionMembers() async throws {
-    // An instance receiver should see its own members, the members of an applicable extension, and
-    // the requirements of every trait it conforms to.
+  func testEnumerateMembers() async throws {
     let names = try await instanceMembers(
       ofStruct: "A",
       in: """
       trait P { fun f() }
       struct A {
-        public memberwise init
         public fun g() {}
       }
       given A is P { fun f() {} }
@@ -23,15 +20,12 @@ final class MemberListingTests: XCTestCase {
     XCTAssert(names.contains("h"))  // extension
   }
 
-  func testListsStaticMembersFromAllSources() async throws {
-    // A type receiver should see static members from the type itself, an extension, and a
-    // conformance.
+  func testEnumerateStaticMembers() async throws {
     let names = try await staticMembers(
       ofStruct: "A",
       in: """
       trait P { static fun h() }
       struct A {
-        public memberwise init
         public static fun f() {}
       }
       given A is P { public static fun h() {} }
@@ -42,28 +36,29 @@ final class MemberListingTests: XCTestCase {
     XCTAssert(names.contains("h"))  // conformance
   }
 
-  func testStaticConformanceRequirementRequiresStaticSelection() async throws {
+  func testEnumerateStaticInheritedMembers() async throws {
     // A static trait requirement is reachable only through a static selection (`A.s`), not on an
-    // instance, so the `static` flag must be honored in the conformance branch.
-    let source: SourceFile = """
+    // instance of `A`.
+    let s: SourceFile = """
       trait P { static fun s() }
-      struct A { public memberwise init }
+      struct A { }
       given A is P { public static fun s() {} }
       """
-    let statics = try await staticMembers(ofStruct: "A", in: source)
-    let instance = try await instanceMembers(ofStruct: "A", in: source)
+
+    let statics = try await staticMembers(ofStruct: "A", in: s)
     XCTAssertTrue(statics.contains("s"))
+
+    let instance = try await instanceMembers(ofStruct: "A", in: s)
     XCTAssertFalse(instance.contains("s"))
   }
 
-  func testDoesNotListSynthesizedConformanceWitnesses() async throws {
+  func testIgnoreSynthesizedDeclarations() async throws {
     // The synthesized `$f` member should not be listed as a member.
     let names = try await instanceMembers(
       ofStruct: "A",
       in: """
       struct A {
-        public memberwise init
-        given let x: Int = 0  
+        given let x: Int = 0
       }
       trait P { fun r() }
       given A is P { fun r() {} }
@@ -93,67 +88,35 @@ final class MemberListingTests: XCTestCase {
     let v = try XCTUnwrap(p.select(.name(.init(identifier: "v"))).first)
     let receiver = try XCTUnwrap(p.type(maybeAssignedTo: v))
     let member = try XCTUnwrap(
-      p.members(of: receiver, in: m, visibleFrom: .init(file: f), static: false)
-        .first(where: { p.name(of: $0.declaration)?.identifier == "f" }))
+      p.members(of: receiver, in: m, visibleFrom: .init(file: f), resolvedStatically: false)
+        .first(where: { p.name(of: $0.declaration.target!)?.identifier == "f" }))
 
     XCTAssertEqual(p.show(member.type), "[let A<B>](let B) let -> Void")
   }
 
-  func testTypeOfSelfIsTheEnclosingTypeWithinAStructScope() async throws {
-    // "Self" inside a struct's body denotes an instance of that struct.
-    var p = Program()
-    let _ = await typeChecked(
-      &p,
-      """
-      struct A {
-        public memberwise init
-      }
-      """)
-
-    let d = try XCTUnwrap(
-      p.select(.and(.tag(StructDeclaration.self), .name(.init(identifier: "A")))).first,
-      "no struct named 'A'")
-    let selfType = try XCTUnwrap(p.typeOfSelf(in: .init(uncheckedFrom: d.erased)))
-    XCTAssertEqual(p.show(selfType), "A")
-  }
-
-  func testTypeOfSelfIsNilAtFileScope() async throws {
-    // "Self" is not legal at the top level of a file, where no type encloses the use.
-    var p = Program()
-    let (_, f) = await typeChecked(
-      &p,
-      """
-      struct A {
-        public memberwise init
-      }
-      """)
-
-    XCTAssertNil(p.typeOfSelf(in: .init(file: f)))
-  }
-
   // MARK: - Helpers
 
-  /// Returns the identifiers of the members `Program.members` reports for the struct named
-  /// `typeName` declared in `source`, selecting instance members.
+  /// Returns the identifiers of the non-static members that `Program.members` reports for the
+  /// struct named `typeName` in `source`.
   private func instanceMembers(
     ofStruct typeName: String, in source: SourceFile,
     file: StaticString = #filePath, line: UInt = #line
   ) async throws -> Set<String> {
-    try await memberNames(ofStruct: typeName, in: source, static: false, file: file, line: line)
+    try await members(ofStruct: typeName, in: source, static: false, file: file, line: line)
   }
 
-  /// Returns the identifiers of the members `Program.members` reports for the struct named `name`
-  /// declared in `source`, selecting static members.
+  /// Returns the identifiers of the static members that `Program.members` reports for the struct 
+  /// named `name` in `source`.
   private func staticMembers(
     ofStruct name: String, in source: SourceFile,
     file: StaticString = #filePath, line: UInt = #line
   ) async throws -> Set<String> {
-    try await memberNames(ofStruct: name, in: source, static: true, file: file, line: line)
+    try await members(ofStruct: name, in: source, static: true, file: file, line: line)
   }
 
   /// Type-checks `source` as a single-file module and returns the identifiers of the members
-  /// reported for the struct named `typeName`, selecting static members iff `isStatic`.
-  private func memberNames(
+  /// of the struct named `typeName`, selecting static members iff `isStatic` is `true`.
+  private func members(
     ofStruct typeName: String, in source: SourceFile, static isStatic: Bool,
     file: StaticString, line: UInt
   ) async throws -> Set<String> {
@@ -167,8 +130,8 @@ final class MemberListingTests: XCTestCase {
     // instance type and selects static or instance members per the flag.
     let receiver = p.type(assignedTo: d)
     return Set(
-      p.members(of: receiver, in: m, visibleFrom: .init(file: f), static: isStatic)
-        .compactMap({ p.name(of: $0.declaration)?.identifier }))
+      p.members(of: receiver, in: m, visibleFrom: .init(file: f), resolvedStatically: isStatic)
+        .compactMap({ p.name(of: $0.declaration.target!)?.identifier }))
   }
 
   /// Type-checks `source` as a single-file `Main` module in `p`, returning its module and file.

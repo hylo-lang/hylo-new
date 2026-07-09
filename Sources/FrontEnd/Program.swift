@@ -1968,36 +1968,28 @@ extension Program {
   /// - Requires: `m` has been type checked.
   public mutating func members(
     of t: AnyTypeIdentity, in m: Module.ID, visibleFrom scopeOfUse: ScopeIdentity,
-    static selectionIsStatic: Bool
+    resolvedStatically selectionIsStatic: Bool
   ) -> [MemberCandidate] {
     withTyper(typing: m) { (typer) in
-      typer.members(of: t, visibleFrom: scopeOfUse, static: selectionIsStatic)
-        .compactMap { (c) in
-          c.reference.target.map { (d) in
-            MemberCandidate(declaration: d, reference: c.reference, type: c.type)
-          }
-        }
+      typer.members(of: t, visibleFrom: scopeOfUse, resolvedStatically: selectionIsStatic)
+        .map { (c) in MemberCandidate(declaration: c.reference, type: c.type) }
     }
   }
 
 }
 
-/// A member reachable on a receiver, together with its type and how it is referred to.
+/// A member declaration and its type.
 public struct MemberCandidate: Sendable {
 
-  /// The declaration of the member.
-  public let declaration: DeclarationIdentity
-
   /// How the member is referred to (direct, bound member, or inherited via extension/conformance).
-  public let reference: DeclarationReference
+  public let declaration: DeclarationReference
 
   /// The type of the member as selected on the receiver, with conformance substitutions applied.
   public let type: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
-  public init(declaration: DeclarationIdentity, reference: DeclarationReference, type: AnyTypeIdentity) {
+  public init(declaration: DeclarationReference, type: AnyTypeIdentity) {
     self.declaration = declaration
-    self.reference = reference
     self.type = type
   }
 

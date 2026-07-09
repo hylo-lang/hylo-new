@@ -4230,17 +4230,16 @@ public struct Typer {
     return candidates
   }
 
-  /// Returns a candidate for every member of `q` reachable in `scopeOfUse`.
+  /// This method is similar to `resolve(_:memberOf:visibleFrom:)`, except that it collects all
+  /// members (declared together with the type or inherited by extension/conformance) that are
+  /// visible from `scopeOfUse`, rather than resolving a single name.
   ///
-  /// This is the enumerating counterpart of `resolve(_:memberOf:visibleFrom:)`: rather than
-  /// resolving a single name, it collects all native members, all members of the applicable
-  /// extensions visible from `scopeOfUse`, and all requirements of every visible trait to which `q`
-  /// conforms (decided by `summon`, exactly as name resolution would). It is the building block for
-  /// IDE features such as member completion.
+  /// This method is intended for tooling and should not be used to perform name resolution. Its
+  /// implementation does not uphold coherence.
   ///
   /// - Requires: `q` is not a unification variable and the enclosing module has been type checked.
   internal mutating func members(
-    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, static s: Bool
+    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, resolvedStatically s: Bool
   ) -> [NameResolutionCandidate] {
     if q.isVariable { return [] }
 
@@ -4250,32 +4249,37 @@ public struct Typer {
     let r = qualificationForSelection(on: q).type
 
     var candidates: [NameResolutionCandidate] = []
-    candidates.append(contentsOf: nativeMembers(of: r, statically: s))
-    candidates.append(contentsOf: extensionMembers(of: r, visibleFrom: scopeOfUse, statically: s))
-    candidates.append(contentsOf: inheritedMembers(of: r, visibleFrom: scopeOfUse, statically: s))
+    candidates.append(contentsOf: nativeMembers(of: r, resolvedStatically: s))
+    candidates.append(contentsOf: extensionMembers(of: r, visibleFrom: scopeOfUse, resolvedStatically: s))
+    candidates.append(contentsOf: inheritedMembers(of: r, visibleFrom: scopeOfUse, resolvedStatically: s))
 
-    // Dedup by declaration identity (e.g. the same trait requirement reached through several
-    // witnesses) while keeping same-named members of distinct declarations (overloads, or members
-    // offered by more than one in-scope trait).
+    return Self.uniqueCandidates(candidates)
+  }
+
+  /// Remove duplicate resolution candidates while keeping same-named members of distinct
+  /// declarations (e.g., overloads or members offered by more than one in-scope trait).
+  static func uniqueCandidates(_ cs: [NameResolutionCandidate]) -> [NameResolutionCandidate] {
     var seen: Set<DeclarationIdentity> = []
-    return candidates.filter { (c) in
-      guard let d = c.reference.target else { return true }
-      return seen.insert(d).inserted
+    return cs.filter { (c) in
+      if let d = c.reference.target {
+        seen.insert(d).inserted
+      } else {
+        true
+      }
     }
   }
 
-  /// Returns a candidate for every native member of `q`.
+  /// Returns the natives members of `q`.
   /// 
   /// Static members are returned iff `selectionIsStatic` is true.
   private mutating func nativeMembers(
-    of q: AnyTypeIdentity, statically selectionIsStatic: Bool
+    of q: AnyTypeIdentity, resolvedStatically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
     //  Mirrors `resolve(_:nativeMemberOf:statically:)` but without filtering by name.
     let (context, receiver) = program.types.contextAndHead(q)
     var candidates: [NameResolutionCandidate] = []
     for ds in declarations(nativeMembersOf: q).values {
-      for m in ds {
-        if !isEnumerableMember(m) { continue }
+      for m in ds where isEnumerableMember(m) {
         var member = typeOfName(referringTo: m, statically: selectionIsStatic)
         if let a = program.types[receiver] as? TypeApplication {
           member = program.types.substitute(a.arguments, in: member)
@@ -4288,12 +4292,12 @@ public struct Typer {
     return candidates
   }
 
-  /// Returns a candidate for every member declared in an extension of `q` visible from 
-  /// `scopeOfUse`.
+  /// Returns the members of `q` that are inherited by extension and visible from `scopeOfUse`.
   /// 
   /// Static members are returned iff `selectionIsStatic` is true.
   private mutating func extensionMembers(
-    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, statically selectionIsStatic: Bool
+    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, 
+    resolvedStatically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
     // Mirrors `resolve(_:declaredIn:applyingTo:in:statically:)` but without filtering by name.
     var candidates: [NameResolutionCandidate] = []
@@ -4303,8 +4307,7 @@ public struct Typer {
         a.witness, applying: a.substitutions, withVariables: .substitutedByError)
       let arguments = w.typeArguments(appliedTo: e)
       for ds in declarations(lexicallyIn: .init(node: e)).values {
-        for m in ds {
-          if !isEnumerableMember(m) { continue }
+        for m in ds where isEnumerableMember(m) {
           var member = typeOfName(referringTo: m, statically: selectionIsStatic)
           if let a = arguments {
             member = program.types.substitute(a, in: member)
@@ -4322,7 +4325,7 @@ public struct Typer {
   /// 
   /// Static members are returned iff `selectionIsStatic` is true.
   private mutating func inheritedMembers(
-    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, statically selectionIsStatic: Bool
+    of q: AnyTypeIdentity, visibleFrom scopeOfUse: ScopeIdentity, resolvedStatically selectionIsStatic: Bool
   ) -> [NameResolutionCandidate] {
     // Mirrors `resolve(_:inheritedMemberOf:visibleFrom:statically:)` but enumerates every visible 
     // trait and all of its requirements instead of resolving a single name.
@@ -4384,8 +4387,7 @@ public struct Typer {
     var ds = declarations(nativeMembersOf: q)[n.identifier] ?? []
     refineLookupResults(&ds, matching: n)
 
-    for m in ds {
-      if !resolvableWithQualification(m) { continue }
+    for m in ds where resolvableWithQualification(m) {
       var member = typeOfName(referringTo: m, statically: selectionIsStatic)
       if let a = program.types[receiver] as? TypeApplication {
         member = program.types.substitute(a.arguments, in: member)
@@ -4597,7 +4599,7 @@ public struct Typer {
     }
   }
 
-  /// Returns `true` iff `m` should be offered when enumerating the members of a type.
+  /// Returns `true` iff `m` is part of the declaration shown when enumerating the members of a type.
   ///
   /// In addition to `resolvableWithQualification`, this excludes the variable introduced by an
   /// implicit (`using`/`given`) binding. Such a value is should be reached through implicit
@@ -4605,7 +4607,7 @@ public struct Typer {
   private func isEnumerableMember(_ m: DeclarationIdentity) -> Bool {
     guard resolvableWithQualification(m) else { return false }
     if let v = program.cast(m, to: VariableDeclaration.self) {
-      return !program[v].synthesized
+      return !program[v].isSynthesized
     }
     return true
   }
