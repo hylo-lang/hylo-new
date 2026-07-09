@@ -1382,45 +1382,44 @@ public struct Program: Sendable {
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
     var i = 0
-    for m in self[d].members {
-      if let b = cast(m, to: BindingDeclaration.self) {
-        forEachVariable(introducedBy: self[self[b].pattern].pattern) { (v, _) in
-          action(v, [i])
-          i += 1
-        }
+    for m in collect(BindingDeclaration.self, in: self[d].members) where !isStatic(m) {
+      forEachVariable(introducedBy: self[self[m].pattern].pattern) { (v, _) in
+        action(v, [i])
+        i += 1
       }
     }
   }
 
   /// Calls `action` for each variable declaration introduced by `d`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in the a record value having the type of `d`.
+  /// `action` accepts a variable declaration and an index path relative to `path`, which identies
+  /// the abstract position of the declaration in the record value having the same type as `p`.
   public func forEachVariable(
     introducedBy d: BindingDeclaration.ID,
+    relativeTo path: IndexPath = [],
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
-    forEachVariable(introducedBy: self[self[d].pattern].pattern, do: action)
+    forEachVariable(introducedBy: self[self[d].pattern].pattern, relativeTo: path, do: action)
   }
 
   /// Calls `action` for each variable declaration introduced in `p`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in the a record value having the type of `p`.
+  /// `action` accepts a variable declaration and an index path relative to `path`, which identies
+  /// the abstract position of the declaration in the record value having the same type as `p`.
   public func forEachVariable(
     introducedBy p: PatternIdentity,
-    at path: IndexPath = [],
+    relativeTo path: IndexPath = [],
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
     switch tag(of: p) {
     case BindingPattern.self:
       let q = castUnchecked(p, to: BindingPattern.self)
-      forEachVariable(introducedBy: self[q].pattern, at: path, do: action)
+      forEachVariable(introducedBy: self[q].pattern, relativeTo: path, do: action)
 
     case TuplePattern.self:
       let q = castUnchecked(p, to: TuplePattern.self)
       for (i, e) in self[q].elements.enumerated() {
-        forEachVariable(introducedBy: e, at: path.appending(i), do: action)
+        forEachVariable(introducedBy: e, relativeTo: path.appending(i), do: action)
       }
 
     case VariableDeclaration.self:
