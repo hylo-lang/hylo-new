@@ -4601,9 +4601,9 @@ public struct Typer {
 
   /// Returns `true` iff `m` is part of the declaration shown when enumerating the members of a type.
   ///
-  /// In addition to `resolvableWithQualification`, this excludes the variable introduced by an
-  /// implicit (`using`/`given`) binding. Such a value is should be reached through implicit
-  /// resolution, not member selection.
+  /// In addition to `resolvableWithQualification`, this excludes the synthesized variable 
+  /// introduced by a given. Such a value should be reached through implicit resolution, not
+  /// member selection.
   private func isEnumerableMember(_ m: DeclarationIdentity) -> Bool {
     guard resolvableWithQualification(m) else { return false }
     if let v = program.cast(m, to: VariableDeclaration.self) {
