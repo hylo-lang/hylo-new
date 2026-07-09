@@ -3,7 +3,7 @@ import Foundation
 extension Process {
 
   /// The error thrown when a process exits with a non-zero status.
-  public struct NonzeroExit: Error {
+  public struct NonzeroExit: Error, CustomStringConvertible {
 
     /// The exit code of the process.
     public let exitCode: Int32
@@ -19,6 +19,19 @@ extension Process {
 
     /// The arguments passed to the process.
     public let arguments: [String]
+
+    public var description: String {
+      """
+      NonZeroExit:\(exitCode)
+      Of command: \(executable) \(arguments.joined(separator: " "))
+      
+      Standard Output:
+      \(standardOutput)
+
+      Standard Error:
+      \(standardError)
+      """
+    }
 
   }
 

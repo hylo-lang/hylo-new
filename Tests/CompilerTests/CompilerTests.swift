@@ -289,7 +289,8 @@ final class CompilerTests: XCTestCase {
     }
 
     var expectedDiagnostics: [FileName: String] = [:]
-    try input.forEachSourceURL { (u) in
+
+    func addHyloSourceFile(at u: URL) throws {
       let source = try SourceFile(contentsOf: u)
       driver.program[m].addSource(source)
 
@@ -298,10 +299,30 @@ final class CompilerTests: XCTestCase {
       expectedDiagnostics[source.name] = expected
     }
 
+    var cSources: [URL] = []
+
+    if input.isPackage {
+      let items = FileManager.default.enumerator(
+        at: input.root,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles, .skipsPackageDescendants])!
+
+      for case let u as URL in items {
+        if u.pathExtension == "hylo" {
+          try addHyloSourceFile(at: u)
+        } else if u.pathExtension == "c" {
+          cSources.append(u)
+        }
+      }
+    } else {
+      try addHyloSourceFile(at: input.root)
+    }
+
     var artifacts = Artifacts()
     do {
       try await compile(
-        m, until: input.manifest.stage, using: &driver, accumulatingArtifactsInto: &artifacts,
+        m, until: input.manifest.stage, using: &driver, withCSources: cSources,
+        accumulatingArtifactsInto: &artifacts,
         expectedArtifacts: input.manifest.artifactExpectations)
     } catch let e {
       try artifacts.save(into: input)
@@ -320,7 +341,7 @@ final class CompilerTests: XCTestCase {
   /// adding compilation artifacts to `artifacts`.
   private func compile(
     _ m: Module.ID, until stage: Manifest.Stage, using driver: inout Driver,
-    accumulatingArtifactsInto artifacts: inout Artifacts,
+    withCSources cSources: [URL], accumulatingArtifactsInto artifacts: inout Artifacts,
     expectedArtifacts: SortedDictionary<ArtifactTag, String>
   ) async throws {
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -363,7 +384,7 @@ final class CompilerTests: XCTestCase {
     if stage == .execution {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
-      _ = try driver.generateExecutable(from: m, writingTo: executable)
+      _ = try driver.generateExecutable(from: m, withCSources: cSources, writingTo: executable)
       artifacts.executable = executable
     }
   }

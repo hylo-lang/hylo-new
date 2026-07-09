@@ -1,3 +1,6 @@
+// These are linked from the standard library shims.
+// Eventually, we should move this file to `StandardLibrary/Sources/`.
+
 /// Allocates `size` bytes of uninitialized storage.
 @c_ffi("c_malloc_indirect")
 public fun malloc(size: Int) -> Pointer<Never> // TODO use MemoryAddress

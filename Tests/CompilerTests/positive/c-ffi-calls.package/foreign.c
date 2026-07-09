@@ -23,5 +23,13 @@ void c_add_int_indirect(
 void c_int_to_i32_indirect(
   intptr_t const* self, int32_t* result
 ) {
-  *result = int32_t(*self);
+  *result = (int32_t)*self;
+}
+
+void c_byte_set_value_to_3_indirect(char** p) {
+  *(*p) = (char)3;
+}
+
+void c_byte_get_value(char const** p, intptr_t* result) {
+  *result = (intptr_t)**p;
 }

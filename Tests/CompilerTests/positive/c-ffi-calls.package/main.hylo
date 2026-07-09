@@ -1,6 +1,3 @@
-@c_ffi("c_print_int_indirect")
-fun print(n: Int) -> Void
-
 struct Point is Deinitializable {
 
   var x: Int
@@ -24,14 +21,24 @@ extension Int {
   fun infix+(other: Int) -> Int
 
   @c_ffi("c_int_to_i32_indirect")
-  fun toi32() -> Int32
+  fun to_i32() -> Int32
 
 }
 
-public fun main() -> Int32 {
-  sink let p = Point(x: 1, y: 2)
-  sink let q = Point(x: 3, y: 4)
-  sink let r = p + q
+@c_ffi("c_byte_set_value_to_3_indirect")
+fun set_value_to_3(of_byte_at address: Pointer<Never>)
 
-  return (r.x + r.y).toi32()
+@c_ffi("c_byte_get_value")
+fun get_value(of_byte_at address: Pointer<Never>) -> Int
+
+public fun main() -> Int32 {
+  let p = Point(x: 1, y: 2)
+  let q = Point(x: 3, y: 4)
+  let r = p + q // == Point(4, 6)
+  
+  let pointer = malloc(1)
+  set_value_to_3(of_byte_at: pointer)
+  let three = get_value(of_byte_at: pointer)
+  
+  return (r.x + r.y + three).to_i32() // 4 + 6 + 3 == 13
 }

@@ -202,20 +202,25 @@ public struct Driver {
   /// - Throws: if the parent folder of `output` doesn't exist.
   public mutating func generateExecutable(
     from module: Module.ID,
+    withCSources cSources: [URL] = [],
     writingTo output: URL
   ) throws -> PhaseResult {
     let elapsed = try ContinuousClock().measure {
       let modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
 
+      var cSources = cSources
+
       if !noStandardLibrary {
         // FIXME: Enable this after we can lower the standard library
         // modulesToLink.append(program.modules[.standardLibrary]!.identity)
+        cSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
       }
 
       try FileManager.default.withUniqueTemporaryDirectory { (d) in
-        let objects = try writeObjectFiles(for: modulesToLink, into: d)
-        try linkExecutable(from: objects, writingTo: output)
+        let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
+        let cObjects = try cSources.map { (s) in try compileC(source: s, destinationDirectory: d) }
+        try linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }
     }
     return .init(elapsed: elapsed, containsError: program[module].containsError)
@@ -242,26 +247,25 @@ public struct Driver {
   public func writeObjectFiles(
     for modules: [Module.ID], into destinationDirectory: URL
   ) throws -> [URL] {
-    var objectFiles = try modules.map { (m) in
+    try modules.map { (m) in
       let o = destinationDirectory.appendingPathComponent(moduleName(m) + ".o", isDirectory: false)
       try llvmModules[m]!.module.write(.objectFile, to: o.path)
       return o
     }
+  }
 
-    if !noStandardLibrary {
-      let shimsObject = destinationDirectory.appendingPathComponent(
-        "stdlib_shims.o", isDirectory: false)
-      _ = try Process.executionOutput(
-        try Host.findNativeExecutable(invokedAs: "clang"),
-        arguments: [
-          "-c", "-fPIC",
-          chosenStandardLibraryRoot.appendingPathComponent(cShimSource).path,
-          "-o", shimsObject.path,
-        ])
-      objectFiles.append(shimsObject)
-    }
+  /// Compiles `source` using `clang` to an object file.
+  ///
+  /// Returns the path to the object file within `destinationDirectory`.
+  public func compileC(source: URL, destinationDirectory: URL) throws -> URL {
+    let o = destinationDirectory.appendingPathComponent(
+      source.deletingPathExtension().appendingPathExtension("o").lastPathComponent,
+      isDirectory: false)
 
-    return objectFiles
+    _ = try Process.executionOutput(
+      try Host.findNativeExecutable(invokedAs: "clang"),
+      arguments: ["-c", "-fPIC", source.path, "-o", o.path])
+    return o
   }
 
   /// Loads `module`, whose sources are in `root`, into `program`.
