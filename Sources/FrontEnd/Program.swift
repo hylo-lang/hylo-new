@@ -1375,8 +1375,8 @@ public struct Program: Sendable {
 
   /// Calls `action` for each stored property declaration in `d`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in a record value having the type declared by `d`.
+  /// `action` accepts a variable declaration and a path identifying its abstract position in a
+  /// record value having the type declared by `d`.
   public func forEachStoredProperty(
     of d: StructDeclaration.ID,
     do action: (VariableDeclaration.ID, IndexPath) -> Void
@@ -1392,20 +1392,20 @@ public struct Program: Sendable {
 
   /// Calls `action` for each variable declaration introduced by `d`.
   ///
-  /// `action` accepts a variable declaration and an index path relative to `path`, which identies
-  /// the abstract position of the declaration in the record value having the same type as `p`.
+  /// `action` accepts a variable declaration and a path relative to `root`, which identities the
+  /// abstract position of the declaration in the record value having the same type as `d`.
   public func forEachVariable(
     introducedBy d: BindingDeclaration.ID,
-    relativeTo path: IndexPath = [],
+    relativeTo root: IndexPath = [],
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
-    forEachVariable(introducedBy: self[self[d].pattern].pattern, relativeTo: path, do: action)
+    forEachVariable(introducedBy: self[self[d].pattern].pattern, relativeTo: root, do: action)
   }
 
   /// Calls `action` for each variable declaration introduced in `p`.
   ///
-  /// `action` accepts a variable declaration and an index path relative to `path`, which identies
-  /// the abstract position of the declaration in the record value having the same type as `p`.
+  /// `action` accepts a variable declaration and a path relative to `root`, which identities the
+  /// abstract position of the declaration in the record value having the same type as `p`.
   public func forEachVariable(
     introducedBy p: PatternIdentity,
     relativeTo path: IndexPath = [],

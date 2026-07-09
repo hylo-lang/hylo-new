@@ -107,7 +107,7 @@ extension IREmitter {
   ///   - mono: The identity of an existentialized function.
   ///   - witnesses: witnesses for each type parameter in the original polymorphic function.
   ///   - parameters: The types of the term parameters of the polymorphic function.
-  ///   - f: The function containing`uer`.
+  ///   - f: The function containing `user`.
   private mutating func depolymorphize(
     polymorphicApplyUser user: AnyInstructionIdentity, with mono: IRFunction.ID,
     passing witnesses: [IRValue], to parameters: [AnyTypeIdentity], in f: inout IRFunction
@@ -129,7 +129,7 @@ extension IREmitter {
   /// `mono`, which is the existentialized form of `u`'s callee.
   ///
   /// This method is similar to `depolymorphize(polymorphicApplyUser:with:passing:to:in:)` only for
-  /// the case where `user` is a projection rather thanan application.
+  /// the case where `user` is a projection rather than an application.
   private mutating func depolymorphize(
     polymorphicProjectUser user: AnyInstructionIdentity, with mono: IRFunction.ID,
     passing witnesses: [IRValue], to parameters: [AnyTypeIdentity], in f: inout IRFunction
