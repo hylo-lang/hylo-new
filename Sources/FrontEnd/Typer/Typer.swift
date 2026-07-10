@@ -974,25 +974,6 @@ public struct Typer {
 
   /// Returns whether a conformance of each stored part of `conformer` to `concept` can be derived
   /// (i.e., resolved or synthesized) in `scopeOfUse`.
-  ///
-  /// - Requires: conformances to `concept` may be synthesized by the compiler.
-  private mutating func structurallyConforms(
-    _ conformer: Tuple.ID, to concept: TraitDeclaration.ID,
-    in scopeOfUse: ScopeIdentity
-  ) -> StructuralConformanceLookupResult {
-    switch program.types[conformer] {
-    case .cons(let head, let tail):
-      return
-        isDerivable(conformanceTo: concept, for: head, in: scopeOfUse)
-        && isDerivable(conformanceTo: concept, for: tail, in: scopeOfUse)
-
-    case .empty:
-      return .success(true)
-    }
-  }
-
-  /// Returns whether a conformance of each stored part of `conformer` to `concept` can be derived
-  /// (i.e., resolved or synthesized) in `scopeOfUse`.
   private mutating func isDerivable(
     conformanceTo concept: TraitDeclaration.ID, for conformer: AnyTypeIdentity,
     in scopeOfUse: ScopeIdentity

@@ -3,7 +3,11 @@
 
 [files]
 # Swifty-LLVM is a separate project. Its spelling is managed upstream.
-extend-exclude = ["Swifty-LLVM"]
+# IR source files may contain mangled and generated symbols.
+extend-exclude = [
+  "Swifty-LLVM",
+  "*-ir.expected",
+]
 
 [default.extend-identifiers]
 # `WriteableArchive` is part of the external `Archivist` dependency's API

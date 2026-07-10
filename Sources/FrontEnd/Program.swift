@@ -107,6 +107,7 @@ public struct Program: Sendable {
     // Generate raw IR from the syntax tree.
     var emitter = IREmitter(insertingIn: m, of: consume self)
     emitter.incorporateTopLevelDeclarations()
+    emitter.implementSynthesizedFunctions()
     self = emitter.release()
   }
 
@@ -1374,52 +1375,51 @@ public struct Program: Sendable {
 
   /// Calls `action` for each stored property declaration in `d`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in a record value having the type declared by `d`.
+  /// `action` accepts a variable declaration and a path identifying its abstract position in a
+  /// record value having the type declared by `d`.
   public func forEachStoredProperty(
     of d: StructDeclaration.ID,
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
     var i = 0
-    for m in self[d].members {
-      if let b = cast(m, to: BindingDeclaration.self) {
-        forEachVariable(introducedBy: self[self[b].pattern].pattern) { (v, _) in
-          action(v, [i])
-          i += 1
-        }
+    for m in collect(BindingDeclaration.self, in: self[d].members) where !isStatic(m) {
+      forEachVariable(introducedBy: self[self[m].pattern].pattern) { (v, _) in
+        action(v, [i])
+        i += 1
       }
     }
   }
 
   /// Calls `action` for each variable declaration introduced by `d`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in the a record value having the type of `d`.
+  /// `action` accepts a variable declaration and a path relative to `root`, which identities the
+  /// abstract position of the declaration in the record value having the same type as `d`.
   public func forEachVariable(
     introducedBy d: BindingDeclaration.ID,
+    relativeTo root: IndexPath = [],
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
-    forEachVariable(introducedBy: self[self[d].pattern].pattern, do: action)
+    forEachVariable(introducedBy: self[self[d].pattern].pattern, relativeTo: root, do: action)
   }
 
   /// Calls `action` for each variable declaration introduced in `p`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in the a record value having the type of `p`.
+  /// `action` accepts a variable declaration and a path relative to `root`, which identities the
+  /// abstract position of the declaration in the record value having the same type as `p`.
   public func forEachVariable(
     introducedBy p: PatternIdentity,
-    at path: IndexPath = [],
+    relativeTo path: IndexPath = [],
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
     switch tag(of: p) {
     case BindingPattern.self:
       let q = castUnchecked(p, to: BindingPattern.self)
-      forEachVariable(introducedBy: self[q].pattern, at: path, do: action)
+      forEachVariable(introducedBy: self[q].pattern, relativeTo: path, do: action)
 
     case TuplePattern.self:
       let q = castUnchecked(p, to: TuplePattern.self)
       for (i, e) in self[q].elements.enumerated() {
-        forEachVariable(introducedBy: e, at: path.appending(i), do: action)
+        forEachVariable(introducedBy: e, relativeTo: path.appending(i), do: action)
       }
 
     case VariableDeclaration.self:
@@ -1585,6 +1585,11 @@ public struct Program: Sendable {
     } else {
       return spanForDiagnostic(about: self[n].value)
     }
+  }
+
+  /// Returns an anchor suitable to generate debug information related to `d` as a whole.
+  public func anchorForDiagnostics(about d: DeclarationIdentity) -> Anchor {
+    .init(site: spanForDiagnostic(about: d), scope: parent(containing: d))
   }
 
   /// Returns `message` with placeholders replaced by their corresponding values in `arguments`.

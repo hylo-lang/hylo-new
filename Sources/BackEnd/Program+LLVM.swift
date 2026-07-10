@@ -476,19 +476,26 @@ extension Program {
     _ i: IRSubfield.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
-    let t = ctx.ir.result(of: s.base)!.type
 
     let i32 = ctx.module.llvm.i32
+    let base = ctx.ir.result(of: s.base)!.type
+    var current = base
     var indices = [i32.unsafe[].constant(0).v]
-    var u = t
     for p in s.path {
-      let m = metadata(of: u, in: &ctx.module)
+      // Get the logical index of the property in its concrete representation.
+      let m = metadata(of: current, in: &ctx.module)
+      let i = m.layout.propertyToField[p]
+
+      // Stop if the property has been erased. The resulting path will be that of its container.
+      if i < 0 { break }
+
+      // Otherwise, move to the next component.
       indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).v)
-      u = fields(of: u, visibleFrom: ctx.module.hylo)![p]
+      current = fields(of: current, visibleFrom: ctx.module.hylo)![p]
     }
 
     let b = ctx.value[s.base]!
-    let m = metadata(of: t, in: &ctx.module)
+    let m = metadata(of: base, in: &ctx.module)
     let x = ctx.module.llvm.insertGetElementPointerInBounds(
       of: b, typed: m.llvm, indices: indices, at: ctx.insertionPoint!)
 
