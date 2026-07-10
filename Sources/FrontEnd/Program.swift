@@ -458,11 +458,6 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns `true` iff `n` is a an interface for a function written in another language.
-  public func isForeign(_ n: FunctionDeclaration.ID) -> Bool {
-    annotation("foreign", appliedTo: n) != nil
-  }
-
   /// Returns `true` iff `n` has an external implementation.
   public func isExtern(_ n: FunctionDeclaration.ID) -> Bool {
     annotation("extern", appliedTo: n) != nil
@@ -1517,7 +1512,7 @@ public struct Program: Sendable {
     switch tag(of: d) {
     case FunctionDeclaration.self:
       let f = castUnchecked(d, to: FunctionDeclaration.self)
-      return !isRequirement(f) && !isForeign(f) && !isExtern(f) && !isCFFI(f)
+      return !isRequirement(f) && !isExtern(f) && !isCFFI(f)
         && !self[f].isMemberwiseInitializer
     default:
       return !isRequirement(d)
