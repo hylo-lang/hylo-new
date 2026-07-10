@@ -1,4 +1,4 @@
-/// C implementations of standard library functions declared with `@c_ffi`.
+/// C implementations of standard library functions declared with `@extern_c_indirect`.
 
 #include <inttypes.h>
 #include <stddef.h>

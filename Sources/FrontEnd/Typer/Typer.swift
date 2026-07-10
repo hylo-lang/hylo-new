@@ -629,20 +629,20 @@ public struct Typer {
     // TODO: Redeclarations
   }
 
-  /// Reports diagnostics iff `d` is annotated with `@c_ffi` and cannot be implemented by a C
-  /// function using the indirect calling convention.
+  /// Checks invariants of `@extern_c_indirect` if the annotation is present.
   private mutating func checkCFFI(_ d: FunctionDeclaration.ID) {
     guard program.isCFFI(d) else { return }
     let s = program.spanForDiagnostic(about: d)
 
     if program[d].body != nil {
-      report(.init(.error, "'@c_ffi' cannot be applied to a function with a body", at: s))
+      report(
+        .init(.error, "'@extern_c_indirect' cannot be applied to a function with a body", at: s))
     }
     if program.isExtern(d) {
-      report(.init(.error, "'@c_ffi' cannot be combined with '@extern'", at: s))
+      report(.init(.error, "'@extern_c_indirect' cannot be combined with '@extern'", at: s))
     }
     if !accumulatedGenericParameters(visibleFrom: .init(node: d)).isEmpty {
-      report(.init(.error, "'@c_ffi' cannot be applied to a generic function", at: s))
+      report(.init(.error, "'@extern_c_indirect' cannot be applied to a generic function", at: s))
     }
   }
 

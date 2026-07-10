@@ -465,7 +465,7 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `n` is implemented by a C function using the indirect calling convention.
   public func isCFFI(_ n: FunctionDeclaration.ID) -> Bool {
-    annotation("c_ffi", appliedTo: n) != nil
+    annotation("extern_c_indirect", appliedTo: n) != nil
   }
 
   /// Returns `true` if the contents of `d` is visible in all modules.
@@ -1274,13 +1274,14 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns the name of the C function implementing `d` iff `d` is annotated with `@c_ffi`.
+  /// Returns the name of the C function implementing `d` iff `d` is annotated with 
+  /// `@extern_c_indirect`.
   ///
   /// The returned function follows the indirect calling convention: it accepts one pointer for
   /// each non-erased parameter of `d`, in order, followed by a pointer to the storage receiving
   /// the result, and returns `void`.
   public func cFFIName(of d: DeclarationIdentity) -> String? {
-    annotation("c_ffi", appliedTo: d).flatMap { (a) in
+    annotation("extern_c_indirect", appliedTo: d).flatMap { (a) in
       if case .some(.string(let n)) = a.arguments.first?.value {
         return n
       } else {

@@ -4,22 +4,22 @@ struct Point is Deinitializable {
   var bytes_0_7: Int
   var bytes_8_15: Int
 
-  @c_ffi("Point_init_indirect")
+  @extern_c_indirect("Point_init_indirect")
   public init(_ x: Int, _ y: Int)
 
-  @c_ffi("Point_get_x_indirect")
+  @extern_c_indirect("Point_get_x_indirect")
   fun x() -> Int
 
-  @c_ffi("Point_get_y_indirect")
+  @extern_c_indirect("Point_get_y_indirect")
   fun y() -> Int
 
-  @c_ffi("Point_set_x_indirect")
+  @extern_c_indirect("Point_set_x_indirect")
   fun set_x(new_value: Int) -> Void
 
-  @c_ffi("Point_set_y_indirect")
+  @extern_c_indirect("Point_set_y_indirect")
   fun set_y(new_value: Int) -> Void
 
-  @c_ffi("Point_add_indirect")
+  @extern_c_indirect("Point_add_indirect")
   fun infix+(other: Point) -> Point
 
 }
@@ -27,18 +27,18 @@ struct Point is Deinitializable {
 // TODO: remove this once standard library compiles.
 extension Int {
 
-  @c_ffi("Int_add_indirect")
+  @extern_c_indirect("Int_add_indirect")
   fun infix+(other: Int) -> Int
 
-  @c_ffi("Int_to_i32_indirect")
+  @extern_c_indirect("Int_to_i32_indirect")
   fun to_i32() -> Int32
 
 }
 
-@c_ffi("set_value_to_3_at_address_indirect")
+@extern_c_indirect("set_value_to_3_at_address_indirect")
 fun set_value_to_3(of_byte_at address: Pointer<Never>)
 
-@c_ffi("get_byte_value_at_address_indirect")
+@extern_c_indirect("get_byte_value_at_address_indirect")
 fun get_value(of_byte_at address: Pointer<Never>) -> Int
 
 public fun main() -> Int32 {

@@ -66,7 +66,7 @@ extension Program {
   }
 
   /// Returns the name of the C function implementing `f` iff `f` was lowered from a declaration
-  /// annotated with `@c_ffi`.
+  /// annotated with `@extern_c_indirect`.
   private func cFFIName(
     of f: IRFunction.ID, in ctx: borrowing ModuleGenerationContext
   ) -> String? {
@@ -85,7 +85,7 @@ extension Program {
     if !self[ctx.hylo].ir[f].isMonomorphic { return }
 
     // Functions without a user-defined definition are just declared, except those annotated with
-    // `@c_ffi`, whose declaring module defines a synthesized body calling their C implementation.
+    // `@extern_c_indirect`, whose declaring module defines the indirect-to-Hylo thunk.
     if !self[ctx.hylo].ir[f].isDefined {
       if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
         let foreign = cFFIName(of: d)
@@ -968,8 +968,8 @@ extension Program {
     }
   }
 
-  /// Defines `m`, which is the LLVM function compiled from a `@c_ffi` declaration, as a thunk
-  /// calling `foreign`, the C function implementing that declaration.
+  /// Defines `m`, which is the LLVM function compiled from a `@extern_c_indirect` declaration, as a
+  /// thunk calling `foreign`, the C function implementing that declaration.
   ///
   /// The C function follows the indirect calling convention: it accepts one pointer for each
   /// parameter of `m`, in order, followed by a pointer to the storage receiving the result 

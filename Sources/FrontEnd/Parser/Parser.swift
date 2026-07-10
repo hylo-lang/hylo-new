@@ -186,15 +186,15 @@ public struct Parser {
         }
       }
 
-    case "c_ffi":
+    case "extern_c_indirect":
       if let (x, xs) = arguments.headAndTail {
         if case .number = x.value {
           report(expected("string argument", at: x.site))
         } else if let y = xs.first {
-          report(.init("'@c_ffi' accepts exactly 1 argument", at: y.site))
+          report(.init("'@extern_c_indirect' accepts exactly 1 argument", at: y.site))
         }
       } else {
-        report(.init("'@c_ffi' requires exactly 1 argument", at: identifier.site))
+        report(.init("'@extern_c_indirect' requires exactly 1 argument", at: identifier.site))
       }
 
     default:
