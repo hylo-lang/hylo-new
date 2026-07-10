@@ -20,6 +20,7 @@ extension Process {
     /// The arguments passed to the process.
     public let arguments: [String]
 
+    /// A textual description of the failure.
     public var description: String {
       """
       NonZeroExit:\(exitCode)
