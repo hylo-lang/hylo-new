@@ -3,13 +3,12 @@ import FrontEnd
 import Interpreter
 import Driver
 
-/// Execute `p` on interpreter and prints all the instruction executed.
+/// Execute `p` on interpreter.
 private func execute(_ p: Program) throws {
-  var logger = TreePrinter(program: p)
-
   var executor = Interpreter(p)
   while executor.isRunning {
-    print(executor.currentInstruction.show(using: &logger))
+    // TODO: Kept for debugging and observability; remove when no longer needed.
+    print(p.show(executor.currentInstruction))
     try executor.step()
   }
 }
