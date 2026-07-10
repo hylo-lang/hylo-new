@@ -6,7 +6,7 @@ import Interpreter
 extension Program {
 
   /// Returns a program loaded from `u` and lowered for interpretation.
-  static func loadForInterpretation(at u: URL) async throws -> Program {
+  static func loadForInterpretation(from u: URL) async throws -> Program {
     var d = Driver(targetSpecification: try .host())
     try await d.loadStandardLibrary()
     try await d.load("Main", withSourcesAt: u, dependingOnStandardLibrary: true)
