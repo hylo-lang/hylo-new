@@ -263,7 +263,7 @@ public struct Driver {
       isDirectory: false)
 
     var a = ["-c", source.path, "-o", o.path]   
-    if let r = Self.defaultRelocationModel.asClangArgument { a.append(r) } 
+    if let r = relocation.asClangArgument { a.append(r) } 
     
     _ = try Process.executionOutput(
       try Host.findNativeExecutable(invokedAs: "clang"), arguments: a)
