@@ -1349,7 +1349,7 @@ public struct Typer {
       // We don't use `program.storedProperties(of:)` because we have to ensure that all stored
       // properties are typed before we can form a corresponding parameter.
       for b in program.collect(BindingDeclaration.self, in: program[s].members) {
-        // Static properties are not excluded.
+        // Static properties are excluded.
         if program.isStatic(b) { continue }
 
         // Non-static properties are reflected in the parameter list.
