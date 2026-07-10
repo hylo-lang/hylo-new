@@ -241,18 +241,14 @@ public struct Driver {
     }
   }
 
-  /// Loads `module`, whose sources are in `root`, into `program`.
+  /// Loads `module`, whose sources are at `root`, into `program`.
   ///
   /// If `moduleCachePath` is set, the module is loaded from cache if an archive is found and its
   /// fingerprint matches the fingerprint of the source files in `root`. Otherwise, the module is
   /// compiled from sources and an archive is stored at `moduleCachePath`. If `moduleCachePath` is
   /// not set, the module is unconditionally compiled from sources and no archive is stored.
   public mutating func load(_ module: Module.Name, withSourcesAt root: URL) async throws {
-    // Compute a fingerprint of all source files.
-    var sources: [SourceFile] = []
-    try SourceFile.forEach(in: root) { (s) in
-      sources.append(s)
-    }
+    let sources = try sources(at: root)
 
     // Attempt to load the module from disk.
     do {
@@ -403,6 +399,22 @@ public struct Driver {
 
   }
 
+}
+
+/// Returns the source files at `location`.
+///
+/// If `location` identifies a file, the result contains that file.
+/// If `location` ientifies a directory, the result contains all source files in that directory.
+private func sources(at location: URL) throws -> [SourceFile] {
+  if location.pathExtension == "hylo" {
+    return [try SourceFile(contentsOf: location)]
+  } else {
+    var s: [SourceFile] = []
+    try SourceFile.forEach(in: location) {
+      s.append($0)
+    }
+    return s
+  }
 }
 
 extension SwiftyLLVM.Module {
