@@ -984,9 +984,12 @@ extension Program {
     for input in m.prototype.mapping.inputs {
       switch input.convention {
       case .erased:
-        
-        // TODO: emit diagnostic; zero-sized parameters have no counterpart in C.
-        continue
+        if case .lowered(let d) = self[ctx.hylo].ir[f].name {
+          self[ctx.hylo].addDiagnostic(.init(.error, 
+            "zero-sized types have no counterpart in C.", at: spanForDiagnostic(about: d)))
+        } else {
+          unreachable("@extern_c_indirect must have been lowered directly from a declaration")
+        }
 
       case .byValue(let j):
         let x = ctx.llvm.insertAlloca(input.type.llvm, at: p)

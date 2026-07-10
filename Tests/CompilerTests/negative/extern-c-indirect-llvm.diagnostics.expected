@@ -1,0 +1,3 @@
+negative/extern-c-indirect-llvm.hylo:3.5-7: error: zero-sized types have no counterpart in C.
+fun f1(x: Void)
+    ~~

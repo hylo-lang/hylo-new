@@ -7,6 +7,6 @@ fun f1() {}
 @extern_c_indirect("f2")
 fun f2()
 
-// Must not be generic
-@extern_c_indirect("ok")
+// Must not be generic.
+@extern_c_indirect("f3")
 fun f3<T>()
