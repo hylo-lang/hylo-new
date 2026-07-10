@@ -259,7 +259,7 @@ public struct Driver {
   /// Returns the path to the object file within `destinationDirectory`.
   public func compileC(source: URL, destinationDirectory: URL) throws -> URL {
     let o = destinationDirectory.appendingPathComponent(
-      source.deletingPathExtension().appendingPathExtension("o").lastPathComponent,
+      "\(UUID())-\(source.deletingPathExtension().appendingPathExtension("o").lastPathComponent))",
       isDirectory: false)
 
     var a = ["-c", source.path, "-o", o.path]   

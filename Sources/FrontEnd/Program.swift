@@ -1507,8 +1507,8 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `d` needs a user-defined a definition.
   ///
-  /// A declaration requires a definition unless it is a trait requirement, an FFI, an external
-  /// function, or a memberwise initializer.
+  /// A declaration requires a definition unless it is a trait requirement, an external function,
+  /// or a memberwise initializer.
   public func requiresDefinition(_ d: DeclarationIdentity) -> Bool {
     switch tag(of: d) {
     case FunctionDeclaration.self:
