@@ -1218,7 +1218,7 @@ extension Program {
       size = next + fieldSize
     }
 
-    let a = rs.last?.layout.alignment ?? 1
+    let a = if let max = ps.last { rs[max].layout.alignment } else { 1 }
     return ConcreteLayout(
       fields: elements, propertyToField: fieldToElement, size: .fixed(size), alignment: a)
   }
