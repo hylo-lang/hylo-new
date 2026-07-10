@@ -84,10 +84,14 @@ extension Program {
     // Don't compile generic functions.
     if !self[ctx.hylo].ir[f].isMonomorphic { return }
 
-    // Functions without a user-defined definition are just declared, except those annotated with
+    // Don't compile functions without a definition, except those annotated with
     // `@extern_c_indirect`, whose declaring module defines the indirect-to-Hylo thunk.
     if !self[ctx.hylo].ir[f].isDefined {
-      incorporateSynthesizedBody(of: f, in: &ctx)
+      if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
+        let foreign = externCName(of: d)
+      {
+        defineIndirectToHyloThunk(calling: foreign, in: f, in: &ctx)
+      }
       return
     }
 
@@ -103,17 +107,6 @@ extension Program {
     if isEntry(f, of: ctx.hylo) {
       ctx.llvm.setLinkage(.private, for: result.value)
       defineMain(calling: result, in: &ctx)
-    }
-  }
-
-  private mutating func incorporateSynthesizedBody(
-    of f: IRFunction.ID, in ctx: inout ModuleGenerationContext
-  ) {
-    if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
-      let foreign = externCName(of: d)
-    {
-      if !ctx.compiled.insert(f).inserted { return }
-      defineIndirectToHyloThunk(calling: foreign, in: f, in: &ctx)
     }
   }
 
@@ -985,6 +978,8 @@ extension Program {
   private mutating func defineIndirectToHyloThunk(
     calling foreign: String, in f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) {
+    if !ctx.compiled.insert(f).inserted { return }
+
     let m = demandFunction(f, in: &ctx)
     let e = ctx.llvm.appendBlock(to: m.value)
     let p = ctx.llvm.endOf(e)
@@ -1216,8 +1211,6 @@ extension Program {
           fields: [], propertyToField: Array(fs.indices), size: .fixed(s), alignment: a)
         return TypeMetadata(llvm: v, layout: l)
       } else if let properties = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
-        // Applications of generic structs (e.g. `Pointer<Never>`) are laid out as records of
-        // their fields after substitution of their type arguments.
         return program.metadata(record: n, fields: properties, in: &ctx)
       } else {
         fatalError("no LLVM metadata representation of the type '\(program.show(t))'")
