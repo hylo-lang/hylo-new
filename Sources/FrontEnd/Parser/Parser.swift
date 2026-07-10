@@ -189,7 +189,8 @@ public struct Parser {
 
     case "extern_c_indirect":
       guard let (x, xs) = arguments.headAndTail else {
-        report(.init("'@extern_c_indirect' requires exactly 1 string argument", at: identifier.site))
+        report(.init("'@extern_c_indirect' requires exactly 1 string argument", 
+          at: identifier.site))
         break
       }
       if case .string(let v) = x.value {

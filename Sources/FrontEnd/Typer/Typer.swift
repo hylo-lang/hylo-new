@@ -634,8 +634,8 @@ public struct Typer {
     guard let a = program.annotation("extern_c_indirect", appliedTo: d) else { return }
 
     if program[d].body != nil {
-      report(
-        .init(.error, "'@extern_c_indirect' cannot be applied to a function with a body", at: a.site))
+      report(.init(.error,
+        "'@extern_c_indirect' cannot be applied to a function with a body", at: a.site))
     }
     if program.isExtern(d) {
       report(.init(.error, "'@extern_c_indirect' cannot be combined with '@extern'", at: a.site))
