@@ -1005,13 +1005,13 @@ extension Program {
     // The C function accepts a trailing pointer to the storage receiving the result
     // unless zero-sized.
     let output = m.prototype.mapping.output!
-    var result: LLVMValue? = nil
+    var spilledResultPlace: LLVMValue? = nil
     switch output.convention {
     case .erased: break
     case .byValue:
       let x = ctx.llvm.insertAlloca(output.type.llvm, at: p)
       ctx.llvm.setAlignment(output.type.layout.alignment, for: x)
-      result = x.v
+      spilledResultPlace = x.v
       arguments.append(x.v)
 
     case .byReference(let j):
@@ -1023,7 +1023,7 @@ extension Program {
     let c = ctx.llvm.declareFunction(foreign, t)
     _ = ctx.llvm.insertCall(c, on: arguments, at: p)
 
-    if let r = result {
+    if let r = spilledResultPlace {
       let v = ctx.llvm.insertLoad(output.type.llvm, from: r, at: p)
       ctx.llvm.insertReturn(v, at: p)
     } else {
