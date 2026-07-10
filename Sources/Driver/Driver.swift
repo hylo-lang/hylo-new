@@ -262,10 +262,8 @@ public struct Driver {
       source.deletingPathExtension().appendingPathExtension("o").lastPathComponent,
       isDirectory: false)
 
-    var a = ["-c", source.path, "-o", o.path]
-    
-    // todo just stringify it directly.
-    if Self.defaultRelocationModel == .pic { a.append("-fPIC") } 
+    var a = ["-c", source.path, "-o", o.path]   
+    if let r = Self.defaultRelocationModel.asClangArgument { a.append(r) } 
     
     _ = try Process.executionOutput(
       try Host.findNativeExecutable(invokedAs: "clang"), arguments: a)
