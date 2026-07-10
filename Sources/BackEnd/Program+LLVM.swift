@@ -966,15 +966,10 @@ extension Program {
     }
   }
 
-  /// Defines `m`, which is the LLVM function compiled from a `@extern_c_indirect` declaration, as a
-  /// thunk calling `foreign`, the C function implementing that declaration.
+  /// Defines the calling convention adopting thunk compiled from a `@extern_c_indirect`
+  /// Hylo declaration `f`, calling `foreign` with indirect C convention.
   ///
-  /// The C function follows the indirect calling convention: it accepts one pointer for each
-  /// parameter of `m`, in order, followed by a pointer to the storage receiving the result 
-  /// (unless the result is `Void`), and returns `void`. The thunk spills the arguments that 
-  /// Hylo's convention passes by value into stack allocations to take their addresses, 
-  /// forwards by-reference arguments as-is, and reads the result back from its storage if
-  /// `m` returns by value.
+  /// - See: `Docs/ABI.md`
   private mutating func defineIndirectToHyloThunk(
     calling foreign: String, in f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) {
