@@ -67,11 +67,11 @@ extension Program {
 
   /// Returns the name of the C function implementing `f` iff `f` was lowered from a declaration
   /// annotated with `@extern_c_indirect`.
-  private func cFFIName(
+  private func externCName(
     of f: IRFunction.ID, in ctx: borrowing ModuleGenerationContext
   ) -> String? {
     if case .lowered(let d) = self[ctx.hylo].ir[f].name {
-      return cFFIName(of: d)
+      return externCName(of: d)
     } else {
       return nil
     }
@@ -88,7 +88,7 @@ extension Program {
     // `@extern_c_indirect`, whose declaring module defines the indirect-to-Hylo thunk.
     if !self[ctx.hylo].ir[f].isDefined {
       if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
-        let foreign = cFFIName(of: d)
+        let foreign = externCName(of: d)
       {
         if !ctx.compiled.insert(f).inserted { return }
         let result = demandFunction(f, in: &ctx)
@@ -699,7 +699,7 @@ extension Program {
     in ctx: inout ModuleGenerationContext
   ) {
     if isPrivate(self[ctx.hylo].ir[f].name, in: ctx.hylo) {
-      assert(self[ctx.hylo].ir[f].isDefined || cFFIName(of: f, in: ctx) != nil)
+      assert(self[ctx.hylo].ir[f].isDefined || externCName(of: f, in: ctx) != nil)
       ctx.llvm.setLinkage(.private, for: g)
     }
   }

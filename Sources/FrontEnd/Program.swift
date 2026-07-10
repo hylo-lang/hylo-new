@@ -1280,7 +1280,7 @@ public struct Program: Sendable {
   /// The returned function follows the indirect calling convention: it accepts one pointer for
   /// each non-erased parameter of `d`, in order, followed by a pointer to the storage receiving
   /// the result, and returns `void`.
-  public func cFFIName(of d: DeclarationIdentity) -> String? {
+  public func externCName(of d: DeclarationIdentity) -> String? {
     annotation("extern_c_indirect", appliedTo: d).flatMap { (a) in
       if case .some(.string(let n)) = a.arguments.first?.value {
         return n
