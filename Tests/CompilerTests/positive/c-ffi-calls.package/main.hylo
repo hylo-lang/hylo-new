@@ -1,44 +1,57 @@
 struct Point is Deinitializable {
 
-  var x: Int
-  var y: Int
+  // TODO: use `private data: UInt8[16]`
+  var bytes_0_7: Int
+  var bytes_8_15: Int
 
-  memberwise init
+  @c_ffi("Point_init_indirect")
+  public init(_ x: Int, _ y: Int)
 
-  @c_ffi("c_point_add_indirect")
+  @c_ffi("Point_get_x_indirect")
+  fun x() -> Int
+
+  @c_ffi("Point_get_y_indirect")
+  fun y() -> Int
+
+  @c_ffi("Point_set_x_indirect")
+  fun set_x(new_value: Int) -> Void
+
+  @c_ffi("Point_set_y_indirect")
+  fun set_y(new_value: Int) -> Void
+
+  @c_ffi("Point_add_indirect")
   fun infix+(other: Point) -> Point
-
-  fun deinit() sink {
-    _ = &self.x
-    _ = &self.y
-  }
 
 }
 
+// TODO: remove this once standard library compiles.
 extension Int {
 
-  @c_ffi("c_add_int_indirect")
+  @c_ffi("Int_add_indirect")
   fun infix+(other: Int) -> Int
 
-  @c_ffi("c_int_to_i32_indirect")
+  @c_ffi("Int_to_i32_indirect")
   fun to_i32() -> Int32
 
 }
 
-@c_ffi("c_byte_set_value_to_3_indirect")
+@c_ffi("set_value_to_3_at_address_indirect")
 fun set_value_to_3(of_byte_at address: Pointer<Never>)
 
-@c_ffi("c_byte_get_value")
+@c_ffi("get_byte_value_at_address_indirect")
 fun get_value(of_byte_at address: Pointer<Never>) -> Int
 
 public fun main() -> Int32 {
-  let p = Point(x: 1, y: 2)
-  let q = Point(x: 3, y: 4)
-  let r = p + q // == Point(4, 6)
+  var p = Point(x: 1, y: 2)
+  var q = Point(x: 3, y: 4)
+
+  &p.set_x(3)
+  &q.set_y(2)
+  let r = p + q // == Point(6, 4)
   
   let pointer = malloc(1)
   set_value_to_3(of_byte_at: pointer)
   let three = get_value(of_byte_at: pointer)
   
-  return (r.x + r.y + three).to_i32() // 4 + 6 + 3 == 13
+  return (r.x() + r.y() + three).to_i32() // 6 + 4 + 3 == 13
 }
