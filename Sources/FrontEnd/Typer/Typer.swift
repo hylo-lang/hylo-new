@@ -624,24 +624,24 @@ public struct Typer {
     check(program[d].parameters)
     check(body: program[d].body, of: .init(d), expectingOutputType: a.output)
     checkCaptures(of: d)
-    checkCFFI(d)
+    checkExternCIndirect(d)
 
     // TODO: Redeclarations
   }
 
   /// Checks invariants of `@extern_c_indirect` if the annotation is present.
-  private mutating func checkCFFI(_ d: FunctionDeclaration.ID) {
-    guard program.isCFFI(d) else { return }
-    let s = program.spanForDiagnostic(about: d)
+  private mutating func checkExternCIndirect(_ d: FunctionDeclaration.ID) {
+    guard let a = program.annotation("extern_c_indirect", appliedTo: d) else { return }
 
     if program[d].body != nil {
       report(
-        .init(.error, "'@extern_c_indirect' cannot be applied to a function with a body", at: s))
+        .init(.error, "'@extern_c_indirect' cannot be applied to a function with a body", at: a.site))
     }
     if program.isExtern(d) {
-      report(.init(.error, "'@extern_c_indirect' cannot be combined with '@extern'", at: s))
+      report(.init(.error, "'@extern_c_indirect' cannot be combined with '@extern'", at: a.site))
     }
     if !accumulatedGenericParameters(visibleFrom: .init(node: d)).isEmpty {
+      let s = program.spanForDiagnostic(about: d)
       report(.init(.error, "'@extern_c_indirect' cannot be applied to a generic function", at: s))
     }
   }

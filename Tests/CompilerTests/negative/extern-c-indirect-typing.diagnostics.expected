@@ -1,0 +1,9 @@
+negative/extern-c-indirect-typing.hylo:2.1-25: error: '@extern_c_indirect' cannot be applied to a function with a body
+@extern_c_indirect("f1")
+~~~~~~~~~~~~~~~~~~~~~~~~
+negative/extern-c-indirect-typing.hylo:7.1-25: error: '@extern_c_indirect' cannot be combined with '@extern'
+@extern_c_indirect("f2")
+~~~~~~~~~~~~~~~~~~~~~~~~
+negative/extern-c-indirect-typing.hylo:12.5-7: error: '@extern_c_indirect' cannot be applied to a generic function
+fun f3<T>()
+    ~~

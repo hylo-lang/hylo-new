@@ -181,20 +181,26 @@ public struct Parser {
       if let (x, xs) = arguments.headAndTail {
         if x.value != .string("always") && x.value != .string("never") {
           report(expected("'always' or 'never'", at: x.site))
-        } else if let y = xs.first {
+        }
+        if let y = xs.first {
           report(.init("'@inline' accepts at most 1 argument", at: y.site))
         }
       }
 
     case "extern_c_indirect":
-      if let (x, xs) = arguments.headAndTail {
-        if case .number = x.value {
-          report(expected("string argument", at: x.site))
-        } else if let y = xs.first {
-          report(.init("'@extern_c_indirect' accepts exactly 1 argument", at: y.site))
+      guard let (x, xs) = arguments.headAndTail else {
+        report(.init("'@extern_c_indirect' requires exactly 1 string argument", at: identifier.site))
+        break
+      }
+      if case .string(let v) = x.value {
+        if v.isEmpty {
+          report(expected("non-empty string argument", at: x.site))
         }
       } else {
-        report(.init("'@extern_c_indirect' requires exactly 1 argument", at: identifier.site))
+        report(expected("string argument", at: x.site))
+      }
+      if let y = xs.first {
+        report(.init("'@extern_c_indirect' accepts exactly 1 argument", at: y.site))
       }
 
     default:

@@ -464,7 +464,7 @@ public struct Program: Sendable {
   }
 
   /// Returns `true` iff `n` is implemented by a C function using the indirect calling convention.
-  public func isCFFI(_ n: FunctionDeclaration.ID) -> Bool {
+  public func isExternCIndirect(_ n: FunctionDeclaration.ID) -> Bool {
     annotation("extern_c_indirect", appliedTo: n) != nil
   }
 
@@ -1513,7 +1513,7 @@ public struct Program: Sendable {
     switch tag(of: d) {
     case FunctionDeclaration.self:
       let f = castUnchecked(d, to: FunctionDeclaration.self)
-      return !isRequirement(f) && !isExtern(f) && !isCFFI(f)
+      return !isRequirement(f) && !isExtern(f) && !isExternCIndirect(f)
         && !self[f].isMemberwiseInitializer
     default:
       return !isRequirement(d)
