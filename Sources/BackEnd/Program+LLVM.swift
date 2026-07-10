@@ -87,13 +87,7 @@ extension Program {
     // Functions without a user-defined definition are just declared, except those annotated with
     // `@extern_c_indirect`, whose declaring module defines the indirect-to-Hylo thunk.
     if !self[ctx.hylo].ir[f].isDefined {
-      if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
-        let foreign = externCName(of: d)
-      {
-        if !ctx.compiled.insert(f).inserted { return }
-        let result = demandFunction(f, in: &ctx)
-        defineCFFIThunk(implementedBy: foreign, into: result, in: &ctx)
-      }
+      incorporateSynthesizedBody(of: f, in: &ctx)
       return
     }
 
@@ -109,6 +103,17 @@ extension Program {
     if isEntry(f, of: ctx.hylo) {
       ctx.llvm.setLinkage(.private, for: result.value)
       defineMain(calling: result, in: &ctx)
+    }
+  }
+
+  private mutating func incorporateSynthesizedBody(
+    of f: IRFunction.ID, in ctx: inout ModuleGenerationContext
+  ) {
+    if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
+      let foreign = externCName(of: d)
+    {
+      if !ctx.compiled.insert(f).inserted { return }
+      defineIndirectToHyloThunk(calling: foreign, in: f, in: &ctx)
     }
   }
 
@@ -977,10 +982,10 @@ extension Program {
   /// Hylo's convention passes by value into stack allocations to take their addresses, 
   /// forwards by-reference arguments as-is, and reads the result back from its storage if
   /// `m` returns by value.
-  private mutating func defineCFFIThunk(
-    implementedBy foreign: String, into m: FunctionMetadata,
-    in ctx: inout ModuleGenerationContext
+  private mutating func defineIndirectToHyloThunk(
+    calling foreign: String, in f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) {
+    let m = demandFunction(f, in: &ctx)
     let e = ctx.llvm.appendBlock(to: m.value)
     let p = ctx.llvm.endOf(e)
 
