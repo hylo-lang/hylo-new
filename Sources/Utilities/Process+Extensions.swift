@@ -23,8 +23,7 @@ extension Process {
     /// A textual description of the failure.
     public var description: String {
       """
-      NonZeroExit:\(exitCode)
-      Of command: \(executable) \(arguments.joined(separator: " "))
+      '\(executable) \(arguments.joined(separator: " "))' exited with status \(exitCode).
       
       Standard Output:
       \(standardOutput)
