@@ -219,7 +219,7 @@ public struct Driver {
 
       try FileManager.default.withUniqueTemporaryDirectory { (d) in
         let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
-        let cObjects = try cSources.map { (s) in try compileC(source: s, destinationDirectory: d) }
+        let cObjects = try cSources.map { (s) in try compileCToObject(source: s, destinationDirectory: d) }
         try linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }
     }
@@ -257,9 +257,11 @@ public struct Driver {
   /// Compiles `source` using `clang` to an object file.
   ///
   /// Returns the path to the object file within `destinationDirectory`.
-  public func compileC(source: URL, destinationDirectory: URL) throws -> URL {
-    let o = destinationDirectory.appendingPathComponent(
-      "\(UUID())-\(source.deletingPathExtension().appendingPathExtension("o").lastPathComponent))",
+  public func compileCToObject(source: URL, destinationDirectory: URL) throws -> URL {
+    let uniquePrefix = source.hashValue
+    let fileName = source.deletingPathExtension().appendingPathExtension("o").lastPathComponent
+
+    let o = destinationDirectory.appendingPathComponent("\(uniquePrefix)-\(fileName))",
       isDirectory: false)
 
     var a = ["-c", source.path, "-o", o.path]   
