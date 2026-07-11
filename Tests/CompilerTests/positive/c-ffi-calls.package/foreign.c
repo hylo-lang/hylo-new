@@ -14,7 +14,6 @@ void Point_init_indirect(
   self->y = *y;
 }
 
-
 void Point_get_x_indirect(struct Point const* self, intptr_t* result) {
   *result = self->x;
 }
