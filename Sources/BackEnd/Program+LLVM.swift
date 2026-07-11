@@ -82,21 +82,15 @@ extension Program {
     _ f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) {
     // Don't compile generic functions.
-    if !self[ctx.hylo].ir[f].isMonomorphic { return }
+    guard self[ctx.hylo].ir[f].isMonomorphic else { return }
 
-    // Don't compile functions without a definition, except those annotated with
-    // `@extern_c_indirect`, whose declaring module defines the indirect-to-Hylo thunk.
-    if !self[ctx.hylo].ir[f].isDefined {
-      if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
-        let foreign = externCName(of: d)
-      {
-        defineIndirectToHyloThunk(calling: foreign, in: f, in: &ctx)
-      }
-      return
+    // Don't compile functions without a definition, unless `@extern_c_indirect`-annotated.
+    guard self[ctx.hylo].ir[f].isDefined else {
+      return defineIndirectToHyloThunkIfNeeded(in: f, in: &ctx)
     }
 
     // Don't re-compile functions.
-    if !ctx.compiled.insert(f).inserted { return }
+    guard ctx.compiled.insert(f).inserted else { return }
 
     // Get the declaraiton of LLVM function corresponding to `f`. It is possible that this function
     // has already been declared if it has been referred to by some code that was compiled first.
@@ -963,6 +957,17 @@ extension Program {
       ctx.llvm.insertReturn(v, at: p)
     } else {
       ctx.llvm.insertReturn(i32.unsafe[].zero, at: p)
+    }
+  }
+
+  /// Defines the C calling convention adopting thunk if `f` is annotated with `@extern_c_indirect`.
+  private mutating func defineIndirectToHyloThunkIfNeeded(
+    in f: IRFunction.ID, in ctx: inout ModuleGenerationContext
+  ) {
+    if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
+      let foreign = externCName(of: d)
+    {
+      defineIndirectToHyloThunk(calling: foreign, in: f, in: &ctx)
     }
   }
 
