@@ -219,7 +219,9 @@ public struct Driver {
 
       try FileManager.default.withUniqueTemporaryDirectory { (d) in
         let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
-        let cObjects = try cSources.map { (s) in try compileCToObject(source: s, destinationDirectory: d) }
+        let cObjects = try cSources.map { (s) in
+          try compileCToObject(source: s, destinationDirectory: d)
+        }
         try linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }
     }
