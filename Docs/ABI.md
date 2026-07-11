@@ -37,6 +37,7 @@ float length(P const* self);
 TODO
 
 ### Indirect C Calling Convention
+
 For C interoperability, we pass every parameter and the return value indirectly through the language
 boundary. For the detailed motivations, see 
 https://github.com/orgs/hylo-lang/discussions/1122#discussioncomment-17090235.
