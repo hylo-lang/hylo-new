@@ -2127,10 +2127,11 @@ internal struct IREmitter {
       _emitArgumentAccesses(&arguments, toApplyOrProject: callee, typed: t)
     }
 
+    let o = program.types.dealiased(program.types[t].output)
     let s = IRProject(
       callee: callee, arguments: arguments,
-      projectee: program.types[t].output,
       access: program.types[t].effect,
+      projectee: o,
       anchor: currentAnchor)
     return insert(s)!
   }
