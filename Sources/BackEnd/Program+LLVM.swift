@@ -960,7 +960,7 @@ extension Program {
     }
   }
 
-  /// Defines the C calling convention adopting thunk if `f` is annotated with `@extern_c_indirect`.
+  /// Defines the calling convention adopting thunk if `f` is annotated with `@extern_c_indirect`.
   private mutating func defineIndirectToHyloThunkIfNeeded(
     in f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) {
@@ -971,8 +971,8 @@ extension Program {
     }
   }
 
-  /// Defines the calling convention adopting thunk compiled from a `@extern_c_indirect`
-  /// Hylo declaration `f`, calling `foreign` with indirect C convention.
+  /// Defines a thunk representing a Hylo function that calls the C function `foreign` having
+  /// *indirect C calling* convention.
   ///
   /// - See: `Docs/ABI.md`
   private mutating func defineIndirectToHyloThunk(
