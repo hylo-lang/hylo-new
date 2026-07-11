@@ -13,6 +13,7 @@
 - 0-sized parameters are erased.
 
 Examples:
+
 ```cpp
 fun f(p1: let Int, p2: inout Int32, let p3: LargeStruct) -> Int
 // roughly translates to:
@@ -24,6 +25,7 @@ fun g(a: let Vector2, b: let Vector2) -> Vector2
 // roughly translates to: 
 void g(Vector2 const* a, Vector2 const* b, Vector2* result);
 ```
+
 ```cpp
 struct Vector2 {
   var (x, t): {Float32, Float32}
@@ -34,16 +36,16 @@ float length(P const* self);
 ```
 
 ### Closure representation
+
 TODO
 
 ### Indirect C Calling Convention
 
-For C interoperability, we pass every parameter and the return value indirectly through the language
-boundary. For the detailed motivations, see 
+For C interoperability, we pass every parameter and the return value indirectly through the language boundary. For the detailed motivations, see 
 https://github.com/orgs/hylo-lang/discussions/1122#discussioncomment-17090235.
 
-We can declare an `@extern_c_indirect`-annotated function in Hylo, and implement it in C. In the 
-indirect C calling convention:
+We can declare an `@extern_c_indirect`-annotated function in Hylo, and implement it in C. In the indirect C calling convention:
+
 - All parameters are passed indirectly, except zero-sized ones, which are ignored.
 - The return value is passed as the last parameter, except if zero-sized.
 
@@ -54,10 +56,12 @@ Example:
 @extern_c_indirect("eq_int_indirect")
 fun eq(x: Int, y: Int) -> Bool
 ```
+
 ```c
 // Indirect C function
 void eq_int_indirect(intptr_t const* x, intptr_t* y, char* result) {
   *result = *x == *y;
 }
 ```
+
 Here the type layout of `intptr_t` is assumed to match `Int`; same for `char` and `Bool`.
