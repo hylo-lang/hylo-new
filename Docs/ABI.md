@@ -51,7 +51,7 @@ Example:
 
 ```hylo
 // Hylo FFI thunk declaration
-@c_ffi("eq_int_indirect")
+@extern_c_indirect("eq_int_indirect")
 fun eq(x: Int, y: Int) -> Bool
 ```
 ```c
