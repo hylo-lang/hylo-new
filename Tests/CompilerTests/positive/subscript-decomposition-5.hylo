@@ -1,0 +1,22 @@
+//! exit-status:23
+
+@inline(never)
+subscript id(x: inout Int32) inout -> Int32 {
+  yield &x
+}
+
+fun main() -> Int32 {
+  var a: Int32 = 0
+  var b: Int32 = 0
+  var c: Int32 = 0
+
+  inout x = &id[&a]
+  inout y = &id[&b]
+  inout z = &id[&c]
+
+  &x = 23
+  &y = 34
+  &z = 45
+
+  return a
+}

@@ -143,24 +143,29 @@ extension FunctionGenerationContext {
       let x = module.llvm.insertGetElementPointerInBounds(
         of: frame, typed: prologue.captureFrame, indices: [0, 1, i], indexType: module.llvm.i32,
         at: insertionPoint!)
-      if isBareProject(d) {
-        saveBareProject(to: x)
-      } else {
+
+      // If the capture is defined by `project`, we have to bundle the projected value together
+      // with the projection's slide. These values are parameters of the function being compiled
+      // iff this function implements the plateau corresponding to the capture (case 1). Otherwise,
+      // the values are already been bundled, which has been opened in the function being compiled
+      // using `setupDominatingDefinitions(dominatedBy:from:into:metadata)`.
+      if let i = d.register, ir.tag(of: i) == IRProject.self {
+        if value[d] == llvm.unsafe[].parameters.first?.v {
+          saveBareProject(to: x)
+        } else {
+          let u = SwiftyLLVM.Load.UnsafeReference(value[d]!)
+          let y = u!.unsafe[].operands[0]
+          module.llvm.insertStore(y, to: x, at: insertionPoint!)
+        }
+      }
+
+      // If the capture is not defined by `project`, then we can simply save it.
+      else {
         module.llvm.insertStore(value[d]!, to: x, at: insertionPoint!)
       }
     }
 
     return frame
-  }
-
-  /// Returns `true` iff  `d` is a `project` instruction represented in the parameters of the
-  /// function being compiled, which is a plateau.
-  private func isBareProject(_ d: FrontEnd.IRValue) -> Bool {
-    if let i = d.register, ir.tag(of: i) == IRProject.self {
-      return value[d] == llvm.unsafe[].parameters.first?.v
-    } else {
-      return false
-    }
   }
 
   /// Stores to `slot` the address of a triple describing arguments of the plateau being compiled
