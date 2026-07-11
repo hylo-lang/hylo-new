@@ -145,7 +145,7 @@ extension FunctionGenerationContext {
         at: insertionPoint!)
 
       // If the capture is defined by `project`, we have to bundle the projected value together
-      // with the projection's slide. These values are paremeters of the function being compiled
+      // with the projection's slide. These values are parameters of the function being compiled
       // iff this function implements the plateau corresponding to the capture (case 1). Otherwise,
       // the values are already been bundled, which has been opened in the function being compiled
       // using `setupDominatingDefinitions(dominatedBy:from:into:metadata)`.
@@ -159,7 +159,7 @@ extension FunctionGenerationContext {
         }
       }
 
-      // If the capture is not defiend by `project`, then we can simply save it.
+      // If the capture is not defined by `project`, then we can simply save it.
       else {
         module.llvm.insertStore(value[d]!, to: x, at: insertionPoint!)
       }
