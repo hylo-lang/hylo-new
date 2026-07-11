@@ -64,10 +64,10 @@ public struct Driver {
 
   #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
   /// The root folder of the standard library's sources.
-  let chosenStandardLibraryRoot = bundledStandardLibrarySources
+  private let chosenStandardLibraryRoot = bundledStandardLibrarySources
   #else
   /// The root folder of the standard library's sources.
-  let chosenStandardLibraryRoot = localStandardLibrarySources
+  private let chosenStandardLibraryRoot = localStandardLibrarySources
   #endif
 
   /// Creates an instance with the given properties.
