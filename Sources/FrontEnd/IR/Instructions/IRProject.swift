@@ -11,15 +11,15 @@ public struct IRProject: IRRegionEntry {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The type of the projected value.
-  public let projectee: AnyTypeIdentity
-
   /// The capabilities of the projection.
   public let access: AccessEffect
 
+  /// The type of the projected value.
+  public let projectee: AnyTypeIdentity
+
   /// Creates an instance with the given properties.
   public init(
-    callee: IRValue, arguments: [IRValue], projectee: AnyTypeIdentity, access: AccessEffect,
+    callee: IRValue, arguments: [IRValue], access: AccessEffect, projectee: AnyTypeIdentity,
     anchor: Anchor
   ) {
     var operands = Array<IRValue>(minimumCapacity: arguments.count + 1)
@@ -28,16 +28,16 @@ public struct IRProject: IRRegionEntry {
 
     self.operands = operands
     self.anchor = anchor
-    self.projectee = projectee
     self.access = access
+    self.projectee = projectee
   }
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
   public init(_ other: Self, substituting properties: IRSubstitutionTable) {
     self.operands = other.operands.map({ (o) in properties[o] })
     self.anchor = properties.anchor(other)
-    self.projectee = other.projectee
     self.access = other.access
+    self.projectee = other.projectee
   }
 
   /// The subscript being applied.

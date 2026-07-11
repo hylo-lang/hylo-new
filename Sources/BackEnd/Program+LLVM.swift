@@ -173,6 +173,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRMemoryCopy.self), in: &ctx)
     case IRPlaceCast.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRPlaceCast.self), in: &ctx)
+    case IRPlaceCast.End.self:
+      return ctx.ir.instruction(after: i)
     case IRProject.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRProject.self), in: &ctx)
     case IRProperty.self:

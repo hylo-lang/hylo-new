@@ -63,9 +63,6 @@ extension IREmitter {
     let poly = program[module].ir[c]
     let mono = demandExistentialized(poly)
 
-    // Get the types of the parameters of the original poloymorphic function.
-    let parameters = poly.termParameters.map(\.type)
-
     // Create an array with a type witness for each of the type argument passed to `i`. These
     // witnesses will be concatenated with the term arguments of each use application of `c`
     // instantiated by `i`.
@@ -82,12 +79,12 @@ extension IREmitter {
         // `i` is used as a callee in an ordinary function application.
         depolymorphize(
           polymorphicApplyUser: u.user, with: mono,
-          passing: witnesses, to: parameters, in: &f)
+          passing: witnesses, to: poly.termParameters, in: &f)
 
       case IRProject.self where u.index == 0:
         depolymorphize(
           polymorphicProjectUser: u.user, with: mono,
-          passing: witnesses, to: parameters, in: &f)
+          passing: witnesses, to: poly.termParameters, in: &f)
 
       default:
         unimplemented()
@@ -98,52 +95,60 @@ extension IREmitter {
     f.remove(i.erased)
   }
 
-  /// Replaces `u`, which is the application of a polymorphic abstraction, with an application of
-  /// `mono`, which is the existentialized form of `u`'s callee.
+  /// Replaces `user`, which is the application of a polymorphic abstraction, with an application
+  /// of `mono`, which is the existentialized form of `u`'s callee.
   ///
   /// - Parameters:
-  ///   - user: The user of a `type_apply` instantiating the polymorphic function of which `mono`is
-  ///     the existentialization.
+  ///   - user: An `apply` instruction whose callee is the result of a `type_apply` instantiating
+  ///     the polymorphic function, of which `mono`is the existentialization.
   ///   - mono: The identity of an existentialized function.
   ///   - witnesses: witnesses for each type parameter in the original polymorphic function.
   ///   - parameters: The types of the term parameters of the polymorphic function.
   ///   - f: The function containing `user`.
   private mutating func depolymorphize(
     polymorphicApplyUser user: AnyInstructionIdentity, with mono: IRFunction.ID,
-    passing witnesses: [IRValue], to parameters: [AnyTypeIdentity], in f: inout IRFunction
+    passing witnesses: [IRValue], to parameters: [IRParameter], in f: inout IRFunction
   ) {
     let old = f.at(user) as! IRApply
 
     var xs = witnesses
     let result = lowering(before: user, in: &f) { (e) in
-      for (a, p) in zip(old.arguments, parameters) { xs.append(e._emitCast(a, to: p)) }
-      return e._emitCast(old.result, to: parameters.last!)
+      for (a, p) in zip(old.arguments, parameters) {
+        xs.append(e._emitCast(a, to: p.access, p.type))
+      }
+      let last = parameters.last!
+      return e._emitCast(old.result, to: last.access, last.type)
     }
 
     let referenceToMono = functionReference(to: mono)
-    let s = IRApply(callee: referenceToMono, arguments: xs, result: result, anchor: old.anchor)
-    f.replace(user, with: s)
+    f.replace(
+      user,
+      with: IRApply(callee: referenceToMono, arguments: xs, result: result, anchor: old.anchor))
+
+    f.closeOpenEndedRegions()
   }
 
-  /// Replaces `u`, which is the application of a polymorphic abstraction, with an application of
-  /// `mono`, which is the existentialized form of `u`'s callee.
+  /// Replaces `user`, which is the application of a polymorphic abstraction, with an application
+  /// of `mono`, which is the existentialized form of `u`'s callee.
   ///
-  /// This method is similar to `depolymorphize(polymorphicApplyUser:with:passing:to:in:)` only for
-  /// the case where `user` is a projection rather than an application.
+  /// This method is similar to `depolymorphize(polymorphicApplyUser:with:passing:to:in:)`, except
+  /// that `user` is a `project` instruction rather than an `apply`.
   private mutating func depolymorphize(
     polymorphicProjectUser user: AnyInstructionIdentity, with mono: IRFunction.ID,
-    passing witnesses: [IRValue], to parameters: [AnyTypeIdentity], in f: inout IRFunction
+    passing witnesses: [IRValue], to parameters: [IRParameter], in f: inout IRFunction
   ) {
     let old = f.at(user) as! IRProject
 
     var xs = witnesses
     lowering(before: user, in: &f) { (e) in
-      for (a, p) in zip(old.arguments, parameters) { xs.append(e._emitCast(a, to: p)) }
+      for (a, p) in zip(old.arguments, parameters) {
+        xs.append(e._emitCast(a, to: p.access, p.type))
+      }
     }
 
     let referenceToMono = functionReference(to: mono)
     let s = IRProject(
-      callee: referenceToMono, arguments: xs, projectee: old.projectee, access: old.access,
+      callee: referenceToMono, arguments: xs, access: old.access, projectee: old.projectee,
       anchor: old.anchor)
 
     // Cast the result of the projection if necessary.
@@ -152,9 +157,13 @@ extension IREmitter {
       assert(t == f.resolved(s.type)!.type)
       f.replace(user, with: s)
     } else {
-      let x0 = lowering(before: user, in: &f, { $0.insert(s) })
-      f.replace(user, with: IRPlaceCast(source: x0!, target: t, anchor: old.anchor))
+      let x = lowering(before: user, in: &f, { $0.insert(s) })!
+      f.replace(
+        user,
+        with: IRPlaceCast(source: x, access: old.access, target: t, anchor: old.anchor))
     }
+
+    f.closeOpenEndedRegions()
   }
 
   /// Returns the identity of the existentialized form of the polymorphic function `f`.
