@@ -1795,9 +1795,9 @@ extension Program {
         let b = select(from: a, .symbol(n.rawValue)).uniqueElement,
         let d = castToDeclaration(b)
       else {
-         precondition(allowPartialStandardLibrary, 
-           "missing or corrupt standard library; missing \(n.rawValue)")
-         continue
+        precondition(allowPartialStandardLibrary,
+          "missing or corrupt standard library; missing \(n.rawValue)")
+        continue
       }
       standardLibraryDeclarations[n] = d
     }

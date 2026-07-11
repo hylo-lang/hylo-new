@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 /// The top-level command of `hc-generate-stdlib`.
-@main struct CommandLine: ParsableCommand {
+@main internal struct CommandLine: ParsableCommand {
 
   @Option(
     name: .customLong("output"),
@@ -10,9 +10,9 @@ import Foundation
     transform: URL.init(fileURLWithPath:))
   private var outputFile: URL
 
-  /// Executes the CLI command, generating output file at `outputFile`.
-  public func run() throws {
-    let contents = try generateIntegerTypes()
+  /// Executes the CLI command, writing the generated declarations to `outputFile`.
+  internal func run() throws {
+    let contents = generateIntegerTypes()
     try contents.write(to: outputFile, atomically: true, encoding: .utf8)
   }
 

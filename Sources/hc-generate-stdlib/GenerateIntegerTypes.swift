@@ -1,7 +1,7 @@
 import Foundation
 
-/// Generates `Integers.hylo` inside `outputDirectory`, creating the directory if needed.
-func generateIntegerTypes() throws -> String {
+/// Returns the Hylo source code declaring the standard library's integer types.
+func generateIntegerTypes() -> String {
   var types: [IntegerTypeDefinition] = []
 
   for bits in [8, 16, 32, 64] {
@@ -39,17 +39,10 @@ extension IntegerTypeDefinition {
 }
 
 /// Whether an integer type is signed or unsigned.
-enum SignednessPrefix: String, CustomStringConvertible {
+enum SignednessPrefix: String {
 
   case signed = "s"
   case unsigned = "u"
-
-  var description: String {
-    switch self {
-    case .signed: "signed"
-    case .unsigned: "unsigned"
-    }
-  }
 
   /// The description of the signedness prefixed with an indefinite article.
   var prefixedDescription: String {
@@ -67,7 +60,9 @@ enum SignednessPrefix: String, CustomStringConvertible {
 /// The size of an integer type.
 enum Size {
 
-  /// The type is capable of representing the size of the largest object in memory on the target platform.
+  /// The type can represent the size of the largest object in memory on the target platform.
+  ///
+  /// Equivalent of `size_t`/`ssize_t` in C.
   case fittingLargestObjectSize
 
   /// The type has exactly `bits` bits.
@@ -105,7 +100,7 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
         /// Returns the absolute value of `self`.
         ///
-        /// - Precondition: `self` must not be `\(declarationName)`'s minimum value.
+        /// - Requires: `self` must not be `\(declarationName)`'s minimum value.
         public fun abs() -> Self {
           if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
         }
@@ -122,10 +117,10 @@ struct IntegerTypeDefinition: CustomStringConvertible {
       /// The raw value of this instance.
       module var value: Builtin.\(builtinType)
 
-      /// Cre ates an instance with its raw value.
+      /// Creates an instance with its raw value.
       module memberwise init
 
-      /// Creates an instance equal to `false`.
+      /// Creates an instance with value `0`.
       public init() {
         &self.value = Builtin.zeroinitializer_\(builtinType)()
       }\(absMethod ?? "")
@@ -156,22 +151,26 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
       /// Returns `true` iff `self` is less than `other`.
       public fun infix< (other: Self) -> Bool {
-        .new(value: Builtin.icmp_\(signedness.abbreviated)lt_\(builtinType)(self.value, other.value))
+        .new(value: \
+    Builtin.icmp_\(signedness.abbreviated)lt_\(builtinType)(self.value, other.value))
       }
 
       /// Returns `true` iff `self` is less than or equal to `other`.
       public fun infix<= (other: Self) -> Bool {
-        .new(value: Builtin.icmp_\(signedness.abbreviated)le_\(builtinType)(self.value, other.value))
+        .new(value: \
+    Builtin.icmp_\(signedness.abbreviated)le_\(builtinType)(self.value, other.value))
       }
 
       /// Returns `true` iff `self` is greater than `other`.
       public fun infix> (other: Self) -> Bool {
-        .new(value: Builtin.icmp_\(signedness.abbreviated)gt_\(builtinType)(self.value, other.value))
+        .new(value: \
+    Builtin.icmp_\(signedness.abbreviated)gt_\(builtinType)(self.value, other.value))
       }
 
       /// Returns `true` iff `self` is greater than or equal to `other`.
       public fun infix>= (_ other: Self) -> Bool {
-        .new(value: Builtin.icmp_\(signedness.abbreviated)ge_\(builtinType)(self.value, other.value))
+        .new(value: \
+    Builtin.icmp_\(signedness.abbreviated)ge_\(builtinType)(self.value, other.value))
       }
 
     }
@@ -180,7 +179,8 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
       /// Returns `self` added to `other`.
       fun infix+ (other: Self) -> Self {
-        let (result, overflow) = Builtin.\(signedness.abbreviated)add_with_overflow_\(builtinType)(self.value, other.value)
+        let (result, overflow) = \
+    Builtin.\(signedness.abbreviated)add_with_overflow_\(builtinType)(self.value, other.value)
         if Bool(value: overflow) {
           fatal_error()
         } else {
@@ -195,7 +195,8 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
       /// Returns `other` subtracted from `self`.
       fun infix- (other: Self) -> Self {
-        let (result, overflow) = Builtin.\(signedness.abbreviated)sub_with_overflow_\(builtinType)(self.value, other.value)
+        let (result, overflow) = \
+    Builtin.\(signedness.abbreviated)sub_with_overflow_\(builtinType)(self.value, other.value)
         if Bool(value: overflow) {
           fatal_error()
         } else {
@@ -219,7 +220,8 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
       /// Returns `self` multiplied by `other`.
       fun infix* (other: Self) -> Self {
-        let (result, overflow) = Builtin.\(signedness.abbreviated)mul_with_overflow_\(builtinType)(self.value, other.value)
+        let (result, overflow) = \
+    Builtin.\(signedness.abbreviated)mul_with_overflow_\(builtinType)(self.value, other.value)
         if Bool(value: overflow) {
           fatal_error()
         } else {
@@ -229,7 +231,7 @@ struct IntegerTypeDefinition: CustomStringConvertible {
 
       /// Multiplies `self` by `other`.
       public fun infix*= (other: Self) inout {
-        &self.value = Builtin.mul_\(builtinType)(self.value, other.value)
+        &self = self * other
       }
 
     }

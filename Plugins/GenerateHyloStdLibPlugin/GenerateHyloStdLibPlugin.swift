@@ -3,7 +3,7 @@ import PackagePlugin
 
 /// The SPM plugin generating repetitive parts of the standard library using `hc-generate-stdlib`.
 @main
-struct GenerateHyloIntegersPlugin: BuildToolPlugin {
+struct GenerateHyloStdLibPlugin: BuildToolPlugin {
 
   func createBuildCommands(
     context: PackagePlugin.PluginContext, target: any PackagePlugin.Target
