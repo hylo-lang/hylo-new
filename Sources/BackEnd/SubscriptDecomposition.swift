@@ -168,16 +168,6 @@ extension FunctionGenerationContext {
     return frame
   }
 
-  /// Returns `true` iff  `d` is a `project` instruction represented in the parameters of the
-  /// function being compiled, which is a plateau.
-  private func isBareProject(_ d: FrontEnd.IRValue) -> Bool {
-    if let i = d.register, ir.tag(of: i) == IRProject.self {
-      return value[d] == llvm.unsafe[].parameters.first?.v
-    } else {
-      return false
-    }
-  }
-
   /// Stores to `slot` the address of a triple describing arguments of the plateau being compiled
   /// that relate to the projection associated with that plateau.
   ///
