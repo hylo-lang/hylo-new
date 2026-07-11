@@ -40,7 +40,7 @@ void Point_add_indirect(
 void Int_add_indirect(
   intptr_t const* a, intptr_t const* b, intptr_t* result
 ) {
-    *result = *a + *b;
+  *result = *a + *b;
 }
 
 void Int_to_i32_indirect(
