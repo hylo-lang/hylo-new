@@ -2104,9 +2104,11 @@ internal struct IREmitter {
   }
 
   /// Inserts a `place_cast` instruction.
-  internal mutating func _place_cast<T: TypeIdentity>(_ source: IRValue, as target: T) -> IRValue {
+  internal mutating func _place_cast<T: TypeIdentity>(
+    _ source: IRValue, as access: AccessEffect, _ target: T
+  ) -> IRValue {
     let t = program.types.dealiased(target.erased)
-    let s = IRPlaceCast(source: source, target: t, anchor: currentAnchor)
+    let s = IRPlaceCast(source: source, access: access, target: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2562,15 +2564,20 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for casting `source` to a place of type `target`.
+  /// Generates the IR for defining a place projecting `source` as a place of type `target` with
+  /// capability `access`.
+  ///
+  /// The result if an `access` if `target` is the type of `source`. Otherwise, the result is a
+  /// `place_cast`, implying that `target` is layout-compatible with the type of `source`. In both
+  /// cases, the result defines a region in which `source` is unavailable unless `access` is `let`.
   internal mutating func _emitCast(
-    _ source: IRValue, to target: AnyTypeIdentity
+    _ source: IRValue, to access: AccessEffect, _ target: AnyTypeIdentity
   ) -> IRValue {
     if target[.hasGenericParameter] {
-      return _place_cast(source, as: target)
+      return _place_cast(source, as: access, target)
     } else {
       assert(target == currentFunction.result(of: source)!.type)
-      return source
+      return _access([access], from: source)
     }
   }
 

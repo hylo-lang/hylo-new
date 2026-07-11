@@ -43,6 +43,7 @@ public struct InstructionTag: Sendable {
     IRMove.self,
     IRPartialApply.self,
     IRPlaceCast.self,
+    IRPlaceCast.End.self,
     IRProject.self,
     IRProject.End.self,
     IRProperty.self,
