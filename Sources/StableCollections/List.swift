@@ -225,7 +225,7 @@ public struct List<Element> {
 
   /// Inserts `newElement` after the element at `address` and returns its address.
   ///
-  /// - Requires: `address` must be a valid an address in `self`.
+  /// - Requires: `address` must be a valid address in `self`.
   @discardableResult
   public mutating func insert(_ newElement: Element, after address: Address) -> Address {
     precondition(isInBounds(address), "address out of bounds")
@@ -314,10 +314,12 @@ public struct List<Element> {
   /// Links up an already allocated bucket at `newAddress` right before `address`.
   ///
   /// - Requires:
-  ///   - `newAddress` and `address` must be valid and unique addresses in `self`.
+  ///   - `newAddress` and `address` must be present and unique addresses in `self`.
   ///   - `newAddress`'s bucket is already linked towards the neighbors but not vice versa.
   @inline(__always)
-  private mutating func linkNeighborsToPreallocated(_ newAddress: Address, before address: Address) {
+  private mutating func linkNeighborsToPreallocated(
+    _ newAddress: Address, before address: Address
+  ) {
     assert(isInBounds(newAddress), "newAddress out of bounds")
     assert(isInBounds(address), "address out of bounds")
     assert(newAddress != address)
@@ -380,10 +382,12 @@ public struct List<Element> {
     }
   }
 
-  /// Relinks the bucket at `address` to appear before `b`.
+  /// Moves the element at `address` to appear before `b`.
   ///
-  /// - Requires: `address` != `b`.
-  public mutating func relink(_ address: Address, before b: Address) {
+  /// - Requires:
+  ///   - `address` != `b`
+  ///   - `address` and `b` are both live addresses in `self`.
+  public mutating func move(_ address: Address, before b: Address) {
     precondition(isInBounds(address), "address out of bounds")
     precondition(isInBounds(b), "b out of bounds")
     precondition(address != b, "address and b must be different")
@@ -395,10 +399,10 @@ public struct List<Element> {
     linkNeighborsToPreallocated(address, before: b)
   }
 
-  /// Relinks the bucket at `address` to appear after `a`.
+  /// Moves the bucket at `address` to appear after `a`.
   ///
   /// - Requires: `address` != `a`.
-  public mutating func relink(_ address: Address, after a: Address) {
+  public mutating func move(_ address: Address, after a: Address) {
     precondition(isInBounds(address), "address out of bounds")
     precondition(isInBounds(a), "a out of bounds")
     precondition(address != a, "address and a must be different")
@@ -410,8 +414,8 @@ public struct List<Element> {
     linkNeighborsToPreallocated(address, after: a)
   }
 
-  /// Relinks the element at `address` to appear at the start of the list.
-  public mutating func relinkToStart(_ address: Address) {
+  /// Moves the element at `address` to appear at the start of the list.
+  public mutating func moveToStart(_ address: Address) {
     precondition(isInBounds(address), "address out of bounds")
     
     guard address.rawValue != headOffset else { return } // Already at start.
@@ -428,8 +432,8 @@ public struct List<Element> {
     headOffset = address.rawValue
   }
 
-  /// Relinks the element at `address` to appear at the end of the list.
-  public mutating func relinkToEnd(_ address: Address) {
+  /// Moves the element at `address` to appear at the end of the list.
+  public mutating func moveToEnd(_ address: Address) {
     precondition(isInBounds(address), "address out of bounds")
     
     guard address.rawValue != tailOffset else { return } // Already at end.

@@ -116,24 +116,24 @@ final class ListTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(s.capacity, 100)
   }
 
-  /// Exhaustively checks `relink(_:before:)` and `relink(_:after:)` against a reference
+  /// Exhaustively checks `move(_:before:)` and `move(_:after:)` against a reference
   /// implementation on lists of 2 to 5 elements, for every pair of distinct positions.
-  func testRelinkMatchesReferenceImplementation() {
+  func testMoveMatchesReferenceImplementation() {
     for n in 2 ... 5 {
       let elements = (0 ..< n).map(String.init)
 
       for i in 0 ..< n {
         for j in 0 ..< n where i != j {
-          assertRelinkBefore(elements, moving: i, target: j)
-          assertRelinkAfter(elements, moving: i, target: j)
+          assertMoveBefore(elements, moving: i, target: j)
+          assertMoveAfter(elements, moving: i, target: j)
         }
       }
     }
   }
 
-  /// Asserts that relinking the element at position `i` before the one at position `j` produces
+  /// Asserts that moving the element at position `i` before the one at position `j` produces
   /// the same order as the equivalent move on a plain `Array`.
-  private func assertRelinkBefore(
+  private func assertMoveBefore(
     _ elements: [String], moving i: Int, target j: Int,
     file: StaticString = #filePath, line: UInt = #line
   ) {
@@ -146,14 +146,14 @@ final class ListTests: XCTestCase {
     let target = expected.firstIndex(of: elements[j])!
     expected.insert(moved, at: target)
 
-    s.relink(addresses[i], before: addresses[j])
+    s.move(addresses[i], before: addresses[j])
 
     assertConsistent(s, equals: expected, "moving \(i) before \(j)", file: file, line: line)
   }
 
-  /// Asserts that relinking the element at position `i` after the one at position `j` produces
+  /// Asserts that moving the element at position `i` after the one at position `j` produces
   /// the same order as the equivalent move on a plain `Array`.
-  private func assertRelinkAfter(
+  private func assertMoveAfter(
     _ elements: [String], moving i: Int, target j: Int,
     file: StaticString = #filePath, line: UInt = #line
   ) {
@@ -166,17 +166,17 @@ final class ListTests: XCTestCase {
     let target = expected.firstIndex(of: elements[j])!
     expected.insert(moved, at: target + 1)
 
-    s.relink(addresses[i], after: addresses[j])
+    s.move(addresses[i], after: addresses[j])
 
     assertConsistent(s, equals: expected, "moving \(i) after \(j)", file: file, line: line)
   }
 
-  /// Checks `relinkToStart(_:)` against a reference implementation on randomly generated lists,
+  /// Checks `moveToStart(_:)` against a reference implementation on randomly generated lists,
   /// moving every element in turn to the start.
   ///
-  /// The property under test is that relinking the element at position `i` to the start yields the
+  /// The property under test is that moving the element at position `i` to the start yields the
   /// same order as removing that element from a plain `Array` and re-inserting it at the front.
-  func testRelinkToStartMatchesReferenceImplementation() {
+  func testMoveToStartMatchesReferenceImplementation() {
     var rng = SplitMix64(seed: 0x5EED_CAFE)
 
     for _ in 0 ..< 100 {
@@ -192,18 +192,18 @@ final class ListTests: XCTestCase {
       expected.insert(moved, at: 0)
 
       let a = Array(s.addresses)[i]
-      s.relinkToStart(a)
+      s.moveToStart(a)
 
       assertConsistent(s, equals: expected, "moving \(i) to start")
     }
   }
 
-  /// Checks `relinkToEnd(_:)` against a reference implementation on randomly generated lists,
+  /// Checks `moveToEnd(_:)` against a reference implementation on randomly generated lists,
   /// moving every element in turn to the end.
   ///
-  /// The property under test is that relinking the element at position `i` to the end yields the
+  /// The property under test is that moving the element at position `i` to the end yields the
   /// same order as removing that element from a plain `Array` and appending it at the back.
-  func testRelinkToEndMatchesReferenceImplementation() {
+  func testMoveToEndMatchesReferenceImplementation() {
     var rng = SplitMix64(seed: 0xC0FF_EE42)
 
     for _ in 0 ..< 100 {
@@ -219,7 +219,7 @@ final class ListTests: XCTestCase {
       expected.append(moved)
 
       let a = Array(s.addresses)[i]
-      s.relinkToEnd(a)
+      s.moveToEnd(a)
 
       assertConsistent(s, equals: expected, "moving \(i) to end")
     }
