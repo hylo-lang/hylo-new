@@ -33,7 +33,7 @@ extension URL {
         if let p = r {
           return String(cString: p)
         } else {
-          throw FileError(description: "\(u) cannot be represented as a file system path.")
+          throw FileError(description: "\(self) cannot be represented as a file system path.")
         }
       }
 
@@ -43,11 +43,11 @@ extension URL {
           throw FileError(description: "Failed to read file attributes of '\(self)'.")
         }
         if writable {
-          attributes &= ~FILE_ATTRIBUTE_READONLY
+          attributes &= ~(FILE_ATTRIBUTE_READONLY as UInt32)
         } else {
-          attributes |= FILE_ATTRIBUTE_READONLY
+          attributes |= (FILE_ATTRIBUTE_READONLY as UInt32)
         }
-        guard SetFileAttributesW(widePath, updated).boolValue else {
+        guard SetFileAttributesW(widePath, attributes).boolValue else {
           throw FileError(description: "Failed to set file attributes of '\(self)'.")
         }
       }
