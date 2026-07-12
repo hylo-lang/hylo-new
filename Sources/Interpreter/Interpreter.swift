@@ -40,7 +40,7 @@ private struct GlobalFunctionIdentity {
 
 extension Program {
 
-  /// Returns first instruction of `f`.
+  /// Returns the first instruction of `f`.
   ///
   /// - Precondition: `self` is sufficiently lowered for interpretation.
   fileprivate func firstInstruction(_ f: GlobalFunctionIdentity) -> AnyInstructionIdentity {
@@ -93,7 +93,7 @@ private struct Stack {
   /// Local variables, parameters, and return addresses.
   private var frames: [StackFrame] = []
 
-  /// Adds a frame for a call to the nullary `f`, a nullary function defined in `p`.
+  /// Adds a frame for a call to `f`, a nullary function defined in `p`.
   public mutating func enter(_ f: GlobalFunctionIdentity, definedIn p: Program) {
     // TODO: support parameters.
     let s = InstructionPointer(interpreting: f, definedIn: p)
@@ -139,12 +139,8 @@ public struct Interpreter {
 
   /// The next instruction to execute.
   private var programCounter: InstructionPointer {
-    _read {
-      yield topOfStack.currentStep
-    }
-    _modify {
-      yield &topOfStack.currentStep
-    }
+    get { topOfStack.currentStep }
+    set { topOfStack.currentStep = newValue }
   }
 
   /// `true` iff the program is still running.
