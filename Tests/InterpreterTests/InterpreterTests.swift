@@ -11,7 +11,7 @@ final class InterpreterRunTests: XCTestCase {
     )
     for f in fs {
       do {
-        let p = try await Program.loadForInterpretation(from: f)
+        let p = try await Program.loadForInterpretation(sourceRoot: f)
         try p.interpret()
       } catch {
         XCTFail(error.localizedDescription)
