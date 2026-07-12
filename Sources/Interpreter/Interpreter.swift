@@ -3,25 +3,50 @@ import Utilities
 
 /// The position of an instruction in the program.
 private struct InstructionPointer {
-  /// The module containing `self`.
-  var module: Module.ID
 
-  /// The function in `module` indicated by `self`.
-  var functionInModule: IRFunction.ID
+  /// The function containing the instruction.
+  public let container: GlobalFunctionIdentity
 
-  /// The position relative to `functionInModule` indicated by `self`.
-  var instructionInFunction: AnyInstructionIdentity
+  /// The instruction designated by `self`, relative to `container`.
+  var position: AnyInstructionIdentity
+
+  /// Creates an instance pointing to `i` in `f`.
+  ///
+  /// - Precondition: `f` is defined.
+  public init(_ i: AnyInstructionIdentity, in f: GlobalFunctionIdentity) {
+    container = f
+    position = i
+  }
+
+  /// Creates an instance pointing to the first instruction of `f`, which is defined in `p`.
+  public init(interpreting f: GlobalFunctionIdentity, definedIn p: Program) {
+    precondition(p[f.module].functions[f.function].isDefined)
+    let i = p.firstInstruction(f)
+    self = .init(i, in: f)
+  }
 
 }
 
 /// A unique function in a `Program`.
-private struct GlobalFunctionID {
+private struct GlobalFunctionIdentity {
 
   /// The module containing `self`.
   public let module: Module.ID
 
   /// The function in `module` indicated by `self`.
   public let function: IRFunction.ID
+
+}
+
+extension Program {
+
+  /// Returns the first instruction of `f`.
+  ///
+  /// - Precondition: `self` is sufficiently lowered for interpretation.
+  fileprivate func firstInstruction(_ f: GlobalFunctionIdentity) -> AnyInstructionIdentity {
+    let fn = self[f.module].functions[f.function]
+    return fn.blocks[fn.entry!].first!
+  }
 
 }
 
@@ -44,10 +69,12 @@ private enum InstructionEpilogue {
   /// Control is transferred to the given instruction.
   case jump(to: InstructionPointer)
 
+  /// Control is transferred back to the caller.
+  case `return`
+
 }
 
-/// The local variables, parameters, and return address for a function
-/// call.
+/// The ephemeral (or non-`Memory`) execution state of a function call.
 private struct StackFrame {
 
   // TODO: add local variables and parameters, which require `Memory`.
@@ -55,9 +82,8 @@ private struct StackFrame {
   /// The results of instructions.
   public var registers: [AnyInstructionIdentity: Value] = [:]
 
-  /// The program counter to which execution should return when
-  /// popping this frame.
-  public var returnAddress: InstructionPointer
+  /// The next instruction to execute.
+  public var currentStep: InstructionPointer
 
 }
 
@@ -67,20 +93,18 @@ private struct Stack {
   /// Local variables, parameters, and return addresses.
   private var frames: [StackFrame] = []
 
-  /// Adds a new frame on top with the given `returnAddress` and `parameters`.
-  public mutating func push(returnAddress: InstructionPointer) {
+  /// Adds a frame for a call to `f`, a nullary function defined in `p`.
+  public mutating func enter(_ f: GlobalFunctionIdentity, definedIn p: Program) {
     // TODO: support parameters.
-    let f = StackFrame(returnAddress: returnAddress)
+    let s = InstructionPointer(interpreting: f, definedIn: p)
+    let f = StackFrame(currentStep: s)
     frames.append(f)
   }
 
-  /// Removes the top frame and returns its `returnAddress`.
-  public mutating func pop() -> InstructionPointer {
-    let f = frames.last!
-    defer {
-      frames.removeLast()
-    }
-    return f.returnAddress
+  /// Removes the top frame.
+  public mutating func pop() {
+    precondition(!isEmpty)
+    frames.removeLast()
   }
 
   /// The top stack frame.
@@ -95,6 +119,11 @@ private struct Stack {
     }
   }
 
+  /// The depth of call stack.
+  public var count: Int {
+    frames.count
+  }
+
   /// `true` iff there is at least 1 stack frame.
   public var isEmpty: Bool {
     frames.isEmpty
@@ -105,14 +134,17 @@ private struct Stack {
 /// A virtual machine that executes Hylo's in-memory IR representation.
 public struct Interpreter {
 
-  /// The program to be executed.
+  /// The program being executed.
   private let program: Program
 
-  /// Identity of the next instruction to be executed.
-  private var programCounter: InstructionPointer
+  /// The next instruction to execute.
+  private var programCounter: InstructionPointer {
+    get { topOfStack.currentStep }
+    set { topOfStack.currentStep = newValue }
+  }
 
   /// `true` iff the program is still running.
-  public private(set) var isRunning: Bool = true
+  public var isRunning: Bool { !callStack.isEmpty }
 
   /// Local variables, parameters and return address.
   private var callStack = Stack()
@@ -132,9 +164,9 @@ public struct Interpreter {
   /// - Precondition: the program is running.
   public var currentInstruction: any Instruction {
     _read {
-      yield program[programCounter.module]
-        .functions[programCounter.functionInModule]
-        .at(programCounter.instructionInFunction)
+      yield program[programCounter.container.module]
+        .functions[programCounter.container.function]
+        .at(programCounter.position)
     }
   }
 
@@ -143,39 +175,19 @@ public struct Interpreter {
   /// - Precondition: `p.entry != nil`
   public init(_ p: Program) {
     program = p
-    let e = program.entry
-    let f = program[e.module].functions[e.function]
-    let i = f.blocks[f.entry!].first!
-    programCounter = .init(
-      module: e.module,
-      functionInModule: e.function,
-      instructionInFunction: i
-    )
-
-    // The return address of the bottom-most frame will never be used,
-    // so we fill it with something arbitrary.
-    callStack.push(returnAddress: programCounter)
+    callStack.enter(p.entry, definedIn: p)
   }
 
   /// Executes a single instruction.
   public mutating func step() throws {
-    let r = try applyCurrentInstruction()
-
-    if case .initializeRegister(let v) = r {
-      topOfStack.registers[programCounter.instructionInFunction] = v
+    switch try applyCurrentInstruction() {
+    case .jump(let pc): programCounter = pc
+    case .return: callStack.pop()
+    case .initializeRegister(let v):
+      topOfStack.registers[programCounter.position] = v
+      try advanceProgramCounter()
     }
-
-    if case .jump(let pc) = r {
-      programCounter = pc
-      if callStack.isEmpty {
-        isRunning = false
-      }
-      return
-    }
-
-    try advanceProgramCounter()
   }
-
 
   /// Applies the `Memory` and I/O effects of the current instruction and returns its epilogue.
   private mutating func applyCurrentInstruction() throws -> InstructionEpilogue {
@@ -219,7 +231,7 @@ public struct Interpreter {
     case let x as IRProperty:
       _ = x
     case is IRReturn:
-      return .jump(to: popStackFrame())
+      return .return
     case let x as IRStore:
       _ = x
     case let x as IRSubfield:
@@ -241,30 +253,20 @@ public struct Interpreter {
 
   }
 
-  /// Removes topmost stack frame and return code pointer to next instruction of any
-  /// previous stack frame.
-  ///
-  /// - Precondition: the program is running.
-  private mutating func popStackFrame() -> InstructionPointer {
-    // precondition(topOfStack.allocations.isEmpty,
-    //     "Function returns before deallocating all local variable storage")
-    return callStack.pop()
-  }
-
   /// Moves the program counter to the next instruction.
   private mutating func advanceProgramCounter() throws {
     guard
-      let i = program[programCounter.module]
-        .functions[programCounter.functionInModule]
-        .instruction(after: programCounter.instructionInFunction)
+      let i = program[programCounter.container.module]
+        .functions[programCounter.container.function]
+        .instruction(after: programCounter.position)
     else { throw IRError() }
-    programCounter.instructionInFunction = i
+    programCounter.position = i
   }
 }
 
 extension Program {
   /// The function whose invocation executes the whole program.
-  fileprivate var entry: GlobalFunctionID {
+  fileprivate var entry: GlobalFunctionIdentity {
     let entryModule = identity(module: "Main")!
     let entryFunctionDeclaration = cast(
       select(
