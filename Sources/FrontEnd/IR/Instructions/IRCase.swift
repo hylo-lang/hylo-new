@@ -1,7 +1,7 @@
 import Archivist
 import Utilities
 
-/// Accesses to the payload of an enum.
+/// Accesses the payload of an enum.
 ///
 ///     case <payload : declaration> of <source : value>
 ///
