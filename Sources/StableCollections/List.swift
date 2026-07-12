@@ -399,8 +399,8 @@ public struct List<Element> {
     linkNeighborsToPreallocated(address, before: b)
   }
 
-  /// Moves the bucket at `address` to appear after `a`.
-  ///
+  /// Moves the bucket at `address` to appear after `a`, without invalidating addresses.
+  /// 
   /// - Requires: `address` != `a`.
   public mutating func move(_ address: Address, after a: Address) {
     precondition(isInBounds(address), "address out of bounds")
@@ -414,7 +414,8 @@ public struct List<Element> {
     linkNeighborsToPreallocated(address, after: a)
   }
 
-  /// Moves the element at `address` to appear at the start of the list.
+  /// Moves the element at `address` to appear at the start of the list without invalidating
+  /// addresses.
   public mutating func moveToStart(_ address: Address) {
     precondition(isInBounds(address), "address out of bounds")
     
@@ -432,7 +433,8 @@ public struct List<Element> {
     headOffset = address.rawValue
   }
 
-  /// Moves the element at `address` to appear at the end of the list.
+  /// Moves the element at `address` to appear at the end of the list without invalidating
+  /// addresses.
   public mutating func moveToEnd(_ address: Address) {
     precondition(isInBounds(address), "address out of bounds")
     
