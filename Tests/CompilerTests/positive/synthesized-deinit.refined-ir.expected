@@ -1,0 +1,110 @@
+
+fun S0.$<ConformanceDeclaration at synthesized-deinit:7.14>() let <: Deinitializable<S0> {
+%b0:
+  %r0 = alloca Deinitializable<S0>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit<Self: S0>} as Deinitializable<S0>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit<Self: S0>(let %p0: Deinitializable<S0>, sink %p1: S0, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = access [set] %p2
+  %r2 = apply S0.deinit(%r0) => %r1
+  %r5 = end %r1
+  %r4 = end %r0
+  %r3 = return
+}
+
+fun S0.deinit(sink %p0: S0, set %p1: Void) {
+%b0:
+  %r0 = subfield %p0 at 0 as Int
+  %r1 = access [sink] %r0
+  %r2 = assume_state %r1 uninitialized
+  %r3 = end %r1
+  %r4 = access [set] %p1
+  %r5 = assume_state %r4 initialized
+  %r6 = end %r4
+  %r7 = return
+}
+
+fun S1.$<ConformanceDeclaration at synthesized-deinit:12.14>() let <: Deinitializable<S1> {
+%b0:
+  %r0 = alloca Deinitializable<S1>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit<Self: S1>} as Deinitializable<S1>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit<Self: S1>(let %p0: Deinitializable<S1>, sink %p1: S1, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun S2.$<ConformanceDeclaration at synthesized-deinit:14.14>() let <: Deinitializable<S2> {
+%b0:
+  %r0 = alloca Deinitializable<S2>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit<Self: S2>} as Deinitializable<S2>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit<Self: S2>(let %p0: Deinitializable<S2>, sink %p1: S2, set %p2: Void) {
+%b0:
+  %r0 = place_cast %p1 as sink {Int, {S0, S1}}
+  %r1 = subfield %r0 at 0 as Int
+  %r2 = access [sink] %r1
+  %r3 = assume_state %r2 uninitialized
+  %r4 = end %r2
+  %r5 = subfield %r0 at 1 as {S0, S1}
+  %r6 = subfield %r5 at 0 as S0
+  %r7 = alloca Void, #preferred
+  %r8 = access [sink] %r6
+  %r9 = access [set] %r7
+  %r10 = apply S0.deinit(%r8) => %r9
+  %r21 = end %r9
+  %r20 = end %r8
+  %r11 = subfield %r5 at 1 as S1
+  %r12 = access [sink] %r11
+  %r13 = assume_state %r12 uninitialized
+  %r14 = end %r12
+  %r19 = end %r0
+  %r15 = access [set] %p2
+  %r16 = assume_state %r15 initialized
+  %r17 = end %r15
+  %r22 = access [sink] %r7
+  %r23 = assume_state %r22 uninitialized
+  %r24 = end %r22
+  %r18 = return
+}

@@ -144,6 +144,9 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts an opaque environment type.
   case opaqueEnvironmentType = "oeT"
 
+  /// Starts an opaque enum payload type.
+  case opaquePayloadType = "opT"
+
   /// Starts a remote type.
   case remoteType = "rT"
 
@@ -270,6 +273,7 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
     .metakindType,
     .metatypeType,
     .opaqueEnvironmentType,
+    .opaquePayloadType,
     .remoteType,
     .structType,
     .traitType,

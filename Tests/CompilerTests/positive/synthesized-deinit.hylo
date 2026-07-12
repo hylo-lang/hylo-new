@@ -1,4 +1,4 @@
-//! stage:llvm
+//! stage:lowering
 
 // `S0` has a user-defined deinitializer, meaning that it is not trivially deinitializable.
 // `S1` has a synthesized deinitializer, which is no-op.

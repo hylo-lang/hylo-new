@@ -252,7 +252,7 @@ public struct Program: Sendable {
   /// Returns the elements in `ns` that identify nodes of type `T`.
   public func collect<S: Sequence, T: Syntax>(
     _ t: T.Type, in ns: S
-  ) -> (some Sequence<ConcreteSyntaxIdentity<T>>) where S.Element: SyntaxIdentity {
+  ) -> (some Collection<ConcreteSyntaxIdentity<T>>) where S.Element: SyntaxIdentity {
     ns.lazy.compactMap({ (n) in cast(n, to: t) })
   }
 
@@ -1063,7 +1063,7 @@ public struct Program: Sendable {
   /// - Requires: The module containing `s` is scoped.
   public func declarations<T: Declaration>(
     of t: T.Type, lexicallyIn s: ScopeIdentity
-  ) -> some Sequence<ConcreteSyntaxIdentity<T>> {
+  ) -> some Collection<ConcreteSyntaxIdentity<T>> {
     collect(t, in: declarations(lexicallyIn: s))
   }
 

@@ -4,10 +4,12 @@ import Archivist
 ///
 ///     place_cast <source : value> as <access : effect> <target : type>
 ///
-/// `place_cast` projects the value of `source` as a value of type `target` into a region, using
-/// `effect` to determine the expected memory state of the source before and after that region. The
-/// conversion is not checked. Accessing the resulting place has undefined behavior unless `target`
-/// is layout-compatible with the type of `source`.
+/// `place_cast` projects the contents of `source`, which is the result an access instruction, as
+/// contents of type `target` into a region, using `effect` to determine the memory state of the
+/// source before and after that region.
+///
+/// The conversion is not checked. Accessing the resulting place has undefined behavior unless
+/// `target` is layout-compatible with the type of `source`.
 @Archivable
 public struct IRPlaceCast: IRRegionEntry {
 
@@ -17,7 +19,7 @@ public struct IRPlaceCast: IRRegionEntry {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The capability of the access formed on the place.
+  /// The capabilities of the projection.
   public let access: AccessEffect
 
   /// The type of the resulting place.
