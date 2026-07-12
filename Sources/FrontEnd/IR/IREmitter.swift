@@ -72,22 +72,7 @@ internal struct IREmitter {
 
       // Is the receiver an instance of a struct or enum?
       else if let d = me.program.declaration(of: receiver) {
-        switch me.program.tag(of: d) {
-        case StructDeclaration.self:
-          me._emitDeinitializeStructurally(
-            whole: .parameter(1),
-            instanceOf: me.program.castUnchecked(d, to: StructDeclaration.self),
-            instantiatedWith: a)
-
-        case EnumDeclaration.self:
-          me._emitDeinitializeStructurally(
-            whole: .parameter(1),
-            instanceOf: me.program.castUnchecked(d, to: EnumDeclaration.self),
-            instantiatedWith: a)
-
-        default:
-          me.program.unexpected(d)
-        }
+        me._emitDeinitializeStructurally(whole: .parameter(1), instanceOf: d, instantiatedWith: a)
       }
 
       // Give up if it's none of the above.
@@ -2720,6 +2705,27 @@ internal struct IREmitter {
       if !_emitDeinitialize(s, instanceOf: m) { return false }
     }
     return true
+  }
+
+  /// Generates the IR for deinitializing each individual part of `whole`, which is an instance of
+  /// the type declared by `d` whose type parameters are assigned in `a`.
+  private mutating func _emitDeinitializeStructurally(
+    whole: IRValue, instanceOf d: DeclarationIdentity, instantiatedWith a: TypeArguments
+  ) {
+    switch program.tag(of: d) {
+    case StructDeclaration.self:
+      _emitDeinitializeStructurally(
+        whole: whole,
+        instanceOf: program.castUnchecked(d, to: StructDeclaration.self), instantiatedWith: a)
+
+    case EnumDeclaration.self:
+      _emitDeinitializeStructurally(
+        whole: whole,
+        instanceOf: program.castUnchecked(d, to: EnumDeclaration.self), instantiatedWith: a)
+
+    default:
+      program.unexpected(d)
+    }
   }
 
   /// Generates the IR for deinitializing each individual part of `whole`, which is an instance of
