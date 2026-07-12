@@ -29,7 +29,7 @@ extension URL {
   /// On Windows, this toggles the file's read-only attribute. 
   fileprivate func setWritable(_ writable: Bool) throws {
     #if os(Windows)
-      let path = self.withUnsafeFileSystemRepresentation { (r) in
+      let path = try self.withUnsafeFileSystemRepresentation { (r) in
         if let p = r {
           return String(cString: p)
         } else {
@@ -43,9 +43,9 @@ extension URL {
           throw FileError(description: "Failed to read file attributes of '\(self)'.")
         }
         if writable {
-          attributes &= ~(FILE_ATTRIBUTE_READONLY as UInt32)
+          attributes &= ~UInt32(FILE_ATTRIBUTE_READONLY)
         } else {
-          attributes |= (FILE_ATTRIBUTE_READONLY as UInt32)
+          attributes |= UInt32(FILE_ATTRIBUTE_READONLY)
         }
         guard SetFileAttributesW(widePath, attributes).boolValue else {
           throw FileError(description: "Failed to set file attributes of '\(self)'.")
