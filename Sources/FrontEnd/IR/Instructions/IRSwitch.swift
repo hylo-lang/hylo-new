@@ -1,6 +1,6 @@
 import Archivist
 
-/// Transfers control flow to the start one of several basic blocks.
+/// Transfers control flow to the start of one of several basic blocks.
 ///
 ///     switch <scrutinee : value>, <t0 : block>, ..., <tn : block>
 ///

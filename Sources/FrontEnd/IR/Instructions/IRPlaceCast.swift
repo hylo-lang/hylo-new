@@ -6,7 +6,7 @@ import Archivist
 ///
 /// `place_cast` projects the contents of `source`, which is the result an access instruction, as
 /// contents of type `target` into a region, using `effect` to determine the memory state of the
-/// source before and after that region. `source` is a place
+/// source before and after that region.
 ///
 /// The conversion is not checked. Accessing the resulting place has undefined behavior unless
 /// `target` is layout-compatible with the type of `source`.
