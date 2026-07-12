@@ -547,7 +547,7 @@ extension Program {
     let s = ctx.ir.at(i)
 
     // Create one basic block for each successor. The pattern of each case is the value of its
-    // offset. The match is exchaustive.
+    // offset. The match is exhaustive.
     let bs: [LLVMModule.SwitchCase] = s.successors.enumerated().map { (j, b) in
       let pattern = ctx.module.llvm.iptr.unsafe[].constant(j)
       return (pattern.v, ctx.demandBasicBlock(b))
