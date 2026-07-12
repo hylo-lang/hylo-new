@@ -75,13 +75,16 @@ internal struct IREmitter {
         switch me.program.tag(of: d) {
         case StructDeclaration.self:
           let s = me.program.castUnchecked(d, to: StructDeclaration.self)
-          me.program.forEachStoredProperty(of: s) { (m, p) in
-            let x = me._subfield(.parameter(1), at: p)
+
+          var properties: [AnyTypeIdentity] = []
+          me.program.forEachStoredProperty(of: s) { (m, _) in
             let t = me.program.type(assignedTo: m, assuming: RemoteType.self)
             let u = me.program.types.substitute(a, in: me.program.types[t].projectee)
-            let v = me.program.types.dealiased(u)
-            _ = me._emitDeinitialize(x, instanceOf: v)
+            properties.append(me.program.types.dealiased(u))
           }
+          let t = me.program.types.tuple(of: properties)
+          let x = me._place_cast(.parameter(1), as: .sink, t)
+          _ = me._emitDeinitialize(x, instanceOf: t)
 
         case EnumDeclaration.self:
           break // TODO

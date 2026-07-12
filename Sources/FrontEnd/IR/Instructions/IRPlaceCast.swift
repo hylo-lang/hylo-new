@@ -17,7 +17,7 @@ public struct IRPlaceCast: IRRegionEntry {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The capability of the access formed on the place.
+  /// The capabilities of the projection.
   public let access: AccessEffect
 
   /// The type of the resulting place.

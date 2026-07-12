@@ -120,6 +120,10 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRMemoryCopy.self), from: &f)
       case IRMove.self:
         pc = interpret(f.castUnchecked(i, to: IRMove.self), from: &f)
+      case IRPlaceCast.self:
+        pc = interpret(f.castUnchecked(i, to: IRPlaceCast.self), from: &f)
+      case IRPlaceCast.End.self:
+        pc = interpret(f.castUnchecked(i, to: IRPlaceCast.End.self), from: &f)
       case IRProject.self:
         pc = interpret(f.castUnchecked(i, to: IRProject.self), from: &f)
       case IRProject.End.self:
@@ -255,7 +259,6 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRAccess.End.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let source = f.at(i).start
     let opener = f.at(f.start(of: i))
 
     // Access is expected to be reified at this stage.
@@ -275,8 +278,9 @@ private struct Transfer: AbstractTransferFunction {
       fatalError("invalid IR")
     }
 
-    context.memory[source] = nil
-    context.locals[source] = nil
+    let p = f.at(i).start
+    context.memory[p] = nil
+    context.locals[p] = nil
     return f.instruction(after: i.erased)
   }
 
@@ -355,10 +359,10 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRCase.End.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let source = f.at(i).start
     let opener = f.at(f.start(of: i))
+    let place = f.at(i).start
 
-    let a = context.locals[source]!.place!
+    let a = context.locals[place]!.place!
     let b = context.locals[opener.source]!.place!
     let v = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o.value })
     if case .uniform = v {
@@ -368,8 +372,8 @@ private struct Transfer: AbstractTransferFunction {
       context.updateValue(.uniform(.uninitialized), at: b, computingLayoutWith: &typer)
     }
 
-    context.memory[source] = nil
-    context.locals[source] = nil
+    context.memory[place] = nil
+    context.locals[place] = nil
     return f.instruction(after: i.erased)
   }
 
@@ -430,6 +434,38 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
+    _ i: IRPlaceCast.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+
+    // Treat the source of the cast like the argument of a projection.
+    applyParameterPrecondition(
+      s.access, s.source, insertingDeinitializationBefore: i.erased, in: &f)
+
+    let v: Domain = (f.at(i).access == .set) ? .uninitialized : .initialized
+    context.declare(i, from: f, initially: v)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRPlaceCast.End.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let opener = f.at(f.start(of: i))
+    let place = f.at(i).start
+
+    // Treat the cast like of a projection.
+    closeProjection(place, openedWith: opener.access, closedBy: i.erased, in: &f)
+    applyParameterPostcondition(opener.access, opener.source)
+
+    context.memory[place] = nil
+    context.locals[place] = nil
+    context.locals.removeAll(where: { (_, p) in p.place?.location.root == place })
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
     _ i: IRProject.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
@@ -449,17 +485,10 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRProject.End.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let source = f.at(i).start
     let opener = f.at(f.start(of: i))
+    let place = f.at(i).start
 
-    switch opener.access {
-    case .let, .set, .inout:
-      checkInitialized(place: source, in: f, at: f.at(i).anchor.site)
-    case .sink:
-      ensureDeinitialized(place: source, before: i.erased, in: &f)
-    case .auto:
-      fatalError("invalid IR")
-    }
+    closeProjection(place, openedWith: opener.access, closedBy: i.erased, in: &f)
 
     let t = f.result(of: opener.callee)!.type
     let u = program.types.seenAsTermAbstraction(t)!
@@ -467,9 +496,9 @@ private struct Transfer: AbstractTransferFunction {
       applyParameterPostcondition(p.access, v)
     }
 
-    context.memory[source] = nil
-    context.locals[source] = nil
-    context.locals.removeAll(where: { (_, p) in p.place?.location.root == source })
+    context.memory[place] = nil
+    context.locals[place] = nil
+    context.locals.removeAll(where: { (_, p) in p.place?.location.root == place })
     return f.instruction(after: i.erased)
   }
 
@@ -766,24 +795,24 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the object stored at `place`, if any, is fully deinitialized, inserting
-  /// deinitialization before `i`, which is in `f`, is necessary.
+  /// Ensures that place `v`, which is in `f`, is fully deinitialized, inserting deinitialization
+  /// before `i` if necessary.
   private mutating func ensureDeinitialized(
-    place: IRValue, before i: AnyInstructionIdentity,
+    place v: IRValue, before i: AnyInstructionIdentity,
     in f: inout IRFunction
   ) {
-    let a = context.locals[place]!.place!
+    let a = context.locals[v]!.place!
     var o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
     let initialized = initializedParts(o.value)
     if !initialized.isEmpty {
-      deinitialize(initialized, at: place, before: i.erased, in: &f)
+      deinitialize(initialized, at: v, before: i.erased, in: &f)
       o.value = .uniform(.uninitialized)
       context.withObject(at: a, computingLayoutWith: &typer, { (x, _) in x = o })
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` satisfies the preconditions of a
-  /// parameter `k`, inserting deinitialization before `i`, which is in `f`, is necessary.
+  /// Ensures that state of place `v`, which is in `f`, satisfies the preconditions of an access
+  /// with capability `k`, inserting deinitialization before `i` if necessary.
   private mutating func applyParameterPrecondition(
     _ k: AccessEffect, _ v: IRValue,
     insertingDeinitializationBefore i: AnyInstructionIdentity, in f: inout IRFunction
@@ -808,8 +837,7 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` satisfies the postconditions of a
-  /// parameter `k`.
+  /// Applies the postconditions of a parameter with capability `k` on the object at place `v`.
   private mutating func applyParameterPostcondition(_ k: AccessEffect, _ v: IRValue) {
     if k == .set {
       // A set parameter initializes memory.
@@ -818,14 +846,30 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` satisfies the pre/postconditions of
-  /// a parameter `k`, inserting deinitialization before `i`, which is in `f`, is necessary.
+  /// Ensures that the of place `v`, which is in `f`, satisfies the pre/postconditions of an access
+  /// with capability `k`, inserting deinitialization before `i` if necessary.
   private mutating func passArgument(
     _ k: AccessEffect, _ v: IRValue,
     insertingDeinitializationBefore i: AnyInstructionIdentity, in f: inout IRFunction
   ) {
     applyParameterPrecondition(k, v, insertingDeinitializationBefore: i, in: &f)
     applyParameterPostcondition(k, v)
+  }
+
+  /// Ensures that the state of place `p`, which is a projection closed by `e` in `f`, satisfies
+  /// the postconditions of an access with capability `k`, inserting deinitialization if necessary.
+  private mutating func closeProjection(
+    _ v: IRValue, openedWith k: AccessEffect, closedBy e: AnyInstructionIdentity,
+    in f: inout IRFunction
+  ) {
+    switch k {
+    case .let, .set, .inout:
+      checkInitialized(place: v, in: f, at: f.at(e).anchor.site)
+    case .sink:
+      ensureDeinitialized(place: v, before: e, in: &f)
+    case .auto:
+      fatalError("invalid IR")
+    }
   }
 
   /// Returns the result of calling `action` on `self` configured with context `c`.
