@@ -112,6 +112,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRCase.End.self), from: &f)
       case IRConditionalBranch.self:
         pc = interpret(f.castUnchecked(i, to: IRConditionalBranch.self), from: &f)
+      case IREnumTag.self:
+        pc = interpret(f.castUnchecked(i, to: IREnumTag.self), from: &f)
       case IRGlobalAccess.self:
         pc = interpret(f.castUnchecked(i, to: IRGlobalAccess.self), from: &f)
       case IRLoad.self:
@@ -136,6 +138,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRStore.self), from: &f)
       case IRSubfield.self:
         pc = interpret(f.castUnchecked(i, to: IRSubfield.self), from: &f)
+      case IRSwitch.self:
+        pc = interpret(f.castUnchecked(i, to: IRSwitch.self), from: &f)
       case IRTypeApply.self:
         pc = interpret(f.castUnchecked(i, to: IRTypeApply.self), from: &f)
       case IRUnreachable.self:
@@ -387,6 +391,16 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
+    _ i: IREnumTag.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+    checkInitialized(place: s.source, in: f, at: s.anchor.site)
+    context.declare(i.erased, from: f, initially: .initialized)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
     _ i: IRGlobalAccess.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     context.declare(i.erased, from: f, initially: .initialized)
@@ -562,6 +576,14 @@ private struct Transfer: AbstractTransferFunction {
     let s = f.at(i)
     let a = context.locals[s.base]!.place!.appending(contentsOf: s.path)
     context.locals[.register(i.erased)] = .place(a)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRSwitch.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    assert(context.locals[f.at(i).scrutinee]!.object!.value == .uniform(.initialized))
     return f.instruction(after: i.erased)
   }
 

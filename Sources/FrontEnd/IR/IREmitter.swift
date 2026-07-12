@@ -74,23 +74,19 @@ internal struct IREmitter {
       else if let d = me.program.declaration(of: receiver) {
         switch me.program.tag(of: d) {
         case StructDeclaration.self:
-          let s = me.program.castUnchecked(d, to: StructDeclaration.self)
-
-          var properties: [AnyTypeIdentity] = []
-          me.program.forEachStoredProperty(of: s) { (m, _) in
-            let t = me.program.type(assignedTo: m, assuming: RemoteType.self)
-            let u = me.program.types.substitute(a, in: me.program.types[t].projectee)
-            properties.append(me.program.types.dealiased(u))
-          }
-          let t = me.program.types.tuple(of: properties)
-          let x = me._place_cast(.parameter(1), as: .sink, t)
-          _ = me._emitDeinitialize(x, instanceOf: t)
+          me._emitDeinitializeStructurally(
+            whole: .parameter(1),
+            instanceOf: me.program.castUnchecked(d, to: StructDeclaration.self),
+            instantiatedWith: a)
 
         case EnumDeclaration.self:
-          break // TODO
+          me._emitDeinitializeStructurally(
+            whole: .parameter(1),
+            instanceOf: me.program.castUnchecked(d, to: EnumDeclaration.self),
+            instantiatedWith: a)
 
         default:
-          break // TODO
+          me.program.unexpected(d)
         }
       }
 
@@ -2060,8 +2056,9 @@ internal struct IREmitter {
   internal mutating func _case(
     _ d: EnumCaseDeclaration.ID, of s: IRValue
   ) -> IRValue {
-    let t = program.withTyper(typing: module, { (tp) in tp.underlyingType(of: d) })
-    let s = IRCase(source: s, payload: d, payloadType: t, anchor: currentAnchor)
+    let e = program.parent(containing: d, as: EnumDeclaration.self)!
+    let t = program.types.demand(OpaqueType.payload(e))
+    let s = IRCase(source: s, payload: d, opaquePayloadType: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2079,6 +2076,13 @@ internal struct IREmitter {
   internal mutating func _end<T: IRRegionEntry>(_: T.Type, openedBy start: IRValue) {
     assert(currentFunction.at(start.register!) is T)
     insert(T.End(start: start, anchor: currentAnchor))
+  }
+
+  /// Inserts an `enum_tag` instruction.
+  internal mutating func _enum_tag(_ source: IRValue) -> IRValue {
+    assert(currentFunction.isPlace(source))
+    let tag = program.types.demand(MachineType.word)
+    return insert(IREnumTag(source: source, tag: tag, anchor: currentAnchor))!
   }
 
   /// Inserts a `global_access` instruction.
@@ -2172,6 +2176,12 @@ internal struct IREmitter {
       base: base, path: path, typeOfSubfield: typeOfSubfield!,
       anchor: currentAnchor)
     return insert(s)!
+  }
+
+  /// Inserts a `switch` instruction.
+  internal mutating func _switch(on scrutinee: IRValue, to successors: [IRBlock.ID]) {
+    assert(!successors.isEmpty)
+    insert(IRSwitch(scrutinee: scrutinee, successors: successors, anchor: currentAnchor))
   }
 
   /// Inserts a `type_apply` instruction.
@@ -2295,6 +2305,11 @@ internal struct IREmitter {
   }
 
   // MARK: Helpers
+
+  /// Creates a new basic block in the current function.
+  private mutating func _addBlock() -> IRBlock.ID {
+    insertionContext.function!.addBlock()
+  }
 
   /// Inserts the IR for extracting the built-in value stored in an instance of `Hylo.Bool`.
   private mutating func _loadWrappedBuiltin(_ wrapper: IRValue) -> IRValue {
@@ -2705,6 +2720,46 @@ internal struct IREmitter {
       if !_emitDeinitialize(s, instanceOf: m) { return false }
     }
     return true
+  }
+
+  /// Generates the IR for deinitializing each individual part of `whole`, which is an instance of
+  /// the type declared by `d` whose type parameters are assigned in `a`.
+  private mutating func _emitDeinitializeStructurally(
+    whole: IRValue, instanceOf d: StructDeclaration.ID, instantiatedWith a: TypeArguments
+  ) {
+    var properties: [AnyTypeIdentity] = []
+    program.forEachStoredProperty(of: d) { (m, _) in
+      let t = program.type(assignedTo: m, assuming: RemoteType.self)
+      let u = program.types.substitute(a, in: program.types[t].projectee)
+      properties.append(program.types.dealiased(u))
+    }
+    let t = program.types.tuple(of: properties)
+    let x = _place_cast(whole, as: .sink, t)
+    _ = _emitDeinitialize(x, instanceOf: t)
+  }
+
+  /// Generates the IR for deinitializing each individual part of `whole`, which is an instance of
+  /// the type declared by `d` whose type parameters are assigned in `a`.
+  private mutating func _emitDeinitializeStructurally(
+    whole: IRValue, instanceOf d: EnumDeclaration.ID, instantiatedWith a: TypeArguments
+  ) {
+    assert(program[d].representation == nil)
+    let cases = Array(program.collect(EnumCaseDeclaration.self, in: program[d].members))
+    let successors = cases.map({ _ in _addBlock() })
+    let end = _addBlock()
+
+    let tag = _enum_tag(whole)
+    _switch(on: tag, to: successors)
+    for i in successors.indices {
+      insertionContext.point = .end(of: successors[i])
+      let t = program.withTyper(typing: module, { (tp) in tp.underlyingType(of: cases[i]) })
+      let x = _case(cases[i], of: whole)
+      let y = _place_cast(x, as: .sink, t)
+      _ = _emitDeinitialize(y, instanceOf: t)
+      _br(end)
+    }
+
+    insertionContext.point = .end(of: end)
   }
 
   /// Generates the IR for move-initializing or move-assigning `target` with `source`.
