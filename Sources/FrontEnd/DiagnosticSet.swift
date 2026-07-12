@@ -1,7 +1,7 @@
 import OrderedCollections
 
 /// A set of diagnostics.
-public struct DiagnosticSet: Hashable, Sendable {
+public struct DiagnosticSet: Hashable, Sendable, CustomStringConvertible {
 
   /// The diagnostics in the set.
   public private(set) var elements: OrderedSet<Diagnostic>
@@ -31,6 +31,10 @@ public struct DiagnosticSet: Hashable, Sendable {
   public init<S: Sequence<Diagnostic>>(_ ds: S) {
     self.init()
     for d in ds { insert(d) }
+  }
+
+  public var description: String {
+    "\n" + elements.lazy.map(\.description).joined(separator: "\n")
   }
 
 }
