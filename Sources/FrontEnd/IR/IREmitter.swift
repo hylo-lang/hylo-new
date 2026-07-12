@@ -132,6 +132,8 @@ internal struct IREmitter {
       lower(program.castUnchecked(d, to: TraitDeclaration.self))
     case VariableDeclaration.self:
       break
+    case TypeAliasDeclaration.self:
+      break
     default:
       program.unexpected(d)
     }

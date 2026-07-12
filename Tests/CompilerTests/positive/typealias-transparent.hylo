@@ -1,0 +1,8 @@
+//! exit-status:2
+public type Int32_2 = Int32
+
+fun f(x: sink Int32_2) -> Int32_2 { x }
+
+fun main() -> Int32 {
+  f(2 as Int32)
+}
