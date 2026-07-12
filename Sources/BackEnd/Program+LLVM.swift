@@ -1233,7 +1233,7 @@ extension Program {
 
     // Add padding after the tag to satisfy the alignment of the payload if necessary.
     let payloadOffset = tagSize.rounded(upToNearestMultipleOf: payloadAlignment)
-    if payloadOffset > 0 {
+    if payloadOffset > tagSize {
       let padding = payloadOffset - tagSize
       fields.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).t)
       fields.swapAt(1, 2)
@@ -1242,7 +1242,7 @@ extension Program {
     let pair = ctx.llvm.structType(named: name, fields, packed: true)
     let layout = ConcreteLayout(
       fields: fields, propertyToField: [0, fields.count - 1],
-      size: .fixed(tagSize + payloadSize),
+      size: .fixed(payloadOffset + payloadSize),
       alignment: max(payloadAlignment, ctx.llvm.layout.preferredAlignment(of: tag)))
     return .init(llvm: pair, layout: layout)
   }
