@@ -1,0 +1,13 @@
+//! exit-status:3
+
+fun main() -> Int32 {
+  var r: Int32 = 30
+  var counter: Int32 = 0
+  while r > .zero() {
+    let a = (5 as Int32) * (2 as Int32) // stack allocation in the loop
+    &r -= a // r -= 10
+    &counter += 1 as Int32
+  }
+
+  return counter
+}

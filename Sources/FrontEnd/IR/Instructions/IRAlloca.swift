@@ -9,6 +9,10 @@ import Archivist
 /// Unlike LLVM's alloca, this instruction cannot be used to allocate dynamically sized buffers. It
 /// is nonetheless possible to allocate storage for a fixed number of contiguous instances using a
 /// tuple (e.g., `Int[8]` in surface syntax).
+///
+/// Repeated allocas may happen in loops, in which case only the first allocation is effective.
+/// Upon repeated allocations, the existing value in the storage must have been deinitialized.
+/// Moving all allocas to the entry block of the function is done during LLVM lowering.
 @Archivable
 public struct IRAlloca: Instruction {
 

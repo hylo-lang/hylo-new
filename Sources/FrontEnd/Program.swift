@@ -3,7 +3,7 @@ import OrderedCollections
 import Utilities
 
 /// A Hylo program.
-/// 
+///
 /// - Invariant: The FileName of source files in `self` are unique.
 public struct Program: Sendable {
 
@@ -1592,7 +1592,8 @@ public struct Program: Sendable {
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
     case Yield.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Yield.self))
-
+    case While.self:
+      return self[castUnchecked(n, to: While.self)].introducer.site
     default:
       return self[n].site
     }

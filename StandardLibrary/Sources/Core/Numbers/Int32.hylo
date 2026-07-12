@@ -1,4 +1,4 @@
-/// A 32-bit signed integer value.
+/// A signed 32-bit integer.
 @_symbol("Int32")
 public struct Int32 is Deinitializable {
 
@@ -13,6 +13,13 @@ public struct Int32 is Deinitializable {
     &self.value = Builtin.zeroinitializer_i32()
   }
 
+  /// Returns the absolute value of `self`.
+  ///
+  /// - Requires: `self` must not be `Int32`'s minimum value.
+  public fun abs() -> Self {
+    if self < Self.zero() { Self.zero() - self } else { Self(value: self.value) }
+  }
+
 }
 
 public given Int32 is ExpressibleByIntegerLiteral { /* built-in */ }
@@ -20,3 +27,99 @@ public given Int32 is ExpressibleByIntegerLiteral { /* built-in */ }
 public given Int32 is Movable {}
 
 public given Int32 is Copyable {}
+
+public given Int32 is Equatable {
+
+  /// Returns `true` iff `self` is equal to `other`.
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.icmp_eq_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_ne_i32(self.value, other.value))
+  }
+
+}
+
+public given Int32 is Comparable {
+
+  /// Returns `true` iff `self` is less than `other`.
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.icmp_slt_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sle_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.icmp_sgt_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  public fun infix>= (_ other: Self) -> Bool {
+    .new(value: Builtin.icmp_sge_i32(self.value, other.value))
+  }
+
+}
+
+public given Int32 is AdditiveArithmetic {
+
+  /// Returns `self` added to `other`.
+  fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.sadd_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Increments `self` by `other`.
+  public fun infix+= (other: Self) inout {
+    &self = self + other
+  }
+
+  /// Returns `other` subtracted from `self`.
+  fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.ssub_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Decrements `self` by `other`.
+  public fun infix-= (other: Self) inout {
+    &self = self - other
+  }
+
+  /// Returns `0`.
+  static fun zero() -> Self {
+    .new()
+  }
+
+}
+
+public given Int32 is Numeric {
+
+  /// Returns `self` multiplied by `other`.
+  fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.smul_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      fatal_error()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Multiplies `self` by `other`.
+  public fun infix*= (other: Self) inout {
+    &self = self * other
+  }
+
+}
