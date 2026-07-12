@@ -498,6 +498,27 @@ public struct TypeStore: Sendable {
     }
   }
 
+  /// If `n` is a type application or an alias thereof, returns its abstraction and arguments,
+  /// otherwise, returns `n` along with an empty set of type parameter assignments.
+  public func seenAsBaseTypeApplication<T: TypeIdentity>(
+    _ n: T
+  ) -> (base: AnyTypeIdentity, arguments: TypeArguments) {
+    var base = n.erased
+    var arguments = TypeArguments()
+    while true {
+      if let t = cast(base, to: TypeApplication.self) {
+        base = self[t].abstraction
+        arguments = self[t].arguments.mapValues { (u) in
+          cast(u, to: GenericParameter.self).flatMap({ (p) in arguments[p] }) ?? u
+        }
+      } else if let t = cast(base, to: TypeAlias.self) {
+        base = self[t].aliasee
+      } else {
+        return (base, arguments)
+      }
+    }
+  }
+
   /// Returns `[Void](A...) -> T)` iff `n` has the form `[Void](self: set T, A...) -> Void`.
   public mutating func asConstructor(_ n: AnyTypeIdentity) -> AnyTypeIdentity? {
     let (c, h) = contextAndHead(n.erased)

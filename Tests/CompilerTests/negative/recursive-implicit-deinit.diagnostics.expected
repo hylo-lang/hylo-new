@@ -1,3 +1,3 @@
-negative/recursive-implicit-deinit.hylo:4.22: error: implicit deinitialization of instances of 'S' causes infinite recursion in this context
-  fun deinit() sink {}
-                     ^
+negative/recursive-implicit-deinit.hylo:12.24: error: implicit deinitialization of instances of 'T' causes infinite recursion in this context
+    fun deinit() sink {}
+                       ^

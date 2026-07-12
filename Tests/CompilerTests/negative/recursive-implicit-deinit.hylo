@@ -1,7 +1,16 @@
 struct S is Deinitializable {
   let x: Int
   memberwise init
-  fun deinit() sink {}
+  fun deinit() sink {
+    // The compiler treats `self` like a tuple and emits memberwise deinitialization to avoid
+    // infinite recursion.
+  }
+}
+
+public fun foo<T>() {
+  given T is Deinitializable {
+    fun deinit() sink {}
+  }
 }
 
 public fun main() {

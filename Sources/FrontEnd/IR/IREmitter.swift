@@ -71,7 +71,7 @@ internal struct IREmitter {
       }
 
       // Is the receiver an instance of a struct or enum?
-      else if let d = me.program.declaration(of: receiver) {
+      else if let d = me.program.declaration(whereStructOrEnum: receiver) {
         me._emitDeinitializeStructurally(whole: .parameter(1), instanceOf: d, instantiatedWith: a)
       }
 
@@ -2643,13 +2643,21 @@ internal struct IREmitter {
       let r = program.standardLibraryDeclaration(.deinitializableDeinit)
 
       // Can we dispatch statically?
-      if let d = w.declaration, let c = program.cast(d, to: ConformanceDeclaration.self) {
-        let table = program.implementations(definedBy: c)
-        if let implementation = table.member(implementing: r) {
-          // Make sure we're not applying the function being lowered recursively, which may happen
-          // if `s` is the receiver of a function implementing `Deinitializable.deinit` for the
-          // witness that's been resolved.
-          if let j = implementation.target, currentFunction.name.isLoweredForm(of: j) {
+      if let implementation = program.implementation(of: r, in: w) {
+        // Make sure we're not applying the function being lowered recursively, which may happen
+        // if `s` is the receiver of a function implementing `Deinitializable.deinit` for the
+        // witness that's been resolved.
+        if let j = implementation.target, currentFunction.name.isLoweredForm(of: j) {
+          // Use memberwise deinitialization for structs and enums, so that one can write a custom
+          // deinitializer that does not have to explicitly consume its receiver.
+          let (x, a) = program.types.seenAsBaseTypeApplication(t)
+          if let base = program.declaration(whereStructOrEnum: x) {
+            _emitDeinitializeStructurally(whole: whole, instanceOf: base, instantiatedWith: a)
+            return true
+          }
+
+          // In other cases, complain about infinite recursion.
+          else {
             let m = """
               implicit deinitialization of instances of '\(program.show(t))' causes infinite \
               recursion in this context
@@ -2657,15 +2665,19 @@ internal struct IREmitter {
             report(.init(.error, m, at: currentAnchor.site))
             _ = _apply_builtin(.trap, to: [])
             return false
-          } else if !implementation.isSynthetic {
-            let o = _alloca(.void)
-            let f = loweredCallee(
-              implementation, qualifiedBy: nil, markedForMutationBy: nil,
-              output: o, at: currentAnchor)
-            let xs = Array(whole, prependedTo: f.arguments)
-            _ = _apply(f.value, xs, into: f.result, afterFormingAccesses: true)
-            return true
           }
+        }
+
+        // Otherwise, if the implementation is not synthetic, we can apply it directly without
+        // constructing a witness table.
+        else if !implementation.isSynthetic {
+          let o = _alloca(.void)
+          let f = loweredCallee(
+            implementation, qualifiedBy: nil, markedForMutationBy: nil,
+            output: o, at: currentAnchor)
+          let xs = Array(whole, prependedTo: f.arguments)
+          _ = _apply(f.value, xs, into: f.result, afterFormingAccesses: true)
+          return true
         }
       }
 
