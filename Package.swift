@@ -62,7 +62,8 @@ let package = Package(
     .executableTarget(
       name: "hc-generate-stdlib",
       dependencies: [
-        .product(name: "ArgumentParser", package: "swift-argument-parser")
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .target(name: "Utilities")
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -186,7 +187,7 @@ let package = Package(
       name: "CompilerTestsPlugin",
       capability: .buildTool(),
       dependencies: [
-        .target(name: "hc-tests")
+        .target(name: "hc-tests"),
       ],
       packageAccess: true),
 
@@ -194,6 +195,6 @@ let package = Package(
       name: "GenerateHyloStdLibPlugin",
       capability: .buildTool(),
       dependencies: [
-        .target(name: "hc-generate-stdlib")
+        .target(name: "hc-generate-stdlib"),
       ]),
   ])

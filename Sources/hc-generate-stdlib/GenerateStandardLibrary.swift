@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import Utilities
 
 /// The top-level command of `hc-generate-stdlib`.
 @main internal struct CommandLine: ParsableCommand {
@@ -12,8 +13,7 @@ import Foundation
 
   /// Executes the CLI command, writing the generated declarations to `outputFile`.
   internal func run() throws {
-    let contents = generateIntegerTypes()
-    try contents.write(to: outputFile, atomically: true, encoding: .utf8)
+    try generateIntegerTypes().forceWriteReadonly(to: outputFile, encoding: .utf8)
   }
 
 }
