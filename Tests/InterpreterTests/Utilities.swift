@@ -5,11 +5,11 @@ import Interpreter
 
 extension Program {
 
-  /// Returns a program loaded from `u` and lowered for interpretation.
-  static func loadForInterpretation(from u: URL) async throws -> Program {
+  /// Returns the sources rooted at `r`, lowered for interpretation.
+  static func loadForInterpretation(sourceRoot r: URL) async throws -> Program {
     var d = Driver(targetSpecification: try .host())
     try await d.loadStandardLibrary()
-    try await d.load("Main", withSourcesAt: u, dependingOnStandardLibrary: true)
+    try await d.load("Main", withSourcesAt: r, dependingOnStandardLibrary: true)
     return d.program
   }
 
