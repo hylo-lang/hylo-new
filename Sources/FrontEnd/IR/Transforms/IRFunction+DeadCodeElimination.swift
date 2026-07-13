@@ -87,6 +87,8 @@ extension IRFunction {
     switch at(i) {
     case let s as IRApply:
       return result(of: s.result)?.type == .never
+    case let s as IRApplyBuiltin:
+      return s.callee == .trap
     default:
       return false
     }
