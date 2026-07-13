@@ -2101,6 +2101,15 @@ internal struct IREmitter {
     return insert(s)!
   }
 
+  /// Inserts a `pointer_to_place` instruction.
+  internal mutating func _pointer_to_place<T: TypeIdentity>(
+    _ source: IRValue, as access: AccessEffect, _ target: T
+  ) -> IRValue {
+    let t = program.types.dealiased(target.erased)
+    let s = IRPointerToPlace(source: source, access: access, target: t, anchor: currentAnchor)
+    return insert(s)!
+  }
+
   /// Inserts a `project` instruction.
   ///
   /// If `formAccesses` is `true`, an access is created on each argument before the projection,
