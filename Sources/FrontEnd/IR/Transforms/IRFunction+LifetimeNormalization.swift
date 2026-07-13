@@ -300,9 +300,11 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRApplyBuiltin.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    for a in f.at(i).arguments {
-      consume(object: a, with: i.erased, in: f)
+    let s = f.at(i)
+    for (p, v) in zip(s.inputs, s.arguments) {
+      passArgument(p, v, insertingDeinitializationBefore: i.erased, in: &f)
     }
+
     context.declare(i, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }

@@ -1252,22 +1252,14 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for loading the value denoted by `e` into a register.
-  private mutating func lowered(rvalue e: ExpressionIdentity) -> IRValue {
-    let v = lowered(lvalue: e)
-    return lowering(e) { (me) in
-      let x = me._access([.sink], from: v)
-      let y = me._load(v)
-      me._end(IRAccess.self, openedBy: x)
-      return y
-    }
-  }
-
   /// Generates the IR for loading the result of `function` applied to `arguments` into a register.
   private mutating func _lower(
     builtin function: BuiltinFunction, appliedTo arguments: [LabeledExpression],
   ) -> IRValue {
-    let xs = arguments.map({ (a) in lowered(rvalue: a.value) })
+    let xs = arguments.map { (a) in
+      let x0 = lowered(lvalue: a.value)
+      return _access([.let], from: x0)
+    }
     return _apply_builtin(function, to: xs)
   }
 
@@ -2023,8 +2015,9 @@ internal struct IREmitter {
     let f = callee.type(uniquingTypesWith: &program.types)
     assert(program.types[f].inputs.count == arguments.count)
 
+    let p = program.types[f].inputs.map(\.access)
     let s = IRApplyBuiltin(
-      callee: callee, returnTypeOfCallee: program.types[f].output, arguments: arguments,
+      callee: callee, inputs: p, output: program.types[f].output, arguments: arguments,
       anchor: currentAnchor)
     return insert(s)!
   }

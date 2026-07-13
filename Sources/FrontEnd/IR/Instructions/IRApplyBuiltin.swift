@@ -2,7 +2,11 @@ import Archivist
 
 /// Invokes a function of the `Builtin` module.
 ///
-/// Unlike `apply`, this instruction does produce a result.
+///     apply_builtin <callee : builtin-function>(<v0 : value>, ..., <vn : value>)
+///
+/// `apply_builtin` applies the built-in function `callee` on arguments `v0` to `vn`, defining a
+/// register with the result of the application. Note that this behavior is unlike `apply`, which
+/// writes its result to a `set` parameter.
 @Archivable
 public struct IRApplyBuiltin: Instruction {
 
@@ -15,18 +19,22 @@ public struct IRApplyBuiltin: Instruction {
   /// The function being applied.
   public let callee: BuiltinFunction
 
-  /// The type of the value returned by `callee`.
-  public let type: IRType
+  /// The capabilities taken by the callee's parameters.
+  public let inputs: [AccessEffect]
+
+  /// The return type of the callee.
+  public let output: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
   public init(
-    callee: BuiltinFunction, returnTypeOfCallee: AnyTypeIdentity, arguments: [IRValue],
+    callee: BuiltinFunction, inputs: [AccessEffect], output: AnyTypeIdentity, arguments: [IRValue],
     anchor: Anchor
   ) {
     self.operands = arguments
     self.anchor = anchor
     self.callee = callee
-    self.type = .value(returnTypeOfCallee)
+    self.inputs = inputs
+    self.output = output
   }
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
@@ -34,12 +42,18 @@ public struct IRApplyBuiltin: Instruction {
     self.operands = other.operands.map({ (o) in properties[o] })
     self.anchor = properties.anchor(other)
     self.callee = other.callee
-    self.type = other.type
+    self.inputs = other.inputs
+    self.output = other.output
   }
 
   /// The arguments of the call.
   public var arguments: [IRValue] {
     operands
+  }
+
+  /// The type of the storage accessed by this instruction.
+  public var type: IRType {
+    .value(output)
   }
 
 }
