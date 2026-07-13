@@ -403,9 +403,8 @@ extension BuiltinFunction {
 
     case .addressOf:
       let t0 = s.fresh().erased
-      let t1 = s.demand(RemoteType(projectee: t0, access: .let)).erased
-      let t2 = s.demand(MachineType.ptr).erased
-      return s.demand(Arrow(inputs: [.init(label: "of", access: .let, type: t1)], output: t2))
+      let t1 = s.demand(MachineType.ptr).erased
+      return s.demand(Arrow(inputs: [.init(label: "of", access: .let, type: t0)], output: t1))
 
     case .markUninitialized:
       let t0 = s.fresh().erased
