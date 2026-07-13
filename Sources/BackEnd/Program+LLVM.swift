@@ -191,6 +191,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRSubfield.self), in: &ctx)
     case IRSwitch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRSwitch.self), in: &ctx)
+    case IRUnreachable.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRUnreachable.self), in: &ctx)
     case IRWitnessTable.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRWitnessTable.self), in: &ctx)
     case IRYield.self:
@@ -258,6 +260,8 @@ extension Program {
     let s = ctx.ir.at(i)
 
     switch s.callee {
+    case .trap:
+      insertTrap(in: &ctx)
     case .addressOf:
       ctx.value[.register(i.erased)] = ctx.value[s.arguments[0]]!
     default:
@@ -577,6 +581,14 @@ extension Program {
       on: ctx.value[s.scrutinee]!,
       cases: bs.dropLast(1), default: last.1, at: ctx.insertionPoint!)
     return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRUnreachable.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    ctx.module.llvm.insertUnreachable(at: ctx.insertionPoint!)
+    return ctx.ir.instruction(after: i.erased)
   }
 
   /// Generates the LLVM IR code corresponding to `i`.
@@ -988,6 +1000,12 @@ extension Program {
       // TODO: alignment
       ctx.module.llvm.insertReturn(y, at: ctx.insertionPoint!)
     }
+  }
+
+  /// Inserts a call to the `llvm.trap` intrinsic.
+  private func insertTrap(in ctx: inout FunctionGenerationContext) {
+    let f = ctx.module.llvm.intrinsic(named: IntrinsicFunction.llvm.trap, for: [])!
+    _ = ctx.module.llvm.insertCall(f, on: [], at: ctx.insertionPoint!)
   }
 
   /// Defines a "main" function calling `f`, which is the module's entry point.

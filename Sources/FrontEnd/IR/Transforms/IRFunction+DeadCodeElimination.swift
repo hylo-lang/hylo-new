@@ -70,6 +70,8 @@ extension IRFunction {
   /// Returns `true` iff `i` can be removed if it has no use.
   private func isRemovableWhenUnused(_ i: AnyInstructionIdentity) -> Bool {
     switch at(i) {
+    case let s as IRApplyBuiltin:
+      return s.callee != .trap
     case let s:
       return s.type != .nothing
     }
