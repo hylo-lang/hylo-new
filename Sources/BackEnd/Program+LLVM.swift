@@ -179,6 +179,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRPlaceCast.self), in: &ctx)
     case IRPlaceCast.End.self:
       return ctx.ir.instruction(after: i)
+    case IRPointerToPlace.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRPointerToPlace.self), in: &ctx)
     case IRProject.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRProject.self), in: &ctx)
     case IRProperty.self:
@@ -388,6 +390,16 @@ extension Program {
   /// Generates the LLVM IR code corresponding to `i`.
   internal mutating func incorporate(
     _ i: IRPlaceCast.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let v = FrontEnd.IRValue.register(i.erased)
+    ctx.value[v] = .some(ctx.value[s.source]!)
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRPointerToPlace.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
     let v = FrontEnd.IRValue.register(i.erased)

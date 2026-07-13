@@ -1,0 +1,8 @@
+//! exit-status:23
+
+public fun main() -> Int32 {
+  var x = 23 as Int32
+  var y: Builtin.ptr = Builtin.address(of: x)
+  var z: Int32 = y as* (sink Int32)
+  return z
+}

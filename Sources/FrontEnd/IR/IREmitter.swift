@@ -743,18 +743,24 @@ internal struct IREmitter {
 
   /// Implements `lower(store:to:)` for conversion expressions.
   private mutating func lower(store e: Conversion.ID, to target: IRValue) {
-    let lhs = program.type(assignedTo: program[e].source)
-    let rhs = program.type(assignedTo: e)
+    switch program[e].semantics.value {
+    case .pointer:
+      let x0 = lowered(lvalue: e)
+      lowering(e) { (me) in
+        me._emitMove([.inout, .set], x0, to: target)
+      }
 
-    // Trivial if the conversion does not involve any change of representation.
-    if let s = program.types.unifiable(lhs, rhs) {
-      assert(s.isEmpty)
-      lower(store: program[e].source, to: target)
-    }
+    default:
+      let lhs = program.type(assignedTo: program[e].source)
+      let rhs = program.type(assignedTo: e)
 
-    // Otherwise, the semantics of the conversion depends on its direction.
-    else {
-      unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      // Trivial if the conversion does not involve any change of representation.
+      if let s = program.types.unifiable(lhs, rhs) {
+        assert(s.isEmpty)
+        lower(store: program[e].source, to: target)
+      } else {
+        unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      }
     }
   }
 
@@ -1305,14 +1311,31 @@ internal struct IREmitter {
 
   /// Implements `lower(lvalue:)` for explicit conversions.
   private mutating func lowered(lvalue e: Conversion.ID) -> IRValue {
-    // Is there any conversion required?
-    let t = program.types.dealiased(program.type(assignedTo: e))
-    let u = program.types.dealiased(program.type(assignedTo: program[e].source))
-    if t == u {
-      return lowered(lvalue: program[e].source)
-    }
+    switch program[e].semantics.value {
+    case .pointer:
+      // The right-hand side is a remote type.
+      let t = program.type(assignedTo: program[e].target, assuming: Metatype.self)
+      let u = program.types.cast(program.types[t].inhabitant, to: RemoteType.self)!
+      let k = program.types[u].access
 
-    unimplemented("conversions involving change of representation")
+      let x0 = lowered(lvalue: program[e].source)
+      return lowering(e) { (me) in
+        let x1 = me._load(x0)
+        return me._pointer_to_place(x1, as: k, me.program.types[u].projectee)
+      }
+
+    default:
+      let lhs = program.type(assignedTo: program[e].source)
+      let rhs = program.type(assignedTo: e)
+
+      // Trivial if the conversion does not involve any change of representation.
+      if let s = program.types.unifiable(lhs, rhs) {
+        assert(s.isEmpty)
+        return lowered(lvalue: program[e].source)
+      } else {
+        unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      }
+    }
   }
 
   /// Implements `lower(lvalue:)` for inout expressions.
@@ -2643,6 +2666,7 @@ internal struct IREmitter {
   private mutating func _emitDeinitialize(
     _ s: IRValue, instanceOf t: AnyTypeIdentity
   ) -> Bool {
+    assert(!t[.hasAliases])
     switch program.types.tag(of: t) {
     case Tuple.self:
       let u = program.types.castUnchecked(t, to: Tuple.self)
