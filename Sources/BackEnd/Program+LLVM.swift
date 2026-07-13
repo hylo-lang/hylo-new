@@ -155,6 +155,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRAlloca.self), in: &ctx)
     case IRApply.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRApply.self), in: &ctx)
+    case IRApplyBuiltin.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRApplyBuiltin.self), in: &ctx)
     case IRAssumeState.self:
       return ctx.ir.instruction(after: i)
     case IRBranch.self:
@@ -244,6 +246,22 @@ extension Program {
       let p = prototype(types[a], in: &ctx.module)
       let x = insertArguments(s.arguments, mappedWith: p.mapping, in: &ctx)
       insertCall(applying: f, describedBy: p, to: x, writingResultTo: s.result, in: &ctx)
+    }
+
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRApplyBuiltin.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+
+    switch s.callee {
+    case .addressOf:
+      ctx.value[.register(i.erased)] = ctx.value[s.arguments[0]]!
+    default:
+      unimplemented(String(describing: s.callee))
     }
 
     return ctx.ir.instruction(after: i.erased)
