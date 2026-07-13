@@ -9,7 +9,7 @@ extension Program {
   static func loadForInterpretation(sourceRoot r: URL) async throws -> Program {
     var d = Driver(targetSpecification: try .host())
     try await d.loadStandardLibrary()
-    try await d.load("Main", withSourcesAt: r, dependingOnStandardLibrary: true)
+    try await d.load("Main", withSourcesAt: r)
     return d.program
   }
 
@@ -25,24 +25,6 @@ extension Program {
       print(show(executor.currentInstruction))
       try executor.step()
     }
-  }
-
-}
-
-extension Driver {
-
-  /// Loads `m` from `root`, making it depend on the standard library if
-  /// `dependingOnStandardLibrary` is `true`.
-  fileprivate mutating func load(
-    _ m: Module.Name,
-    withSourcesAt root: URL,
-    dependingOnStandardLibrary: Bool
-  ) async throws {
-    if dependingOnStandardLibrary {
-      let r = program.demandModule(m)
-      program[r].addDependency(Module.standardLibraryName)
-    }
-    try await load(m, withSourcesAt: root)
   }
 
 }
