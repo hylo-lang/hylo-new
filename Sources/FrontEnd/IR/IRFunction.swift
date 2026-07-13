@@ -870,7 +870,7 @@ extension IRFunction.Name: Showable {
 
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
-      return "\(printer.program.debugName(of: d))<\(list: xs)>"
+      return "\(printer.program.debugName(of: d))$synthesized<\(list: xs)>"
 
     case .implementation(let d, _, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })

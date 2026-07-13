@@ -918,8 +918,8 @@ public struct Program: Sendable {
     self[d.module].implementations(definedBy: d) ?? unreachable("untyped node at \(self[d].site)")
   }
 
-  /// If `witness` expresses the application of a closed and concrete conformance declaration,
-  /// returns the implementation of `requirement` for that conformance; otherwise, returns `nil`.
+  /// If `witness` expresses the application of some closed and concrete conformance declaration,
+  /// returns that conformance along with its implementation of `requirement`.
   ///
   /// `requirement` is the declaration of a requirement of the trait whose conformance is being
   /// witnessed by the value computed by `witness`. The result is non-`nil` iff `witness` is an
@@ -928,9 +928,9 @@ public struct Program: Sendable {
   /// - Requires: The module containing `d` is typed.
   public func implementation(
     of requirement: DeclarationIdentity, in witness: WitnessExpression
-  ) -> DeclarationReference? {
+  ) -> (ConformanceDeclaration.ID, DeclarationReference)? {
     if let d = witness.declaration, let c = cast(d, to: ConformanceDeclaration.self) {
-      return implementations(definedBy: c).member(implementing: requirement)
+      return implementations(definedBy: c).member(implementing: requirement).map({ (m) in (c, m) })
     } else {
       return nil
     }
