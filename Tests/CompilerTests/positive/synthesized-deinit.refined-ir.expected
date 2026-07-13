@@ -1,5 +1,4 @@
-
-fun S0.$<ConformanceDeclaration at synthesized-deinit:7.14>() let <: Deinitializable<S0> {
+fun S0.$<ConformanceDeclaration at synthesized-deinit:8.14>() let <: Deinitializable<S0> {
 %b0:
   %r0 = alloca Deinitializable<S0>, #preferred
   %r1 = witnesstable {Deinitializable.deinit<Self: S0>} as Deinitializable<S0>
@@ -37,7 +36,7 @@ fun S0.deinit(sink %p0: S0, set %p1: Void) {
   %r7 = return
 }
 
-fun S1.$<ConformanceDeclaration at synthesized-deinit:12.14>() let <: Deinitializable<S1> {
+fun S1.$<ConformanceDeclaration at synthesized-deinit:13.14>() let <: Deinitializable<S1> {
 %b0:
   %r0 = alloca Deinitializable<S1>, #preferred
   %r1 = witnesstable {Deinitializable.deinit<Self: S1>} as Deinitializable<S1>
@@ -56,18 +55,47 @@ fun S1.$<ConformanceDeclaration at synthesized-deinit:12.14>() let <: Deinitiali
 fun Deinitializable.deinit<Self: S1>(let %p0: Deinitializable<S1>, sink %p1: S1, set %p2: Void) {
 %b0:
   %r0 = access [sink] %p1
-  %r1 = assume_state %r0 uninitialized
-  %r2 = end %r0
-  %r3 = access [set] %p2
-  %r4 = assume_state %r3 initialized
-  %r5 = end %r3
-  %r6 = return
+  %r1 = access [set] %p2
+  %r2 = apply S1.deinit(%r0) => %r1
+  %r5 = end %r1
+  %r4 = end %r0
+  %r3 = return
 }
 
-fun S2.$<ConformanceDeclaration at synthesized-deinit:14.14>() let <: Deinitializable<S2> {
+fun S1.deinit(sink %p0: S1, set %p1: Void) {
+%b0:
+  %r0 = access [set] %p1
+  %r1 = assume_state %r0 initialized
+  %r2 = end %r0
+  %r4 = project S1.$<ConformanceDeclaration at synthesized-deinit:13.14>[]
+  %r5 = alloca Void, #preferred
+  %r6 = access [let] %r4
+  %r7 = access [sink] %p0
+  %r8 = access [set] %r5
+  %r9 = apply Deinitializable.deinit$synthesized<Self: S1>(%r6, %r7) => %r8
+  %r10 = end %r8
+  %r11 = end %r7
+  %r12 = end %r6
+  %r13 = end %r4
+  %r3 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: S1>(let %p0: Deinitializable<S1>, sink %p1: S1, set %p2: Void) {
+%b0:
+  %r0 = place_cast %p1 as sink Void
+  %r1 = access [sink] %r0
+  %r2 = assume_state %r1 uninitialized
+  %r3 = end %r1
+  %r4 = access [set] %p2
+  %r5 = assume_state %r4 initialized
+  %r6 = end %r4
+  %r7 = return
+}
+
+fun S2.$<ConformanceDeclaration at synthesized-deinit:17.14>() let <: Deinitializable<S2> {
 %b0:
   %r0 = alloca Deinitializable<S2>, #preferred
-  %r1 = witnesstable {Deinitializable.deinit<Self: S2>} as Deinitializable<S2>
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: S2>} as Deinitializable<S2>
   %r2 = access [set] %r0
   %r3 = store %r1 to %r2
   %r4 = end %r2
@@ -80,7 +108,18 @@ fun S2.$<ConformanceDeclaration at synthesized-deinit:14.14>() let <: Deinitiali
   %r11 = return
 }
 
-fun Deinitializable.deinit<Self: S2>(let %p0: Deinitializable<S2>, sink %p1: S2, set %p2: Void) {
+fun Deinitializable.deinit$synthesized<Self: S2>(let %p0: Deinitializable<S2>, sink %p1: S2, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: S3>(let %p0: Deinitializable<S3>, sink %p1: S3, set %p2: Void) {
 %b0:
   %r0 = place_cast %p1 as sink {Int, {S0, S1}}
   %r1 = subfield %r0 at 0 as Int
@@ -93,18 +132,148 @@ fun Deinitializable.deinit<Self: S2>(let %p0: Deinitializable<S2>, sink %p1: S2,
   %r8 = access [sink] %r6
   %r9 = access [set] %r7
   %r10 = apply S0.deinit(%r8) => %r9
-  %r21 = end %r9
-  %r20 = end %r8
+  %r22 = end %r9
+  %r21 = end %r8
   %r11 = subfield %r5 at 1 as S1
-  %r12 = access [sink] %r11
-  %r13 = assume_state %r12 uninitialized
-  %r14 = end %r12
-  %r19 = end %r0
-  %r15 = access [set] %p2
-  %r16 = assume_state %r15 initialized
-  %r17 = end %r15
-  %r22 = access [sink] %r7
-  %r23 = assume_state %r22 uninitialized
-  %r24 = end %r22
-  %r18 = return
+  %r12 = alloca Void, #preferred
+  %r13 = access [sink] %r11
+  %r14 = access [set] %r12
+  %r15 = apply S1.deinit(%r13) => %r14
+  %r24 = end %r14
+  %r23 = end %r13
+  %r20 = end %r0
+  %r16 = access [set] %p2
+  %r17 = assume_state %r16 initialized
+  %r18 = end %r16
+  %r25 = access [sink] %r7
+  %r26 = assume_state %r25 uninitialized
+  %r27 = end %r25
+  %r28 = access [sink] %r12
+  %r29 = assume_state %r28 uninitialized
+  %r30 = end %r28
+  %r19 = return
+}
+
+fun E0.$<ConformanceDeclaration at synthesized-deinit:26.12>() let <: Deinitializable<E0> {
+%b0:
+  %r0 = alloca Deinitializable<E0>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit<Self: E0>} as Deinitializable<E0>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit<Self: E0>(let %p0: Deinitializable<E0>, sink %p1: E0, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = access [set] %p2
+  %r2 = apply E0.deinit(%r0) => %r1
+  %r5 = end %r1
+  %r4 = end %r0
+  %r3 = return
+}
+
+fun E0.deinit(sink %p0: E0, set %p1: Void) {
+%b0:
+  %r0 = access [set] %p1
+  %r1 = assume_state %r0 initialized
+  %r2 = end %r0
+  %r4 = project E0.$<ConformanceDeclaration at synthesized-deinit:26.12>[]
+  %r5 = alloca Void, #preferred
+  %r6 = access [let] %r4
+  %r7 = access [sink] %p0
+  %r8 = access [set] %r5
+  %r9 = apply Deinitializable.deinit$synthesized<Self: E0>(%r6, %r7) => %r8
+  %r10 = end %r8
+  %r11 = end %r7
+  %r12 = end %r6
+  %r13 = end %r4
+  %r3 = return
+}
+
+fun E2.$<ConformanceDeclaration at synthesized-deinit:32.12>() let <: Deinitializable<E2> {
+%b0:
+  %r0 = alloca Deinitializable<E2>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: E2>} as Deinitializable<E2>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: E2>(let %p0: Deinitializable<E2>, sink %p1: E2, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun E3.$<ConformanceDeclaration at synthesized-deinit:34.12>() let <: Deinitializable<E3> {
+%b0:
+  %r0 = alloca Deinitializable<E3>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: E3>} as Deinitializable<E3>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: E3>(let %p0: Deinitializable<E3>, sink %p1: E3, set %p2: Void) {
+%b0:
+  %r0 = enum_tag %p1
+  %r1 = switch %r0, %b1, %b2
+%b1:
+  %r2 = case "a" of %p1
+  %r3 = place_cast %r2 as sink {S0}
+  %r4 = subfield %r3 at 0 as S0
+  %r5 = alloca Void, #preferred
+  %r6 = access [sink] %r4
+  %r7 = access [set] %r5
+  %r8 = apply S0.deinit(%r6) => %r7
+  %r25 = end %r7
+  %r24 = end %r6
+  %r23 = end %r3
+  %r22 = end %r2
+  %r9 = br %b3
+%b2:
+  %r10 = case "b" of %p1
+  %r11 = place_cast %r10 as sink {S1}
+  %r12 = subfield %r11 at 0 as S1
+  %r13 = alloca Void, #preferred
+  %r14 = access [sink] %r12
+  %r15 = access [set] %r13
+  %r16 = apply S1.deinit(%r14) => %r15
+  %r29 = end %r15
+  %r28 = end %r14
+  %r27 = end %r11
+  %r26 = end %r10
+  %r17 = br %b3
+%b3:
+  %r18 = access [set] %p2
+  %r19 = assume_state %r18 initialized
+  %r20 = end %r18
+  %r21 = return
 }

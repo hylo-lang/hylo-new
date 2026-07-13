@@ -918,6 +918,24 @@ public struct Program: Sendable {
     self[d.module].implementations(definedBy: d) ?? unreachable("untyped node at \(self[d].site)")
   }
 
+  /// If `witness` expresses the application of some closed and concrete conformance declaration,
+  /// returns that conformance along with its implementation of `requirement`.
+  ///
+  /// `requirement` is the declaration of a requirement of the trait whose conformance is being
+  /// witnessed by the value computed by `witness`. The result is non-`nil` iff `witness` is an
+  /// application of a concrete conformance declaration that does not capture any local binding.
+  ///
+  /// - Requires: The module containing `d` is typed.
+  public func implementation(
+    of requirement: DeclarationIdentity, in witness: WitnessExpression
+  ) -> (ConformanceDeclaration.ID, DeclarationReference)? {
+    if let d = witness.declaration, let c = cast(d, to: ConformanceDeclaration.self) {
+      return implementations(definedBy: c).member(implementing: requirement).map({ (m) in (c, m) })
+    } else {
+      return nil
+    }
+  }
+
   /// If `n` is a requirement, returns the traits that introduces it. Otherwise, returns `nil`.
   ///
   /// - Requires: The module containing `n` is scoped.
@@ -1085,13 +1103,30 @@ public struct Program: Sendable {
     return self[d.file].variableToBinding[d.offset]
   }
 
-  /// Returns the declaration of the type of which `t` is an instance, if any.
+  /// Returns the declaration of the base type of `t` iff that is a struct or enum.
+  public func declaration(whereStructOrEnum t: AnyTypeIdentity) -> DeclarationIdentity? {
+    guard let d = declaration(of: t) else { return nil }
+    switch tag(of: d) {
+    case StructDeclaration.self, EnumDeclaration.self:
+      return d
+    default:
+      return nil
+    }
+  }
+
+  /// Returns the declaration of the base type of `t`, if any.
   public func declaration(of t: AnyTypeIdentity) -> DeclarationIdentity? {
     switch types.tag(of: t) {
+    case AssociatedType.self:
+      return .init(types[types.castUnchecked(t, to: AssociatedType.self)].declaration)
     case Enum.self:
       return .init(types[types.castUnchecked(t, to: Enum.self)].declaration)
+    case GenericParameter.self:
+      return declaration(of: types.castUnchecked(t, to: GenericParameter.self))
     case Struct.self:
       return .init(types[types.castUnchecked(t, to: Struct.self)].declaration)
+    case Trait.self:
+      return .init(types[types.castUnchecked(t, to: Trait.self)].declaration)
     case TypeAlias.self:
       return declaration(of: types[types.castUnchecked(t, to: TypeAlias.self)].aliasee)
     case TypeApplication.self:
@@ -1099,6 +1134,11 @@ public struct Program: Sendable {
     default:
       return nil
     }
+  }
+
+  /// Returns the declaration of the type of which `t` is an instance, if any.
+  public func declaration(of t: GenericParameter.ID) -> DeclarationIdentity? {
+    types[t].declaration.map(DeclarationIdentity.init(_:))
   }
 
   /// Returns the types of stored parts of `t` iff its layout is visible from `module`.

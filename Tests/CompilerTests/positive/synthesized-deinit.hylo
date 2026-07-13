@@ -1,19 +1,39 @@
 //! stage:lowering
 
 // `S0` has a user-defined deinitializer, meaning that it is not trivially deinitializable.
-// `S1` has a synthesized deinitializer, which is no-op.
-// `S2` has a synthesized deinitializer, which deinitializes each property individually.
+// `S1` has a user-defined deinitializer that delegates to memberwise deinitialization.
+// `S2` has a synthesized deinitializer that is no-op.
+// `S3` has a synthesized deinitializer that deinitializes each property individually.
 
 struct S0 is Deinitializable {
   var i: Int
   fun deinit() sink { _ = self.i }
 }
 
-struct S1 is Deinitializable {}
+struct S1 is Deinitializable {
+  fun deinit() sink {}
+}
 
-struct S2 is Deinitializable {
+struct S2 is Deinitializable {}
+
+struct S3 is Deinitializable {
   let i: Int
   let r: {S0, S1}
+}
+
+// Enums behave similarly as structs.
+
+enum E0 is Deinitializable {
+  case a(i: Int)
+  case b(i: Int)
+  fun deinit() sink {}
+}
+
+enum E2 is Deinitializable {}
+
+enum E3 is Deinitializable {
+  case a(i: S0)
+  case b(i: S1)
 }
 
 public fun main() {}
