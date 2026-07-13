@@ -43,11 +43,6 @@ public enum BuiltinFunction: Hashable, Sendable {
   /// measures may be needed to keep the argument alive during the pointer's use.
   case addressOf
 
-  /// `Builtin.mark_uninitialized<T>(_ v: sink T) -> Void`
-  ///
-  /// Marks `v` as being uninitialized.
-  case markUninitialized
-
   // MARK: Functions with a counterpart LLVM instruction.
 
   case add(OverflowBehavior, MachineType.ID)
@@ -406,10 +401,6 @@ extension BuiltinFunction {
       let t1 = s.demand(MachineType.ptr).erased
       return s.demand(Arrow(inputs: [.init(label: "of", access: .let, type: t0)], output: t1))
 
-    case .markUninitialized:
-      let t0 = s.fresh().erased
-      return s.demand(Arrow(inputs: [.init(label: nil, access: .sink, type: t0)], output: .void))
-
     case .add(_, let t):
       return s.demand(Arrow(t, t, to: t))
     case .sub(_, let t):
@@ -752,8 +743,6 @@ extension BuiltinFunction: Showable {
       return "trap"
     case .addressOf:
       return "address"
-    case .markUninitialized:
-      return "mark_uninitialized"
     case .add(let p, let t):
       return printer.format((p != .ignore) ? "add_\(p)_%T" : "add_%T", [t.erased])
     case .sub(let p, let t):
@@ -1098,15 +1087,6 @@ extension BuiltinFunction {
     case "address":
       if !tokens.isEmpty { return nil }
       self = .addressOf
-    case "mark":
-      if tokens != ["uninitialized"] { return nil }
-      self = .markUninitialized
-
-    //    case "advanced":
-    //      guard let ((_, _), t) = (exactly("by") + exactly("bytes") + machineType)(&tokens)
-    //      else { return nil }
-    //      self = .advancedByBytes(byteOffset: t)
-
     case "add":
       guard let (p, t) = integerArithmeticTail(&tokens) else { return nil }
       self = .add(p, s.demand(t))
