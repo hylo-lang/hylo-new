@@ -278,7 +278,7 @@ public struct Driver {
     // Compile the module from sources.
     let m = program.demandModule(module)
 
-    if addStandardLibraryDependency {
+    if addStandardLibraryDependency && module != Module.standardLibraryName {
       program[m].addDependency(Module.standardLibraryName)
     }
 
