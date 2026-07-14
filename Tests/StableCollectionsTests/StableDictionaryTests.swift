@@ -221,6 +221,25 @@ final class StableDictionaryTests: XCTestCase {
     XCTAssertEqual(t.description, m)
   }
 
+  func testInsertAtCapacityBound() {
+    var xs = StableDictionary<DistinctlyHashed, Int>()
+
+    // Append four keys hashing to distinct buckets/slots: capacity grows to 4 with end == 4.
+    let a = DistinctlyHashed(as: 0)
+    let b = DistinctlyHashed(as: 1)
+    let c = DistinctlyHashed(as: 2)
+    let d = DistinctlyHashed(as: 3)
+    for (i, k) in [a, b, c, d].enumerated() { xs.assignValue(i, forKey: k) }
+    XCTAssertEqual(xs.capacity, xs.endIndex)  // capacity == end == 4
+
+    // Remove position 0, leaving a tombstone; count (3) is now below end (4).
+    xs.removeValue(forKey: a)
+
+    xs.assignValue(99, forKey: DistinctlyHashed(as: 4))
+
+    XCTAssertGreaterThanOrEqual(xs.capacity, xs.endIndex, "insert wrote one bucket past the buffer")
+  }
+
   func testCopyOnWriteReallocationPreservesLiveBucketsPastCount() {
     var subject = StableDictionary<DistinctlyHashed, Int>()
 
