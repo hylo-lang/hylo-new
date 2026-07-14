@@ -1,6 +1,7 @@
-import Driver
+@testable import Driver
 import SwiftyLLVM
 import XCTest
+import FrontEnd
 
 final class DriverTests: XCTestCase {
 
@@ -70,6 +71,28 @@ final class DriverTests: XCTestCase {
         }
       }
     }
+  }
+
+}
+
+final class CompilationErrorTests: XCTestCase {
+
+  func testStringRepresentation() {
+    let f: SourceFile = "Hello."
+    let s = SourceSpan(f.startIndex ..< f.index(f.startIndex, offsetBy: 2), in: f)
+    let e = Diagnostic(.error, "bang", at: s)
+    let c = CompilationError(diagnostics: DiagnosticSet(CollectionOfOne(e)))
+
+    XCTAssertEqual(
+      "\(c)",
+      """
+
+      virtual:///1ssiyy33rbj6z:1.1-3: error: bang
+      Hello.
+      ~~
+
+      """)
+
   }
 
 }
