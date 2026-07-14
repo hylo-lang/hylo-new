@@ -234,9 +234,7 @@ final class StableDictionaryTests: XCTestCase {
 
     // Remove position 0, leaving a tombstone; count (3) is now below end (4).
     xs.removeValue(forKey: a)
-
     xs.assignValue(99, forKey: DistinctlyHashed(as: 4))
-
     XCTAssertGreaterThanOrEqual(xs.capacity, xs.endIndex, "insert wrote one bucket past the buffer")
   }
 
@@ -264,6 +262,7 @@ final class StableDictionaryTests: XCTestCase {
     XCTAssertEqual(subject[c], 12, "reallocation clobbered a live bucket at position >= count")
     XCTAssertEqual(subject[b], 110)
   }
+
 }
 
 /// A key whose hash is fixed by the caller, so bucket placement is fully deterministic.
