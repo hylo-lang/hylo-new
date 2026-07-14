@@ -33,7 +33,7 @@ final class DiagnosticSetTests: XCTestCase {
     XCTAssertEqual(
       "\(d)",
       """
-
+      
       virtual:///1ssiyy33rbj6z:1.1-3: error: bang
       Hello.
       ~~
