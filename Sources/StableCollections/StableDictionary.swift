@@ -423,8 +423,8 @@ public struct StableDictionary<Key: Hashable, Value> {
 
   /// Inserts the given key/value pair at `p`.
   private mutating func insert(key: Key, value: Value, at p: Int) {
-    reserveCapacity(Swift.max(count + 1, p))
     ensureUnique()
+    reserveCapacity(Swift.max(count + 1, p + 1))
     contents!.withUnsafeMutablePointers { (head, body) in
       let hash = key.hashValue
       head.pointee.assign(position: p, in: body, forHash: hash)
