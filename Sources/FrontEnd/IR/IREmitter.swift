@@ -701,9 +701,18 @@ internal struct IREmitter {
 
     // Are we lowering a built-in call?
     else if let f = program.asBuiltinFunction(program[e].callee) {
-      return lowering(e) { (me) in
-        let result = me._lower(builtin: f, appliedTo: me.program[e].arguments)
-        me._emitInitialize(target, with: result)
+      // `Builtin.assume_[un]initialized` is lowered directly to `assume_state`.
+      if case .assumeInitialized(let s) = f {
+        let x0 = lowered(lvalue: program[e].arguments.uniqueElement!.value)
+        lowering(e) { (me) in
+          me._assume_state(x0, initialized: s)
+          me._assume_state(target, initialized: true)
+        }
+      } else {
+        lowering(e) { (me) in
+          let x0 = me._emitApply(builtin: f, to: me.program[e].arguments)
+          me._emitInitialize(target, with: x0)
+        }
       }
     }
 
@@ -1256,17 +1265,6 @@ internal struct IREmitter {
         return me._project(f.value, arguments, afterFormingAccesses: true)
       }
     }
-  }
-
-  /// Generates the IR for loading the result of `function` applied to `arguments` into a register.
-  private mutating func _lower(
-    builtin function: BuiltinFunction, appliedTo arguments: [LabeledExpression],
-  ) -> IRValue {
-    let xs = arguments.map { (a) in
-      let x0 = lowered(lvalue: a.value)
-      return _access([.let], from: x0)
-    }
-    return _apply_builtin(function, to: xs)
   }
 
   /// Generates the IR for computing the place of the value denoted by `e`.
@@ -2033,11 +2031,9 @@ internal struct IREmitter {
 
   /// Inserts a `apply_builtin` instruction.
   internal mutating func _apply_builtin(
-    _ callee: BuiltinFunction, to arguments: [IRValue]
+    _ callee: BuiltinFunction, typed f: Arrow.ID, to arguments: [IRValue]
   ) -> IRValue {
-    let f = callee.type(uniquingTypesWith: &program.types)
     assert(program.types[f].inputs.count == arguments.count)
-
     let p = program.types[f].inputs.map(\.access)
     let s = IRApplyBuiltin(
       callee: callee, inputs: p, output: program.types[f].output, arguments: arguments,
@@ -2597,7 +2593,27 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for defining a place projecting `source` as a place of type `target` with
+  /// Generates IR for calling `Builtin.trap`.
+  internal mutating func _emitTrap() {
+    let f = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
+    _ = _apply_builtin(.trap, typed: f, to: [])
+  }
+
+  /// Generates IR for applying `callee` to `arguments`.
+  ///
+  /// `callee` is any built-in function but `assume_[un]initialized`.
+  private mutating func _emitApply(
+    builtin callee: BuiltinFunction, to arguments: [LabeledExpression],
+  ) -> IRValue {
+    let t = callee.type(uniquingTypesWith: &program.types)
+    let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
+      let x0 = lowered(lvalue: a.value)
+      return _access([p.access], from: x0)
+    }
+    return _apply_builtin(callee, typed: t, to: xs)
+  }
+
+  /// Generates IR for defining a place projecting `source` as a place of type `target` with
   /// capability `access`.
   ///
   /// The result if an `access` if `target` is the type of `source`. Otherwise, the result is a
@@ -2685,7 +2701,7 @@ internal struct IREmitter {
   ) -> Bool {
     switch witnessOfDeinitializable(for: t) {
     case .none:
-      _ = _apply_builtin(.trap, to: [])
+      _emitTrap()
       return false
 
     case .trivial:
@@ -2718,7 +2734,7 @@ internal struct IREmitter {
               recursion in this context
               """
             report(.init(.error, m, at: currentAnchor.site))
-            _ = _apply_builtin(.trap, to: [])
+            _emitTrap()
             return false
           }
         }
@@ -2935,7 +2951,7 @@ internal struct IREmitter {
 
     // Other types require a conformance to `Hylo.Movable`.
     guard let w = conformanceWitness(of: typeOfSource, is: .movable) else {
-      _ = _apply_builtin(.trap, to: [])
+      _emitTrap()
       return
     }
 
