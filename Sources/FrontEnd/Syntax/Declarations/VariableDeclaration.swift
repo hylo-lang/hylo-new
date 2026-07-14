@@ -14,6 +14,9 @@ public struct VariableDeclaration: Declaration, Pattern {
   /// The site from which `self` was parsed.
   public var site: SourceSpan { identifier.site }
 
+  /// `true` iff `identifier` was synthesized rather than user-written.
+  public var isSynthesized: Bool
+
 }
 
 extension VariableDeclaration: Showable {
@@ -29,10 +32,12 @@ extension VariableDeclaration: Archivable {
 
   public init<T>(from archive: inout ReadableArchive<T>, in context: inout Any) throws {
     self.identifier = try archive.read(Parsed<String>.self, in: &context)
+    self.isSynthesized = try archive.read(Bool.self, in: &context)
   }
 
   public func write<T>(to archive: inout WriteableArchive<T>, in context: inout Any) throws {
     try archive.write(identifier, in: &context)
+    try archive.write(isSynthesized, in: &context)
   }
 
 }
