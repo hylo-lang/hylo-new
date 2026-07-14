@@ -24,4 +24,21 @@ final class DiagnosticSetTests: XCTestCase {
     XCTAssertEqual(log.elements.count, 3)
   }
 
+  func testStringRepresentation() {
+    let f: SourceFile = "Hello."
+    let s = SourceSpan(f.startIndex ..< f.index(f.startIndex, offsetBy: 2), in: f)
+    let e = Diagnostic(.error, "bang", at: s)
+    let d = DiagnosticSet(CollectionOfOne(e))
+
+    XCTAssertEqual(
+      "\(d)",
+      """
+
+      virtual:///1ssiyy33rbj6z:1.1-3: error: bang
+      Hello.
+      ~~
+
+      """)
+  }
+
 }
