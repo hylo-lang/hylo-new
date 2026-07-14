@@ -126,6 +126,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRPlaceCast.self), from: &f)
       case IRPlaceCast.End.self:
         pc = interpret(f.castUnchecked(i, to: IRPlaceCast.End.self), from: &f)
+      case IRPointerToPlace.self:
+        pc = interpret(f.castUnchecked(i, to: IRPointerToPlace.self), from: &f)
       case IRProject.self:
         pc = interpret(f.castUnchecked(i, to: IRProject.self), from: &f)
       case IRProject.End.self:
@@ -300,9 +302,11 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRApplyBuiltin.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    for a in f.at(i).arguments {
-      consume(object: a, with: i.erased, in: f)
+    let s = f.at(i)
+    for (p, v) in zip(s.inputs, s.arguments) {
+      passArgument(p, v, insertingDeinitializationBefore: i.erased, in: &f)
     }
+
     context.declare(i, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }
@@ -475,6 +479,16 @@ private struct Transfer: AbstractTransferFunction {
     context.memory[place] = nil
     context.locals[place] = nil
     context.locals.removeAll(where: { (_, p) in p.place?.location.root == place })
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRPointerToPlace.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+    let v: Domain = (s.access == .set) ? .uninitialized : .initialized
+    context.declare(i.erased, from: f, initially: v)
     return f.instruction(after: i.erased)
   }
 

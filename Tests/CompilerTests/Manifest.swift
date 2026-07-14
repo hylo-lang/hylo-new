@@ -23,7 +23,7 @@ struct Manifest {
     case execution
 
     /// The position of `self` in the pipeline.
-    var order: Int {
+    private var order: Int {
       switch self {
       case .parsing: 0
       case .typing: 1
@@ -60,8 +60,11 @@ struct Manifest {
   /// The optimizer configuration with which the input should be compiled.
   private(set) var optimizations: Optimizations = .none
 
-  /// The expected exit status of the input, if executed.
+  /// The expected exit status of the compiled input, if executed.
   private(set) var exitStatus: Int32 = 0
+
+  /// `true` iff the compiled input should trap when executed.
+  private(set) var shouldTrap: Bool = false
 
   /// The expected textual artifacts of the test run, asserted when present.
   private(set) var artifactExpectations = SortedDictionary<CompilerTests.ArtifactTag, String>()
@@ -145,6 +148,8 @@ struct Manifest {
       optimizations = try parse(v, for: k, with: Optimizations.init(rawValue:))
     case "exit-status":
       exitStatus = try parse(v, for: k, with: Int32.init(_:))
+    case "trap":
+      shouldTrap = true
     default:
       throw ManifestError.unknownOption
     }

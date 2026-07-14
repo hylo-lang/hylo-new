@@ -242,6 +242,8 @@ public struct IRFunction: Sendable {
       return isBoundImmutably((at(i) as! IRCase).source)
     case IRPlaceCast.self:
       return (at(i) as! IRPlaceCast).access == .let
+    case IRPointerToPlace.self:
+      return (at(i) as! IRPointerToPlace).access == .let
     case IRProject.self:
       return (at(i) as! IRProject).access == .let
     case IRSubfield.self:

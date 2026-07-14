@@ -1,17 +1,14 @@
 import Archivist
 
-/// Projects a value at a different type.
+/// Converts a built-in pointer to a place.
 ///
-///     place_cast <source : value> as <access : effect> <target : type>
+///     pointer_to_place <source : value> as <access : effect> <target : type>
 ///
-/// `place_cast` projects the contents of `source`, which is the result an access instruction, as
-/// contents of type `target` into a region, using `access` to determine the memory state of the
-/// source before and after that region.
-///
-/// The conversion is not checked. Accessing the resulting place has undefined behavior unless
-/// `target` is layout-compatible with the type of `source`.
+/// `pointer_to_place` defines a place of type `target` with the value of `source`, which denotes
+/// the value of a `Builtin.ptr`, using `access` to determine the memory state of the place. The
+/// resulting place unsafely refers to the memory referenced by `source`.
 @Archivable
-public struct IRPlaceCast: IRRegionEntry {
+public struct IRPointerToPlace: IRRegionEntry {
 
   /// The operands of the instruction.
   public let operands: [IRValue]
@@ -19,7 +16,7 @@ public struct IRPlaceCast: IRRegionEntry {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The capabilities of the projection.
+  /// The capabilities of the place.
   public let access: AccessEffect
 
   /// The type of the resulting place.
@@ -41,7 +38,7 @@ public struct IRPlaceCast: IRRegionEntry {
     self.target = other.target
   }
 
-  /// The place being converted.
+  /// The pointer being converted to a place.
   public var source: IRValue {
     operands[0]
   }
@@ -58,11 +55,11 @@ public struct IRPlaceCast: IRRegionEntry {
 
 }
 
-extension IRPlaceCast: Showable {
+extension IRPointerToPlace: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "place_cast \(printer.show(source)) as \(access) \(printer.show(target))"
+    "pointer_to_place \(printer.show(source)) as \(access) \(printer.show(target))"
   }
 
 }

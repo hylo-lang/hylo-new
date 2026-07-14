@@ -701,9 +701,18 @@ internal struct IREmitter {
 
     // Are we lowering a built-in call?
     else if let f = program.asBuiltinFunction(program[e].callee) {
-      return lowering(e) { (me) in
-        let result = me._lower(builtin: f, appliedTo: me.program[e].arguments)
-        me._emitInitialize(target, with: result)
+      // `Builtin.assume_[un]initialized` is lowered directly to `assume_state`.
+      if case .assumeInitialized(let s) = f {
+        let x0 = lowered(lvalue: program[e].arguments.uniqueElement!.value)
+        lowering(e) { (me) in
+          me._assume_state(x0, initialized: s)
+          me._assume_state(target, initialized: true)
+        }
+      } else {
+        lowering(e) { (me) in
+          let x0 = me._emitApply(builtin: f, to: me.program[e].arguments)
+          me._emitInitialize(target, with: x0)
+        }
       }
     }
 
@@ -743,18 +752,24 @@ internal struct IREmitter {
 
   /// Implements `lower(store:to:)` for conversion expressions.
   private mutating func lower(store e: Conversion.ID, to target: IRValue) {
-    let lhs = program.type(assignedTo: program[e].source)
-    let rhs = program.type(assignedTo: e)
+    switch program[e].semantics.value {
+    case .pointer:
+      let x0 = lowered(lvalue: e)
+      lowering(e) { (me) in
+        me._emitMove([.inout, .set], x0, to: target)
+      }
 
-    // Trivial if the conversion does not involve any change of representation.
-    if let s = program.types.unifiable(lhs, rhs) {
-      assert(s.isEmpty)
-      lower(store: program[e].source, to: target)
-    }
+    default:
+      let lhs = program.type(assignedTo: program[e].source)
+      let rhs = program.type(assignedTo: e)
 
-    // Otherwise, the semantics of the conversion depends on its direction.
-    else {
-      unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      // Trivial if the conversion does not involve any change of representation.
+      if let s = program.types.unifiable(lhs, rhs) {
+        assert(s.isEmpty)
+        lower(store: program[e].source, to: target)
+      } else {
+        unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      }
     }
   }
 
@@ -1252,25 +1267,6 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for loading the value denoted by `e` into a register.
-  private mutating func lowered(rvalue e: ExpressionIdentity) -> IRValue {
-    let v = lowered(lvalue: e)
-    return lowering(e) { (me) in
-      let x = me._access([.sink], from: v)
-      let y = me._load(v)
-      me._end(IRAccess.self, openedBy: x)
-      return y
-    }
-  }
-
-  /// Generates the IR for loading the result of `function` applied to `arguments` into a register.
-  private mutating func _lower(
-    builtin function: BuiltinFunction, appliedTo arguments: [LabeledExpression],
-  ) -> IRValue {
-    let xs = arguments.map({ (a) in lowered(rvalue: a.value) })
-    return _apply_builtin(function, to: xs)
-  }
-
   /// Generates the IR for computing the place of the value denoted by `e`.
   ///
   /// The return value is a place holding the value of `e`. If `e` computes a rvalue, this value is
@@ -1313,14 +1309,31 @@ internal struct IREmitter {
 
   /// Implements `lower(lvalue:)` for explicit conversions.
   private mutating func lowered(lvalue e: Conversion.ID) -> IRValue {
-    // Is there any conversion required?
-    let t = program.types.dealiased(program.type(assignedTo: e))
-    let u = program.types.dealiased(program.type(assignedTo: program[e].source))
-    if t == u {
-      return lowered(lvalue: program[e].source)
-    }
+    switch program[e].semantics.value {
+    case .pointer:
+      // The right-hand side is a remote type.
+      let t = program.type(assignedTo: program[e].target, assuming: Metatype.self)
+      let u = program.types.cast(program.types[t].inhabitant, to: RemoteType.self)!
+      let k = program.types[u].access
 
-    unimplemented("conversions involving change of representation")
+      let x0 = lowered(lvalue: program[e].source)
+      return lowering(e) { (me) in
+        let x1 = me._load(x0)
+        return me._pointer_to_place(x1, as: k, me.program.types[u].projectee)
+      }
+
+    default:
+      let lhs = program.type(assignedTo: program[e].source)
+      let rhs = program.type(assignedTo: e)
+
+      // Trivial if the conversion does not involve any change of representation.
+      if let s = program.types.unifiable(lhs, rhs) {
+        assert(s.isEmpty)
+        return lowered(lvalue: program[e].source)
+      } else {
+        unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      }
+    }
   }
 
   /// Implements `lower(lvalue:)` for inout expressions.
@@ -2018,13 +2031,12 @@ internal struct IREmitter {
 
   /// Inserts a `apply_builtin` instruction.
   internal mutating func _apply_builtin(
-    _ callee: BuiltinFunction, to arguments: [IRValue]
+    _ callee: BuiltinFunction, typed f: Arrow.ID, to arguments: [IRValue]
   ) -> IRValue {
-    let f = callee.type(uniquingTypesWith: &program.types)
     assert(program.types[f].inputs.count == arguments.count)
-
+    let p = program.types[f].inputs.map(\.access)
     let s = IRApplyBuiltin(
-      callee: callee, returnTypeOfCallee: program.types[f].output, arguments: arguments,
+      callee: callee, inputs: p, output: program.types[f].output, arguments: arguments,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2105,6 +2117,15 @@ internal struct IREmitter {
   ) -> IRValue {
     let t = program.types.dealiased(target.erased)
     let s = IRPlaceCast(source: source, access: access, target: t, anchor: currentAnchor)
+    return insert(s)!
+  }
+
+  /// Inserts a `pointer_to_place` instruction.
+  internal mutating func _pointer_to_place<T: TypeIdentity>(
+    _ source: IRValue, as access: AccessEffect, _ target: T
+  ) -> IRValue {
+    let t = program.types.dealiased(target.erased)
+    let s = IRPointerToPlace(source: source, access: access, target: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2572,7 +2593,27 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for defining a place projecting `source` as a place of type `target` with
+  /// Generates IR for calling `Builtin.trap`.
+  internal mutating func _emitTrap() {
+    let f = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
+    _ = _apply_builtin(.trap, typed: f, to: [])
+  }
+
+  /// Generates IR for applying `callee` to `arguments`.
+  ///
+  /// `callee` is any built-in function but `assume_[un]initialized`.
+  private mutating func _emitApply(
+    builtin callee: BuiltinFunction, to arguments: [LabeledExpression],
+  ) -> IRValue {
+    let t = callee.type(uniquingTypesWith: &program.types)
+    let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
+      let x0 = lowered(lvalue: a.value)
+      return _access([p.access], from: x0)
+    }
+    return _apply_builtin(callee, typed: t, to: xs)
+  }
+
+  /// Generates IR for defining a place projecting `source` as a place of type `target` with
   /// capability `access`.
   ///
   /// The result if an `access` if `target` is the type of `source`. Otherwise, the result is a
@@ -2641,6 +2682,7 @@ internal struct IREmitter {
   private mutating func _emitDeinitialize(
     _ s: IRValue, instanceOf t: AnyTypeIdentity
   ) -> Bool {
+    assert(!t[.hasAliases])
     switch program.types.tag(of: t) {
     case Tuple.self:
       let u = program.types.castUnchecked(t, to: Tuple.self)
@@ -2659,7 +2701,7 @@ internal struct IREmitter {
   ) -> Bool {
     switch witnessOfDeinitializable(for: t) {
     case .none:
-      _ = _apply_builtin(.trap, to: [])
+      _emitTrap()
       return false
 
     case .trivial:
@@ -2692,7 +2734,7 @@ internal struct IREmitter {
               recursion in this context
               """
             report(.init(.error, m, at: currentAnchor.site))
-            _ = _apply_builtin(.trap, to: [])
+            _emitTrap()
             return false
           }
         }
@@ -2909,7 +2951,7 @@ internal struct IREmitter {
 
     // Other types require a conformance to `Hylo.Movable`.
     guard let w = conformanceWitness(of: typeOfSource, is: .movable) else {
-      _ = _apply_builtin(.trap, to: [])
+      _emitTrap()
       return
     }
 

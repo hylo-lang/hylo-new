@@ -122,6 +122,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRPlaceCast.self), from: &f)
       case IRPlaceCast.End.self:
         pc = interpret(f.castUnchecked(i, to: IRPlaceCast.End.self), from: &f)
+      case IRPointerToPlace.self:
+        pc = interpret(f.castUnchecked(i, to: IRPointerToPlace.self), from: &f)
       case IRProject.self:
         pc = interpret(f.castUnchecked(i, to: IRProject.self), from: &f)
       case IRProject.End.self:
@@ -213,7 +215,6 @@ private struct Transfer: AbstractTransferFunction {
     return f.instruction(after: i.erased)
   }
 
-
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
     _ i: IRCase.ID, from f: inout IRFunction
@@ -253,6 +254,14 @@ private struct Transfer: AbstractTransferFunction {
   ) -> AnyInstructionIdentity? {
     context.memory[f.at(i).start] = nil
     context.locals[f.at(i).start] = nil
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRPointerToPlace.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
