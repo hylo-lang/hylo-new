@@ -80,9 +80,9 @@ extension IRFunction {
   /// Returns `true` iff `i` denotes an instruction that never returns control.
   ///
   /// `Never` is encoded as `<T> T`, meaning that a never-returning expression will typically be
-  /// wrapped into a type application so that the it matches the expected type. This method can
-  /// therefore identify the instruction denoting the lowered form of a never-returning expression
-  /// right before any type application.
+  /// wrapped into a type application so that it matches the expected type. This method can thus
+  /// identify the instruction denoting the lowered form of a never-returning expression right
+  /// before any type application.
   private func neverReturns(_ i: AnyInstructionIdentity) -> Bool {
     // Note that it's fine to compare the return type of applications with `Never` because the
     // expression should still have the form `<T> T` at this point.
