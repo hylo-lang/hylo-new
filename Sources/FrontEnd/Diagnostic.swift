@@ -1,3 +1,5 @@
+import Foundation
+
 /// A diagnostic related to a region of Hylo source code.
 public struct Diagnostic: Hashable, Sendable {
 
@@ -73,7 +75,11 @@ extension Diagnostic: Comparable {
 extension Diagnostic: CustomStringConvertible {
 
   public var description: String {
-    "\(site.gnuStandardText()): \(level): \(message)"
+    var r = ""
+    render(
+      into: &r, showingPaths: .relative(to: FileManager.default.currentDirectoryURL),
+      style: .unstyled)
+    return r
   }
 
 }
