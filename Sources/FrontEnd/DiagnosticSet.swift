@@ -1,4 +1,5 @@
 import OrderedCollections
+import Foundation
 
 /// A set of diagnostics.
 public struct DiagnosticSet: Hashable, Sendable, CustomStringConvertible {
@@ -34,7 +35,13 @@ public struct DiagnosticSet: Hashable, Sendable, CustomStringConvertible {
   }
 
   public var description: String {
-    "\n" + elements.lazy.map(\.description).joined(separator: "\n")
+    var r = ""
+    let cwd = FileManager.default.currentDirectoryURL
+    for x in elements {
+      r.append("\n")
+      x.render(into: &r, showingPaths: .relative(to: cwd), style: .unstyled)
+    }
+    return r
   }
 
 }
