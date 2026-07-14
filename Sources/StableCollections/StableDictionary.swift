@@ -376,7 +376,7 @@ public struct StableDictionary<Key: Hashable, Value> {
     // Zero-initialize the additional storage.
     newContents.withUnsafeMutablePointers { (head, target) in
       let o = head.pointee.offsets
-      for i in count ..< newCapacity {
+      for i in capacity ..< newCapacity {
         Bucket.withMaybeUninitializedHash(of: target.advanced(by: i), offsets: o) { (h) in
           h.initialize(to: 0)
         }
