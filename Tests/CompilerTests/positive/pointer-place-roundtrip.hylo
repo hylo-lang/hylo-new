@@ -1,8 +1,13 @@
 //! exit-status:23
 
+subscript pointer(to_sink x: sink Int32) sink -> Builtin.ptr {
+  yield Builtin.address(of: x)
+  Builtin.assume_uninitialized(x)
+}
+
 public fun main() -> Int32 {
   var x = 23 as Int32
-  var y: Builtin.ptr = Builtin.address(of: x)
-  var z: Int32 = y as* (sink Int32)
-  return z
+  let p = pointer[to_sink: x]
+  var y: Int32 = p as* (sink Int32)
+  return y
 }
