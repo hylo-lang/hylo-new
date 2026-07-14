@@ -221,4 +221,50 @@ final class StableDictionaryTests: XCTestCase {
     XCTAssertEqual(t.description, m)
   }
 
+  func testCopyOnWriteReallocationPreservesLiveBucketsPastCount() {
+    var subject = StableDictionary<DistinctlyHashed, Int>()
+
+    let a = DistinctlyHashed(as: 0)
+    subject.assignValue(10, forKey: a)
+
+    let b = DistinctlyHashed(as: 1)
+    subject.assignValue(11, forKey: b)
+
+    let c = DistinctlyHashed(as: 2)
+    subject.assignValue(12, forKey: c)
+
+    subject.removeValue(forKey: a)  // count == 2, live bucket `c` is at position 2.
+
+    // Share the buffer, then mutate to force a copy-on-write reallocation.
+    let held = subject
+    subject.assignValue(110, forKey: b)
+    withExtendedLifetime(held) {}
+
+    // `c` at position 2 must survive the reallocation.
+    XCTAssertEqual(subject.count, 2)
+    XCTAssertEqual(subject[c], 12, "reallocation clobbered a live bucket at position >= count")
+    XCTAssertEqual(subject[b], 110)
+  }
+}
+
+/// A key whose hash is fixed by the caller, so bucket placement is fully deterministic.
+///
+/// `StableDictionary` only ever reads `key.hashValue` (never `hash(into:)`) to place and look up
+/// buckets, so overriding `hashValue` gives complete control over where each key lands.
+private struct DistinctlyHashed: Hashable {
+  
+  /// The hash of `self`.
+  let hashValue: Int
+
+  /// Creates an instance that hashes as `hashValue`. 
+  init(as hashValue: Int) {
+    self.hashValue = hashValue
+  }
+
+  /// Hashesh `self` according to the supplied hash value `id`.
+  func hash(into hasher: inout Hasher) { hasher.combine(hashValue) }
+
+  /// Returns `true` iff the `l` and `r` hash to the same value.
+  static func == (l: Self, r: Self) -> Bool { l.hashValue == r.hashValue }
+
 }
