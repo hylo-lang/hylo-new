@@ -7,28 +7,47 @@ A use case is either a single Hylo source file or a directory representing a pac
 A single-file test is compiled to a binary executable, just as if it was passed as an argument to `hc`.
 A package test is built according to the configuration specified by its manifest.
 
+## Test attributes
 
-## Testing without the standard library
+Tests can be configured with various flags and option, called *test attributes*.
+For a single-file test, these settings are written on the first line, prefixed by `//!`.
+For instance, the following test will compile the program, execute it, and check that the exit status is `42`.
 
-You can add `//! no-std` on the first line of a single-file test to disable the loading of the standard library. We encourage using `no-std` when possible, as it makes the test significantly faster.
+```hylo
+//! exit-status:42
 
-## Stopping after a compilation stage
+public fun main() -> Int32 { 42 }
+```
 
-Add `//! stage:stage_name` to stop the driver after a specific compilation stage. Valid stages are:
+For a package test, settings are written by adding an `options` entry to the manifest, whole value is an array of flags and options expressed as character strings. 
+
+### Testing without the standard library
+
+Add the test attribute `no-std` on the first line of a single-file test to disable the loading of the standard library.
+We encourage using `no-std` when possible, as it makes the test significantly faster.
+
+### Stopping after a compilation stage
+
+Add the test attribute `stage:stage_name` to stop the driver after a specific compilation stage.
+Valid stages are:
+
 - `stage:parsing`
 - `stage:typing`
 - `stage:lowering`
 - `stage:llvm`
 - `stage:execution` (default); applicable only in positive tests.
 
-## Expectation types
+### Termination
 
-### Exit status
+Add the test attribute `exit-status:n` to specify the expected expected exit status of the compiled program.
+`0` is expected by default.
 
-Specify an expected exit code by `exit-status:42` manifest attribute. `0` is expected by default.
-Asserted when `stage` is set to `execution` (default). 
+Add the test attribute `trap` to specify that the compiled program is expected to trap (e.g., by calling `fatal_error()`).
 
-### Textual Artifact Expectations
+These two test attributes are mutually exclusive.
+Both of them are applicable only in combination with `stage:execution`.
+
+## Textual Artifact Expectations
 
 Add a `test-case.<artifact-tag>.expected` file besides your `test-case.hylo` to assert the contents of a compilation artifact. Valid artifacts are:
 - `*.raw-ir.expected`

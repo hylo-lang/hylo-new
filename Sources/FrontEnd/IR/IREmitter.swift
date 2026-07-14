@@ -71,24 +71,8 @@ internal struct IREmitter {
       }
 
       // Is the receiver an instance of a struct or enum?
-      else if let d = me.program.declaration(of: receiver) {
-        switch me.program.tag(of: d) {
-        case StructDeclaration.self:
-          let s = me.program.castUnchecked(d, to: StructDeclaration.self)
-          me.program.forEachStoredProperty(of: s) { (m, p) in
-            let x = me._subfield(.parameter(1), at: p)
-            let t = me.program.type(assignedTo: m, assuming: RemoteType.self)
-            let u = me.program.types.substitute(a, in: me.program.types[t].projectee)
-            let v = me.program.types.dealiased(u)
-            _ = me._emitDeinitialize(x, instanceOf: v)
-          }
-
-        case EnumDeclaration.self:
-          break // TODO
-
-        default:
-          break // TODO
-        }
+      else if let d = me.program.declaration(whereStructOrEnum: receiver) {
+        me._emitDeinitializeMemberwise(.parameter(1), instanceOf: d, instantiatedWith: a)
       }
 
       // Give up if it's none of the above.
@@ -110,6 +94,8 @@ internal struct IREmitter {
   /// Generates the IR of `d`.
   private mutating func lower(_ d: DeclarationIdentity) {
     switch program.tag(of: d) {
+    case AssociatedTypeDeclaration.self:
+      break
     case BindingDeclaration.self:
       lower(program.castUnchecked(d, to: BindingDeclaration.self))
     case ConformanceDeclaration.self:
@@ -130,6 +116,8 @@ internal struct IREmitter {
       lower(program.castUnchecked(d, to: StructDeclaration.self))
     case TraitDeclaration.self:
       lower(program.castUnchecked(d, to: TraitDeclaration.self))
+    case TypeAliasDeclaration.self:
+      break
     case VariableDeclaration.self:
       break
     case TypeAliasDeclaration.self:
@@ -715,9 +703,18 @@ internal struct IREmitter {
 
     // Are we lowering a built-in call?
     else if let f = program.asBuiltinFunction(program[e].callee) {
-      return lowering(e) { (me) in
-        let result = me._lower(builtin: f, appliedTo: me.program[e].arguments)
-        me._emitInitialize(target, with: result)
+      // `Builtin.assume_[un]initialized` is lowered directly to `assume_state`.
+      if case .assumeInitialized(let s) = f {
+        let x0 = lowered(lvalue: program[e].arguments.uniqueElement!.value)
+        lowering(e) { (me) in
+          me._assume_state(x0, initialized: s)
+          me._assume_state(target, initialized: true)
+        }
+      } else {
+        lowering(e) { (me) in
+          let x0 = me._emitApply(builtin: f, to: me.program[e].arguments)
+          me._emitInitialize(target, with: x0)
+        }
       }
     }
 
@@ -757,18 +754,24 @@ internal struct IREmitter {
 
   /// Implements `lower(store:to:)` for conversion expressions.
   private mutating func lower(store e: Conversion.ID, to target: IRValue) {
-    let lhs = program.type(assignedTo: program[e].source)
-    let rhs = program.type(assignedTo: e)
+    switch program[e].semantics.value {
+    case .pointer:
+      let x0 = lowered(lvalue: e)
+      lowering(e) { (me) in
+        me._emitMove([.inout, .set], x0, to: target)
+      }
 
-    // Trivial if the conversion does not involve any change of representation.
-    if let s = program.types.unifiable(lhs, rhs) {
-      assert(s.isEmpty)
-      lower(store: program[e].source, to: target)
-    }
+    default:
+      let lhs = program.type(assignedTo: program[e].source)
+      let rhs = program.type(assignedTo: e)
 
-    // Otherwise, the semantics of the conversion depends on its direction.
-    else {
-      unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      // Trivial if the conversion does not involve any change of representation.
+      if let s = program.types.unifiable(lhs, rhs) {
+        assert(s.isEmpty)
+        lower(store: program[e].source, to: target)
+      } else {
+        unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      }
     }
   }
 
@@ -1266,25 +1269,6 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for loading the value denoted by `e` into a register.
-  private mutating func lowered(rvalue e: ExpressionIdentity) -> IRValue {
-    let v = lowered(lvalue: e)
-    return lowering(e) { (me) in
-      let x = me._access([.sink], from: v)
-      let y = me._load(v)
-      me._end(IRAccess.self, openedBy: x)
-      return y
-    }
-  }
-
-  /// Generates the IR for loading the result of `function` applied to `arguments` into a register.
-  private mutating func _lower(
-    builtin function: BuiltinFunction, appliedTo arguments: [LabeledExpression],
-  ) -> IRValue {
-    let xs = arguments.map({ (a) in lowered(rvalue: a.value) })
-    return _apply_builtin(function, to: xs)
-  }
-
   /// Generates the IR for computing the place of the value denoted by `e`.
   ///
   /// The return value is a place holding the value of `e`. If `e` computes a rvalue, this value is
@@ -1327,14 +1311,31 @@ internal struct IREmitter {
 
   /// Implements `lower(lvalue:)` for explicit conversions.
   private mutating func lowered(lvalue e: Conversion.ID) -> IRValue {
-    // Is there any conversion required?
-    let t = program.types.dealiased(program.type(assignedTo: e))
-    let u = program.types.dealiased(program.type(assignedTo: program[e].source))
-    if t == u {
-      return lowered(lvalue: program[e].source)
-    }
+    switch program[e].semantics.value {
+    case .pointer:
+      // The right-hand side is a remote type.
+      let t = program.type(assignedTo: program[e].target, assuming: Metatype.self)
+      let u = program.types.cast(program.types[t].inhabitant, to: RemoteType.self)!
+      let k = program.types[u].access
 
-    unimplemented("conversions involving change of representation")
+      let x0 = lowered(lvalue: program[e].source)
+      return lowering(e) { (me) in
+        let x1 = me._load(x0)
+        return me._pointer_to_place(x1, as: k, me.program.types[u].projectee)
+      }
+
+    default:
+      let lhs = program.type(assignedTo: program[e].source)
+      let rhs = program.type(assignedTo: e)
+
+      // Trivial if the conversion does not involve any change of representation.
+      if let s = program.types.unifiable(lhs, rhs) {
+        assert(s.isEmpty)
+        return lowered(lvalue: program[e].source)
+      } else {
+        unimplemented(program.format("conversion from '%T' to '%T'", [lhs, rhs]))
+      }
+    }
   }
 
   /// Implements `lower(lvalue:)` for inout expressions.
@@ -1667,16 +1668,16 @@ internal struct IREmitter {
       // If `d` is a trait requirement, the trait receiver comes next.
       if let c = program.traitRequiring(d) {
         let t = program.withTyper(typing: c.module, { (tp) in tp.typeOfTraitSelf(in: c) })
-        let u = program.types.dealiased(t)
-        let v = program.types.substitute(substitutions, in: u)
+        let u = program.types.substitute(substitutions, in: t)
+        let v = program.types.dealiased(u)
         terms.append(IRParameter(type: v, access: .let, declaration: nil))
       }
 
       // Explicit parameters come next.
       for p in parameters.explicit {
         let t = program.type(assignedTo: p, assuming: RemoteType.self)
-        let u = program.types.dealiased(program.types[t].projectee)
-        let v = program.types.substitute(substitutions, in: u)
+        let u = program.types.substitute(substitutions, in: program.types[t].projectee)
+        let v = program.types.dealiased(u)
         let k = program.types[t].access.unlessAuto(program.types[shape].effect)
         assert((k != .auto) || program.tag(of: d) == FunctionBundleDeclaration.self)
         terms.append(IRParameter(type: v, access: k, declaration: .init(p)))
@@ -1685,8 +1686,8 @@ internal struct IREmitter {
 
     // Return register comes last.
     let r = program.types.resultOfApplying(typeOfDeclaration.head, mutably: usedMutably)!
-    let s = program.types.dealiased(r)
-    let t = program.types.substitute(substitutions, in: s)
+    let s = program.types.substitute(substitutions, in: r)
+    let t = program.types.dealiased(s)
     if program.types[shape].style == .parenthesized {
       terms.append(IRParameter(type: t, access: .set, declaration: nil))
       return (terms, .indirect)
@@ -2036,13 +2037,12 @@ internal struct IREmitter {
 
   /// Inserts a `apply_builtin` instruction.
   internal mutating func _apply_builtin(
-    _ callee: BuiltinFunction, to arguments: [IRValue]
+    _ callee: BuiltinFunction, typed f: Arrow.ID, to arguments: [IRValue]
   ) -> IRValue {
-    let f = callee.type(uniquingTypesWith: &program.types)
     assert(program.types[f].inputs.count == arguments.count)
-
+    let p = program.types[f].inputs.map(\.access)
     let s = IRApplyBuiltin(
-      callee: callee, returnTypeOfCallee: program.types[f].output, arguments: arguments,
+      callee: callee, inputs: p, output: program.types[f].output, arguments: arguments,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2063,8 +2063,9 @@ internal struct IREmitter {
   internal mutating func _case(
     _ d: EnumCaseDeclaration.ID, of s: IRValue
   ) -> IRValue {
-    let t = program.withTyper(typing: module, { (tp) in tp.underlyingType(of: d) })
-    let s = IRCase(source: s, payload: d, payloadType: t, anchor: currentAnchor)
+    let e = program.parent(containing: d, as: EnumDeclaration.self)!
+    let t = program.types.demand(OpaqueType.payload(e))
+    let s = IRCase(source: s, payload: d, opaquePayloadType: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2082,6 +2083,13 @@ internal struct IREmitter {
   internal mutating func _end<T: IRRegionEntry>(_: T.Type, openedBy start: IRValue) {
     assert(currentFunction.at(start.register!) is T)
     insert(T.End(start: start, anchor: currentAnchor))
+  }
+
+  /// Inserts an `enum_tag` instruction.
+  internal mutating func _enum_tag(_ source: IRValue) -> IRValue {
+    assert(currentFunction.isPlace(source))
+    let tag = program.types.demand(MachineType.word)
+    return insert(IREnumTag(source: source, tag: tag, anchor: currentAnchor))!
   }
 
   /// Inserts a `global_access` instruction.
@@ -2115,6 +2123,15 @@ internal struct IREmitter {
   ) -> IRValue {
     let t = program.types.dealiased(target.erased)
     let s = IRPlaceCast(source: source, access: access, target: t, anchor: currentAnchor)
+    return insert(s)!
+  }
+
+  /// Inserts a `pointer_to_place` instruction.
+  internal mutating func _pointer_to_place<T: TypeIdentity>(
+    _ source: IRValue, as access: AccessEffect, _ target: T
+  ) -> IRValue {
+    let t = program.types.dealiased(target.erased)
+    let s = IRPointerToPlace(source: source, access: access, target: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2175,6 +2192,12 @@ internal struct IREmitter {
       base: base, path: path, typeOfSubfield: typeOfSubfield!,
       anchor: currentAnchor)
     return insert(s)!
+  }
+
+  /// Inserts a `switch` instruction.
+  internal mutating func _switch(on scrutinee: IRValue, to successors: [IRBlock.ID]) {
+    assert(!successors.isEmpty)
+    insert(IRSwitch(scrutinee: scrutinee, successors: successors, anchor: currentAnchor))
   }
 
   /// Inserts a `type_apply` instruction.
@@ -2298,6 +2321,11 @@ internal struct IREmitter {
   }
 
   // MARK: Helpers
+
+  /// Creates a new basic block in the current function.
+  private mutating func _addBlock() -> IRBlock.ID {
+    insertionContext.function!.addBlock()
+  }
 
   /// Inserts the IR for extracting the built-in value stored in an instance of `Hylo.Bool`.
   private mutating func _loadWrappedBuiltin(_ wrapper: IRValue) -> IRValue {
@@ -2571,7 +2599,27 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for defining a place projecting `source` as a place of type `target` with
+  /// Generates IR for calling `Builtin.trap`.
+  internal mutating func _emitTrap() {
+    let f = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
+    _ = _apply_builtin(.trap, typed: f, to: [])
+  }
+
+  /// Generates IR for applying `callee` to `arguments`.
+  ///
+  /// `callee` is any built-in function but `assume_[un]initialized`.
+  private mutating func _emitApply(
+    builtin callee: BuiltinFunction, to arguments: [LabeledExpression],
+  ) -> IRValue {
+    let t = callee.type(uniquingTypesWith: &program.types)
+    let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
+      let x0 = lowered(lvalue: a.value)
+      return _access([p.access], from: x0)
+    }
+    return _apply_builtin(callee, typed: t, to: xs)
+  }
+
+  /// Generates IR for defining a place projecting `source` as a place of type `target` with
   /// capability `access`.
   ///
   /// The result if an `access` if `target` is the type of `source`. Otherwise, the result is a
@@ -2595,7 +2643,7 @@ internal struct IREmitter {
     _end(IRAccess.self, openedBy: x0)
   }
 
-  /// Generates the for initializing `target` with an instance of the enum case declared by `d`.
+  /// Generates the IR initializing `target` with an instance of the enum case declared by `d`.
   private mutating func _emitInitialize(
     _ target: IRValue, withConstantCase d: EnumCaseDeclaration.ID
   ) {
@@ -2604,97 +2652,182 @@ internal struct IREmitter {
     _assume_state(x0, initialized: true)
   }
 
-  /// Generates the IR for deinitializing `source` and returns `true` iff `source` or its parts can
-  /// be deinitialized. Otherwise, inserts a trap and returns `false`.
+  /// Generates the IR deinitializing `s` and returns `true` iff `s` is deinitializable; otherwise,
+  /// inserts a trap and returns `false`.
   ///
-  /// If `s` is instance of a structural type (e.g., a tuple), the method attempts to deinitialize
-  /// each part inidividually rather than the whole. Otherwise, deinitialization is done using a
-  /// witness of `Deinitializable`.
+  /// This method deinitializes values in one of two ways, thereafter referred to as "whole" and
+  /// "memberwise" deinitialization. The former applies the implementation of `deinit` defined by
+  /// the whole's conformance to `Hylo.Deinitializable`. The latter consists of deinitializing each
+  /// part of the whole individually. It applies only if `s` is instance of a structural type or if
+  /// `s` is instance of a struct or enum and this method is used to deinitialize it implicitly at
+  /// the end of a custom deinitializer. The following illustrates:
+  ///
+  ///     struct S is Deinitializable {
+  ///       var x: T[]
+  ///       fun deinit() sink { print("Au revoir!") }
+  ///     }
+  ///
+  /// In the above example, the compiler will call `_emitDeinitialize(_:)` while processing the IR
+  /// of the custom deinitializer, which will insert memberwise deinitialization.
+  ///
+  /// This method returns `true` iff `s` could be deinitialized, in which case `s` is fully
+  /// fully deinitialized immediately after the last instruction inserted. Otherwise, the method
+  /// inserts a trap and returns `false`. In either case, all generated IR is refined and the
+  /// control-flow graph of the function is not modified.
   @discardableResult
-  internal mutating func _emitDeinitialize(_ source: IRValue) -> Bool {
-    let (t, _) = currentFunction.result(of: source) ?? badOperand()
-    return _emitDeinitialize(source, instanceOf: t)
+  internal mutating func _emitDeinitialize(_ s: IRValue) -> Bool {
+    let (t, _) = currentFunction.result(of: s) ?? badOperand()
+    return _emitDeinitialize(s, instanceOf: t)
   }
 
-  /// Implements `_emitDeinitialize(_:)` for arbitrary types.
+  /// Generates the IR deinitializing `s`, which is an instance of `t`, and returns `true` iff `s`
+  /// is deinitializable; otherwise, inserts a trap and returns `false`.
+  ///
+  /// This method implements the specification of `_emitDeinitialize(_:)`, using `t` to determine
+  /// whether it should apply membewise initialization or find an instance of `Deinitializable`.
   private mutating func _emitDeinitialize(
     _ s: IRValue, instanceOf t: AnyTypeIdentity
   ) -> Bool {
+    assert(!t[.hasAliases])
     switch program.types.tag(of: t) {
     case Tuple.self:
       let u = program.types.castUnchecked(t, to: Tuple.self)
-      return _emitDeinitialize(tuple: s, instanceOf: u)
+      return _emitDeinitializeMemberwise(s, instanceOf: u)
     default:
-      return _emitDeinitialize(whole: s, instanceOf: t)
+      return _emitDeinitializeWhole(s, instanceOf: t)
     }
   }
 
-  /// Implements `_emitDeinitialize(_:)` for types that cannot be decomposed structurally.
-  private mutating func _emitDeinitialize(
-    whole: IRValue, instanceOf t: AnyTypeIdentity
+  /// Generates the IR deinitializing `s`, which is an instance of `t`, and returns `true` iff `s`
+  /// is deinitializable; otherwise, inserts a trap and returns `false`.
+  ///
+  /// This method implements parts of `_emitDeinitialize(_:)`, covering whole deinitialization.
+  private mutating func _emitDeinitializeWhole(
+    _ s: IRValue, instanceOf t: AnyTypeIdentity
   ) -> Bool {
     switch witnessOfDeinitializable(for: t) {
     case .none:
-      _ = _apply_builtin(.trap, to: [])
+      _emitTrap()
       return false
 
     case .trivial:
-      _assume_state(whole, initialized: false)
+      _assume_state(s, initialized: false)
       return true
 
     case .nontrivial(let w):
       let r = program.standardLibraryDeclaration(.deinitializableDeinit)
 
       // Can we dispatch statically?
-      if let d = w.declaration, let c = program.cast(d, to: ConformanceDeclaration.self) {
-        let table = program.implementations(definedBy: c)
-        if let implementation = table.member(implementing: r) {
-          // Make sure we're not applying the function being lowered recursively, which may happen
-          // if `s` is the receiver of a function implementing `Deinitializable.deinit` for the
-          // witness that's been resolved.
-          if let j = implementation.target, currentFunction.name.isLoweredForm(of: j) {
+      if let (conformance, implementation) = program.implementation(of: r, in: w) {
+        // Make sure we're not applying the function being lowered recursively, which may happen
+        // if `s` is the receiver of a function implementing `Deinitializable.deinit` for the
+        // witness that's been resolved.
+        if let j = implementation.target, currentFunction.name.isLoweredForm(of: j) {
+          // Use memberwise deinitialization for structs and enums, so that one can write a custom
+          // deinitializer that does not have to explicitly consume its receiver.
+          let (x, _) = program.types.seenAsBaseTypeApplication(t)
+          if program.declaration(whereStructOrEnum: x) != nil {
+            _emitDeinitializeWhole(
+              structOrEnum: s, instanceOf: t,
+              applyingDeinitializerSynthesizedFor: w, declaredBy: conformance)
+            return true
+          }
+
+          // In other cases, complain about infinite recursion.
+          else {
             let m = """
               implicit deinitialization of instances of '\(program.show(t))' causes infinite \
               recursion in this context
               """
             report(.init(.error, m, at: currentAnchor.site))
-            _ = _apply_builtin(.trap, to: [])
+            _emitTrap()
             return false
-          } else if !implementation.isSynthetic {
-            let o = _alloca(.void)
-            let f = loweredCallee(
-              implementation, qualifiedBy: nil, markedForMutationBy: nil,
-              output: o, at: currentAnchor)
-            let xs = Array(whole, prependedTo: f.arguments)
-            _ = _apply(f.value, xs, into: f.result, afterFormingAccesses: true)
-            return true
           }
+        }
+
+        // Otherwise, if the implementation is not synthetic, we can apply it directly without
+        // constructing a witness table.
+        else if !implementation.isSynthetic {
+          let o = _alloca(.void)
+          let f = loweredCallee(
+            implementation, qualifiedBy: nil, markedForMutationBy: nil,
+            output: o, at: currentAnchor)
+          let xs = Array(s, prependedTo: f.arguments)
+          _ = _apply(f.value, xs, into: f.result, afterFormingAccesses: true)
+          return true
         }
       }
 
       // Emit a call to the witness.
-      let deinitializable = _emit(witness: w)
-      let t0 = program.types.demand(
-        Arrow(inputs: [.init(access: .sink, type: t)], output: .void))
-
-      let x0 = _alloca(.void)
-      let x1 = _access([.sink], from: whole)
-      let x2 = _access([.set], from: x0)
-      let x3 = _property(r, of: deinitializable, withType: t0.erased)
-      let x4 = _access([.let], from: x3)
-
-      _ = _apply(x4, [x1], into: x2, afterFormingAccesses: false)
-
-      _end(IRAccess.self, openedBy: x4)
-      _end(IRAccess.self, openedBy: x2)
-      _end(IRAccess.self, openedBy: x1)
-
+      _emitDeinitializeWhole(s, instanceOf: t, usingNonTrivialConformance: w)
       return true
     }
   }
 
-  /// Implements `_emitDeinitialize(_:)` for tuples.
-  private mutating func _emitDeinitialize(tuple s: IRValue, instanceOf t: Tuple.ID) -> Bool {
+  /// Generates the IR deinitializing `s`, which is an instance of `t`, using the conformance to
+  /// `Deinitializable` expressed by `w`.
+  private mutating func _emitDeinitializeWhole(
+    _ s: IRValue, instanceOf t: AnyTypeIdentity, usingNonTrivialConformance w: WitnessExpression
+  ) {
+    let requirement = program.standardLibraryDeclaration(.deinitializableDeinit)
+    let table = _emit(witness: w)
+    let t0 = program.types.demand(
+      Arrow(inputs: [.init(access: .sink, type: t)], output: .void))
+
+    let x0 = _alloca(.void)
+    let x1 = _access([.sink], from: s)
+    let x2 = _access([.set], from: x0)
+    let x3 = _property(requirement, of: table, withType: t0.erased)
+    let x4 = _access([.let], from: x3)
+
+    _ = _apply(x4, [x1], into: x2, afterFormingAccesses: false)
+
+    _end(IRAccess.self, openedBy: x4)
+    _end(IRAccess.self, openedBy: x2)
+    _end(IRAccess.self, openedBy: x1)
+  }
+
+  /// Generates the IR deinitializing `s`, which is an instance of `t`, generating and applying a
+  /// synthesized memberwise deinitializer associated with the conformance witnessed by `w` and
+  /// declared by `conformance`.
+  private mutating func _emitDeinitializeWhole(
+    structOrEnum s: IRValue, instanceOf t: AnyTypeIdentity,
+    applyingDeinitializerSynthesizedFor w: WitnessExpression,
+    declaredBy conformance: ConformanceDeclaration.ID
+  ) {
+    let requirement = program.standardLibraryDeclaration(.deinitializableDeinit)
+    let receiver = program.withTyper(typing: module) { (tp) in
+      tp.typeOfSelf(in: .init(uncheckedFrom: requirement.erased))!
+    }
+
+    let a = TypeArguments.init(
+      mapping: [program.types.castUnchecked(receiver, to: GenericParameter.self)], to: [t])
+    let f = demandLoweredDeclaration(
+      implementationOf: requirement, synthesized: true, for: conformance, a)
+    implementSynthesizedDeinitializer(f, for: a)
+
+    let x0 = functionReference(to: f)
+    let x1 = _emit(witness: w)
+    let x2 = _alloca(.void)
+    let x3 = _access([.let], from: x1)
+    let x4 = _access([.sink], from: s)
+    let x5 = _access([.set], from: x2)
+
+    _ = _apply(x0, [x3, x4], into: x5, afterFormingAccesses: false)
+
+    _end(IRAccess.self, openedBy: x5)
+    _end(IRAccess.self, openedBy: x4)
+    _end(IRAccess.self, openedBy: x3)
+  }
+
+  /// Generates the IR deinitializing `s`, which is an instance of `t`, and returns `true` iff each
+  /// individual part of `s` is deinitializable; otherwise, inserts a trap and returns `false`.
+  ///
+  /// This method implements part of `_emitDeinitialize(_:)`, covering memberwise deinitialization
+  /// for instances of tuples.
+  private mutating func _emitDeinitializeMemberwise(
+    _ s: IRValue, instanceOf t: Tuple.ID
+  ) -> Bool {
     // Is the tuple empty?
     let (ms, _) = program.types.members(of: t)
     if ms.isEmpty {
@@ -2708,6 +2841,65 @@ internal struct IREmitter {
       if !_emitDeinitialize(s, instanceOf: m) { return false }
     }
     return true
+  }
+
+  /// Generates the IR deinitializing each individual part of `s`, which is an instance of the type
+  /// declared by `d` whose type parameters are assigned in `a`.
+  private mutating func _emitDeinitializeMemberwise(
+    _ s: IRValue, instanceOf d: DeclarationIdentity, instantiatedWith a: TypeArguments
+  ) {
+    switch program.tag(of: d) {
+    case StructDeclaration.self:
+      _emitDeinitializeMemberwise(
+        s, instanceOf: program.castUnchecked(d, to: StructDeclaration.self), instantiatedWith: a)
+
+    case EnumDeclaration.self:
+      _emitDeinitializeMemberwise(
+        s, instanceOf: program.castUnchecked(d, to: EnumDeclaration.self), instantiatedWith: a)
+
+    default:
+      program.unexpected(d)
+    }
+  }
+
+  /// Generates the IR deinitializing each individual part of `s`, which is an instance of the type
+  /// declared by `d` whose type parameters are assigned in `a`.
+  private mutating func _emitDeinitializeMemberwise(
+    _ s: IRValue, instanceOf d: StructDeclaration.ID, instantiatedWith a: TypeArguments
+  ) {
+    var properties: [AnyTypeIdentity] = []
+    program.forEachStoredProperty(of: d) { (m, _) in
+      let t = program.type(assignedTo: m, assuming: RemoteType.self)
+      let u = program.types.substitute(a, in: program.types[t].projectee)
+      properties.append(program.types.dealiased(u))
+    }
+    let t = program.types.tuple(of: properties)
+    let x = _place_cast(s, as: .sink, t)
+    _ = _emitDeinitialize(x, instanceOf: t)
+  }
+
+  /// Generates the IR deinitializing each individual part of `s`, which is an instance of the type
+  /// declared by `d` whose type parameters are assigned in `a`.
+  private mutating func _emitDeinitializeMemberwise(
+    _ s: IRValue, instanceOf d: EnumDeclaration.ID, instantiatedWith a: TypeArguments
+  ) {
+    assert(program[d].representation == nil)
+    let cases = Array(program.collect(EnumCaseDeclaration.self, in: program[d].members))
+    let successors = cases.map({ _ in _addBlock() })
+    let end = _addBlock()
+
+    let tag = _enum_tag(s)
+    _switch(on: tag, to: successors)
+    for i in successors.indices {
+      insertionContext.point = .end(of: successors[i])
+      let t = program.withTyper(typing: module, { (tp) in tp.underlyingType(of: cases[i]) })
+      let x = _case(cases[i], of: s)
+      let y = _place_cast(x, as: .sink, t)
+      _ = _emitDeinitialize(y, instanceOf: t)
+      _br(end)
+    }
+
+    insertionContext.point = .end(of: end)
   }
 
   /// Generates the IR for move-initializing or move-assigning `target` with `source`.
@@ -2765,7 +2957,7 @@ internal struct IREmitter {
 
     // Other types require a conformance to `Hylo.Movable`.
     guard let w = conformanceWitness(of: typeOfSource, is: .movable) else {
-      _ = _apply_builtin(.trap, to: [])
+      _emitTrap()
       return
     }
 

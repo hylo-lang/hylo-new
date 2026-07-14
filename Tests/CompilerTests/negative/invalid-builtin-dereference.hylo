@@ -1,0 +1,10 @@
+//! no-std
+
+fun use(x: Void) {
+  let p = Builtin.address(of: x)
+  let q = p as* Void
+}
+
+public fun main() {
+  use(())
+}

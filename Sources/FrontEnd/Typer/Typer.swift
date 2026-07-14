@@ -2161,20 +2161,31 @@ public struct Typer {
         inferredType(of: program[e].source, in: &ctx)
       }
 
+      let sourceSite = program.spanForDiagnostic(about: program[e].source)
+      let targetSite = program.spanForDiagnostic(about: program[e].target)
+      let operatorSite = program[e].semantics.site
+
       switch program[e].semantics.value {
       case .up:
-        let s = program.spanForDiagnostic(about: program[e].source)
-        context.obligations.assume(WideningConstraint(lhs: lhs, rhs: rhs, site: s))
+        context.obligations.assume(WideningConstraint(lhs: lhs, rhs: rhs, site: sourceSite))
+        return context.obligations.assume(e, hasType: rhs, at: operatorSite)
+
       case .down:
-        let s = program.spanForDiagnostic(about: program[e].target)
-        context.obligations.assume(WideningConstraint(lhs: rhs, rhs: lhs, site: s))
+        context.obligations.assume(WideningConstraint(lhs: rhs, rhs: lhs, site: targetSite))
+        return context.obligations.assume(e, hasType: rhs, at: operatorSite)
+
       case .pointer:
-        if program.types.tag(of: rhs) != RemoteType.self {
-          fatalError()
+        let p = program.types.demand(MachineType.ptr)
+        context.obligations.assume(EqualityConstraint(lhs: lhs, rhs: p.erased, site: sourceSite))
+
+        if let t = program.types.cast(rhs, to: RemoteType.self) {
+          let u = program.types[t].projectee
+          return context.obligations.assume(e, hasType: u, at: operatorSite)
+        } else {
+          report(.init(.error, "expected remote type", at: targetSite))
+          return context.obligations.assume(e, hasType: .error, at: operatorSite)
         }
       }
-
-      return context.obligations.assume(e, hasType: rhs, at: program[e].site)
     }
 
     // Inference failed on the right-hand side.
@@ -3084,7 +3095,7 @@ public struct Typer {
 
   /// Returns the type of an instance of `Self` in `s`, or `nil` if `s` isn't notionally in the
   /// scope of a type declaration.
-  private mutating func typeOfSelf(in s: ScopeIdentity) -> AnyTypeIdentity? {
+  internal mutating func typeOfSelf(in s: ScopeIdentity) -> AnyTypeIdentity? {
     if let memoized = cache.scopeToTypeOfSelf[s] { return memoized }
 
     guard let n = s.node else { return nil }

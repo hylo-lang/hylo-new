@@ -7,6 +7,9 @@ public enum OpaqueType: TypeTree {
   /// An opaque type representing the inferred environment of a local abstraction.
   case environment(DeclarationIdentity)
 
+  /// An opaque type representing the payload of an enum.
+  case payload(EnumDeclaration.ID)
+
   /// Properties about `self`.
   public var properties: TypeProperties {
     .init()

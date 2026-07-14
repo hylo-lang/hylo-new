@@ -240,6 +240,10 @@ public struct IRFunction: Sendable {
       return (at(i) as! IRAccess).capabilities == [.let]
     case IRCase.self:
       return isBoundImmutably((at(i) as! IRCase).source)
+    case IRPlaceCast.self:
+      return (at(i) as! IRPlaceCast).access == .let
+    case IRPointerToPlace.self:
+      return (at(i) as! IRPointerToPlace).access == .let
     case IRProject.self:
       return (at(i) as! IRProject).access == .let
     case IRSubfield.self:
@@ -868,7 +872,7 @@ extension IRFunction.Name: Showable {
 
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
-      return "\(printer.program.debugName(of: d))<\(list: xs)>"
+      return "\(printer.program.debugName(of: d))$synthesized<\(list: xs)>"
 
     case .implementation(let d, _, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })

@@ -35,8 +35,8 @@ public struct Arrow: TypeTree {
     self.output = output
   }
 
-  /// Creates an instance from `inputs`, which denote unlabeled `let` parameters, to `output`,
-  /// having no environment and the `let` effect.
+  /// Creates the type of a built-in function accepting `inputs`, which are the types of unlabeled
+  /// `let` parameters, and returning an instance of `output`.
   public init<T: TypeIdentity>(_ inputs: MachineType.ID..., to output: T) {
     self.init(
       inputs: inputs.map({ (i) in .init(access: .let, type: i.erased) }),

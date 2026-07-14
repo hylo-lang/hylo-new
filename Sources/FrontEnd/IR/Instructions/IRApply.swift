@@ -1,7 +1,7 @@
 import Archivist
 import Utilities
 
-/// Invokes an IR function.
+/// Invokes a function with the Hylo calling convention.
 ///
 /// This instruction does not define any register. The return value of the function being applied
 /// is stored in the last argument of the function, which is always a `set` access.

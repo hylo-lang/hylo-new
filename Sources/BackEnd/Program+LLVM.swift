@@ -155,6 +155,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRAlloca.self), in: &ctx)
     case IRApply.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRApply.self), in: &ctx)
+    case IRApplyBuiltin.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRApplyBuiltin.self), in: &ctx)
     case IRAssumeState.self:
       return ctx.ir.instruction(after: i)
     case IRBranch.self:
@@ -163,6 +165,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRCase.self), in: &ctx)
     case IRCase.End.self:
       return ctx.ir.instruction(after: i)
+    case IREnumTag.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IREnumTag.self), in: &ctx)
     case IRConditionalBranch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRConditionalBranch.self), in: &ctx)
     case IRGlobalAccess.self:
@@ -175,6 +179,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRPlaceCast.self), in: &ctx)
     case IRPlaceCast.End.self:
       return ctx.ir.instruction(after: i)
+    case IRPointerToPlace.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRPointerToPlace.self), in: &ctx)
     case IRProject.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRProject.self), in: &ctx)
     case IRProperty.self:
@@ -185,6 +191,10 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRStore.self), in: &ctx)
     case IRSubfield.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRSubfield.self), in: &ctx)
+    case IRSwitch.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRSwitch.self), in: &ctx)
+    case IRUnreachable.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRUnreachable.self), in: &ctx)
     case IRWitnessTable.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRWitnessTable.self), in: &ctx)
     case IRYield.self:
@@ -247,6 +257,24 @@ extension Program {
 
   /// Generates the LLVM IR code corresponding to `i`.
   internal mutating func incorporate(
+    _ i: IRApplyBuiltin.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+
+    switch s.callee {
+    case .trap:
+      insertTrap(in: &ctx)
+    case .addressOf:
+      ctx.value[.register(i.erased)] = ctx.value[s.arguments[0]]!
+    default:
+      unimplemented(String(describing: s.callee))
+    }
+
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
     _ i: IRBranch.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
@@ -264,9 +292,39 @@ extension Program {
     let t = StructType.UnsafeReference(m.llvm)!
 
     let x = ctx.module.llvm.insertGetStructElementPointer(
-      of: ctx.value[s.source]!, typed: t, index: 1, at: ctx.insertionPoint!)
+      of: ctx.value[s.source]!, typed: t, index: m.layout.propertyToField[1],
+      at: ctx.insertionPoint!)
     let v = IRValue.register(i.erased)
     ctx.value[v] = x.v
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IREnumTag.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let m = metadata(of: ctx.ir.result(of: s.source)!.type, in: &ctx.module)
+    let t = StructType.UnsafeReference(m.llvm)!
+
+    let tag = t.unsafe[].fields[0].t
+    let iptr = ctx.module.llvm.iptr.t
+
+    // Read the value of the tag, which is always at index 0 but whose size depends on the enum.
+    let x0 = ctx.module.llvm.insertGetStructElementPointer(
+      of: ctx.value[s.source]!, typed: t, index: 0, at: ctx.insertionPoint!)
+    let x1 = ctx.module.llvm.insertLoad(tag, from: x0, at: ctx.insertionPoint!)
+
+    // The value of the discriminator may need to be zero-extended, since `enum_tag` is expected
+    // to load a `Builtin.word` into register.
+    let v = IRValue.register(i.erased)
+    if tag != iptr.t {
+      let x2 = ctx.module.llvm.insertZeroExtend(x1, to: iptr, at: ctx.insertionPoint!)
+      ctx.value[v] = x2.v
+    } else {
+      ctx.value[v] = x1.v
+    }
+
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -332,6 +390,16 @@ extension Program {
   /// Generates the LLVM IR code corresponding to `i`.
   internal mutating func incorporate(
     _ i: IRPlaceCast.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    let v = FrontEnd.IRValue.register(i.erased)
+    ctx.value[v] = .some(ctx.value[s.source]!)
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRPointerToPlace.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
     let v = FrontEnd.IRValue.register(i.erased)
@@ -503,6 +571,35 @@ extension Program {
 
     let v = IRValue.register(i.erased)
     ctx.value[v] = x.v
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRSwitch.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+
+    // Create one basic block for each successor. The pattern of each case is the value of its
+    // offset. The match is exhaustive.
+    let bs: [LLVMModule.SwitchCase] = s.successors.enumerated().map { (j, b) in
+      let pattern = ctx.module.llvm.iptr.unsafe[].constant(j)
+      return (pattern.v, ctx.demandBasicBlock(b))
+    }
+
+    // There must be at least one case that we can pick as the default.
+    let last = bs.last!
+    ctx.module.llvm.insertSwitch(
+      on: ctx.value[s.scrutinee]!,
+      cases: bs.dropLast(1), default: last.1, at: ctx.insertionPoint!)
+    return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRUnreachable.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    ctx.module.llvm.insertUnreachable(at: ctx.insertionPoint!)
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -917,6 +1014,12 @@ extension Program {
     }
   }
 
+  /// Inserts a call to the `llvm.trap` intrinsic.
+  private func insertTrap(in ctx: inout FunctionGenerationContext) {
+    let f = ctx.module.llvm.intrinsic(named: IntrinsicFunction.llvm.trap, for: [])!
+    _ = ctx.module.llvm.insertCall(f, on: [], at: ctx.insertionPoint!)
+  }
+
   /// Defines a "main" function calling `f`, which is the module's entry point.
   ///
   /// This method creates a function named "main" acting as a program entry point. This function
@@ -1159,32 +1262,37 @@ extension Program {
     }
 
     // Otherwise, construct a pair leading with the tag.
-    else {
-      var payloadSize = 0
-      var payloadAlignment = 1
-      for c in cases {
-        let m = metadata(of: c, in: &ctx)
-        payloadSize = max(payloadSize, m.layout.size.fixed!)
-        payloadAlignment = max(payloadAlignment, m.layout.alignment)
-      }
-
-      // Pad the size of the tag to satisfy the alignment of the payload.
-      let tag = ctx.integerTypeToRepresent(cases.count)
-      let tagSize = ctx.llvm.layout.storageSize(of: tag).rounded(
-        upToNearestMultipleOf: payloadAlignment)
-
-      let fields: [LLVMType] = [
-        ctx.llvm.arrayType(tagSize, ctx.llvm.i8).t,
-        ctx.llvm.arrayType(payloadSize, ctx.llvm.i8).t
-      ]
-
-      let pair = ctx.llvm.structType(named: name, fields, packed: true)
-      let layout = ConcreteLayout(
-        fields: fields, propertyToField: [0, 1],
-        size: .fixed(tagSize + payloadSize),
-        alignment: max(payloadAlignment, ctx.llvm.layout.preferredAlignment(of: tag)))
-      return .init(llvm: pair, layout: layout)
+    var payloadSize = 0
+    var payloadAlignment = 1
+    for c in cases {
+      let m = metadata(of: c, in: &ctx)
+      payloadSize = max(payloadSize, m.layout.size.fixed!)
+      payloadAlignment = max(payloadAlignment, m.layout.alignment)
     }
+
+    // Determine the size of the tag.
+    assert(cases.count < UInt32.max, "too many enum cases")
+    let tag = ctx.integerTypeToRepresent(cases.count)
+    let tagSize = ctx.llvm.layout.storageSize(of: tag)
+    var fields: [LLVMType] = [
+      tag.t,
+      ctx.llvm.arrayType(payloadSize, ctx.llvm.i8).t
+    ]
+
+    // Add padding after the tag to satisfy the alignment of the payload if necessary.
+    let payloadOffset = tagSize.rounded(upToNearestMultipleOf: payloadAlignment)
+    if payloadOffset > tagSize {
+      let padding = payloadOffset - tagSize
+      fields.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).t)
+      fields.swapAt(1, 2)
+    }
+
+    let pair = ctx.llvm.structType(named: name, fields, packed: true)
+    let layout = ConcreteLayout(
+      fields: fields, propertyToField: [0, fields.count - 1],
+      size: .fixed(payloadOffset + payloadSize),
+      alignment: max(payloadAlignment, ctx.llvm.layout.preferredAlignment(of: tag)))
+    return .init(llvm: pair, layout: layout)
   }
 
   /// Returns the standard layout of a record type having the given fields.

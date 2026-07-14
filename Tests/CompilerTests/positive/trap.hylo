@@ -1,0 +1,5 @@
+//! trap
+
+public fun main() {
+  Builtin.trap()
+}
