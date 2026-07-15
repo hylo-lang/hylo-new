@@ -9,7 +9,7 @@ extension IRFunction {
         removeAll(after: i)
 
         let a = at(i).anchor
-        let s = IRUnreachable(anchor: .init(site: .empty(at: a.site.end), scope: a.scope))
+        let s = IRUnreachable(anchor: a.emptyAtEnd)
         append(s, to: b)
       }
     }

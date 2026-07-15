@@ -22,9 +22,8 @@ public struct SourcePosition: Hashable {
   }
 
   /// The 0-based line and 0-based UTF-16 offset of this position.
-  public var lineAndUTF16Offset: (line: Int, offset: Int) {
-    let r = source.lineAndUTF16Offset(index)
-    return (r.line, r.offset)
+  public var lineAndUTF16Offset: LineAndUTF16Offset {
+    source.lineAndUTF16Offset(index)
   }
 
 }
