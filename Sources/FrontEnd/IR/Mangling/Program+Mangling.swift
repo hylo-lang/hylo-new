@@ -32,7 +32,7 @@ extension Program {
     var m = ManglingEncoding(self)
     var o = ManglingContext(self)
     mangle(s, &m, &o)
-    return o.output.assemblySanitized
+    return ManglingEncoding.manglingPrefix + o.output.assemblySanitized
   }
 
 }
