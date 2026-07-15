@@ -109,9 +109,9 @@ private struct Stack {
 
   /// The top stack frame.
   public var top: StackFrame {
-    _read {
+    get {
       precondition(!isEmpty)
-      yield frames[frames.count - 1]
+      return frames[frames.count - 1]
     }
     _modify {
       precondition(!isEmpty)
@@ -151,8 +151,8 @@ public struct Interpreter {
 
   /// The top stack frame.
   private var topOfStack: StackFrame {
-    _read {
-      yield callStack.top
+    get {
+      callStack.top
     }
     _modify {
       yield &callStack.top
@@ -163,11 +163,9 @@ public struct Interpreter {
   ///
   /// - Precondition: the program is running.
   public var currentInstruction: any Instruction {
-    _read {
-      yield program[programCounter.container.module]
-        .functions[programCounter.container.function]
-        .at(programCounter.position)
-    }
+    program[programCounter.container.module]
+      .functions[programCounter.container.function]
+      .at(programCounter.position)
   }
 
   /// An instance executing `p`.
