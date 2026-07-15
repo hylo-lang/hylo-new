@@ -1,0 +1,20 @@
+/// The header of the structure representing information stored in all type witnesses.
+///
+/// A type witness is a 4-tuple optionally followed by a buffer of pointers containing:
+/// - A string describing the type being witnessed;
+/// - The size of the type, as a 32-bit unsigned integer;
+/// - The alignment of the type, as a 16-bit unsigned ingeter;
+/// - The number of type parameters or type arguments, encoded using a 16-bit signed integer.
+///
+/// Let `n` be the value of the 4-th component. If `n` is non-negative, then the witness is for a
+/// proper type, `n` is the arity of the constructor that formed this type, and the tail buffer
+/// contains a pointer to the witnesses the type arguments. Otherwise, the witness is for a type
+/// constructor of arity `-n` and the tail buffer contains a pointer to a function implementing
+/// that constructor.
+
+module type TypeWitnessHeader = {
+  Pointer<UInt8>, // ?
+  UInt32,         // size
+  UInt16          // alignment
+}
+
