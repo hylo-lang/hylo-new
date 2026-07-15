@@ -261,7 +261,7 @@ internal struct IREmitter {
   /// Generates the IR of the subscript that projects the witness declared by `d`, assuming the
   /// insertion context is configured to generate IR into its lowered form.
   private mutating func lowerDefinition(_ d: ConformanceDeclaration.ID) {
-    insertionContext.anchor = .init(site: program[d].introducer.site, scope: .init(node: d))
+    insertionContext.anchor = program.anchor(introducerOf: d)
     let (_, w, _) = currentFunction.output.remote!
 
     // If the conformance is a nested given, we can simply extract the witness from the parameter
@@ -1006,10 +1006,9 @@ internal struct IREmitter {
     _ e: NameExpression.ID, output r: IRValue, markedForMutationBy mutationMarker: Token?,
   ) -> LoweredCallee {
     let d = program.declaration(referredToBy: e)
-    let a = Anchor(site: program[e].site, scope: program.parent(containing: e))
     return loweredCallee(
       d, qualifiedBy: program[e].qualification, markedForMutationBy: mutationMarker,
-      output: r, at: a)
+      output: r, at: program.anchorForDiagnostics(about: e))
   }
 
   /// Generates the IR using `d` as a callee that is optionally qualified by `qualification`,
@@ -1036,7 +1035,7 @@ internal struct IREmitter {
 
       // The qualification may define type arguments.
       if let ts = qualification.flatMap({ (e) in argumentsFromStaticQualification(e) }) {
-        let g = lowering(at: anchor.site, in: anchor.scope, { $0._type_apply(f.value, to: ts) })
+        let g = lowering(at: anchor, { $0._type_apply(f.value, to: ts) })
         return f.substituting(value: g)
       } else {
         return f
@@ -1052,7 +1051,7 @@ internal struct IREmitter {
       // the receiver's expression.
       let r = currentFunction.result(of: receiver)!.type
       if let ts = program.types.select(r, \TypeApplication.arguments) {
-        let g = lowering(at: anchor.site, in: anchor.scope, { $0._type_apply(f.value, to: ts) })
+        let g = lowering(at: anchor, { $0._type_apply(f.value, to: ts) })
         return f.substituting(value: g)
       } else {
         return f
@@ -1067,7 +1066,7 @@ internal struct IREmitter {
         let target = loweredCallee(
           referringTo: m, boundTo: receiver, markedForMutationBy: mutationMarker, output: result)
 
-        return lowering(at: anchor.site, in: anchor.scope) { (me) in
+        return lowering(at: anchor) { (me) in
           // References to members in extensions are expressed using a witness representing the
           // type and term arguments passed to parameters declared on the extension itself.
           let (e, ts, xs) = me._emit(decompose: w)
@@ -1084,7 +1083,7 @@ internal struct IREmitter {
           tp.typeOfImplementation(satisfying: m, in: w)
         }
 
-        return lowering(at: anchor.site, in: anchor.scope) { (me) in
+        return lowering(at: anchor) { (me) in
           let x0 = me._emit(witness: w)
           let x1 = me._property(m, of: x0, withType: typeOfImplementation)
           return LoweredCallee(value: x1, arguments: Array(contentsOf: receiver), result: result)
@@ -1517,7 +1516,7 @@ internal struct IREmitter {
     if let i = program[module].ir.functions.index(forKey: name) {
       return i
     } else {
-      let anchor = program.anchorForDiagnostics(about: .init(conformance))
+      let anchor = program.anchorForDiagnostics(about: conformance)
       let (terms, output) = prototype(functionOrConformance: requirement, applying: arguments)
       return program[module].ir.addFunction(
         IRFunction(
@@ -1552,7 +1551,7 @@ internal struct IREmitter {
     let o = program.types.dealiased(program.types[e].inhabitant)
     ps.append(.init(type: o, access: .set, declaration: nil))
 
-    let anchor = program.anchorForDiagnostics(about: .init(d))
+    let anchor = program.anchorForDiagnostics(about: d)
     return program[module].ir.addFunction(
       IRFunction(
         name: name, anchor: anchor, output: .indirect, typeParameters: ts, termParameters: ps))
@@ -1574,9 +1573,9 @@ internal struct IREmitter {
     // Declare the global's initializer.
     let t = program.types.dealiased(program.type(assignedTo: d))
     let o = IRParameter(type: t, access: .set, declaration: nil)
-    let a = program.anchorForDiagnostics(about: .init(d))
     let i = IRFunction(
-      name: .initializer(d), anchor: a, output: .indirect, typeParameters: [], termParameters: [o])
+      name: .initializer(d), anchor: program.anchorForDiagnostics(about: d),
+      output: .indirect, typeParameters: [], termParameters: [o])
     let f = program[module].ir.addFunction(i)
 
     // Declare the global itself.
@@ -1789,7 +1788,18 @@ internal struct IREmitter {
   private mutating func lowering<R>(
     at site: SourceSpan, in scope: ScopeIdentity, _ action: (inout Self) -> R
   ) -> R {
-    var a = Anchor(site: site, scope: scope) as Optional
+    var a = program.anchor(at: site, in: scope) as Optional
+    swap(&a, &insertionContext.anchor)
+    let r = action(&self)
+    swap(&a, &insertionContext.anchor)
+    return r
+  }
+
+  /// Returns the result of calling `action` on `self` with the given insertion anchor.
+  private mutating func lowering<R>(
+    at anchor: Anchor, _ action: (inout Self) -> R
+  ) -> R {
+    var a = anchor as Optional
     swap(&a, &insertionContext.anchor)
     let r = action(&self)
     swap(&a, &insertionContext.anchor)
@@ -2375,7 +2385,7 @@ internal struct IREmitter {
       // Is `d` referring to a local variable that is not yet in scope?
       if let v = program.cast(d, to: VariableDeclaration.self) {
         // The only way to get here is if `v` has not been defined yet.
-        let s = insertionContext.anchor!.site
+        let s = program.span(insertionContext.anchor!)
         report(.init(.error, "use of '\(program[v].identifier)' before its declaration", at: s))
         return .poison(program.types.ir(place: t))
       }
@@ -2760,7 +2770,7 @@ internal struct IREmitter {
               implicit deinitialization of instances of '\(program.show(t))' causes infinite \
               recursion in this context
               """
-            report(.init(.error, m, at: currentAnchor.site))
+            report(.init(.error, m, at: program.span(currentAnchor)))
             _emitTrap()
             return false
           }
@@ -3119,7 +3129,8 @@ internal struct IREmitter {
     if let pick = candidates.uniqueElement {
       return pick.witness
     } else {
-      report(program.noUniqueGivenInstance(of: goal, found: candidates, at: currentAnchor.site))
+      let s = program.span(currentAnchor)
+      report(program.noUniqueGivenInstance(of: goal, found: candidates, at: s))
       return nil
     }
   }

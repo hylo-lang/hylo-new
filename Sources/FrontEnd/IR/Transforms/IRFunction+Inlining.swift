@@ -10,8 +10,8 @@ extension IRFunction {
     for i in instructions() {
       if let s = at(i) as? IRApply, case .function(let f, _) = s.callee {
         if typer.program.isPrivate(f, in: m) {
-          let d = Diagnostic(
-            .error, "use of non-exposed function in inlined function", at: s.anchor.site)
+          let a = typer.program.span(s.anchor)
+          let d = Diagnostic(.error, "use of non-exposed function in inlined function", at: a)
           typer.program[m].addDiagnostic(d)
           success = false
         }

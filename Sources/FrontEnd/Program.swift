@@ -135,11 +135,7 @@ public struct Program: Sendable {
         work[i].function.closeOpenEndedRegions()
 
         // The following passes may fail.
-        var ds = DiagnosticSet()
-        work[i].function.checkYieldCoherence(reportingDiagnosticsTo: &ds)
-        typer.program[m].addDiagnostics(ds)
-        if ds.containsError { continue }
-
+        if !work[i].function.checkYieldCoherence(using: &typer) { continue }
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
@@ -1627,11 +1623,6 @@ public struct Program: Sendable {
     } else {
       return spanForDiagnostic(about: self[n].value)
     }
-  }
-
-  /// Returns an anchor suitable to generate debug information related to `d` as a whole.
-  public func anchorForDiagnostics(about d: DeclarationIdentity) -> Anchor {
-    .init(site: spanForDiagnostic(about: d), scope: parent(containing: d))
   }
 
   /// Returns `message` with placeholders replaced by their corresponding values in `arguments`.

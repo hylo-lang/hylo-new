@@ -237,13 +237,13 @@ private struct Transfer: AbstractTransferFunction {
     // skip further changes to the context to avoid cascading diagnostics.
     let isLegal = (k == .let) || !f.isBoundImmutably(access.source)
     if !isLegal {
-      report(.illegalAccess(k, at: access.anchor.site))
+      report(program.illegalAccess(k, at: access.anchor))
     }
 
     switch k {
     case .let, .inout, .sink:
       if isLegal {
-        checkInitialized(place: access.source, in: f, at: access.anchor.site)
+        checkInitialized(place: access.source, in: f, at: program.span(access.anchor))
         if k == .sink { consume(place: access.source, with: i.erased, in: f) }
       }
       context.declare(i, from: f, initially: .initialized)
@@ -271,7 +271,7 @@ private struct Transfer: AbstractTransferFunction {
     let k = opener.capabilities.uniqueElement!
     switch k {
     case .let, .set, .inout:
-      checkInitialized(place: f.at(i).start, in: f, at: f.at(i).anchor.site)
+      checkInitialized(place: f.at(i).start, in: f, at: program.span(f.at(i).anchor))
 
       // Assume the postcondition moving forward.
       let a = context.locals[opener.source]!.place!
@@ -398,7 +398,7 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IREnumTag.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
-    checkInitialized(place: s.source, in: f, at: s.anchor.site)
+    checkInitialized(place: s.source, in: f, at: program.span(s.anchor))
     context.declare(i.erased, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }
@@ -559,7 +559,7 @@ private struct Transfer: AbstractTransferFunction {
 
         // Report potential failures.
         if o.value != .uniform(.initialized) {
-          let s = f.at(i).anchor.site
+          let s = program.span(f.at(i).anchor)
           if v == f.returnRegister {
             report(.init(.error, "missing return value", at: s))
           } else {
@@ -712,11 +712,11 @@ private struct Transfer: AbstractTransferFunction {
     case .uniform(.initialized):
       break
     case .uniform(.uninitialized), .uniform(.phi):
-      report(.useOfUninitializedObject(at: site))
+      report(program.useOfUninitializedObject(at: site))
     case .uniform(.consumed):
-      report(.useOfConsumedObject(at: site))
+      report(program.useOfConsumedObject(at: site))
     case .mixed:
-      report(.useOfPartialObject(at: site))
+      report(program.useOfPartialObject(at: site))
     }
   }
 
@@ -742,15 +742,15 @@ private struct Transfer: AbstractTransferFunction {
     }
 
     let a = context.locals[place]!.place!
-    let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) -> Diagnostic? in
+    let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) -> Anchor? in
       if o.value == .uniform(.initialized) {
         o.value = .uniform(.consumed( [consumer]))
         return nil
       } else {
-        return .illegalMove(at: f.at(consumer).anchor.site)
+        return f.at(consumer).anchor
       }
     }
-    d.map({ (d) in report(d) })
+    d.map({ (d) in report(program.illegalMove(at: d)) })
   }
 
   /// Updates `object` to mark it consumed by `consumer`, reporting a diagnostic if `object` cannot
@@ -766,17 +766,17 @@ private struct Transfer: AbstractTransferFunction {
       return
     }
 
-    let d = modify(&context.locals[object]!) { (local) -> Diagnostic? in
+    let d = modify(&context.locals[object]!) { (local) -> Anchor? in
       var o = local.object!
       if o.value == .uniform(.initialized) {
         o.value = .uniform(.consumed([consumer]))
         local = .object(o)
         return nil
       } else {
-        return .illegalMove(at: f.at(consumer).anchor.site)
+        return f.at(consumer).anchor
       }
     }
-    d.map({ (d) in report(d) })
+    d.map({ (d) in report(program.illegalMove(at: d)) })
   }
 
   /// Inserts IR to deinitialize the specified `parts` of the object stored at `place` immediately
@@ -857,7 +857,7 @@ private struct Transfer: AbstractTransferFunction {
     case .let, .inout, .sink:
       // All three effects require that the object be fully initialized.
       let a = context.locals[v]!.place!
-      checkInitialized(place: v, in: f, at: f.at(i).anchor.site)
+      checkInitialized(place: v, in: f, at: program.span(f.at(i).anchor))
 
       // A `sink` access consumes its source.
       if k == .sink {
@@ -900,7 +900,7 @@ private struct Transfer: AbstractTransferFunction {
   ) {
     switch k {
     case .let, .set, .inout:
-      checkInitialized(place: v, in: f, at: f.at(e).anchor.site)
+      checkInitialized(place: v, in: f, at: program.span(f.at(e).anchor))
     case .sink:
       ensureDeinitialized(place: v, before: e, in: &f)
     case .auto:
