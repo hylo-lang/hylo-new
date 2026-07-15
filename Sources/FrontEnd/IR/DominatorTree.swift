@@ -114,6 +114,11 @@ public struct DominatorTree: Sendable {
     return false
   }
 
+  /// Returns `true` iff `a` strictly dominates `b`.
+  public func strictlyDominates(_ a: IRBlock.ID, _ b: IRBlock.ID) -> Bool {
+    (a != b) && dominates(a, b)
+  }
+
   /// Returns `true` if the instruction identified by `definition` dominates `use` in `self`, which
   /// is the dominator tree of `f`.
   public func dominates(definition: AnyInstructionIdentity, use: Use, in f: IRFunction) -> Bool {

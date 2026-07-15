@@ -433,6 +433,17 @@ extension Program {
 
     // Otherwise, compile the plateau following the project instruction.
     let (plateau, captures, covered) = definePlateau(dominatedBy: i, in: &ctx)
+    ctx.factoredOut.formUnion(covered)
+
+    // The call to the subscript's ramp returns with the identifier of the basic block to which
+    // control flow should be transferred. This basic block must be a successor of one of the
+    // blocks having been incorporated that is not dominated by `i`.
+    let entry = ctx.ir.block(defining: i)
+    let successors = covered.elements.reduce(into: IRBlockSet()) { (s, a) in
+      for b in ctx.ir.successors(of: a) where (b == entry) || !covered.contains(b) {
+        s.insert(b)
+      }
+    }
 
     switch s.callee {
     case .function(let n, _):
@@ -441,36 +452,32 @@ extension Program {
       x.append(plateau.value.v)
       x.append(captures.v)
 
-      // The call to the subscript's ramp returns with the identifier of the basic block to which
-      // control flow should be transferred. This basic block must be a successor of one of the
-      // blocks having been incorporated that is not dominated by `i`.
-      let after = ctx.module.llvm.insertCall(f.value, on: x, at: ctx.insertionPoint!)
-      let successors = covered.elements.reduce(into: IRBlockSet()) { (s, a) in
-        for b in ctx.ir.successors(of: a) where !covered.contains(b) { s.insert(b) }
-      }
-
       // Compute the branches of a switch terminator redirecting control-flow.
-      typealias Case = SwiftyLLVM.Module.SwitchCase
+      let after = ctx.module.llvm.insertCall(f.value, on: x, at: ctx.insertionPoint!)
       let i32 = ctx.module.llvm.i32
-      let cases = successors.elements.map { (b: IRBlock.ID) -> Case in
+      let cases = successors.elements.map { (b: IRBlock.ID) -> SwiftyLLVM.Module.SwitchCase in
         let n = i32.unsafe[].constant(b.rawValue).v
         let b = ctx.demandBasicBlock(b)
         return (n, b)
       }
 
-      if let (c, cs) = cases.headAndTail {
-        // Insert the switch terminator, using the first case as a default branch.
-        ctx.module.llvm.insertSwitch(on: after, cases: cs, default: c.1, at: ctx.insertionPoint!)
+      // If none of the blocks covered by the plateau has a successor, we can assume the plateau
+      // always returns 0 and there is no need for conditional branching.
+      let done = ctx.module.llvm.appendBlock(to: ctx.llvm)
+      if cases.isEmpty {
+        ctx.module.llvm.insertBr(to: done, at: ctx.insertionPoint!)
       } else {
-        // If none of the blocks covered by the plateau has a successor, then the remainder of the
-        // function has been incorporated into the plateau.
-        assert(successors.isEmpty)
-        if ctx.result.isPlateau || ctx.result.isRamp {
-          ctx.module.llvm.insertReturn(after, at: ctx.insertionPoint!)
-        } else {
-          // If we are the ramp of a subscript we should also return.
-          insertReturn(in: &ctx)
-        }
+        ctx.module.llvm.insertSwitch(
+          on: after, cases: cases, default: done, at: ctx.insertionPoint!)
+      }
+
+      // If the plateau returns `0`, then the remainder of the function has been incorporated.
+      if ctx.result.isPlateau || ctx.result.isRamp {
+        ctx.module.llvm.insertReturn(after, at: ctx.module.llvm.endOf(done))
+      } else {
+        // If we are the ramp of a subscript we should also return.
+        ctx.insertionPoint = ctx.module.llvm.endOf(done)
+        insertReturn(in: &ctx)
       }
 
     default:

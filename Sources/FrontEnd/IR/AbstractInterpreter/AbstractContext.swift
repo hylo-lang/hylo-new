@@ -174,15 +174,12 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
   internal mutating func declare<T: InstructionIdentity>(
     _ i: T, from f: IRFunction, initially v: Domain
   ) {
-    assert(locals[.register(i.erased)] == nil, "register is already assigned")
-
     // Create a new object.
     let t = f.resolved(f.at(i.erased).type)!
     let o = AbstractObject(type: t.type, value: .uniform(v))
 
     // If the register defines an address, create a new place and assigns it the new object.
     if t.isPlace {
-      assert(memory[.register(i.erased)] == nil, "storage already exists")
       memory[.register(i.erased)] = .init(type: t.type, value: .uniform(v))
       locals[.register(i.erased)] = .place(.root(.register(i.erased)))
     }
