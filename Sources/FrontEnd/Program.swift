@@ -208,19 +208,19 @@ public struct Program: Sendable {
 
   /// Projects the module identified by `m`.
   public subscript(m: Module.ID) -> Module {
-    _read { yield modules.values[m] }
+    get { modules.values[m] }
     _modify { yield &modules.values[m] }
   }
 
   /// Projects the source file identified by `f`.
   internal subscript(f: SourceFile.ID) -> Module.SourceContainer {
-    _read { yield modules.values[f.module][f] }
+    get { modules.values[f.module][f] }
     _modify { yield &modules.values[f.module][f] }
   }
 
   /// Projects the node identified by `n`.
   public subscript<T: SyntaxIdentity>(n: T) -> any Syntax {
-    _read { yield modules.values[n.module][n] }
+    get { modules.values[n.module][n] }
   }
 
   /// Projects the node identified by `n`.

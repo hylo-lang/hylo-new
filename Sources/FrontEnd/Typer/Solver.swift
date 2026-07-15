@@ -70,7 +70,7 @@ internal struct Solver {
 
   /// The program containing the module being typed.
   internal var program: Program {
-    _read { yield typer.program }
+    get { typer.program }
     _modify { yield &typer.program }
   }
 

@@ -59,9 +59,9 @@ public struct Module: Sendable {
 
     /// Projects the node identified by `n`.
     internal subscript<T: SyntaxIdentity>(n: T) -> any Syntax {
-      _read {
+      get {
         assert(n.file == identity)
-        yield syntax[n.offset].wrapped
+        return syntax[n.offset].wrapped
       }
     }
 
@@ -361,9 +361,9 @@ public struct Module: Sendable {
 
   /// Projects the source file identified by `f`.
   internal subscript(f: SourceFile.ID) -> SourceContainer {
-    _read {
+    get {
       assert(f.module == identity)
-      yield sources.values[f.offset]
+      return sources.values[f.offset]
     }
     _modify {
       assert(f.module == identity)
