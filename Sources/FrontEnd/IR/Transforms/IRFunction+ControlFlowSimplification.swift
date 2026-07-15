@@ -5,8 +5,9 @@ extension IRFunction {
     // Nothing to do if there isn't more than one basic block.
     if blocks.count <= 1 { return }
 
+    // Skip over the entry.
+    var work = Array(blocks.addresses.dropFirst())
     var g = controlFlow()
-    var work = Array(blocks.addresses)
 
     while let b = work.popLast() {
       // Remove blocks whose only instruction is an unconditional branch.
