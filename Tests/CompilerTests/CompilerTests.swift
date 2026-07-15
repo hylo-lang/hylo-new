@@ -288,12 +288,12 @@ final class CompilerTests: XCTestCase {
       driver.program[m].addDependency(Module.standardLibraryName)
     }
 
-    let (cSources, expectedDiagnostics) = try collectSources(input: input, m: &driver.program[m])
+    let expectedDiagnostics = try collectSources(input: input, m: &driver.program[m])
 
     var artifacts = Artifacts()
     do {
       try await compile(
-        m, until: input.manifest.stage, using: &driver, withCSources: cSources,
+        m, until: input.manifest.stage, using: &driver,
         accumulatingArtifactsInto: &artifacts,
         expectedArtifacts: input.manifest.artifactExpectations)
     } catch let e {
@@ -313,9 +313,8 @@ final class CompilerTests: XCTestCase {
   /// Hylo source file.
   func collectSources(
     input: TestDescription, m: inout Module
-  ) throws -> (cSources: [URL], expectedDiagnostics: [FileName: String]) {
+  ) throws -> [FileName: String] {
     var expectedDiagnostics: [FileName: String] = [:]
-    var cSources: [URL] = []
 
     func addHyloSourceFile(at u: URL) throws {
       let source = try SourceFile(contentsOf: u)
@@ -336,21 +335,22 @@ final class CompilerTests: XCTestCase {
         if u.pathExtension == "hylo" {
           try addHyloSourceFile(at: u)
         } else if u.pathExtension == "c" {
-          cSources.append(u)
+          // Foreign sources are added to the module like any other source; they are not parsed.
+          m.addSource(try SourceFile(contentsOf: u))
         }
       }
     } else {
       try addHyloSourceFile(at: input.root)
     }
 
-    return (cSources, expectedDiagnostics)
+    return expectedDiagnostics
   }
 
   /// Compiles `m`, which is a module whose source have been parsed with `driver`, until `stage`,
   /// adding compilation artifacts to `artifacts`.
   private func compile(
     _ m: Module.ID, until stage: Manifest.Stage, using driver: inout Driver,
-    withCSources cSources: [URL], accumulatingArtifactsInto artifacts: inout Artifacts,
+    accumulatingArtifactsInto artifacts: inout Artifacts,
     expectedArtifacts: SortedDictionary<ArtifactTag, String>
   ) async throws {
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -393,7 +393,7 @@ final class CompilerTests: XCTestCase {
     if stage == .execution {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
-      _ = try driver.generateExecutable(from: m, withCSources: cSources, writingTo: executable)
+      _ = try driver.generateExecutable(from: m, writingTo: executable)
       artifacts.executable = executable
     }
   }

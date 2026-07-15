@@ -281,10 +281,13 @@ public struct Module: Sendable {
     if let f = sources.index(forKey: s.name) {
       return (inserted: false, identity: .init(module: identity, offset: f))
     } else {
-      let p = Parser(s)
       var f = Module.SourceContainer(
         identity: .init(module: identity, offset: sources.count), source: s)
-      p.parseTopLevelDeclarations(in: &f)
+      // Foreign sources are stored verbatim and carried through to linking; only Hylo
+      // sources are parsed.
+      if !s.isForeign {
+        Parser(s).parseTopLevelDeclarations(in: &f)
+      }
       sources[s.name] = f
       return (inserted: true, identity: f.identity)
     }
@@ -350,6 +353,12 @@ public struct Module: Sendable {
   /// The top-level declarations in `self`.
   public var topLevelDeclarations: some Collection<DeclarationIdentity> {
     sources.values.map(\.topLevelDeclarations).joined()
+  }
+
+  /// The foreign (non-Hylo) source files in `self`, e.g. C sources that are compiled and linked
+  /// as-is rather than parsed.
+  public var foreignSources: [SourceFile] {
+    sources.values.lazy.map(\.source).filter(\.isForeign)
   }
 
   /// Returns the identity of a contained source file named `f`, if any.

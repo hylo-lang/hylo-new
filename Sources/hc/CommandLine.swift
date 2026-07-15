@@ -365,7 +365,7 @@ private typealias Module = FrontEnd.Module
     for url in inputs {
       if url.hasDirectoryPath {
         try SourceFile.forEach(in: url) { (f) in sources.append(f) }
-      } else if url.pathExtension == "hylo" {
+      } else if url.pathExtension == "hylo" || url.pathExtension == "c" {
         try sources.append(SourceFile(contentsOf: url))
       } else {
         throw ValidationError("unexpected input: \(url.relativePath)")

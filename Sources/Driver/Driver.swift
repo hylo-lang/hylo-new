@@ -202,14 +202,15 @@ public struct Driver {
   /// - Throws: if the parent folder of `output` doesn't exist.
   public mutating func generateExecutable(
     from module: Module.ID,
-    withCSources cSources: [URL] = [],
     writingTo output: URL
   ) throws -> PhaseResult {
     let elapsed = try ContinuousClock().measure {
       let modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
 
-      var cSources = cSources
+      // Foreign (C) sources that were added to the module travel with it.
+      let foreignSources = program[module].foreignSources
+      var cSources: [URL] = []
 
       if !noStandardLibrary {
         // FIXME: Enable this after we can lower the standard library
@@ -219,8 +220,14 @@ public struct Driver {
 
       try FileManager.default.withUniqueTemporaryDirectory { (d) in
         let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
-        let cObjects = try cSources.map { (s) in
+        var cObjects = try cSources.map { (s) in
           try compileCToObject(source: s, destinationDirectory: d)
+        }
+        // Materialize the module's foreign sources (stored as text) and compile them.
+        for s in foreignSources {
+          let c = d.appendingPathComponent(s.name.url.lastPathComponent, isDirectory: false)
+          try s.text.write(to: c, atomically: true, encoding: .utf8)
+          cObjects.append(try compileCToObject(source: c, destinationDirectory: d))
         }
         try linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }

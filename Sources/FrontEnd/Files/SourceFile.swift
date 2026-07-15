@@ -79,6 +79,17 @@ public struct SourceFile: Hashable, Sendable {
     name.url.deletingPathExtension().lastPathComponent
   }
 
+  /// `true` iff `self` is a foreign source that the Hylo compiler carries through to linking
+  /// without parsing (currently: C sources).
+  ///
+  /// - Note: Virtual sources are never foreign; they always hold Hylo code.
+  public var isForeign: Bool {
+    switch name {
+    case .local(let u): return u.pathExtension == "c"
+    case .virtual: return false
+    }
+  }
+
   /// The contents of the file.
   public var text: String {
     properties.text
