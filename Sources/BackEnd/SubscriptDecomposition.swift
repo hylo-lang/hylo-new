@@ -178,6 +178,7 @@ extension FunctionGenerationContext {
     to slot: SwiftyLLVM.AnyInstruction.UnsafeReference
   ) {
     let parameters = llvm.unsafe[].parameters
+    assert(parameters.count >= 3, "Invalid parameter count for function being built: \(parameters)")
     let project = module.llvm.insertAlloca(module.nestedProject, atEntryOf: llvm)
 
     var v = module.llvm.poisonValue(of: module.nestedProject).v

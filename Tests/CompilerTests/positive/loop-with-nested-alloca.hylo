@@ -1,0 +1,20 @@
+//! exit-status:55
+
+fun loop_with_nested_allocation() {
+  var i: Int32 = 10
+  var sum: Int32 = 0
+
+  while i > .zero() {
+    var j = i + .zero()
+
+    while j > .zero() {
+      let d = (1 as Int32) + .zero()
+      &j -= d
+      &sum += 1 as Int32
+    }
+
+    &i -= 1 as Int32
+  }
+
+  return
+}

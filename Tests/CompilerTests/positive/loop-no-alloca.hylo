@@ -1,0 +1,12 @@
+//! exit-status:42
+
+fun main() -> Int32 {
+  var r: Int32 = 42
+  var c: Int32 = 0
+  while r > .zero() {
+    &r -= 1 as Int32
+    &c += 1 as Int32
+  }
+
+  return c
+}

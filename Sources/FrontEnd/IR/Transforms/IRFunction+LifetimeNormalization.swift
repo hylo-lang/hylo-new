@@ -54,6 +54,9 @@ private struct Transfer: AbstractTransferFunction {
   /// A typer for querying type relations and resolve names.
   private var typer: Typer! = nil
 
+  /// The control-flow graph of the function being interpreted.
+  private var controlFlow: ControlFlowGraph! = nil
+
   /// The context being updated.
   private var context: Context = .init()
 
@@ -74,9 +77,11 @@ private struct Transfer: AbstractTransferFunction {
   mutating func apply(
     _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
     precededBy predecessors: SortedDictionary<IRBlock.ID, Context>,
+    controlFlow: ControlFlowGraph,
     using typer: inout Typer
   ) -> [IRBlock.ID] {
     self.typer = consume typer
+    self.controlFlow = controlFlow
     swap(&context, &c)
 
     defer {
@@ -229,7 +234,7 @@ private struct Transfer: AbstractTransferFunction {
 
     // Built-in values are implicitly copied.
     if (k == .sink) && f.isBuiltinValue(access.source, using: program) {
-      context.declare(i, from: f, initially: .initialized)
+      context.declare(i, from: f, controlFlow: controlFlow, initially: .initialized)
       return f.instruction(after: i.erased)
     }
 
@@ -246,13 +251,13 @@ private struct Transfer: AbstractTransferFunction {
         checkInitialized(place: access.source, in: f, at: access.anchor.site)
         if k == .sink { consume(place: access.source, with: i.erased, in: f) }
       }
-      context.declare(i, from: f, initially: .initialized)
+      context.declare(i, from: f, controlFlow: controlFlow, initially: .initialized)
 
     case .set:
       if isLegal {
         ensureDeinitialized(place: access.source, before: i.erased, in: &f)
       }
-      context.declare(i, from: f, initially: .uninitialized)
+      context.declare(i, from: f, controlFlow: controlFlow, initially: .uninitialized)
 
     case .auto:
       fatalError("invalid IR")
@@ -294,7 +299,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRAlloca.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .uninitialized)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .uninitialized)
     return f.instruction(after: i.erased)
   }
 
@@ -307,7 +312,7 @@ private struct Transfer: AbstractTransferFunction {
       passArgument(p, v, insertingDeinitializationBefore: i.erased, in: &f)
     }
 
-    context.declare(i, from: f, initially: .initialized)
+    context.declare(i, from: f, controlFlow: controlFlow, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 
@@ -359,7 +364,7 @@ private struct Transfer: AbstractTransferFunction {
       }
     }
 
-    context.declare(i, from: f, initially: v)
+    context.declare(i, from: f, controlFlow: controlFlow, initially: v)
     return f.instruction(after: i.erased)
   }
 
@@ -399,7 +404,7 @@ private struct Transfer: AbstractTransferFunction {
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
     checkInitialized(place: s.source, in: f, at: s.anchor.site)
-    context.declare(i.erased, from: f, initially: .initialized)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 
@@ -407,7 +412,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRGlobalAccess.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .initialized)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 
@@ -417,7 +422,7 @@ private struct Transfer: AbstractTransferFunction {
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
     consume(place: s.source, with: i.erased, in: f)
-    context.declare(i, from: f, initially: .initialized)
+    context.declare(i, from: f, controlFlow: controlFlow, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 
@@ -461,7 +466,7 @@ private struct Transfer: AbstractTransferFunction {
       s.access, s.source, insertingDeinitializationBefore: i.erased, in: &f)
 
     let v: Domain = (f.at(i).access == .set) ? .uninitialized : .initialized
-    context.declare(i, from: f, initially: v)
+    context.declare(i, from: f, controlFlow: controlFlow, initially: v)
     return f.instruction(after: i.erased)
   }
 
@@ -488,7 +493,7 @@ private struct Transfer: AbstractTransferFunction {
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
     let v: Domain = (s.access == .set) ? .uninitialized : .initialized
-    context.declare(i.erased, from: f, initially: v)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: v)
     return f.instruction(after: i.erased)
   }
 
@@ -505,7 +510,7 @@ private struct Transfer: AbstractTransferFunction {
     }
 
     let v: Domain = (f.at(i).access == .set) ? .uninitialized : .initialized
-    context.declare(i, from: f, initially: v)
+    context.declare(i, from: f, controlFlow: controlFlow, initially: v)
     return f.instruction(after: i.erased)
   }
 
@@ -534,7 +539,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRProperty.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .initialized)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 
@@ -605,7 +610,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRTypeApply.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .initialized)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .initialized)
     return f.instruction(after: i.erased)
   }
   /// Interprets `i`, which is in `f`.
@@ -619,7 +624,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRWitnessTable.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .initialized)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 

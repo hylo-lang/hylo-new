@@ -76,6 +76,9 @@ private struct Transfer: AbstractTransferFunction {
   /// The context being updated.
   private var context: Context = .init()
 
+  /// The control-flow graph of the function being interpreted.
+  private var controlFlow: ControlFlowGraph! = nil
+
   /// `true` iff an application of this function raised an error.
   fileprivate private(set) var didFoundError: Bool = false
 
@@ -93,9 +96,11 @@ private struct Transfer: AbstractTransferFunction {
   mutating func apply(
     _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
     precededBy predecessors: SortedDictionary<IRBlock.ID, Context>,
+    controlFlow: ControlFlowGraph,
     using typer: inout Typer
   ) -> [IRBlock.ID] {
     self.typer = consume typer
+    self.controlFlow = controlFlow
     swap(&context, &c)
 
     defer {
@@ -153,7 +158,7 @@ private struct Transfer: AbstractTransferFunction {
 
     // Built-in values are implicitly copied.
     if (k == .sink) && f.isBuiltinValue(access.source, using: program) {
-      context.declare(i.erased, from: f, initially: .unique)
+      context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
       return f.instruction(after: i.erased)
     }
 
@@ -211,7 +216,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRAlloca.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
@@ -219,7 +224,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRCase.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
@@ -236,7 +241,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRGlobalAccess.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
@@ -244,7 +249,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRPlaceCast.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
@@ -261,7 +266,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRPointerToPlace.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
@@ -269,7 +274,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRProject.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
@@ -286,7 +291,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRProperty.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
@@ -304,7 +309,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRWitnessTable.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    context.declare(i.erased, from: f, controlFlow: controlFlow, initially: .unique)
     return f.instruction(after: i.erased)
   }
 
