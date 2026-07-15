@@ -266,8 +266,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       /// Increments `self` by `other`.
       @inline(always)
       public fun infix+= (other: Self) inout {
-        let t = self + other  // Avoid requiring `Movable`.
-        &self = t.copy()
+        &self.value = (self + other).value // Avoid requiring `Movable` or `Copyable`.
       }
 
       /// Returns `other` subtracted from `self`.
@@ -285,8 +284,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       /// Decrements `self` by `other`.
       @inline(always)
       public fun infix-= (other: Self) inout {
-        let t = self - other  // Avoid requiring `Movable`.
-        &self = t.copy()
+        &self.value = (self - other).value // Avoid requiring `Movable` or `Copyable`.
       }
 
       /// Returns `0`.
@@ -312,8 +310,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       /// Multiplies `self` by `other`.
       @inline(always)
       public fun infix*= (other: Self) inout {
-        let t = self * other  // Avoid requiring `Movable`.
-        &self = t.copy()
+        &self.value = (self * other).value // Avoid requiring `Movable` or `Copyable`.
       }
 
       /// Returns `self` divided by `other`, rounded towards zero.

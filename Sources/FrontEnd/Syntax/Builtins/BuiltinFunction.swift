@@ -70,7 +70,7 @@ public enum BuiltinFunction: Hashable, Sendable {
   //
   //  case ashr(exact: Bool, MachineType.ID)
   //
-  //  case urem(MachineType.ID)
+  case urem(MachineType.ID)
   //
   //  case srem(MachineType.ID)
 
@@ -100,9 +100,9 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case icmp(IntegerPredicate, MachineType.ID)
 
-  //  case trunc(MachineType.ID, MachineType.ID)
-  //
-  //  case zext(MachineType.ID, MachineType.ID)
+  case trunc(MachineType.ID, MachineType.ID)
+
+  case zext(MachineType.ID, MachineType.ID)
   //
   //  case sext(MachineType.ID, MachineType.ID)
   //
@@ -152,8 +152,8 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case zeroinitializer(MachineType.ID)
 
-  //  // Corresponding LLVM instruction: get_elementptr_inbounds.
-  //  case advancedByBytes(byteOffset: MachineType.ID)
+  // Corresponding LLVM instruction: get_elementptr_inbounds.
+  case advancedByBytes(byteOffset: MachineType.ID)
   //
   //  case atomic_store_relaxed(MachineType.ID)
   //
@@ -439,8 +439,9 @@ extension BuiltinFunction {
     //      return .init(^t, ^t, to: ^t)
     //    case .ashr(_, let t):
     //      return .init(^t, ^t, to: ^t)
-    //    case .urem(let t):
-    //      return .init(^t, ^t, to: ^t)
+    case .urem(let t):
+      return s.demand(Arrow(t, t, to: t))
+
     //    case .srem(let t):
     //      return .init(^t, ^t, to: ^t)
     case .and(let t):
@@ -469,9 +470,11 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: u)).erased
     case .icmp(_, let t):
       return s.demand(Arrow(t, t, to: i1)).erased
-    //    case .trunc(let s, let d):
-    //      return .init(^s, to: ^d)
-    //    case .zext(let s, let d):
+    case .trunc(let src, let dst):
+      return s.demand(Arrow(src, to: dst)).erased
+    case .zext(let src, let dst):
+      return s.demand(Arrow(src, to: dst))
+
     //      return .init(^s, to: ^d)
     //    case .sext(let s, let d):
     //      return .init(^s, to: ^d)
@@ -511,8 +514,9 @@ extension BuiltinFunction {
     //      return .init(^t, to: ^t)
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
-    //    case .advancedByBytes(let byteOffset):
-    //      return .init(.builtin(.ptr), ^byteOffset, to: .builtin(.ptr))
+    case .advancedByBytes(let t):
+      let p = s.demand(MachineType.ptr)
+      return s.demand(Arrow(p, t, to: p))
     //    case .atomic_store_relaxed(let t):
     //      return .init(.builtin(.ptr), ^t, to: .void)
     //    case .atomic_store_release(let t):
@@ -783,8 +787,9 @@ extension BuiltinFunction: Showable {
     //      return e ? "lshr_exact_\(t)" : "lshr_\(t)"
     //    case .ashr(let e, let t):
     //      return e ? "ashr_exact_\(t)" : "ashr_\(t)"
-    //    case .urem(let t):
-    //      return "urem_\(t)"
+    case .urem(let t):
+      return printer.format("urem_%T", [t.erased])
+
     //    case .srem(let t):
     //      return "srem_\(t)"
     case .and(let t):
@@ -807,10 +812,10 @@ extension BuiltinFunction: Showable {
       return printer.format("umul_with_overflow_%T", [t.erased])
     case .icmp(let p, let t):
       return printer.format("icmp_%S_%T", [p, t.erased])
-    //    case .trunc(let l, let r):
-    //      return "trunc_\(l)_\(r)"
-    //    case .zext(let l, let r):
-    //      return "zext_\(l)_\(r)"
+    case .trunc(let s, let d):
+      return printer.format("trunc_%T_%T", [s.erased, d.erased])
+    case .zext(let s, let d):
+      return printer.format("trunc_%T_%T", [s.erased, d.erased])
     //    case .sext(let l, let r):
     //      return "sext_\(l)_\(r)"
     //    case .uitofp(let l, let r):
@@ -849,8 +854,8 @@ extension BuiltinFunction: Showable {
     //      return "cttz_\(t)"
     case .zeroinitializer(let t):
       return printer.format("zeroinitializer_%T", [t.erased])
-    //    case .advancedByBytes(let t):
-    //      return "advanced_by_bytes_\(t)"
+    case .advancedByBytes(let t):
+      return "advanced_by_bytes_\(t)"
     //    case .atomic_store_relaxed(let t):
     //      return "atomic_store_relaxed_\(t)"
     //    case .atomic_store_release(let t):
@@ -1111,6 +1116,9 @@ extension BuiltinFunction {
     case "address":
       if !tokens.isEmpty { return nil }
       self = .addressOf
+    case "advanced":
+      guard let (_, t) = advancedByBytesTail(&tokens) else { return nil }
+      self = .advancedByBytes(byteOffset: s.demand(t))
     case "assume" where tokens.first == "initialized":
       self = .assumeInitialized(true)
     case "assume" where tokens.first == "uninitialized":
@@ -1144,10 +1152,10 @@ extension BuiltinFunction {
     //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .ashr(exact: p != nil, t)
     //
-    //    case "urem":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .urem(t)
-    //
+    case "urem":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .urem(s.demand(t))
+
     //    case "srem":
     //      guard let t = machineType(&tokens) else { return nil }
     //      self = .srem(t)
@@ -1183,13 +1191,12 @@ extension BuiltinFunction {
       guard let (p, t) = integerComparisonTail(&tokens) else { return nil }
       self = .icmp(p, s.demand(t))
 
-    //    case "trunc":
-    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
-    //      self = .trunc(s, d)
-    //
-    //    case "zext":
-    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
-    //      self = .zext(s, d)
+    case "trunc":
+      guard let (src, dst) = (machineType + machineType)(&tokens) else { return nil }
+      self = .trunc(s.demand(src), s.demand(dst))
+    case "zext":
+      guard let (src, dst) = (machineType + machineType)(&tokens) else { return nil }
+      self = .zext(s.demand(src), s.demand(dst))
     //
     //    case "sext":
     //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
@@ -1623,6 +1630,9 @@ private func integerArithmeticWithOverflowTail(
   let p = exactly("with") + exactly("overflow") + machineType
   return p(&stream).map(\.1)
 }
+
+private let advancedByBytesTail =
+  exactly("by") + exactly("bytes") + machineType
 
 /// Parses the parameters and type of an integer arithmetic instruction.
 private let integerArithmeticTail =

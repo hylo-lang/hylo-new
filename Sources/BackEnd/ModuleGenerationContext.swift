@@ -61,7 +61,7 @@ internal struct ModuleGenerationContext: ~Copyable {
 
   /// The header of the structure representing information stored in all type witnesses.
   ///
-  /// A type witness is a 4-tuple followed by a tail buffer of zero or more pointers. 
+  /// A type witness is a 4-tuple followed by a tail buffer of zero or more pointers.
   /// The tuple contains:
   /// - A string describing the type being witnessed;
   /// - The size of the type, as a 32-bit unsigned integer;
@@ -73,6 +73,10 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// contains a pointer to the witnesses the type arguments. Otherwise, the witness is for a type
   /// constructor of arity `-n` and the tail buffer contains a pointer to a function implementing
   /// that constructor.
+  ///
+  /// - Note: If this structure is changed, `TypeWitnessHeader` in
+  ///   StandardLibrary/Sources/Core/Runtime/OffsetOfMember.hylo must be
+  ///   updated accordingly.
   internal let typeWitnessHeader: [LLVMType]
 
   /// Creates the initial state of a compilation of `m`.
