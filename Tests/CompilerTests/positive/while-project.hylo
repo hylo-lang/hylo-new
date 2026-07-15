@@ -1,0 +1,15 @@
+//! exit-status:23
+
+subscript id(x: Bool) -> Bool { x }
+
+public fun main() -> Int32 {
+  var result = 1 as Int32
+
+  var work = true
+  while id[work] {
+    &work = false
+    &result = 23
+  }
+
+  return result
+}

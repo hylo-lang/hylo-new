@@ -12,6 +12,7 @@ public struct IRBlockSet: Hashable, Sendable {
     self.rawValue = .init()
   }
 
+  /// The elements in `self`.
   public var elements: some Sequence<IRBlock.ID> {
     rawValue.lazy.compactMap(IRBlock.ID.init(_:))
   }

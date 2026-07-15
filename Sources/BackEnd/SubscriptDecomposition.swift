@@ -203,6 +203,21 @@ extension FunctionGenerationContext {
     }
   }
 
+  /// Returns the LLVM basic block corresponding to `b` iff `p` strictly dominates `b`; otherwise,
+  /// returns a basic block not related to any basic block in `ctx.ir`.
+  fileprivate mutating func demandBasicBlock(
+    _ b: IRBlock.ID, dominatedBy p: RegionPrologue
+  ) -> SwiftyLLVM.BasicBlock.UnsafeReference {
+    if dominance.strictlyDominates(ir.block(defining: p.boundary), b) {
+      return demandBasicBlock(b)
+    } else {
+      let target = module.llvm.appendBlock(to: llvm)
+      let v = module.llvm.i32.unsafe[].constant(b.rawValue)
+      module.llvm.insertReturn(v, at: module.llvm.endOf(target))
+      return target
+    }
+  }
+
 }
 
 extension Program {
@@ -237,7 +252,7 @@ extension Program {
   /// Compiles into `result` the contents of the slide starting immediately after `prologue`, which
   /// is an instruction in `source` dominated by all the definitions in `prologue`.
   ///
-  /// The contents of `source` that are compiled into `result` includes all instructions sequenced
+  /// The contents of `source` that are compiled into `result` include all instructions sequenced
   /// after `prologue.boundary`.
   ///
   /// - Parameters:
@@ -250,17 +265,23 @@ extension Program {
     queryingDominanceWith dominance: DominatorTree,
     in ctx: inout ModuleGenerationContext
   ) {
-    let entryInSource = source.block(defining: prologue.boundary)
-
-    // Initialize the code generation context.
+    // Initialize the code generation context, unpacking the environment captured by the prologue
+    // in a "prelude" block, which precedes the contents of the slide.
     var nested = FunctionGenerationContext(
       compiling: source, within: dominance, into: result, in: ctx)
-    let slideEntry = nested.demandBasicBlock(entryInSource)
-    nested.insertionPoint = nested.module.llvm.endOf(slideEntry)
+    let prelude = nested.module.llvm.appendBlock(to: nested.llvm)
+    nested.insertionPoint = nested.module.llvm.endOf(prelude)
 
     let p = nested.llvm.unsafe[].parameters[0]
     setupDominatingDefinitions(prologue, capturedIn: p, inRamp: false, in: &nested)
 
+    // Jump to the entry of the contents being copied into the slide.
+    let entryInSource = source.block(defining: prologue.boundary)
+    let entryInSlide = nested.demandBasicBlock(entryInSource)
+    nested.module.llvm.insertBr(to: entryInSlide, at: nested.insertionPoint!)
+    nested.insertionPoint = nested.module.llvm.endOf(entryInSlide)
+
+    // Incorporate the contents of the slide.
     let reachable = nested.ir.blocks(reachableFrom: entryInSource)
     for b in nested.dominance where reachable.contains(b) && !nested.factoredOut.contains(b) {
       let i = nested.firstInstruction(in: b, dominatedBy: prologue.boundary)!
@@ -272,8 +293,13 @@ extension Program {
 
   /// Returns the closure implementing the plateau starting immediately after `y`.
   ///
-  /// The result is a triple `(f, e, c)` where `f` is a lifted closure, `e` is its environment, and
-  /// `c` is the set of basic blocks whose contents have been compiled into `f`.
+  /// The result is a triple `(f, e, c)` where `f` is a lifted closure and `e` is its environment,
+  /// and where `c` contains the basic blocks whose contents have been compiled into `f`.
+  ///
+  /// Note that if the basic block defining `y` is successor of an instruction that it dominates,
+  /// then the plateau is covering the body of a loop whose head starts *before* the plateau. In
+  /// this case, the head of the loop is only be partially covered (the plateau does not cover `y`)
+  /// and therefore the plateau may redirect control-flow to it.
   internal mutating func definePlateau(
     dominatedBy y: IRProject.ID, in ctx: inout FunctionGenerationContext
   ) -> (FunctionMetadata, LLVMValue, IRBlockSet) {
@@ -294,7 +320,6 @@ extension Program {
       dominatedBy: prologue, inRamp: ctx.result.isRamp, from: ctx.ir, into: plateau,
       queryingDominanceWith: ctx.dominance,
       in: &ctx.module)
-    ctx.factoredOut.formUnion(covered)
 
     return (plateau, captures, covered)
   }
@@ -302,7 +327,7 @@ extension Program {
   /// Compiles into `result` the contents of the plateau starting immediately after `prologue`,
   /// which is an instruction in `source` dominated by all the definitions in `prologue`.
   ///
-  /// The contents of `source` that are compiled into `result` includes all instructions sequenced
+  /// The contents of `source` that are compiled into `result` include all instructions sequenced
   /// after `prologue.boundary`.
   ///
   /// - Parameters:
@@ -318,19 +343,25 @@ extension Program {
     queryingDominanceWith dominance: DominatorTree,
     in ctx: inout ModuleGenerationContext
   ) -> IRBlockSet {
-    let entryInSource = source.block(defining: prologue.boundary)
-
-    // Initialize the code generation context.
+    // Initialize the code generation context, unpacking the environment captured by the prologue
+    // in a "prelude" block, which precedes the contents of the plateau.
     var nested = FunctionGenerationContext(
       compiling: source, within: dominance, into: result, in: ctx)
-    let slideEntry = nested.demandBasicBlock(entryInSource)
-    nested.insertionPoint = nested.module.llvm.endOf(slideEntry)
+    let prelude = nested.module.llvm.appendBlock(to: nested.llvm)
+    nested.insertionPoint = nested.module.llvm.endOf(prelude)
 
     let v = IRValue.register(prologue.boundary.erased)
     nested.value[v] = nested.llvm.unsafe[].parameters[0].v
     let p = nested.llvm.unsafe[].parameters[1]
     setupDominatingDefinitions(prologue, capturedIn: p, inRamp: isRamp, in: &nested)
 
+    // Jump to the entry of the contents being copied into the plateau.
+    let entryInSource = source.block(defining: prologue.boundary)
+    let entryInSlide = nested.demandBasicBlock(entryInSource)
+    nested.module.llvm.insertBr(to: entryInSlide, at: nested.insertionPoint!)
+    nested.insertionPoint = nested.module.llvm.endOf(entryInSlide)
+
+    // Incorporate the contents of the plateau.
     var covered = IRBlockSet()
     var coveredYield = false
     var work = nested.dominance.region(dominatedBy: entryInSource)
@@ -377,6 +408,8 @@ extension Program {
       return incorporate(cast(IRProject.End.self), dominatedBy: p, in: &ctx)
     case IRReturn.self:
       return incorporate(cast(IRReturn.self), dominatedBy: p, in: &ctx)
+    case IRSwitch.self:
+      return incorporate(cast(IRSwitch.self), dominatedBy: p, in: &ctx)
     default:
       return incorporate(i, in: &ctx)
     }
@@ -389,14 +422,9 @@ extension Program {
     in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
-    if ctx.dominance.dominates(ctx.ir.block(defining: p.boundary), s.target) {
-      return incorporate(i, in: &ctx)
-    } else {
-      let t = ctx.module.llvm.i32
-      let v = t.unsafe[].constant(s.target.rawValue)
-      ctx.module.llvm.insertReturn(v, at: ctx.insertionPoint!)
-      return nil
-    }
+    let b = ctx.demandBasicBlock(s.target, dominatedBy: p)
+    ctx.module.llvm.insertBr(to: b, at: ctx.insertionPoint!)
+    return nil
   }
 
   /// Generates the LLVM IR code corresponding to `i`, which is the end of a projection occurring
@@ -405,21 +433,11 @@ extension Program {
     _ i: IRConditionalBranch.ID, dominatedBy p: RegionPrologue,
     in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
-    _ = incorporate(i, in: &ctx)
-
     let s = ctx.ir.at(i)
-    let a = ctx.demandBasicBlock(s.onSuccess)
-    let b = ctx.demandBasicBlock(s.onFailure)
-    let t = ctx.module.llvm.i32
-
-    if !ctx.dominance.dominates(ctx.ir.block(defining: p.boundary), s.onSuccess) {
-      let v = t.unsafe[].constant(s.onSuccess.rawValue)
-      ctx.module.llvm.insertReturn(v, at: ctx.module.llvm.endOf(a))
-    }
-    if !ctx.dominance.dominates(ctx.ir.block(defining: p.boundary), s.onFailure) {
-      let v = t.unsafe[].constant(s.onFailure.rawValue)
-      ctx.module.llvm.insertReturn(v, at: ctx.module.llvm.endOf(b))
-    }
+    let a = ctx.demandBasicBlock(s.onSuccess, dominatedBy: p)
+    let b = ctx.demandBasicBlock(s.onFailure, dominatedBy: p)
+    let c = ctx.value[s.condition]!
+    ctx.module.llvm.insertCondBr(if: c, then: a, else: b, at: ctx.insertionPoint!)
     return nil
   }
 
@@ -462,6 +480,15 @@ extension Program {
     }
 
     return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`, which is the end of a projection occurring
+  /// in the plateau dominated by `p`.
+  private func incorporate(
+    _ i: IRSwitch.ID, dominatedBy p: RegionPrologue,
+    in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    fatalError()
   }
 
   /// Generates the LLVM IR code corresponding to `i`, which is the end of a projection occurring
