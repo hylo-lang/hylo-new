@@ -1,5 +1,6 @@
 //! exit-status:23
 
+@inline(never)
 subscript id(x: Bool) -> Bool { x }
 
 public fun main() -> Int32 {
