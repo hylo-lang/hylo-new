@@ -1678,8 +1678,9 @@ public struct Program: Sendable {
         return "%"
 
       case let c:
-        let s = c.map(String.init(_:)) ?? ""
-        fatalError("invalid placeholder '%\(s)'", file: file, line: line)
+        // Work around https://github.com/hylo-lang/hylo-new/issues/297
+        return c.map(String.init(_:)) ?? ""
+        // fatalError("invalid placeholder '%\(s)'", file: file, line: line)
       }
     }
 
