@@ -692,7 +692,7 @@ public struct TypeStore: Sendable {
 
   /// Projects the type identified by `n`.
   public subscript<T: TypeIdentity>(n: T) -> any TypeTree {
-    _read { yield self[n.erased] }
+    self[n.erased]
   }
 
   /// Projects the type identified by `n`.
@@ -702,18 +702,18 @@ public struct TypeStore: Sendable {
 
   /// Projects the type identified by `n`.
   internal subscript(n: AnyTypeIdentity) -> any TypeTree {
-    _read {
+    get {
       switch n.offset {
       case AnyTypeIdentity.error.offset:
-        yield ErrorType()
+        ErrorType()
       case AnyTypeIdentity.void.offset:
-        yield Tuple.empty
+        Tuple.empty
       case AnyTypeIdentity.never.offset:
-        yield UniversalType(parameters: [alpha], head: alpha.erased)
+        UniversalType(parameters: [alpha], head: alpha.erased)
       case let i where n.isVariable:
-        yield TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
+        TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
       case let i:
-        yield types[i].wrapped
+        types[i].wrapped
       }
     }
   }

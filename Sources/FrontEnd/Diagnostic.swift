@@ -140,6 +140,33 @@ extension Program {
     .init(.error, "expression does not denote a type", at: spanForDiagnostic(about: e))
   }
 
+  /// Returns an error indicating that `second` yields after `first` already did.
+  internal func extraneousYield(
+    _ second: IRYield.ID, first: IRYield.ID, in source: IRFunction
+  ) -> Diagnostic {
+    let a = span(source.at(first).anchor)
+    let b = span(source.at(second).anchor)
+    let n = Diagnostic(.note, "value already projected here", at: .empty(at: a.start))
+    return .init(
+      .error, "subscript cannot project more than once", at: .empty(at: b.start),
+      notes: [n])
+  }
+
+  /// Returns an error indicating that a yield statement is missing.
+  internal func missingYield(_ anchor: Anchor) -> Diagnostic {
+    .init(.error, "subscript must yield before returning", at: span(anchor))
+  }
+
+  /// Returns an error diagnosing an invalid access on some lvalue.
+  internal func illegalAccess(_ k: AccessEffect, at anchor: Anchor) -> Diagnostic {
+    .init(.error, "illegal '\(k)' access", at: span(anchor))
+  }
+
+  /// Returns an error diagnosing an invalid relocation.
+  internal func illegalMove(at anchor: Anchor) -> Diagnostic {
+    .init(.error, "illegal move", at: span(anchor))
+  }
+
   /// Returns an error diagnosing an illegal non-empty capture list.
   internal func illegalCaptureList(at site: SourceSpan) -> Diagnostic {
     .init(.error, "declaration cannot have a non-empty capture list", at: site)
@@ -278,56 +305,18 @@ extension Program {
     .init(level, format("unused value of type '%T'", [t]), at: site)
   }
 
-}
-
-extension IRFunction {
-
-  /// Returns an error indicating that `second` yields after `first` already did.
-  internal func extraneousYield(
-    _ second: AnyInstructionIdentity, first: AnyInstructionIdentity
-  ) -> Diagnostic {
-    let n = Diagnostic(
-      .note, "value already projected here", at: .empty(at: at(first).anchor.site.start))
-    return .init(
-      .error, "subscript cannot project more than once",
-      at: .empty(at: at(second).anchor.site.start),
-      notes: [n])
-  }
-
-  /// Returns an error indicating that a yield statement is missing.
-  internal func missingYield(at site: SourceSpan) -> Diagnostic {
-    .init(.error, "subscript must yield before returning", at: site)
-  }
-
-}
-
-extension Diagnostic {
-
-  internal static func illegalConsumption(_ k: AccessEffect, at site: SourceSpan) -> Diagnostic {
-    .init(.error, "cannot consume '\(k)' projection", at: site)
-  }
-
-  internal static func illegalAccess(_ k: AccessEffect, at site: SourceSpan) -> Diagnostic {
-    .init(.error, "illegal '\(k)' access", at: site)
-  }
-
-  internal static func illegalMove(at site: SourceSpan) -> Diagnostic {
-    .init(.error, "illegal move", at: site)
-  }
-
-  internal static func uninitializedObject(at site: SourceSpan) -> Diagnostic {
-    .init(.error, "uninitialized object", at: site)
-  }
-
-  internal static func useOfConsumedObject(at site: SourceSpan) -> Diagnostic {
+  /// Returns an error reporting the illegal use of a consumed object.
+  internal func useOfConsumedObject(at site: SourceSpan) -> Diagnostic {
     .init(.error, "use of consumed object", at: site)
   }
 
-  internal static func useOfPartialObject(at site: SourceSpan) -> Diagnostic {
+  /// Returns an error reporting the illegal use of a partially initialized object.
+  internal func useOfPartialObject(at site: SourceSpan) -> Diagnostic {
     .init(.error, "use of partially initialized object", at: site)
   }
 
-  internal static func useOfUninitializedObject(at site: SourceSpan) -> Diagnostic {
+  /// Returns an error reporting the illegal use of an uninitialized object.
+  internal func useOfUninitializedObject(at site: SourceSpan) -> Diagnostic {
     .init(.error, "use of uninitialized object", at: site)
   }
 

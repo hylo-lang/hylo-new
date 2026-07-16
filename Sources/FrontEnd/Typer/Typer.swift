@@ -1106,6 +1106,8 @@ public struct Typer {
       checkAsStatement(program.castUnchecked(s, to: If.self))
     case Return.self:
       check(program.castUnchecked(s, to: Return.self))
+    case While.self:
+      check(program.castUnchecked(s, to: While.self))
     case Yield.self:
       check(program.castUnchecked(s, to: Yield.self))
     case _ where program.isExpression(s):
@@ -1152,6 +1154,13 @@ public struct Typer {
       report(.init(.error, m, at: s))
     }
 
+    program[s.module].setType(.void, for: s)
+  }
+
+  /// Type checks `s`.
+  private mutating func check(_ s: While.ID) {
+    for n in program[s].conditions { check(n) }
+    for n in program[program[s].body].statements { check(n) }
     program[s.module].setType(.void, for: s)
   }
 

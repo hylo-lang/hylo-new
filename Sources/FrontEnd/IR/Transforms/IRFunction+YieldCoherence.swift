@@ -15,10 +15,12 @@ extension IRFunction {
   /// In the second phase, we run another breadth-first search starting from the slides we have
   /// identified and look for illegal yield statements.
   ///
+  /// Errors are reported `typer.program`.
+  ///
   /// - Complexity: O(*n*) where *n* is the number of instructions in the function.
-  internal mutating func checkYieldCoherence(reportingDiagnosticsTo log: inout DiagnosticSet) {
+  internal mutating func checkYieldCoherence(using typer: inout Typer) -> Bool {
     // Nothing to do if the function isn't a subscript or isn't defined.
-    if !isSubscript || !isDefined { return }
+    if !isSubscript || !isDefined { return true }
 
     /// A work list with the basic blocks to process.
     var work: [IRBlock.ID] = .init(minimumCapacity: blocks.count)
@@ -37,8 +39,8 @@ extension IRFunction {
         // Make sure there isn't another yield in the same block.
         for i in instructions(after: y) {
           if tag(of: i) == IRYield.self {
-            log.insert(extraneousYield(i, first: y))
-            return
+            typer.program.reportExtraneousYield(i, first: y, in: self)
+            return false
           }
         }
 
@@ -56,8 +58,8 @@ extension IRFunction {
 
       // Otherwise, complain that there isn't any yield statement.
       else {
-        log.insert(missingYield(at: .empty(at: at(blocks[b].last!).anchor.site.end)))
-        return
+        typer.program.reportMissingYield(endOf: b, in: self)
+        return false
       }
     }
 
@@ -70,8 +72,8 @@ extension IRFunction {
       // Make sure there isn't another yield in the block.
       let y = slide[b]!
       if let i = instructions(in: b).first(where: { (s) in tag(of: s) == IRYield.self }) {
-        log.insert(extraneousYield(i, first: y))
-        return
+        typer.program.reportExtraneousYield(i, first: y, in: self)
+        return false
       }
 
       // Collect the next blocks to visit.
@@ -80,6 +82,28 @@ extension IRFunction {
         work.append(s)
       }
     }
+
+    return true
+  }
+
+}
+
+extension Program {
+
+  /// Reports an error diagnosing that `extra` is an extraneous yield instruction occurring after,
+  /// which is another yield instruction in `f`.
+  fileprivate mutating func reportExtraneousYield(
+    _ extra: AnyInstructionIdentity, first: AnyInstructionIdentity, in f: IRFunction
+  ) {
+    let a = f.castUnchecked(extra, to: IRYield.self)
+    let b = f.castUnchecked(first, to: IRYield.self)
+    self[f.anchor.scope.module].addDiagnostic(extraneousYield(a, first: b, in: f))
+  }
+
+  /// Reports an error diagnosing that there is a missing yield statement at the end of `b`, which
+  /// is an exit point of `f`.
+  fileprivate mutating func reportMissingYield(endOf b: IRBlock.ID, in f: IRFunction) {
+    self[f.anchor.scope.module].addDiagnostic(missingYield(f.at(f.blocks[b].last!).anchor))
   }
 
 }

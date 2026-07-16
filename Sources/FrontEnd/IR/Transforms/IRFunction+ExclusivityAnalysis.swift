@@ -159,14 +159,14 @@ private struct Transfer: AbstractTransferFunction {
 
     let s = f.reborrowedSource(i)
     let a = context.locals[access.source]!.place!
-    let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) -> Diagnostic? in
+    let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, tp) -> Diagnostic? in
       switch k {
       case .let:
         if f.isValidImmutableAccess(reborrowingFrom: s, sharedBy: borrowers(o.value)) {
           insertBorrower(i, into: &o.value)
           return nil
         } else {
-          return .illegalAccess(.let, at: access.anchor.site)
+          return tp.program.illegalAccess(.let, at: access.anchor)
         }
 
       case .inout, .set, .sink:
@@ -175,7 +175,7 @@ private struct Transfer: AbstractTransferFunction {
           insertBorrower(i, into: &o.value)
           return nil
         } else {
-          return .illegalAccess(k, at: access.anchor.site)
+          return tp.program.illegalAccess(k, at: access.anchor)
         }
 
       case .auto:

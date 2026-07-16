@@ -135,11 +135,7 @@ public struct Program: Sendable {
         work[i].function.closeOpenEndedRegions()
 
         // The following passes may fail.
-        var ds = DiagnosticSet()
-        work[i].function.checkYieldCoherence(reportingDiagnosticsTo: &ds)
-        typer.program[m].addDiagnostics(ds)
-        if ds.containsError { continue }
-
+        if !work[i].function.checkYieldCoherence(using: &typer) { continue }
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
@@ -212,19 +208,19 @@ public struct Program: Sendable {
 
   /// Projects the module identified by `m`.
   public subscript(m: Module.ID) -> Module {
-    _read { yield modules.values[m] }
+    get { modules.values[m] }
     _modify { yield &modules.values[m] }
   }
 
   /// Projects the source file identified by `f`.
   internal subscript(f: SourceFile.ID) -> Module.SourceContainer {
-    _read { yield modules.values[f.module][f] }
+    get { modules.values[f.module][f] }
     _modify { yield &modules.values[f.module][f] }
   }
 
   /// Projects the node identified by `n`.
   public subscript<T: SyntaxIdentity>(n: T) -> any Syntax {
-    _read { yield modules.values[n.module][n] }
+    get { modules.values[n.module][n] }
   }
 
   /// Projects the node identified by `n`.
@@ -1590,6 +1586,8 @@ public struct Program: Sendable {
 
     case Return.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
+    case While.self:
+      return self[castUnchecked(n, to: While.self)].introducer.site
     case Yield.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Yield.self))
 
@@ -1625,11 +1623,6 @@ public struct Program: Sendable {
     } else {
       return spanForDiagnostic(about: self[n].value)
     }
-  }
-
-  /// Returns an anchor suitable to generate debug information related to `d` as a whole.
-  public func anchorForDiagnostics(about d: DeclarationIdentity) -> Anchor {
-    .init(site: spanForDiagnostic(about: d), scope: parent(containing: d))
   }
 
   /// Returns `message` with placeholders replaced by their corresponding values in `arguments`.

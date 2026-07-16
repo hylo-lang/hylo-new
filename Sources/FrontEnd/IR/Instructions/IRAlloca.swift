@@ -4,7 +4,8 @@ import Archivist
 ///
 /// The instruction defines a place capable of storing an instance of `storage`, allocated on the
 /// stack. The place is uninitialized after its creation and it must be deinitialized before its
-/// deallocation, which occurs automatically when the function returns.
+/// deallocation, which occurs automatically when the function returns. Allocated memory is valid
+/// only in blocks dominated by the instruction.
 ///
 /// Unlike LLVM's alloca, this instruction cannot be used to allocate dynamically sized buffers. It
 /// is nonetheless possible to allocate storage for a fixed number of contiguous instances using a
