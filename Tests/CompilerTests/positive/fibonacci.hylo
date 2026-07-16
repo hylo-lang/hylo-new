@@ -1,0 +1,13 @@
+//! exit-status:21
+
+fun fibonacci(n: sink Int32) -> Int32 {
+  if n > (1 as Int32) {
+    fibonacci(n - (1 as Int32)) + fibonacci(n - (2 as Int32))
+  } else {
+    n
+  }
+}
+
+public fun main() -> Int32 {
+  fibonacci(8 as Int32)
+}
