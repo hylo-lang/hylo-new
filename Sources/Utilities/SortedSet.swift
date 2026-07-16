@@ -161,10 +161,10 @@ extension SortedSet: SetAlgebra {
   public mutating func update(with e: consuming Element) -> Element? {
     let (inserted, k) = index(insertingIfAbsent: e)
     if inserted {
+      return nil
+    } else {
       swap(&e, &elements[k])
       return e
-    } else {
-      return nil
     }
   }
 
@@ -177,29 +177,46 @@ extension SortedSet: SetAlgebra {
     self = union(other)
   }
 
+  /// Returns all elements that are in `self` or `other`.
+  /// 
+  /// - Complexity: O(self.count + other.count)
   public func union(_ other: SortedSet) -> SortedSet {
-    var lhs = self.elements
-    var rhs = other.elements
-
-    // Insert into the largest container to minimize the number of lookups.
-    if lhs.count < rhs.count { swap(&lhs, &rhs) }
-
-    var i = 0
-    for j in rhs.indices {
-      let e = rhs[j]
-      let k = lhs[i...].partitioningIndex(where: { (x) in e <= x })
-
-      if k >= lhs.count {
-        lhs.append(contentsOf: other.elements[j...])
-        break
-      } else if self.elements[k] != e {
-        lhs.insert(e, at: k)
-      }
-
-      i = k + 1
+    if self.isEmpty {
+      return other
+    } else if other.isEmpty {
+      return self
     }
 
-    return .init(sorted: lhs)
+    var result: ContiguousArray<Element> = []
+    result.reserveCapacity(Swift.max(self.count, other.count))
+    var i = 0
+    var j = 0
+
+    while true {
+      if i == self.count {
+        result.append(contentsOf: other.elements[j...])
+        return .init(sorted: result)
+      }
+      if j == other.count {
+        result.append(contentsOf: self.elements[i...])
+        return .init(sorted: result)
+      }
+
+      let a = self.elements[i]
+      let b = other.elements[j]
+
+      if a == b {
+        result.append(a)
+        i += 1
+        j += 1
+      } else if a < b {
+        result.append(a)
+        i += 1
+      } else {
+        result.append(b)
+        j += 1
+      }
+    }
   }
 
   public mutating func formIntersection(_ other: Self) {
@@ -243,7 +260,14 @@ extension SortedSet: SetAlgebra {
     var i = 0
     var j = 0
 
-    while (i < self.elements.count) && (j < other.elements.count) {
+    while true {
+      if i == self.elements.count {
+        result.append(contentsOf: other.elements[j...])
+        return .init(sorted: result)
+      } else if j == other.elements.count {
+        result.append(contentsOf: self.elements[i...])
+        return .init(sorted: result)
+      }
       let a = self.elements[i]
       let b = other.elements[j]
       if a == b {
@@ -257,8 +281,6 @@ extension SortedSet: SetAlgebra {
         j += 1
       }
     }
-
-    return .init(sorted: result)
   }
 
 }
