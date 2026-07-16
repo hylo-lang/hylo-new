@@ -3,7 +3,8 @@ internal indirect enum DemangledSymbol: Hashable, Sendable {
 
   /// Creates an instance decoding the symbol mangled in `s`.
   ///
-  /// `self` is assigned to an error if `s` is malformed.
+  /// `self` is assigned to `.notMangled` if `s` doesn't start with the mangling prefix, or to
+  /// `.error` if `s` is malformed.
   internal init(_ s: String) {
     guard s.starts(with: ManglingEncoding.manglingPrefix) else {
       self = .notMangled

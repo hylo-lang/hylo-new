@@ -27,15 +27,12 @@ import FrontEnd
     let input = try sourceText()
 
     if listOnly {
-      input.enumerateTokens { (token) in
-        if let demangled = String(token).demangled() {
-          print("\(token) => \(demangled)")
-        }
-      }
-      return
+      printDemangled(input)
+    }
+    else {
+      printRewritten(input)
     }
 
-    printRewritten(input)
   }
 
   /// Returns the text to scan, from arguments or stdin.
@@ -60,14 +57,22 @@ import FrontEnd
       }
       if let demangled = String(token).demangled() {
         print(demangled, terminator: "")
-      }
-      else {
+      } else {
         print(token, terminator: "")
       }
       lastIndex = token.endIndex
     }
     if lastIndex < input.endIndex {
       print(input[lastIndex..<input.endIndex], terminator: "")
+    }
+  }
+
+  /// Prints the demangled form of each matched mangled symbol om `input`.
+  private func printDemangled(_ input: String) {
+    input.enumerateTokens { (token) in
+      if let demangled = String(token).demangled() {
+        print("\(token) => \(demangled)")
+      }
     }
   }
 
@@ -96,6 +101,5 @@ extension Character {
   fileprivate func isValidManglingSymbol() -> Bool {
     isASCII && (isLetter || isNumber || self == "_" || self == "." || self == "$")
   }
-  
-}
 
+}
