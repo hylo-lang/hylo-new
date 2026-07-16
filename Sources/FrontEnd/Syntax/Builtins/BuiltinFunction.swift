@@ -152,8 +152,8 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case zeroinitializer(MachineType.ID)
 
-  //  // Corresponding LLVM instruction: get_elementptr_inbounds.
-  //  case advancedByBytes(byteOffset: MachineType.ID)
+  // Corresponding LLVM instruction: get_elementptr_inbounds.
+  case advancedByBytes(byteOffset: MachineType.ID)
   //
   //  case atomic_store_relaxed(MachineType.ID)
   //
@@ -505,8 +505,9 @@ extension BuiltinFunction {
     //      return .init(^t, to: ^t)
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased))
-    //    case .advancedByBytes(let byteOffset):
-    //      return .init(.builtin(.ptr), ^byteOffset, to: .builtin(.ptr))
+    case .advancedByBytes(let t):
+      let p = s.demand(MachineType.ptr)
+      return s.demand(Arrow(p, t, to: p))
     //    case .atomic_store_relaxed(let t):
     //      return .init(.builtin(.ptr), ^t, to: .void)
     //    case .atomic_store_release(let t):
@@ -844,8 +845,8 @@ extension BuiltinFunction: Showable {
     //      return "cttz_\(t)"
     case .zeroinitializer(let t):
       return printer.format("zeroinitializer_%T", [t.erased])
-    //    case .advancedByBytes(let t):
-    //      return "advanced_by_bytes_\(t)"
+    case .advancedByBytes(let t):
+      return "advanced_by_bytes_\(t)"
     //    case .atomic_store_relaxed(let t):
     //      return "atomic_store_relaxed_\(t)"
     //    case .atomic_store_release(let t):
@@ -1106,6 +1107,9 @@ extension BuiltinFunction {
     case "address":
       if !tokens.isEmpty { return nil }
       self = .addressOf
+    case "advanced":
+      guard let (_, t) = advancedByBytesTail(&tokens) else { return nil }
+      self = .advancedByBytes(byteOffset: s.demand(t))
     case "assume" where tokens.first == "initialized":
       self = .assumeInitialized(true)
     case "assume" where tokens.first == "uninitialized":
@@ -1619,6 +1623,9 @@ private func integerArithmeticWithOverflowTail(
   let p = exactly("with") + exactly("overflow") + machineType
   return p(&stream).map(\.1)
 }
+
+private let advancedByBytesTail =
+  exactly("by") + exactly("bytes") + machineType
 
 /// Parses the parameters and type of an integer arithmetic instruction.
 private let integerArithmeticTail =
