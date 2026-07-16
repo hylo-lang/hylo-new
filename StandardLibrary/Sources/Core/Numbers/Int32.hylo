@@ -13,6 +13,94 @@ public struct Int32 is Deinitializable {
     &self.value = Builtin.zeroinitializer_i32()
   }
 
+  /// Returns the sum of `self` and `other`.
+  ///
+  /// - Requires: The result is representable in `Self`.
+  @inline(always)
+  public fun infix+ (other: Self) -> Self {
+    let (result, overflow) = Builtin.sadd_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      Builtin.trap()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns the result of `other` subtracted from `self`.
+  ///
+  /// - Requires: The result is representable in `Self`.
+  @inline(always)
+  public fun infix- (other: Self) -> Self {
+    let (result, overflow) = Builtin.ssub_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      Builtin.trap()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns the result of `self` multiplied by `other`.
+  ///
+  /// - Requires: The result is representable in `Self`.
+  @inline(always)
+  public fun infix* (other: Self) -> Self {
+    let (result, overflow) = Builtin.smul_with_overflow_i32(self.value, other.value)
+    if Bool(value: overflow) {
+      Builtin.trap()
+    } else {
+      return .new(value: result)
+    }
+  }
+
+  /// Returns the result of `self` divided by `other`.
+  ///
+  /// - Requires: `other` is different from zero.
+  @inline(always)
+  public fun infix/ (other: Self) -> Self {
+    if other == (0 as Self) {
+      Builtin.trap()
+    } else {
+      return .new(value: Builtin.sdiv_i32(self.value, other.value))
+    }
+  }
+
+
+  /// Returns `true` iff `self` is equal to `other`.
+  @inline(always)
+  public fun infix== (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_eq_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  @inline(always)
+  public fun infix!= (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_ne_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than `other`.
+  @inline(always)
+  public fun infix< (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_slt_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  @inline(always)
+  public fun infix<= (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_sle_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  @inline(always)
+  public fun infix> (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_sgt_i32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  @inline(always)
+  public fun infix>= (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_sge_i32(self.value, other.value))
+  }
+
 }
 
 public given Int32 is ExpressibleByIntegerLiteral { /* built-in */ }
