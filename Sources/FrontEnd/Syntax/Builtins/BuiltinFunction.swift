@@ -70,7 +70,7 @@ public enum BuiltinFunction: Hashable, Sendable {
   //
   //  case ashr(exact: Bool, MachineType.ID)
   //
-  //  case urem(MachineType.ID)
+  case urem(MachineType.ID)
   //
   //  case srem(MachineType.ID)
 
@@ -430,8 +430,9 @@ extension BuiltinFunction {
     //      return .init(^t, ^t, to: ^t)
     //    case .ashr(_, let t):
     //      return .init(^t, ^t, to: ^t)
-    //    case .urem(let t):
-    //      return .init(^t, ^t, to: ^t)
+    case .urem(let t):
+      return s.demand(Arrow(t, t, to: t))
+
     //    case .srem(let t):
     //      return .init(^t, ^t, to: ^t)
     case .and(let t):
@@ -776,8 +777,9 @@ extension BuiltinFunction: Showable {
     //      return e ? "lshr_exact_\(t)" : "lshr_\(t)"
     //    case .ashr(let e, let t):
     //      return e ? "ashr_exact_\(t)" : "ashr_\(t)"
-    //    case .urem(let t):
-    //      return "urem_\(t)"
+    case .urem(let t):
+      return printer.format("urem_%T", [t.erased])
+
     //    case .srem(let t):
     //      return "srem_\(t)"
     case .and(let t):
@@ -1138,10 +1140,10 @@ extension BuiltinFunction {
     //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .ashr(exact: p != nil, t)
     //
-    //    case "urem":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .urem(t)
-    //
+    case "urem":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .urem(s.demand(t))
+
     //    case "srem":
     //      guard let t = machineType(&tokens) else { return nil }
     //      self = .srem(t)
