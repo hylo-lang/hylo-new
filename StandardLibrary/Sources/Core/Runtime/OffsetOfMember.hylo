@@ -81,6 +81,8 @@ extension UInt {
 
 }
 
+given Pointer<RecordMemberType> is Deinitializable {}
+
 extension Pointer<RecordMemberType> {
 
   type Pointee = RecordMemberType
@@ -98,35 +100,32 @@ extension Pointer<RecordMemberType> {
 
 }
 
-/*
-
 extension Metatype<RecordMemberType> {
 
   type Subject = RecordMemberType
 
   /// Yields `self`, granting access to details.
-  static subscript asPointerToTypeWitness() -> Pointer<TypeWitnessHeader> {
-    yield Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Self)
-    ).unsafe[]
+  static subscript type_info() -> TypeWitnessHeader {
+    yield Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).unsafe[].unsafe[]
   }
 
   /// Returns the size in bytes of the `Subject`.
   static fun size() -> Size {
-    Self.asPointerToTypeWitness[].size()
+    Self.type_info[].size.copy()
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
   static fun alignment() -> Alignment {
-    Self.asPointerToTypeWitness[].alignment()
+    Self.type_info[].alignment.copy()
   }
 
   /// Returns the number of bytes between elements in a buffer of `Subject`.
   static fun stride() -> Size {
     Self.alignment().first_aligned_offset(starting_from: Self.size())
   }
-
 }
 
+/*
 
 extension Pointer<RecordMemberType> {
 
