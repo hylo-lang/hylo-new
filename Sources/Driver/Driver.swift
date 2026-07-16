@@ -342,7 +342,7 @@ public struct Driver {
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
     try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot,
-      additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)
+      additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.

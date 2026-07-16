@@ -1,0 +1,14 @@
+//! exit-status:24 optimizations:all
+
+fun factorial(n: sink Int32) -> Int32 {
+  var m: Int32 = 1
+  while n > (0 as Int32) {
+    &m = m * n
+    &n = n - (1 as Int32)
+  }
+  return m
+}
+
+public fun main() -> Int32 {
+  factorial(4 as Int32)
+}
