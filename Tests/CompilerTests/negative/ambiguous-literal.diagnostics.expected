@@ -1,0 +1,3 @@
+negative/ambiguous-literal.hylo:49.12-13: error: ambiguous type for literal expression
+  let r = (1 + 1) as Target
+           ^

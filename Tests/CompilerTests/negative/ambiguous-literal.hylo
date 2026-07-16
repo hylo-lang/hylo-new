@@ -1,0 +1,50 @@
+//! stage:typing
+
+// When an integer literal's default type does not fit but two distinct conforming types do, the
+// literal's type is ambiguous.
+
+struct Target is Deinitializable {
+  public var value: Int
+  memberwise init
+}
+
+struct A is Deinitializable {
+  public var value: Int
+  memberwise init
+}
+
+struct B is Deinitializable {
+  public var value: Int
+  memberwise init
+}
+
+public given A is ExpressibleByIntegerLiteral {
+  public init(integer_literal literal: Builtin.IntegerLiteral) {
+    &self.value = Int(integer_literal: literal)
+  }
+}
+
+public given B is ExpressibleByIntegerLiteral {
+  public init(integer_literal literal: Builtin.IntegerLiteral) {
+    &self.value = Int(integer_literal: literal)
+  }
+}
+
+public given A is Movable {}
+public given A is Copyable {}
+public given B is Movable {}
+public given B is Copyable {}
+public given Target is Movable {}
+public given Target is Copyable {}
+
+extension A {
+  public fun infix+ (other: A) -> Target { Target(value: 0) }
+}
+
+extension B {
+  public fun infix+ (other: B) -> Target { Target(value: 0) }
+}
+
+public fun main() {
+  let r = (1 + 1) as Target
+}

@@ -16,6 +16,8 @@ struct Float32 is Deinitializable {
 
 public given Float32 is ExpressibleByFloatingPointLiteral { /* built-in */ }
 
+public given Float32 is ExpressibleByIntegerLiteral { /* built-in */ }
+
 public given Float32 is Movable {}
 
 public given Float32 is Copyable {}

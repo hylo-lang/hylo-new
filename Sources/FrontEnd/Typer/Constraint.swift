@@ -427,6 +427,53 @@ extension TupleMemberConstraint: Showable {
 
 }
 
+/// A constraint stating that `variable` is the type of a scalar literal expression, whose value
+/// is `defaultType` (e.g. `Int`) unless the context requires a different conformer of `concept`.
+///
+/// The constraint is discharged trivially once `variable` has been assigned a concrete type by
+/// unification (e.g. a literal used in argument or ascription position). If the solver runs out
+/// of other deductions while `variable` is still open, it is assigned `defaultType` if that types
+/// the program, and otherwise a conformer of `concept` visible from `scope` that does; this
+/// reproduces literal defaulting as a decision of last resort rather than an eager commitment.
+internal struct LiteralConstraint: Constraint {
+
+  /// The type of the literal.
+  internal private(set) var variable: AnyTypeIdentity
+
+  /// The type assigned to `variable` if it cannot be inferred from context.
+  internal private(set) var defaultType: AnyTypeIdentity
+
+  /// The trait whose conformers `variable` may be assigned when the default does not fit.
+  internal let concept: TraitDeclaration.ID
+
+  /// The scope from which the literal's type is resolved.
+  internal let scope: ScopeIdentity
+
+  /// The site from which the constraint originates.
+  internal let site: SourceSpan
+
+  /// `true` iff `self` trivially holds and solving it will not enable any new deductions.
+  internal var isTrivial: Bool {
+    !variable.isVariable
+  }
+
+  /// Applies `transform` on constituent types of `self`.
+  internal mutating func update(_ transform: (AnyTypeIdentity) -> AnyTypeIdentity) {
+    variable = transform(variable)
+    defaultType = transform(defaultType)
+  }
+
+}
+
+extension LiteralConstraint: Showable {
+
+  /// Returns a textual representation of `self` using `printer`.
+  internal func show(using printer: inout TreePrinter) -> String {
+    "\(printer.show(variable)) defaults to \(printer.show(defaultType))"
+  }
+
+}
+
 /// A constraint stating that a name expression refers to a declaration in an overload set.
 internal struct OverloadConstraint: Constraint {
 

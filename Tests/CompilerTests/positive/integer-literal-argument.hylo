@@ -1,0 +1,25 @@
+//! stage:typing
+
+// An integer literal in argument position is typed from the parameter it is passed to, rather
+// than eagerly defaulting to `Int` (see issue #253).
+
+struct Triple is Deinitializable {
+  let (a, b, c): {Int32, Int32, Int32}
+  memberwise init
+}
+
+fun ck<T>(x: T) {}
+
+fun f() -> Triple {
+  Triple(a: 3, b: 4, c: 42)
+}
+
+fun g(x: Int32) {}
+
+public fun main() {
+  g(3)
+
+  // A literal with no context still defaults to `Int`.
+  let x = 10
+  ck<Int>(x)
+}

@@ -919,7 +919,10 @@ public struct Typer {
     // Look for built-in conformances.
     switch concept {
     case program.standardLibraryDeclaration(.expressibleByIntegerLiteral):
+      // Floating-point types are also expressible by an integer literal (e.g. `1.0` may be
+      // written `1`), so an integer literal can be used where a float is expected.
       return isStandardLibraryIntegerType(conformer)
+        || isStandardLibraryFloatingPointType(conformer)
     case program.standardLibraryDeclaration(.expressibleByFloatingPointLiteral):
       return isStandardLibraryFloatingPointType(conformer)
     default:
@@ -2309,7 +2312,8 @@ public struct Typer {
 
     // Otherwise, elaborate to `.new(<Literal.conversionLabel>: e)`.
     else {
-      let s = SourceSpan.empty(at: program[e].site.start)
+      let literalSite = program[e].site
+      let s = SourceSpan.empty(at: literalSite.start)
       let p = program.parent(containing: e)
 
       let literal = program[e.module].insert(program[e], in: p)
@@ -2329,9 +2333,32 @@ public struct Typer {
           style: .parenthesized,
           site: program[e].site))
 
-      let qualification = context.expectedType ?? standardLibraryType(T.defaultType)
-      return context.withSubcontext(expectedType: qualification) { (ctx) in
-        inferredType(of: c, in: &ctx)
+      // If the context provides an expected type, construct against it directly. Otherwise defer
+      // the literal's type: construct against a fresh variable and constrain the literal's value
+      // to default to `T.defaultType` (e.g. `Int`). Deferral lets an expected type arriving later
+      // through unification (argument or ascription position) pin the literal, instead of eagerly
+      // committing to the default.
+      if let expected = context.expectedType {
+        return context.withSubcontext(expectedType: expected) { (ctx) in
+          inferredType(of: c, in: &ctx)
+        }
+      } else {
+        let v = fresh().erased
+        let t = context.withSubcontext(expectedType: v) { (ctx) in
+          inferredType(of: c, in: &ctx)
+        }
+        // Tie the constructed type to the qualification so that pinning either (e.g. the value,
+        // via an argument coercion) resolves the constructor, then default the value if it is
+        // never constrained.
+        context.obligations.assume(EqualityConstraint(lhs: v, rhs: t, site: literalSite))
+        context.obligations.assume(
+          LiteralConstraint(
+            variable: t,
+            defaultType: standardLibraryType(T.defaultType),
+            concept: program.standardLibraryDeclaration(T.literalTrait, as: TraitDeclaration.self),
+            scope: p,
+            site: literalSite))
+        return t
       }
     }
   }
@@ -4684,6 +4711,43 @@ public struct Typer {
   }
 
   // MARK: Standard library
+
+  /// Returns the concrete types visible from `scopeOfUse` that conform to the literal trait
+  /// `concept` (e.g. `ExpressibleByIntegerLiteral`) through a non-parameterized given.
+  ///
+  /// These are the candidate types considered when a scalar literal cannot be typed from context
+  /// and its default type does not fit. Parameterized conformances (e.g. `<T> Array<T> is ...`)
+  /// are skipped since they do not denote a single concrete literal type.
+  internal mutating func literalConformers(
+    of concept: TraitDeclaration.ID, visibleFrom scopeOfUse: ScopeIdentity
+  ) -> [AnyTypeIdentity] {
+    var result: [AnyTypeIdentity] = []
+    var seen: Set<AnyTypeIdentity> = []
+
+    for gs in givens(visibleFrom: scopeOfUse) {
+      for g in gs {
+        guard
+          case .user(let d) = g,
+          let c = program.cast(d, to: ConformanceDeclaration.self)
+        else { continue }
+
+        let (context, head) = program.types.contextAndHead(declaredType(of: c))
+        if !context.parameters.isEmpty { continue }
+
+        guard
+          let w = program.types.seenAsTraitApplication(head),
+          program.types[w.concept].declaration == concept
+        else { continue }
+
+        let conformer = w.arguments.values[0]
+        if !conformer[.hasVariable] && !conformer[.hasError] && seen.insert(conformer).inserted {
+          result.append(conformer)
+        }
+      }
+    }
+
+    return result
+  }
 
   /// Returns `true` iff `t` is a standard library integer type (e.g., `Hylo.Int`).
   ///

@@ -120,6 +120,8 @@ internal struct Solver {
             o = me.solve(member: g)
           case is TupleMemberConstraint:
             o = me.solve(tupleMember: g)
+          case is LiteralConstraint:
+            o = me.solve(literal: g)
           case is OverloadConstraint:
             return me.solve(overload: g)
           default:
@@ -135,7 +137,15 @@ internal struct Solver {
         if let result = s { return result }
       }
 
-      if fresh.isEmpty { refreshCoercionAndWideningConstraints() }
+      if fresh.isEmpty {
+        // Resolve a literal that no coercion can still pin by searching its default type and the
+        // visible conformers of its literal trait, then let the remaining coercion and widening
+        // constraints select their bounds. Resolving a literal first lets it unblock a dependent
+        // constraint (e.g. a `Movable` witness on the literal's type) before that constraint would
+        // otherwise be force-failed.
+        if let solution = resolveStaleLiteral() { return solution }
+        if fresh.isEmpty { refreshCoercionAndWideningConstraints() }
+      }
     }
 
     // Not enough context to solve the remaining stale constraints.
@@ -256,6 +266,20 @@ internal struct Solver {
 
     default:
       return simplify(k)
+    }
+  }
+
+  /// Discharges `g`, which is a literal constraint.
+  private mutating func solve(literal g: GoalIdentity) -> GoalOutcome {
+    let k = goals[g] as! LiteralConstraint
+
+    // If the literal's type has been inferred from context, we're done: whether that type is a
+    // valid literal type is enforced by resolution of the `.new(<literal>:)` constructor. Until
+    // then, wait: the type may still be pinned by unification, or defaulted as a last resort.
+    if k.variable.isVariable {
+      return postpone(g)
+    } else {
+      return .success
     }
   }
 
@@ -669,6 +693,85 @@ internal struct Solver {
     }
 
     stale.removeSubrange(end...)
+  }
+
+  /// Resolves a stale literal whose type is still open and cannot be pinned by any pending
+  /// coercion, and returns the solution it leads to; returns `nil` if there is no such literal.
+  ///
+  /// This is the literal-typing decision of last resort. A literal that is the source of a
+  /// coercion to a fully-known type (e.g. a literal passed to a typed parameter, or ascribed) is
+  /// left untouched so that its context wins: such a literal is pinned when its coercion is later
+  /// simplified. Every other open literal is resolved by first trying its default type (e.g.
+  /// `Int`); if the default types the whole program without error, it is preferred. Otherwise the
+  /// visible conformers of the literal's trait are tried, and a unique conformer that succeeds is
+  /// selected; two such conformers are reported as an ambiguity, and if none succeeds the default's
+  /// solution (carrying its diagnostics) is returned.
+  private mutating func resolveStaleLiteral() -> Solution? {
+    guard let g = firstUnpinnableStaleLiteral() else { return nil }
+    let k = goals[g] as! LiteralConstraint
+
+    // Try the default type first; if it types the program, it is preferred over any conformer.
+    let byDefault = solution(assigning: k.defaultType, toLiteral: g)
+    if !byDefault.diagnostics.containsError { return byDefault }
+
+    // The default does not fit; look for a conforming type that does.
+    var viable: [Solution] = []
+    for c in typer.literalConformers(of: k.concept, visibleFrom: k.scope) where c != k.defaultType {
+      let s = solution(assigning: c, toLiteral: g)
+      if !s.diagnostics.containsError { viable.append(s) }
+    }
+
+    if viable.count == 1 {
+      return viable[0]
+    } else if viable.count > 1 {
+      var s = viable[0]
+      s.add(.init(.error, "ambiguous type for literal expression", at: k.site))
+      return s
+    } else {
+      return byDefault
+    }
+  }
+
+  /// Returns the solution obtained by assigning `type` to the literal goal `g` and discharging the
+  /// remaining goals in a fork of `self`.
+  private mutating func solution(
+    assigning type: AnyTypeIdentity, toLiteral g: GoalIdentity
+  ) -> Solution {
+    let k = goals[g] as! LiteralConstraint
+    return indenting { (me) in
+      var fork = Self(forking: me)
+      fork.best = .worst
+      fork.stale.removeAll(where: { $0 == g })
+      let subgoal = fork.insert(fresh: EqualityConstraint(lhs: k.variable, rhs: type, site: k.site))
+      fork.outcomes[g] = fork.delegate([subgoal])
+      return fork.solution(betterThanOrEqualTo: .worst, using: &me.typer)!
+    }
+  }
+
+  /// Returns the identity of a stale literal goal whose type is still open and cannot be pinned by
+  /// a pending coercion or widening, if any.
+  private func firstUnpinnableStaleLiteral() -> GoalIdentity? {
+    // Literal types that a pending coercion or widening can still pin to a concrete type; those
+    // are resolved by simplifying their coercion, not by searching.
+    var pinnable: Set<AnyTypeIdentity> = []
+    for g in stale {
+      switch goals[g] {
+      case let k as CoercionConstraint where k.lhs.isVariable && !k.rhs[.hasVariable]:
+        pinnable.insert(k.lhs)
+      case let k as WideningConstraint where k.lhs.isVariable && !k.rhs[.hasVariable]:
+        pinnable.insert(k.lhs)
+      default:
+        continue
+      }
+    }
+
+    return stale.first { (g) in
+      if let k = goals[g] as? LiteralConstraint {
+        return k.variable.isVariable && !pinnable.contains(k.variable)
+      } else {
+        return false
+      }
+    }
   }
 
   /// Inserts `gs` into the fresh set and return their identities.

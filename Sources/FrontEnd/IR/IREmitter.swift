@@ -1452,6 +1452,10 @@ internal struct IREmitter {
       return .integer(value, program.types.demand(MachineType.i(32)))
     case program.standardLibraryType(.int64):
       return .integer(value, program.types.demand(MachineType.i(64)))
+    case program.standardLibraryType(.float32):
+      return .floatingPoint(literal: value.description, program.types.demand(.float32))
+    case program.standardLibraryType(.float64):
+      return .floatingPoint(literal: value.description, program.types.demand(.float64))
     default:
       program.unexpected(target)
     }

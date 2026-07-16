@@ -19,6 +19,8 @@ public struct IntegerLiteral: LiteralExpression {
 
   public static let defaultType: Program.StandardLibraryEntity = .int
 
+  public static let literalTrait: Program.StandardLibraryEntity = .expressibleByIntegerLiteral
+
   public static let constructorLabel: String = "integer_literal"
 
 }

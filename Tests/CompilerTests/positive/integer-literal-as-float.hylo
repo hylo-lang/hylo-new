@@ -1,0 +1,17 @@
+//! stage:typing
+
+// A floating-point type is expressible by an integer literal, so an integer literal can be used
+// where a float is expected.
+
+fun ck<T>(x: T) {}
+
+public fun main() {
+  let a: Float64 = 1
+  ck<Float64>(a)
+
+  let b: Float32 = 2
+  ck<Float32>(b)
+
+  let c = 3 as Float64
+  ck<Float64>(c)
+}

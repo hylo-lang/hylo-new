@@ -1,0 +1,41 @@
+//! stage:typing
+
+// When an arithmetic expression over literals has an expected type, the literal operands are not
+// forced to their default type: the compiler searches the conformers of the literal's trait for a
+// typing that satisfies the expected type. Here the operands of `*` are `Small`, whose `infix*`
+// widens to `Wide` -- the type demanded by the ascription -- even though neither operand's type
+// appears in the ascription.
+
+struct Small is Deinitializable {
+  public var value: Int
+  memberwise init
+}
+
+struct Wide is Deinitializable {
+  public var value: Int
+  memberwise init
+}
+
+public given Small is ExpressibleByIntegerLiteral {
+  public init(integer_literal literal: Builtin.IntegerLiteral) {
+    &self.value = Int(integer_literal: literal)
+  }
+}
+
+public given Small is Movable {}
+public given Small is Copyable {}
+public given Wide is Movable {}
+public given Wide is Copyable {}
+
+extension Small {
+  public fun infix* (other: Small) -> Wide {
+    Wide(value: self.value * other.value)
+  }
+}
+
+fun ck<T>(x: T) {}
+
+public fun main() {
+  let r = (2 * 3) as Wide
+  ck<Wide>(r)
+}
