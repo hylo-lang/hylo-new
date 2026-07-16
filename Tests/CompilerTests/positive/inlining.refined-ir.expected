@@ -1,0 +1,35 @@
+fun main(set %p0: Int32) {
+%b0:
+  %r0 = alloca Bool, #preferred
+  %r1 = subfield %r0 at 0 as i1
+  %r2 = access [set] %r1
+  %r3 = store i1 1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = access [set] %p0
+  %r14 = subfield %r5 at 0 as i1
+  %r15 = access [let] %r14
+  %r16 = load %r15
+  %r17 = end %r15
+  %r18 = condbr %r16, %b4, %b2
+%b1:
+  %r10 = end %r6
+  %r9 = end %r5
+  %r11 = access [sink] %r0
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r8 = return
+%b2:
+  %r25 = access [set] %r6
+  %r26 = apply one() => %r25
+  %r27 = end %r25
+  %r28 = br %b3
+%b3:
+  %r24 = br %b1
+%b4:
+  %r19 = subfield %r6 at 0 as i32
+  %r20 = access [set] %r19
+  %r21 = store i32 2 to %r20
+  %r22 = end %r20
+  %r23 = br %b3
+}
