@@ -454,14 +454,14 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns `true` iff `n` is a an interface for a function written in another language.
-  public func isForeign(_ n: FunctionDeclaration.ID) -> Bool {
-    annotation("foreign", appliedTo: n) != nil
-  }
-
   /// Returns `true` iff `n` has an external implementation.
   public func isExtern(_ n: FunctionDeclaration.ID) -> Bool {
     annotation("extern", appliedTo: n) != nil
+  }
+
+  /// Returns `true` iff `n` is implemented by a C function using the indirect calling convention.
+  public func isExternCIndirect(_ n: FunctionDeclaration.ID) -> Bool {
+    annotation("extern_c_indirect", appliedTo: n) != nil
   }
 
   /// Returns `true` if the contents of `d` is visible in all modules.
@@ -1310,6 +1310,18 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns the name of the C function implementing `d` iff `d` is annotated with 
+  /// `@extern_c_indirect`.
+  public func externCName(of d: DeclarationIdentity) -> String? {
+    annotation("extern_c_indirect", appliedTo: d).flatMap { (a) in
+      if case .some(.string(let n)) = a.arguments.first?.value {
+        return n
+      } else {
+        return nil
+      }
+    }
+  }
+
   /// Returns the symbol associated with `n`, if any.
   ///
   /// A syntax tree has an associated symbol if it is annotated with `@_symbol(s)` in sources,
@@ -1527,13 +1539,14 @@ public struct Program: Sendable {
 
   /// Returns `true` iff `d` needs a user-defined a definition.
   ///
-  /// A declaration requires a definition unless it is a trait requirement, an FFI, an external
-  /// function, or a memberwise initializer.
+  /// A declaration requires a definition unless it is a trait requirement, an external function,
+  /// or a memberwise initializer.
   public func requiresDefinition(_ d: DeclarationIdentity) -> Bool {
     switch tag(of: d) {
     case FunctionDeclaration.self:
       let f = castUnchecked(d, to: FunctionDeclaration.self)
-      return !isRequirement(f) && !isForeign(f) && !isExtern(f) && !self[f].isMemberwiseInitializer
+      return !isRequirement(f) && !isExtern(f) && !isExternCIndirect(f)
+        && !self[f].isMemberwiseInitializer
     default:
       return !isRequirement(d)
     }

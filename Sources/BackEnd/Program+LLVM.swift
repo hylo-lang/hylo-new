@@ -65,16 +65,32 @@ extension Program {
     }
   }
 
+  /// Returns the name of the C function implementing `f` iff `f` was lowered from a declaration
+  /// annotated with `@extern_c_indirect`.
+  private func externCName(
+    of f: IRFunction.ID, in ctx: borrowing ModuleGenerationContext
+  ) -> String? {
+    if case .lowered(let d) = self[ctx.hylo].ir[f].name {
+      return externCName(of: d)
+    } else {
+      return nil
+    }
+  }
+
   /// Declares `f` and, if necessary, compiles its definition into the LLVM module being built.
   private mutating func incorporate(
     _ f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) {
     // Don't compile generic functions.
-    if !self[ctx.hylo].ir[f].isMonomorphic { return }
-    // Don't compile functions without a definition.
-    if !self[ctx.hylo].ir[f].isDefined { return }
+    guard self[ctx.hylo].ir[f].isMonomorphic else { return }
+
+    // Don't compile functions without a definition, unless `@extern_c_indirect`-annotated.
+    guard self[ctx.hylo].ir[f].isDefined else {
+      return defineIndirectToHyloThunkIfNeeded(in: f, in: &ctx)
+    }
+
     // Don't re-compile functions.
-    if !ctx.compiled.insert(f).inserted { return }
+    guard ctx.compiled.insert(f).inserted else { return }
 
     // Get the declaraiton of LLVM function corresponding to `f`. It is possible that this function
     // has already been declared if it has been referred to by some code that was compiled first.
@@ -781,7 +797,7 @@ extension Program {
     in ctx: inout ModuleGenerationContext
   ) {
     if isPrivate(self[ctx.hylo].ir[f].name, in: ctx.hylo) {
-      assert(self[ctx.hylo].ir[f].isDefined)
+      assert(self[ctx.hylo].ir[f].isDefined || externCName(of: f, in: ctx) != nil)
       ctx.llvm.setLinkage(.private, for: g)
     }
   }
@@ -1056,6 +1072,82 @@ extension Program {
     }
   }
 
+  /// Defines the calling convention adopting thunk if `f` is annotated with `@extern_c_indirect`.
+  private mutating func defineIndirectToHyloThunkIfNeeded(
+    in f: IRFunction.ID, in ctx: inout ModuleGenerationContext
+  ) {
+    if case .lowered(let d) = self[ctx.hylo].ir[f].name, d.module == ctx.hylo,
+      let foreign = externCName(of: d)
+    {
+      defineIndirectToHyloThunk(calling: foreign, in: f, in: &ctx)
+    }
+  }
+
+  /// Defines a thunk representing a Hylo function that calls the C function `foreign` having
+  /// *indirect C calling* convention.
+  ///
+  /// - See: `Docs/ABI.md`
+  private mutating func defineIndirectToHyloThunk(
+    calling foreign: String, in f: IRFunction.ID, in ctx: inout ModuleGenerationContext
+  ) {
+    if !ctx.compiled.insert(f).inserted { return }
+
+    let m = demandFunction(f, in: &ctx)
+    let e = ctx.llvm.appendBlock(to: m.value)
+    let p = ctx.llvm.endOf(e)
+
+    // Take the address of each non-erased parameter.
+    var arguments: [LLVMValue] = []
+    for input in m.prototype.mapping.inputs {
+      switch input.convention {
+      case .erased:
+        if case .lowered(let d) = self[ctx.hylo].ir[f].name {
+          self[ctx.hylo].addDiagnostic(.init(.error, 
+            "zero-sized types have no counterpart in C.", at: spanForDiagnostic(about: d)))
+        } else {
+          unreachable("@extern_c_indirect must have been lowered directly from a declaration")
+        }
+
+      case .byValue(let j):
+        let x = ctx.llvm.insertAlloca(input.type.llvm, at: p)
+        ctx.llvm.setAlignment(input.type.layout.alignment, for: x)
+        ctx.llvm.insertStore(m.value.unsafe[].parameters[j], to: x, at: p)
+        arguments.append(x.v)
+
+      case .byReference(let j):
+        arguments.append(m.value.unsafe[].parameters[j].v)
+      }
+    }
+
+    // The C function accepts a trailing pointer to the storage receiving the result
+    // unless zero-sized.
+    let output = m.prototype.mapping.output!
+    var spilledResultPlace: LLVMValue? = nil
+    switch output.convention {
+    case .erased: break
+    case .byValue:
+      let x = ctx.llvm.insertAlloca(output.type.llvm, at: p)
+      ctx.llvm.setAlignment(output.type.layout.alignment, for: x)
+      spilledResultPlace = x.v
+      arguments.append(x.v)
+
+    case .byReference(let j):
+      arguments.append(m.value.unsafe[].parameters[j].v)
+    }
+
+    // Declare and apply the C function.
+    let t = ctx.llvm.functionType(from: .init(repeating: ctx.llvm.ptr.t, count: arguments.count))
+    let c = ctx.llvm.declareFunction(foreign, t)
+    _ = ctx.llvm.insertCall(c, on: arguments, at: p)
+
+    if let r = spilledResultPlace {
+      let v = ctx.llvm.insertLoad(output.type.llvm, from: r, at: p)
+      ctx.llvm.insertReturn(v, at: p)
+    } else {
+      ctx.llvm.insertReturn(at: p)
+    }
+  }
+
   /// Returns the representation of `v` in LLVM IR.
   private mutating func codegen(
     _ v: FrontEnd.IRValue, in ctx: inout FunctionGenerationContext
@@ -1233,6 +1325,8 @@ extension Program {
         let l = ConcreteLayout(
           fields: [], propertyToField: Array(fs.indices), size: .fixed(s), alignment: a)
         return TypeMetadata(llvm: v, layout: l)
+      } else if let properties = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
+        return program.metadata(record: n, fields: properties, in: &ctx)
       } else {
         fatalError("no LLVM metadata representation of the type '\(program.show(t))'")
       }

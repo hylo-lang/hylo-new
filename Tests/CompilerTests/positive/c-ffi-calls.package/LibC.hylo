@@ -1,0 +1,12 @@
+// These are linked from the standard library shims.
+// Eventually, we should move this file to `StandardLibrary/Sources/`.
+
+/// Allocates `size` bytes of uninitialized storage.
+@extern_c_indirect("c_malloc_indirect")
+public fun malloc(size: Int) -> Pointer<Never> // TODO use MemoryAddress
+
+/// Deallocates the block of memory pointed at by `pointer`.
+/// 
+/// - Requires: there is a live heap allocation starting at `address`.
+@extern_c_indirect("c_free_indirect")
+public fun unsafe_free(pointer: Pointer<Never>) // TODO use MemoryAddress

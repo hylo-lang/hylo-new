@@ -292,20 +292,13 @@ final class CompilerTests: XCTestCase {
       driver.program[m].addDependency(Module.standardLibraryName)
     }
 
-    var expectedDiagnostics: [FileName: String] = [:]
-    try input.forEachSourceURL { (u) in
-      let source = try SourceFile(contentsOf: u)
-      driver.program[m].addSource(source)
-
-      let v = u.deletingPathExtension().appendingPathExtension("diagnostics.expected")
-      let expected = try? String(contentsOf: v, encoding: .utf8)
-      expectedDiagnostics[source.name] = expected
-    }
+    let (cSources, expectedDiagnostics) = try collectSources(input: input, m: &driver.program[m])
 
     var artifacts = Artifacts()
     do {
       try await compile(
-        m, until: input.manifest.stage, using: &driver, accumulatingArtifactsInto: &artifacts,
+        m, until: input.manifest.stage, using: &driver, withCSources: cSources,
+        accumulatingArtifactsInto: &artifacts,
         expectedArtifacts: input.manifest.artifactExpectations)
     } catch let e {
       try artifacts.save(into: input)
@@ -320,11 +313,48 @@ final class CompilerTests: XCTestCase {
       artifacts: artifacts)
   }
 
+  /// Collects the Hylo sources into `m`, and returns the C sources and expected diagnostics per
+  /// Hylo source file.
+  func collectSources(
+    input: TestDescription, m: inout Module
+  ) throws -> (cSources: [URL], expectedDiagnostics: [FileName: String]) {
+    var expectedDiagnostics: [FileName: String] = [:]
+    var cSources: [URL] = []
+
+    func addHyloSourceFile(at u: URL) throws {
+      let source = try SourceFile(contentsOf: u)
+      m.addSource(source)
+
+      let v = u.deletingPathExtension().appendingPathExtension("diagnostics.expected")
+      let expected = try? String(contentsOf: v, encoding: .utf8)
+      expectedDiagnostics[source.name] = expected
+    }
+
+    if input.isPackage {
+      let items = FileManager.default.enumerator(
+        at: input.root,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles, .skipsPackageDescendants])!
+
+      for case let u as URL in items {
+        if u.pathExtension == "hylo" {
+          try addHyloSourceFile(at: u)
+        } else if u.pathExtension == "c" {
+          cSources.append(u)
+        }
+      }
+    } else {
+      try addHyloSourceFile(at: input.root)
+    }
+
+    return (cSources, expectedDiagnostics)
+  }
+
   /// Compiles `m`, which is a module whose source have been parsed with `driver`, until `stage`,
   /// adding compilation artifacts to `artifacts`.
   private func compile(
     _ m: Module.ID, until stage: Manifest.Stage, using driver: inout Driver,
-    accumulatingArtifactsInto artifacts: inout Artifacts,
+    withCSources cSources: [URL], accumulatingArtifactsInto artifacts: inout Artifacts,
     expectedArtifacts: SortedDictionary<ArtifactTag, String>
   ) async throws {
     // Exit if there are parsing errors or if the stage is set to `parsing`.
@@ -367,7 +397,7 @@ final class CompilerTests: XCTestCase {
     if stage == .execution {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
-      _ = try driver.generateExecutable(from: m, writingTo: executable)
+      _ = try driver.generateExecutable(from: m, withCSources: cSources, writingTo: executable)
       artifacts.executable = executable
     }
   }

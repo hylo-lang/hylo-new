@@ -54,6 +54,8 @@ final class HostTests: XCTestCase {
           XCTAssertEqual(e.exitCode, 42)
           XCTAssertEqual(e.executable, executable)
           XCTAssertEqual(e.arguments, arguments)
+
+          XCTAssert(e.description.contains("exited with status 42"))
         } else {
           XCTFail("Expected Process.NonzeroExit, got \(error)")
         }
