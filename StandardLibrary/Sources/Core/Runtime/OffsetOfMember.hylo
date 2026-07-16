@@ -240,6 +240,10 @@ struct RecordLayout {
     }
   }
 
+  fun assign_at(n: MemberIndex, newValue: sink RecordMemberType) inout {
+    &((self.start + n).value as* inout RecordMemberType).assign(newValue)
+  }
+
   /// Discard element n and any with lesser alignments, or with the
   /// same alignment occurring at an initial index >= n.
   fun retain_only_elements(that_lay_out_before_element n: MemberIndex) inout {
@@ -249,7 +253,7 @@ struct RecordLayout {
     var i: MemberCount = 0
     // Skip over initial retained sequence.
     while i < n && self.at[i].alignment() >= nth_alignment {
-      i += _1
+      &i += _1
     }
     // The number of elements to retain.
     var new_count = i.copy()
@@ -257,7 +261,7 @@ struct RecordLayout {
     // ith is not retained, either because it is nth or because its
     // alignment was too low.  Therefore we have a hole at new_count
     // that we can write into.
-    i += _1
+    &i += _1
 
     // From here on out, i > new_count
 
@@ -265,12 +269,10 @@ struct RecordLayout {
     // equal alignment.
     while i < n {
       if self.at[i].alignment() >= nth_alignment {
-        let rhs = self.at[i].copy()
-        inout lhs = &self.at[new_count]
-        &lhs.assign(rhs)
-        new_count += _1
+        &self.assign_at(new_count, self.at[i].copy())
+        &new_count += _1
       }
-      i += _1
+      &i += _1
     }
 
     // Nth element is discarded.
@@ -280,10 +282,10 @@ struct RecordLayout {
     // alignment.
     while i < self.count {
       if self.at[i].alignment() > nth_alignment {
-        &self.at[new_count] = self.at[i]
-        new_count += _1
+        &self.assign_at(new_count, self.at[i].copy())
+        &new_count += _1
       }
-      i += _1
+      &i += _1
     }
 
     &self.count = new_count
@@ -316,18 +318,18 @@ struct RecordLayout {
 
         // The hole position,
         var j = i
+
         // Move the hole toward the front (by repeatedly moving an
         // element into the hole) until it's where ith should go.
-
         var done = false
         while !done {
           // Move jth back one, into the hole, leaving a hole at j - 1.
-          &self.at[j] = self.at[j - _1]
+          &self.assign_at(j, self.at[j - _1].copy())
           j -= _1
           if j == _0 || self.at[j - _1].alignment() >= w_alignment { &done = true }
         }
         // put w in the hole.
-        &self.at[j] = w
+        &self.assign_at(j, w)
       }
 
       i += _1
