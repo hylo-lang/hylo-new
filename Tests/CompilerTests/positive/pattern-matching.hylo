@@ -1,9 +1,9 @@
 //! stage:typing no-std
 
 enum A<T> {
-  case one()
-  case two(x: sink T)
-  case three(_ y: sink T)
+  case one
+  case two(x: T)
+  case three(_ y: T)
 }
 
 struct B<U> {
@@ -14,9 +14,9 @@ struct B<U> {
 fun check<T>(x: T) {}
 
 public fun main() {
-  let x = A<Void>.one()
+  let x = A<Void>.one
   let y = match x {
-    case .one() { B(u: ()) }
+    case .one { B(u: ()) }
     case .two(sink let a) { B(u: a) }
     case .three(y: sink let a) { B(u: a) }
   }

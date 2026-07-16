@@ -25,8 +25,8 @@ final class ManglingTests: XCTestCase {
         }
 
         enum MyEnum<T> {
-          case one()
-          case two(x: sink T)
+          case one
+          case two(x: T)
         }
         """)
     p = await p.typeChecked()
@@ -45,6 +45,7 @@ final class ManglingTests: XCTestCase {
     testMachineTypeMangling(program: &p)
     testMetakindTypeMangling(program: &p)
     testOpaqueEnvironmentTypeMangling(module: m0, program: &p)
+    testOpaquePayloadTypeMangling(module: m0, program: &p)
     testRemoteTypeMangling(program: &p)
     testStructTypeMangling(module: m0, program: &p)
     testTraitTypeMangling(module: m0, program: &p)
@@ -67,8 +68,8 @@ final class ManglingTests: XCTestCase {
         given Void is W { type X = Void }
 
         enum MyEnum<T> {
-          case one()
-          case two(x: sink T)
+          case one
+          case two(x: T)
         }
 
         struct B<X> {
@@ -542,6 +543,13 @@ final class ManglingTests: XCTestCase {
   private func testOpaqueEnvironmentTypeMangling(module m: Module.ID, program: inout Program) {
     let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
     let t = OpaqueType.environment(d)
+    assertManglingOf(type: program.types.demand(t).erased, in: program, is: "some M0.#.MyEnum")
+  }
+
+  /// Tests the mangling and demangling of opaque environment types in `program`.
+  private func testOpaquePayloadTypeMangling(module m: Module.ID, program: inout Program) {
+    let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
+    let t = OpaqueType.payload(program.castUnchecked(d, to: EnumDeclaration.self))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "some M0.#.MyEnum")
   }
 

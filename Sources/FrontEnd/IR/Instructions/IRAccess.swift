@@ -2,6 +2,14 @@ import Archivist
 
 /// Creates an access on a storage.
 ///
+/// - Syntax:
+///
+///   `access <capability> <source>`
+///
+/// - Semantics:
+///
+///   Blah
+///
 /// Hylo IR uses a capability system to govern storage accesses. To read/write values from/to
 /// memory, one must acquire a capability on the storage matching the desired effect. For example,
 /// a `set` capability is required to initialize storage. These capabilities can only be formed by
@@ -9,7 +17,7 @@ import Archivist
 /// During IR analysis, the compiler verifies that the instructions do not violate the rights and
 /// duties associated with each acquired capability.
 ///
-/// It is possible to create accesses on "raw addresses" (those result from instructions allocating
+/// It is possible to create accesses on "raw places" (those result from instructions allocating
 /// memory or computing addresses) or on other accesses. For example, it is legal to form a `let`
 /// access from an `inout` access.
 @Archivable

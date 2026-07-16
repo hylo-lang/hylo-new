@@ -498,6 +498,27 @@ public struct TypeStore: Sendable {
     }
   }
 
+  /// If `n` is a type application or an alias thereof, returns its abstraction and arguments,
+  /// otherwise, returns `n` along with an empty set of type parameter assignments.
+  public func seenAsBaseTypeApplication<T: TypeIdentity>(
+    _ n: T
+  ) -> (base: AnyTypeIdentity, arguments: TypeArguments) {
+    var base = n.erased
+    var arguments = TypeArguments()
+    while true {
+      if let t = cast(base, to: TypeApplication.self) {
+        base = self[t].abstraction
+        arguments = self[t].arguments.mapValues { (u) in
+          cast(u, to: GenericParameter.self).flatMap({ (p) in arguments[p] }) ?? u
+        }
+      } else if let t = cast(base, to: TypeAlias.self) {
+        base = self[t].aliasee
+      } else {
+        return (base, arguments)
+      }
+    }
+  }
+
   /// Returns `[Void](A...) -> T)` iff `n` has the form `[Void](self: set T, A...) -> Void`.
   public mutating func asConstructor(_ n: AnyTypeIdentity) -> AnyTypeIdentity? {
     let (c, h) = contextAndHead(n.erased)
@@ -671,7 +692,7 @@ public struct TypeStore: Sendable {
 
   /// Projects the type identified by `n`.
   public subscript<T: TypeIdentity>(n: T) -> any TypeTree {
-    _read { yield self[n.erased] }
+    self[n.erased]
   }
 
   /// Projects the type identified by `n`.
@@ -681,18 +702,18 @@ public struct TypeStore: Sendable {
 
   /// Projects the type identified by `n`.
   internal subscript(n: AnyTypeIdentity) -> any TypeTree {
-    _read {
+    get {
       switch n.offset {
       case AnyTypeIdentity.error.offset:
-        yield ErrorType()
+        ErrorType()
       case AnyTypeIdentity.void.offset:
-        yield Tuple.empty
+        Tuple.empty
       case AnyTypeIdentity.never.offset:
-        yield UniversalType(parameters: [alpha], head: alpha.erased)
+        UniversalType(parameters: [alpha], head: alpha.erased)
       case let i where n.isVariable:
-        yield TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
+        TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
       case let i:
-        yield types[i].wrapped
+        types[i].wrapped
       }
     }
   }

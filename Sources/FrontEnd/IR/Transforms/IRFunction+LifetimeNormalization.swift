@@ -106,8 +106,14 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRAssumeState.self), from: &f)
       case IRBranch.self:
         pc = interpret(f.castUnchecked(i, to: IRBranch.self), from: &f)
+      case IRCase.self:
+        pc = interpret(f.castUnchecked(i, to: IRCase.self), from: &f)
+      case IRCase.End.self:
+        pc = interpret(f.castUnchecked(i, to: IRCase.End.self), from: &f)
       case IRConditionalBranch.self:
         pc = interpret(f.castUnchecked(i, to: IRConditionalBranch.self), from: &f)
+      case IREnumTag.self:
+        pc = interpret(f.castUnchecked(i, to: IREnumTag.self), from: &f)
       case IRGlobalAccess.self:
         pc = interpret(f.castUnchecked(i, to: IRGlobalAccess.self), from: &f)
       case IRLoad.self:
@@ -116,6 +122,12 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRMemoryCopy.self), from: &f)
       case IRMove.self:
         pc = interpret(f.castUnchecked(i, to: IRMove.self), from: &f)
+      case IRPlaceCast.self:
+        pc = interpret(f.castUnchecked(i, to: IRPlaceCast.self), from: &f)
+      case IRPlaceCast.End.self:
+        pc = interpret(f.castUnchecked(i, to: IRPlaceCast.End.self), from: &f)
+      case IRPointerToPlace.self:
+        pc = interpret(f.castUnchecked(i, to: IRPointerToPlace.self), from: &f)
       case IRProject.self:
         pc = interpret(f.castUnchecked(i, to: IRProject.self), from: &f)
       case IRProject.End.self:
@@ -128,6 +140,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRStore.self), from: &f)
       case IRSubfield.self:
         pc = interpret(f.castUnchecked(i, to: IRSubfield.self), from: &f)
+      case IRSwitch.self:
+        pc = interpret(f.castUnchecked(i, to: IRSwitch.self), from: &f)
       case IRTypeApply.self:
         pc = interpret(f.castUnchecked(i, to: IRTypeApply.self), from: &f)
       case IRUnreachable.self:
@@ -223,13 +237,13 @@ private struct Transfer: AbstractTransferFunction {
     // skip further changes to the context to avoid cascading diagnostics.
     let isLegal = (k == .let) || !f.isBoundImmutably(access.source)
     if !isLegal {
-      report(.illegalAccess(k, at: access.anchor.site))
+      report(program.illegalAccess(k, at: access.anchor))
     }
 
     switch k {
     case .let, .inout, .sink:
       if isLegal {
-        checkInitialized(place: access.source, in: f, at: access.anchor.site)
+        checkInitialized(place: access.source, in: f, at: program.span(access.anchor))
         if k == .sink { consume(place: access.source, with: i.erased, in: f) }
       }
       context.declare(i, from: f, initially: .initialized)
@@ -251,14 +265,13 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRAccess.End.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let source = f.at(i).start
     let opener = f.at(f.start(of: i))
 
     // Access is expected to be reified at this stage.
     let k = opener.capabilities.uniqueElement!
     switch k {
     case .let, .set, .inout:
-      checkInitialized(place: f.at(i).start, in: f, at: f.at(i).anchor.site)
+      checkInitialized(place: f.at(i).start, in: f, at: program.span(f.at(i).anchor))
 
       // Assume the postcondition moving forward.
       let a = context.locals[opener.source]!.place!
@@ -271,8 +284,9 @@ private struct Transfer: AbstractTransferFunction {
       fatalError("invalid IR")
     }
 
-    context.memory[source] = nil
-    context.locals[source] = nil
+    let p = f.at(i).start
+    context.memory[p] = nil
+    context.locals[p] = nil
     return f.instruction(after: i.erased)
   }
 
@@ -288,9 +302,11 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRApplyBuiltin.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    for a in f.at(i).arguments {
-      consume(object: a, with: i.erased, in: f)
+    let s = f.at(i)
+    for (p, v) in zip(s.inputs, s.arguments) {
+      passArgument(p, v, insertingDeinitializationBefore: i.erased, in: &f)
     }
+
     context.declare(i, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }
@@ -331,9 +347,59 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
+    _ i: IRCase.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+    let a = context.locals[s.source]!.place!
+    let v = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) in
+      if case .uniform(let s) = o.value {
+        return s
+      } else {
+        unreachable("expected uniform state")
+      }
+    }
+
+    context.declare(i, from: f, initially: v)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRCase.End.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let opener = f.at(f.start(of: i))
+    let place = f.at(i).start
+
+    let a = context.locals[place]!.place!
+    let b = context.locals[opener.source]!.place!
+    let v = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o.value })
+    if case .uniform = v {
+      context.updateValue(v, at: b, computingLayoutWith: &typer)
+    } else {
+      assert(initializedParts(v).isEmpty, "expected uniform state")
+      context.updateValue(.uniform(.uninitialized), at: b, computingLayoutWith: &typer)
+    }
+
+    context.memory[place] = nil
+    context.locals[place] = nil
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
     _ i: IRConditionalBranch.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     assert(context.locals[f.at(i).condition]!.object!.value == .uniform(.initialized))
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IREnumTag.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+    checkInitialized(place: s.source, in: f, at: program.span(s.anchor))
+    context.declare(i.erased, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 
@@ -386,6 +452,48 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
+    _ i: IRPlaceCast.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+
+    // Treat the source of the cast like the argument of a projection.
+    applyParameterPrecondition(
+      s.access, s.source, insertingDeinitializationBefore: i.erased, in: &f)
+
+    let v: Domain = (f.at(i).access == .set) ? .uninitialized : .initialized
+    context.declare(i, from: f, initially: v)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRPlaceCast.End.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let opener = f.at(f.start(of: i))
+    let place = f.at(i).start
+
+    // Treat the cast like of a projection.
+    closeProjection(place, openedWith: opener.access, closedBy: i.erased, in: &f)
+    applyParameterPostcondition(opener.access, opener.source)
+
+    context.memory[place] = nil
+    context.locals[place] = nil
+    context.locals.removeAll(where: { (_, p) in p.place?.location.root == place })
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRPointerToPlace.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    let s = f.at(i)
+    let v: Domain = (s.access == .set) ? .uninitialized : .initialized
+    context.declare(i.erased, from: f, initially: v)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
     _ i: IRProject.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
@@ -405,17 +513,10 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRProject.End.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let source = f.at(i).start
     let opener = f.at(f.start(of: i))
+    let place = f.at(i).start
 
-    switch opener.access {
-    case .let, .set, .inout:
-      checkInitialized(place: source, in: f, at: f.at(i).anchor.site)
-    case .sink:
-      ensureDeinitialized(place: source, before: i.erased, in: &f)
-    case .auto:
-      fatalError("invalid IR")
-    }
+    closeProjection(place, openedWith: opener.access, closedBy: i.erased, in: &f)
 
     let t = f.result(of: opener.callee)!.type
     let u = program.types.seenAsTermAbstraction(t)!
@@ -423,9 +524,9 @@ private struct Transfer: AbstractTransferFunction {
       applyParameterPostcondition(p.access, v)
     }
 
-    context.memory[source] = nil
-    context.locals[source] = nil
-    context.locals.removeAll(where: { (_, p) in p.place?.location.root == source })
+    context.memory[place] = nil
+    context.locals[place] = nil
+    context.locals.removeAll(where: { (_, p) in p.place?.location.root == place })
     return f.instruction(after: i.erased)
   }
 
@@ -458,7 +559,7 @@ private struct Transfer: AbstractTransferFunction {
 
         // Report potential failures.
         if o.value != .uniform(.initialized) {
-          let s = f.at(i).anchor.site
+          let s = program.span(f.at(i).anchor)
           if v == f.returnRegister {
             report(.init(.error, "missing return value", at: s))
           } else {
@@ -489,6 +590,14 @@ private struct Transfer: AbstractTransferFunction {
     let s = f.at(i)
     let a = context.locals[s.base]!.place!.appending(contentsOf: s.path)
     context.locals[.register(i.erased)] = .place(a)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRSwitch.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    assert(context.locals[f.at(i).scrutinee]!.object!.value == .uniform(.initialized))
     return f.instruction(after: i.erased)
   }
 
@@ -603,11 +712,11 @@ private struct Transfer: AbstractTransferFunction {
     case .uniform(.initialized):
       break
     case .uniform(.uninitialized), .uniform(.phi):
-      report(.useOfUninitializedObject(at: site))
+      report(program.useOfUninitializedObject(at: site))
     case .uniform(.consumed):
-      report(.useOfConsumedObject(at: site))
+      report(program.useOfConsumedObject(at: site))
     case .mixed:
-      report(.useOfPartialObject(at: site))
+      report(program.useOfPartialObject(at: site))
     }
   }
 
@@ -633,15 +742,15 @@ private struct Transfer: AbstractTransferFunction {
     }
 
     let a = context.locals[place]!.place!
-    let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) -> Diagnostic? in
+    let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) -> Anchor? in
       if o.value == .uniform(.initialized) {
         o.value = .uniform(.consumed( [consumer]))
         return nil
       } else {
-        return .illegalMove(at: f.at(consumer).anchor.site)
+        return f.at(consumer).anchor
       }
     }
-    d.map({ (d) in report(d) })
+    d.map({ (d) in report(program.illegalMove(at: d)) })
   }
 
   /// Updates `object` to mark it consumed by `consumer`, reporting a diagnostic if `object` cannot
@@ -657,17 +766,17 @@ private struct Transfer: AbstractTransferFunction {
       return
     }
 
-    let d = modify(&context.locals[object]!) { (local) -> Diagnostic? in
+    let d = modify(&context.locals[object]!) { (local) -> Anchor? in
       var o = local.object!
       if o.value == .uniform(.initialized) {
         o.value = .uniform(.consumed([consumer]))
         local = .object(o)
         return nil
       } else {
-        return .illegalMove(at: f.at(consumer).anchor.site)
+        return f.at(consumer).anchor
       }
     }
-    d.map({ (d) in report(d) })
+    d.map({ (d) in report(program.illegalMove(at: d)) })
   }
 
   /// Inserts IR to deinitialize the specified `parts` of the object stored at `place` immediately
@@ -722,24 +831,24 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the object stored at `place`, if any, is fully deinitialized, inserting
-  /// deinitialization before `i`, which is in `f`, is necessary.
+  /// Ensures that place `v`, which is in `f`, is fully deinitialized, inserting deinitialization
+  /// before `i` if necessary.
   private mutating func ensureDeinitialized(
-    place: IRValue, before i: AnyInstructionIdentity,
+    place v: IRValue, before i: AnyInstructionIdentity,
     in f: inout IRFunction
   ) {
-    let a = context.locals[place]!.place!
+    let a = context.locals[v]!.place!
     var o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
     let initialized = initializedParts(o.value)
     if !initialized.isEmpty {
-      deinitialize(initialized, at: place, before: i.erased, in: &f)
+      deinitialize(initialized, at: v, before: i.erased, in: &f)
       o.value = .uniform(.uninitialized)
       context.withObject(at: a, computingLayoutWith: &typer, { (x, _) in x = o })
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` satisfies the preconditions of a
-  /// parameter `k`, inserting deinitialization before `i`, which is in `f`, is necessary.
+  /// Ensures that state of place `v`, which is in `f`, satisfies the preconditions of an access
+  /// with capability `k`, inserting deinitialization before `i` if necessary.
   private mutating func applyParameterPrecondition(
     _ k: AccessEffect, _ v: IRValue,
     insertingDeinitializationBefore i: AnyInstructionIdentity, in f: inout IRFunction
@@ -748,7 +857,7 @@ private struct Transfer: AbstractTransferFunction {
     case .let, .inout, .sink:
       // All three effects require that the object be fully initialized.
       let a = context.locals[v]!.place!
-      checkInitialized(place: v, in: f, at: f.at(i).anchor.site)
+      checkInitialized(place: v, in: f, at: program.span(f.at(i).anchor))
 
       // A `sink` access consumes its source.
       if k == .sink {
@@ -764,8 +873,7 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` satisfies the postconditions of a
-  /// parameter `k`.
+  /// Applies the postconditions of a parameter with capability `k` on the object at place `v`.
   private mutating func applyParameterPostcondition(_ k: AccessEffect, _ v: IRValue) {
     if k == .set {
       // A set parameter initializes memory.
@@ -774,14 +882,30 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the state of the object stored at place `v` satisfies the pre/postconditions of
-  /// a parameter `k`, inserting deinitialization before `i`, which is in `f`, is necessary.
+  /// Ensures that the of place `v`, which is in `f`, satisfies the pre/postconditions of an access
+  /// with capability `k`, inserting deinitialization before `i` if necessary.
   private mutating func passArgument(
     _ k: AccessEffect, _ v: IRValue,
     insertingDeinitializationBefore i: AnyInstructionIdentity, in f: inout IRFunction
   ) {
     applyParameterPrecondition(k, v, insertingDeinitializationBefore: i, in: &f)
     applyParameterPostcondition(k, v)
+  }
+
+  /// Ensures that the state of place `p`, which is a projection closed by `e` in `f`, satisfies
+  /// the postconditions of an access with capability `k`, inserting deinitialization if necessary.
+  private mutating func closeProjection(
+    _ v: IRValue, openedWith k: AccessEffect, closedBy e: AnyInstructionIdentity,
+    in f: inout IRFunction
+  ) {
+    switch k {
+    case .let, .set, .inout:
+      checkInitialized(place: v, in: f, at: program.span(f.at(e).anchor))
+    case .sink:
+      ensureDeinitialized(place: v, before: e, in: &f)
+    case .auto:
+      fatalError("invalid IR")
+    }
   }
 
   /// Returns the result of calling `action` on `self` configured with context `c`.

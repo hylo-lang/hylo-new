@@ -239,7 +239,11 @@ final class CompilerTests: XCTestCase {
       if input.manifest.stage == .execution {
         let e = try XCTUnwrap(r.artifacts.executable)
         let x = try Process.execute(e)
-        assertExitStatus(x, describedBy: input)
+        if input.manifest.shouldTrap {
+          XCTAssert(x.terminationReason == .uncaughtSignal, "program did not trap")
+        } else {
+          assertExitStatus(x, describedBy: input)
+        }
       }
 
       if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }

@@ -158,10 +158,10 @@ public struct SourceFile: Hashable, Sendable {
   ///
   /// - Complexity: O(log N) + O(C) where N is the number of lines in `self` and C is the returned
   ///   offset.
-  func lineAndUTF16Offset(_ i: Index) -> (line: Int, offset: Int) {
+  func lineAndUTF16Offset(_ i: Index) -> LineAndUTF16Offset {
     let lineNumber = line(containing: i).index
     let offset = text.utf16.distance(from: properties.lineStarts[lineNumber], to: i)
-    return (lineNumber, offset)
+    return LineAndUTF16Offset(line: lineNumber, offset: offset)
   }
 
   /// Returns the index in `text` corresponding to the 0-based `line` and `offset`.
@@ -190,8 +190,8 @@ public struct SourceFile: Hashable, Sendable {
     let lineStart = properties.lineStarts[line]
     let utf16Line = text[lineStart...].utf16
 
-    return utf16Line.index(utf16Line.startIndex, offsetBy: utf16Offset, limitedBy: endIndex)
-      ?? endIndex
+    let e = utf16Line.index(utf16Line.startIndex, offsetBy: utf16Offset, limitedBy: endIndex)
+    return e ?? endIndex
   }
 
   /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`.
@@ -258,5 +258,29 @@ extension SourceFile: Archivable {
     try archive.write(name)
     try archive.write(text)
   }
+
+}
+
+/// A 0-based line index and 0-based UTF-16 column offset in that line.
+@Archivable
+public struct LineAndUTF16Offset: Hashable, Sendable {
+
+  /// Internal representation of `self`.
+  private let _line: UInt32
+
+  /// The 0-based offset in the line.
+  private let _offset: UInt32
+
+  /// Creates an instance with the given properties.
+  fileprivate init(line: Int, offset: Int) {
+    self._line = UInt32(line)
+    self._offset = UInt32(offset)
+  }
+
+  /// Internal representation of `self`.
+  public var line: Int { Int(_line) }
+
+  /// The 0-based offset in the line.
+  public var offset: Int { Int(_offset) }
 
 }

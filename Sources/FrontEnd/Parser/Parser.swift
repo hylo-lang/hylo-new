@@ -337,11 +337,48 @@ public struct Parser {
   private mutating func parseOptionalEnumCasePayload(
     in file: inout Module.SourceContainer
   ) throws -> [ParameterDeclaration.ID] {
+    // Is there an associated value?
     if next(is: .leftParenthesis) {
-      return try parseParenthesizedParameterList(in: &file)
-    } else {
-      return []
+      let (ps, _) = try inParentheses { (m0) in
+        try m0.commaSeparated(until: Token.hasTag(.rightParenthesis)) { (m1) in
+          try m1.parseEnumCaseParameterDeclaration(in: &file)
+        }
+      }
+      return ps
     }
+
+    // No associated value.
+    else { return [] }
+  }
+
+  /// Parses the declaration of an enum case parameter.
+  private mutating func parseEnumCaseParameterDeclaration(
+    in file: inout Module.SourceContainer
+  ) throws -> ParameterDeclaration.ID {
+    let start = nextTokenStart()
+    let (label, identifier) = try parseLabelAndIdentifier()
+
+    // Enum case parameters are implicitly `sink`.
+    _ = try take(.colon) ?? expected("ascription")
+    if let k = parseOptionalAccessEffect() {
+      report(.init("access effect is not allowed here", at: k.site))
+    }
+
+    let a = try parseExpression(in: &file)
+    let s = file[a].site
+    let k = Parsed<AccessEffect>(.sink, at: .empty(at: s.start))
+    let ascription = file.insert(RemoteTypeExpression(access: k, projectee: a, site: s))
+
+    let defaultValue = try parseOptionalInitializerExpression(in: &file)
+
+    return file.insert(
+      ParameterDeclaration(
+        label: label,
+        identifier: identifier,
+        ascription: ascription,
+        defaultValue: defaultValue,
+        lazyModifier: nil,
+        site: span(from: start)))
   }
 
   /// Parses an enum declaration.
@@ -971,23 +1008,7 @@ public struct Parser {
     in file: inout Module.SourceContainer
   ) throws -> ParameterDeclaration.ID {
     let start = nextTokenStart()
-    let label: Parsed<String>?
-    let identifier: Parsed<String>
-
-    switch (take(if: \.isArgumentLabel), take(.name)) {
-    case (let x, .some(let y)):
-      identifier = Parsed(y)
-      label = x.map({ (t) in (t.tag == .underscore) ? identifier : Parsed(t) })
-
-    case (.some(let n), nil):
-      if n.isKeyword { report(.init("'\(n.text)' is not a valid identifier", at: n.site)) }
-      identifier = Parsed(n)
-      label = nil
-
-    case (nil, nil):
-      throw expected("parameter declaration")
-    }
-
+    let (label, identifier) = try parseLabelAndIdentifier()
     let ascription = try parseOptionalParameterAscription(in: &file)
     let defaultValue = try parseOptionalInitializerExpression(in: &file)
 
@@ -999,6 +1020,22 @@ public struct Parser {
         defaultValue: defaultValue,
         lazyModifier: ascription?.lazyModifier,
         site: span(from: start)))
+  }
+
+  /// Parses the label and identifier of a parameter declaration.
+  private mutating func parseLabelAndIdentifier() throws -> (Parsed<String>?, Parsed<String>) {
+    switch (take(if: \.isArgumentLabel), take(.name)) {
+    case (let x, .some(let y)):
+      let identifier = Parsed<String>(y)
+      return (x.map({ (t) in (t.tag == .underscore) ? identifier : Parsed(t) }), identifier)
+
+    case (.some(let n), .none):
+      if n.isKeyword { report(.init("'\(n.text)' is not a valid identifier", at: n.site)) }
+      return (nil, Parsed<String>(n))
+
+    case (nil, nil):
+      throw expected("parameter declaration")
+    }
   }
 
   /// Parses the body of an abstraction introduced by `head` iff the next token is a left brace.
@@ -1026,7 +1063,10 @@ public struct Parser {
     // If we parsed an empty body and we're in the body of a function or initializer, then insert
     // a return statement.
     if ss.isEmpty && (head != .subscript) {
-      let r = file.insert(Return(introducer: nil, value: nil, site: .empty(at: position)))
+      // `position` is immediately after the last consumed token, which was a right brace.
+      let e = tokens.source.index(before: position.index)
+      let p = SourcePosition(e, in: tokens.source)
+      let r = file.insert(Return(introducer: nil, value: nil, site: .empty(at: p)))
       ss.append(.init(r))
     }
 
@@ -2221,6 +2261,8 @@ public struct Parser {
       return try .init(parseDiscardStatement(in: &file))
     case .return:
       return try .init(parseReturnStatement(in: &file))
+    case .while:
+      return try .init(parseWhileStatement(in: &file))
     case .yield:
       return try .init(parseYieldStatement(in: &file))
     case _ where head.isDeclarationHead:
@@ -2265,6 +2307,21 @@ public struct Parser {
     }
 
     return file.insert(Return(introducer: i, value: v, site: span(from: i)))
+  }
+
+  /// Parses a while statement.
+  ///
+  ///     while-statement ::=
+  ///       'while' condition block
+  ///
+  private mutating func parseWhileStatement(
+    in file: inout Module.SourceContainer
+  ) throws -> While.ID {
+    let i = try take(.while) ?? expected("'while'")
+    let c = try parseConditionList(in: &file)
+    let s = try parseConditionalBody(in: &file)
+
+    return file.insert(While(introducer: i, condition: c, body: s, site: span(from: i)))
   }
 
   /// Parses a yield statement.
@@ -2607,7 +2664,12 @@ public struct Parser {
     }
   }
 
-  /// Parses an instance of `T` enclosed in `delimiters`.
+  /// Parses an instance of `T` enclosed in `delimiters`, returning the parsed instance along with
+  /// the right delimiter.
+  ///
+  /// The result is an instance of `T` parsed immediately after the left delimiter and immediately
+  /// before the right delimiter. The method throws if it cannot consume the left delimiter but
+  /// only reports an error if it cannot consume the right one.
   private mutating func between<T>(
     _ delimiters: (left: Token.Tag, right: Token.Tag),
     _ parse: (inout Self) throws -> T

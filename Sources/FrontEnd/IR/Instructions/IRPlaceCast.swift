@@ -1,11 +1,17 @@
 import Archivist
 
-/// Converts a place of type `A` to a place of type `B`.
+/// Projects a value at a different type.
 ///
-/// The conversion is not checked. Accessing the resulting place has undefined behavior unless `B`
-/// is layout-compatible with `A`.
+///     place_cast <source : value> as <access : effect> <target : type>
+///
+/// `place_cast` projects the contents of `source`, which is the result an access instruction, as
+/// contents of type `target` into a region, using `access` to determine the memory state of the
+/// source before and after that region.
+///
+/// The conversion is not checked. Accessing the resulting place has undefined behavior unless
+/// `target` is layout-compatible with the type of `source`.
 @Archivable
-public struct IRPlaceCast: Instruction {
+public struct IRPlaceCast: IRRegionEntry {
 
   /// The operands of the instruction.
   public let operands: [IRValue]
@@ -13,13 +19,17 @@ public struct IRPlaceCast: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
+  /// The capabilities of the projection.
+  public let access: AccessEffect
+
   /// The type of the resulting place.
   public let target: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
-  public init(source: IRValue, target: AnyTypeIdentity, anchor: Anchor) {
+  public init(source: IRValue, access: AccessEffect, target: AnyTypeIdentity, anchor: Anchor) {
     self.operands = [source]
     self.anchor = anchor
+    self.access = access
     self.target = target
   }
 
@@ -27,9 +37,9 @@ public struct IRPlaceCast: Instruction {
   public init(_ other: Self, substituting properties: IRSubstitutionTable) {
     self.operands = [properties[other.source]]
     self.anchor = properties.anchor(other)
+    self.access = other.access
     self.target = other.target
   }
-
 
   /// The place being converted.
   public var source: IRValue {
@@ -52,7 +62,7 @@ extension IRPlaceCast: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "place_cast \(printer.show(source)) as \(printer.show(target))"
+    "place_cast \(printer.show(source)) as \(access) \(printer.show(target))"
   }
 
 }

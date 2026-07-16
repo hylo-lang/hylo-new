@@ -274,8 +274,8 @@ internal indirect enum DemangledType: Hashable, Sendable {
   /// A metatype.
   case metatype(DemangledType)
 
-  /// An opaque environment type.
-  case opaqueEnvironment(DemangledEntity)
+  /// An opaque type.
+  case opaque(DemangledEntity)
 
   /// A remote type.
   case remote(DemangledType, AccessEffect)
@@ -386,7 +386,7 @@ extension DemangledType: CustomStringConvertible {
     case .metatype(let t):
       return "Metatype<\(t)>"
 
-    case .opaqueEnvironment(let d):
+    case .opaque(let d):
       return "some \(d)"
 
     case .remote(let t, let a):

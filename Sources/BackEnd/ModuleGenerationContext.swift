@@ -61,7 +61,7 @@ internal struct ModuleGenerationContext: ~Copyable {
 
   /// The header of the structure representing information stored in all type witnesses.
   ///
-  /// A type witness is a 4-tuple optionally followed by a buffer of pointer containing:
+  /// A type witness is a 4-tuple optionally followed by a buffer of pointers containing:
   /// - A string describing the type being witnessed;
   /// - The size of the type, as a 32-bit unsigned integer;
   /// - The alignment of the type, as a 16-bit unsigned ingeter;
@@ -100,6 +100,20 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// Returns the resources held by this instance.
   internal consuming func release() -> LLVMModule {
     llvm
+  }
+
+  /// Returns an unsigned integer type large enough to represent `n`.
+  internal func integerTypeToRepresent(_ n: Int) -> SwiftyLLVM.IntegerType.UnsafeReference {
+    switch n {
+    case _ where n <= 0xff:
+      return llvm.i8
+    case _ where n <= 0xffff:
+      return llvm.i16
+    case _ where n <= 0xffffffff:
+      return llvm.i32
+    default:
+      return llvm.i64
+    }
   }
 
 }

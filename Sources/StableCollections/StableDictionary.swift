@@ -376,7 +376,7 @@ public struct StableDictionary<Key: Hashable, Value> {
     // Zero-initialize the additional storage.
     newContents.withUnsafeMutablePointers { (head, target) in
       let o = head.pointee.offsets
-      for i in count ..< newCapacity {
+      for i in capacity ..< newCapacity {
         Bucket.withMaybeUninitializedHash(of: target.advanced(by: i), offsets: o) { (h) in
           h.initialize(to: 0)
         }
@@ -423,8 +423,8 @@ public struct StableDictionary<Key: Hashable, Value> {
 
   /// Inserts the given key/value pair at `p`.
   private mutating func insert(key: Key, value: Value, at p: Int) {
-    reserveCapacity(Swift.max(count + 1, p))
     ensureUnique()
+    reserveCapacity(Swift.max(count + 1, p + 1))
     contents!.withUnsafeMutablePointers { (head, body) in
       let hash = key.hashValue
       head.pointee.assign(position: p, in: body, forHash: hash)

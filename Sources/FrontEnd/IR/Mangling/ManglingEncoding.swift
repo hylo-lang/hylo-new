@@ -769,6 +769,8 @@ internal struct ManglingEncoding: Sendable {
       demangled = takeMetakindType(from: &source)
     case .metatypeType:
       demangled = takeMetatypeType(from: &source)
+    case .opaquePayloadType:
+      demangled = takeOpaquePayloadType(from: &source)
     case .opaqueEnvironmentType:
       demangled = takeOpaqueEnvironmentType(from: &source)
     case .remoteType:
@@ -1087,14 +1089,24 @@ internal struct ManglingEncoding: Sendable {
     case .environment(let d):
       output.add(operator: .opaqueEnvironmentType)
       append(decl: d, to: &output)
+    case .payload(let d):
+      output.add(operator: .opaquePayloadType)
+      append(decl: .init(d), to: &output)
     }
+  }
+
+  /// Demangles an opaque environment type from `stream`.
+  private static func takeOpaquePayloadType(
+    from source: inout DemanglingContext
+  ) -> DemangledType {
+    .opaque(takeEntity(from: &source))
   }
 
   /// Demangles an opaque environment type from `stream`.
   private static func takeOpaqueEnvironmentType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    .opaqueEnvironment(takeEntity(from: &source))
+    .opaque(takeEntity(from: &source))
   }
 
   /// Writes the mangled representation of `t` to `output`.

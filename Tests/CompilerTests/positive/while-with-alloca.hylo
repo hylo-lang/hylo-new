@@ -1,0 +1,21 @@
+//! exit-status:23
+
+@inline(never)
+fun flip(x: inout Bool) {}
+
+public fun main() -> Int32 {
+  var result = 1 as Int32
+
+  var work = true
+  while work {
+    // `x` is declared in the body of the loop, causing an alloca to be redefined. The function
+    // call guarantees that DCE won't discard it.
+    var x = true
+    flip(&x)
+
+    &work = false
+    &result = 23
+  }
+
+  return result
+}

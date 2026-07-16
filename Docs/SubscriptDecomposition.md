@@ -1,6 +1,8 @@
 # Subscript Decomposition
 
 This document discusses subscript decomposition, which is the process `hc` uses to compile subscripts and their applications.
+Note that subscript decomposition is not part of Hylo's language specification.
+It is only one possible implementation strategy for subscripts, whose primary benefit is to avoid dynamic allocation.
 
 ## Intuition
 
@@ -8,29 +10,44 @@ Intuitively, a subscript can be understood as a pair of functions.
 The first, called *ramp*, computes a value to project.
 The second, called *slide* undoes the setup made to compute that value and potentially applies changes made to the projected value back to the whole of which it is a part.
 Then, applying a subscript consists of calling the ramp to obtain a value before eventually calling the slide to dispose of the projected value, after its last use.
-
-Setting up a value to project may involve memory allocation.
-One main objective of subscript decomposition is to avoid allocating such memory on the heap.
-To that end, the idea is to keep the call frame ramp on the stack while the projected value is being used.
-Hence, rather than returning from the ramp, one can instead pass it a closure encapsulating the uses of the value being projected.
-Perhaps more simply, subscripts can be implemented as higher-order functions applying a closure to the value being projected.
-This approach, however, presents two issues.
-First, the lifetime of a subscript may end in different parts of the program, notwithstanding its lexical structure.
-Second, projections may overlap without nesting. Both of these issues make it not obvious to determine what region of a closure covers.
-
-One solution is to renounce keeping closures small, taking a page from continuation passing instead.
-When a subscript is called, all the code dominated by that call can be wrapped into a closure passed to the subscript.
-This closure, called a *plateau*, will then call the slide after the last use of the projection.
-Consider the following program to illustrate:
+To illustrate, consider the following example:
 
 ```hylo
 subscript bit(i: Int, of n: inout Int) inout -> Bool {
   let m = 1 << i
   let b = n & m != 0
   yield b
-  &b = if b { b | m } else { b & ~m }
+  &n = if b { n | m } else { n & ~m }
 }
 
+public fun main() {
+  var x = 0b11
+  inout b = &bit[1, of: &x]
+  &b = false
+  print(x) // 1 (i.e., 0b01)
+}
+```
+
+The ramp of `bit(_:of:)` covers the first three instructions, which prepare a mask `m`, apply it to `n` to focus on a specific bit, and then projects the result.
+The slide covers the last statement, which reuses the mask to update `n` depending on the value of `b`, which may have been modified by the caller.
+
+Setting up a value to project may involve memory allocation.
+In the above example, `b` does not exist in memory before the subscript is applied, meaning that it must be allocated somewhere.
+One main objective of subscript decomposition is to avoid allocating such memory on the heap.
+To that end, the key idea is to keep the call frame ramp on the stack while the projected value is being used.
+Rather than returning from the ramp, one can instead pass it a closure encapsulating the uses of the value being projected.
+Perhaps more simply, subscripts can be implemented as higher-order functions applying a closure to the value being projected.
+This approach, however, presents two issues.
+First, the lifetime of a subscript may end in different parts of the program, notwithstanding its lexical structure.
+Second, projections may overlap without nesting.
+Both of these issues make it not obvious to determine what region of the program a closure covers.
+
+One solution is to renounce keeping closures small, taking a page from delimited continuations instead.
+When a subscript is called, all the code dominated by that call can be wrapped into a closure passed to the subscript.
+This closure, called a *plateau*, will then call the slide after the last use of the projection.
+Consider the following program to illustrate:
+
+```hylo
 fun foo() {
   var x = 0b11
   inout b = &bit[1, of: &x]

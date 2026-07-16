@@ -1,0 +1,16 @@
+//! exit-status:42
+
+// A type larger than a pointer should be passed correctly.
+struct Triple is Deinitializable  {
+  let (a, b, c): {Int32, Int32, Int32}
+  memberwise init
+}
+
+@inline(never)
+fun make_triple() -> Triple {
+  return Triple(a: 3 as Int32, b: 4 as Int32, c: 42 as Int32)
+}
+
+public fun main() -> Int32 {
+  return make_triple().c
+}

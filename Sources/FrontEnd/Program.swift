@@ -3,7 +3,7 @@ import OrderedCollections
 import Utilities
 
 /// A Hylo program.
-/// 
+///
 /// - Invariant: The FileName of source files in `self` are unique.
 public struct Program: Sendable {
 
@@ -107,6 +107,7 @@ public struct Program: Sendable {
     // Generate raw IR from the syntax tree.
     var emitter = IREmitter(insertingIn: m, of: consume self)
     emitter.incorporateTopLevelDeclarations()
+    emitter.implementSynthesizedFunctions()
     self = emitter.release()
   }
 
@@ -134,11 +135,7 @@ public struct Program: Sendable {
         work[i].function.closeOpenEndedRegions()
 
         // The following passes may fail.
-        var ds = DiagnosticSet()
-        work[i].function.checkYieldCoherence(reportingDiagnosticsTo: &ds)
-        typer.program[m].addDiagnostics(ds)
-        if ds.containsError { continue }
-
+        if !work[i].function.checkYieldCoherence(using: &typer) { continue }
         if !work[i].function.normalizeLifetimes(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdExclusivity(emittingInto: m, using: &typer) { continue }
         if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
@@ -211,19 +208,19 @@ public struct Program: Sendable {
 
   /// Projects the module identified by `m`.
   public subscript(m: Module.ID) -> Module {
-    _read { yield modules.values[m] }
+    get { modules.values[m] }
     _modify { yield &modules.values[m] }
   }
 
   /// Projects the source file identified by `f`.
   internal subscript(f: SourceFile.ID) -> Module.SourceContainer {
-    _read { yield modules.values[f.module][f] }
+    get { modules.values[f.module][f] }
     _modify { yield &modules.values[f.module][f] }
   }
 
   /// Projects the node identified by `n`.
   public subscript<T: SyntaxIdentity>(n: T) -> any Syntax {
-    _read { yield modules.values[n.module][n] }
+    get { modules.values[n.module][n] }
   }
 
   /// Projects the node identified by `n`.
@@ -251,7 +248,7 @@ public struct Program: Sendable {
   /// Returns the elements in `ns` that identify nodes of type `T`.
   public func collect<S: Sequence, T: Syntax>(
     _ t: T.Type, in ns: S
-  ) -> (some Sequence<ConcreteSyntaxIdentity<T>>) where S.Element: SyntaxIdentity {
+  ) -> (some Collection<ConcreteSyntaxIdentity<T>>) where S.Element: SyntaxIdentity {
     ns.lazy.compactMap({ (n) in cast(n, to: t) })
   }
 
@@ -597,6 +594,18 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `true` iff `n` is the application of a memberwise initializer.
+  public func isMemberwiseInitialization(_ n: Call.ID) -> Bool {
+    if
+      let f = cast(self[n].callee, to: New.self),
+      case .some(.direct(let d)) = declaration(maybeReferredToBy: self[f].target)
+    {
+      return isMemberwiseInitializer(d)
+    } else {
+      return false
+    }
+  }
+
   /// Returns `true` iff `w` denotes a synthetic conformance that does not involve any user code.
   ///
   /// The result is a conservative overapproximation which does not take arguments to conditional
@@ -756,6 +765,19 @@ public struct Program: Sendable {
     }
   }
 
+  /// If `n` refers to an enum case without an associated value, returns the declaration of that
+  /// case; otherwise, returns `nil`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public func asConstantCase(_ n: NameExpression.ID) -> EnumCaseDeclaration.ID? {
+    guard
+      case .direct(let d) = declaration(referredToBy: n),
+      let c = cast(d, to: EnumCaseDeclaration.self)
+    else { return nil }
+
+    return self[c].parameters.isEmpty ? c : nil
+  }
+
   /// Returns the built-in function referred to by `n`, if any.
   public func asBuiltinFunction(_ n: ExpressionIdentity) -> BuiltinFunction? {
     if let e = cast(n, to: NameExpression.self) {
@@ -839,9 +861,8 @@ public struct Program: Sendable {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
-  /// Returns the declaration referred to by `n`, if any.
-  ///
-  /// - Note: This may only return non-nil after type-checking.
+  /// Returns the declaration referred to by `n` iff the module containing `n` is typed; otherwise,
+  /// returns `nil`.
   public func declaration(maybeReferredToBy n: NameExpression.ID) -> DeclarationReference? {
     self[n.module].declaration(referredToBy: n)
   }
@@ -891,6 +912,24 @@ public struct Program: Sendable {
   /// - Requires: The module containing `d` is typed.
   public func implementations(definedBy d: ConformanceDeclaration.ID) -> WitnessTable {
     self[d.module].implementations(definedBy: d) ?? unreachable("untyped node at \(self[d].site)")
+  }
+
+  /// If `witness` expresses the application of some closed and concrete conformance declaration,
+  /// returns that conformance along with its implementation of `requirement`.
+  ///
+  /// `requirement` is the declaration of a requirement of the trait whose conformance is being
+  /// witnessed by the value computed by `witness`. The result is non-`nil` iff `witness` is an
+  /// application of a concrete conformance declaration that does not capture any local binding.
+  ///
+  /// - Requires: The module containing `d` is typed.
+  public func implementation(
+    of requirement: DeclarationIdentity, in witness: WitnessExpression
+  ) -> (ConformanceDeclaration.ID, DeclarationReference)? {
+    if let d = witness.declaration, let c = cast(d, to: ConformanceDeclaration.self) {
+      return implementations(definedBy: c).member(implementing: requirement).map({ (m) in (c, m) })
+    } else {
+      return nil
+    }
   }
 
   /// If `n` is a requirement, returns the traits that introduces it. Otherwise, returns `nil`.
@@ -1038,7 +1077,7 @@ public struct Program: Sendable {
   /// - Requires: The module containing `s` is scoped.
   public func declarations<T: Declaration>(
     of t: T.Type, lexicallyIn s: ScopeIdentity
-  ) -> some Sequence<ConcreteSyntaxIdentity<T>> {
+  ) -> some Collection<ConcreteSyntaxIdentity<T>> {
     collect(t, in: declarations(lexicallyIn: s))
   }
 
@@ -1060,12 +1099,58 @@ public struct Program: Sendable {
     return self[d.file].variableToBinding[d.offset]
   }
 
-  /// Returns the types of stored parts of `t` visible from `module`.
+  /// Returns the declaration of the base type of `t` iff that is a struct or enum.
+  public func declaration(whereStructOrEnum t: AnyTypeIdentity) -> DeclarationIdentity? {
+    guard let d = declaration(of: t) else { return nil }
+    switch tag(of: d) {
+    case StructDeclaration.self, EnumDeclaration.self:
+      return d
+    default:
+      return nil
+    }
+  }
+
+  /// Returns the declaration of the base type of `t`, if any.
+  public func declaration(of t: AnyTypeIdentity) -> DeclarationIdentity? {
+    switch types.tag(of: t) {
+    case AssociatedType.self:
+      return .init(types[types.castUnchecked(t, to: AssociatedType.self)].declaration)
+    case Enum.self:
+      return .init(types[types.castUnchecked(t, to: Enum.self)].declaration)
+    case GenericParameter.self:
+      return declaration(of: types.castUnchecked(t, to: GenericParameter.self))
+    case Struct.self:
+      return .init(types[types.castUnchecked(t, to: Struct.self)].declaration)
+    case Trait.self:
+      return .init(types[types.castUnchecked(t, to: Trait.self)].declaration)
+    case TypeAlias.self:
+      return declaration(of: types[types.castUnchecked(t, to: TypeAlias.self)].aliasee)
+    case TypeApplication.self:
+      return declaration(of: types[types.castUnchecked(t, to: TypeApplication.self)].abstraction)
+    default:
+      return nil
+    }
+  }
+
+  /// Returns the declaration of the type of which `t` is an instance, if any.
+  public func declaration(of t: GenericParameter.ID) -> DeclarationIdentity? {
+    types[t].declaration.map(DeclarationIdentity.init(_:))
+  }
+
+  /// Returns the types of stored parts of `t` iff its layout is visible from `module`.
   public mutating func storage(
     of t: AnyTypeIdentity, visibleFrom module: Module.ID
   ) -> [AnyTypeIdentity]? {
     // TODO: Resilience
     withTyper(typing: module, { (typer) in typer.storage(of: t) })
+  }
+
+  /// Returns the types of the fields of `t` iff its layout is visible from `module`.
+  public mutating func fields(
+    of t: AnyTypeIdentity, visibleFrom module: Module.ID
+  ) -> [AnyTypeIdentity]? {
+    // TODO: Resilience
+    withTyper(typing: module, { (typer) in typer.fields(of: t) })
   }
 
   /// Returns the names introduced by `d`.
@@ -1326,48 +1411,51 @@ public struct Program: Sendable {
 
   /// Calls `action` for each stored property declaration in `d`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in a record value having the type declared by `d`.
+  /// `action` accepts a variable declaration and a path identifying its abstract position in a
+  /// record value having the type declared by `d`.
   public func forEachStoredProperty(
     of d: StructDeclaration.ID,
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
-    for m in self[d].members {
-      if let b = cast(m, to: BindingDeclaration.self) {
-        forEachVariable(introducedBy: self[self[b].pattern].pattern, do: action)
+    var i = 0
+    for m in collect(BindingDeclaration.self, in: self[d].members) where !isStatic(m) {
+      forEachVariable(introducedBy: self[self[m].pattern].pattern) { (v, _) in
+        action(v, [i])
+        i += 1
       }
     }
   }
 
   /// Calls `action` for each variable declaration introduced by `d`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in the a record value having the type of `d`.
+  /// `action` accepts a variable declaration and a path relative to `root`, which identities the
+  /// abstract position of the declaration in the record value having the same type as `d`.
   public func forEachVariable(
     introducedBy d: BindingDeclaration.ID,
+    relativeTo root: IndexPath = [],
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
-    forEachVariable(introducedBy: self[self[d].pattern].pattern, do: action)
+    forEachVariable(introducedBy: self[self[d].pattern].pattern, relativeTo: root, do: action)
   }
 
   /// Calls `action` for each variable declaration introduced in `p`.
   ///
-  /// `action` accepts a variable declaration and an index path identifying its abstract position
-  /// in the a record value having the type of `p`.
+  /// `action` accepts a variable declaration and a path relative to `root`, which identities the
+  /// abstract position of the declaration in the record value having the same type as `p`.
   public func forEachVariable(
     introducedBy p: PatternIdentity,
-    at path: IndexPath = [],
+    relativeTo path: IndexPath = [],
     do action: (VariableDeclaration.ID, IndexPath) -> Void
   ) {
     switch tag(of: p) {
     case BindingPattern.self:
       let q = castUnchecked(p, to: BindingPattern.self)
-      forEachVariable(introducedBy: self[q].pattern, at: path, do: action)
+      forEachVariable(introducedBy: self[q].pattern, relativeTo: path, do: action)
 
     case TuplePattern.self:
       let q = castUnchecked(p, to: TuplePattern.self)
       for (i, e) in self[q].elements.enumerated() {
-        forEachVariable(introducedBy: e, at: path.appending(i), do: action)
+        forEachVariable(introducedBy: e, relativeTo: path.appending(i), do: action)
       }
 
     case VariableDeclaration.self:
@@ -1498,6 +1586,8 @@ public struct Program: Sendable {
 
     case Return.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Return.self))
+    case While.self:
+      return self[castUnchecked(n, to: While.self)].introducer.site
     case Yield.self:
       return spanForDiagnostic(about: castUnchecked(n, to: Yield.self))
 

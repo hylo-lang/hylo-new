@@ -1,0 +1,34 @@
+// Structs and enums can define a custom deinitializer that does not actually consume any property
+// at the user level. In this case the compiler treats `self` like a tuple and emits memberwise
+// deinitialization at the end of the scope, thus avoiding infinite recursion.
+
+struct S is Deinitializable {
+  let x: Int
+  fun deinit() sink {}
+}
+
+enum E is Deinitializable {
+  case a(x: Int)
+  case b(x: Bool)
+  fun deinit() sink {}
+}
+
+// The deinitialization of tuples is always structural. Custom initializers are never applied.
+
+given {S, S} is Deinitializable {
+  fun deinit() sink {}
+}
+
+// The following types have no memberwise deinitialization.
+
+trait P {
+  type A
+  fun foo() {
+    given A is Deinitializable { fun deinit() sink {} }
+  }
+}
+
+public fun foo<T>() {
+  type A = T
+  given A is Deinitializable { fun deinit() sink {} }
+}

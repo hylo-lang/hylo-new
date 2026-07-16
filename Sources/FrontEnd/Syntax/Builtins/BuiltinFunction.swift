@@ -30,12 +30,12 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   // MARK: Functions unique to Hylo
 
-  /// Stops the execution of the program.
+  /// `Builtin.trap() -> Never`
   ///
-  /// This function abstracts over the `trap` instruction of the target.
+  /// Stops the execution of the program by executing the `trap` instruction of the target.
   case trap
 
-  /// `Builtin.address<T>(of v: T) -> Builtin.ptr`
+  /// `Builtin.address<T>(of v: let T) -> Builtin.ptr`
   ///
   /// Returns a pointer to the storage of the argument.
   ///
@@ -43,10 +43,14 @@ public enum BuiltinFunction: Hashable, Sendable {
   /// measures may be needed to keep the argument alive during the pointer's use.
   case addressOf
 
-  /// `Builtin.mark_uninitialized<T>(_ v: sink T) -> Void`
+  /// `Builtin.assume_[un]initialized<T>(x: auto T) -> Void
   ///
-  /// Marks `v` as being uninitialized.
-  case markUninitialized
+  /// Unsafely treats `x` as having been initialized or uninitialized.
+  ///
+  /// Applications of this function translate directly to an `assume_state` instruction. No access
+  /// is formed on the argument, meaning that no precondition is checked on the initialization
+  /// state of `x` before the instruction is applied.
+  case assumeInitialized(Bool)
 
   // MARK: Functions with a counterpart LLVM instruction.
 
@@ -403,13 +407,12 @@ extension BuiltinFunction {
 
     case .addressOf:
       let t0 = s.fresh().erased
-      let t1 = s.demand(RemoteType(projectee: t0, access: .let)).erased
-      let t2 = s.demand(MachineType.ptr).erased
-      return s.demand(Arrow(inputs: [.init(label: "of", access: .let, type: t1)], output: t2))
+      let t1 = s.demand(MachineType.ptr).erased
+      return s.demand(Arrow(inputs: [.init(label: "of", access: .let, type: t0)], output: t1))
 
-    case .markUninitialized:
+    case .assumeInitialized:
       let t0 = s.fresh().erased
-      return s.demand(Arrow(inputs: [.init(label: nil, access: .sink, type: t0)], output: .void))
+      return s.demand(Arrow(inputs: [.init(label: nil, access: .auto, type: t0)], output: .void))
 
     case .add(_, let t):
       return s.demand(Arrow(t, t, to: t))
@@ -753,8 +756,8 @@ extension BuiltinFunction: Showable {
       return "trap"
     case .addressOf:
       return "address"
-    case .markUninitialized:
-      return "mark_uninitialized"
+    case .assumeInitialized(let b):
+      return "assume_\(b ? "" : "un")initialized"
     case .add(let p, let t):
       return printer.format((p != .ignore) ? "add_\(p)_%T" : "add_%T", [t.erased])
     case .sub(let p, let t):
@@ -1099,15 +1102,10 @@ extension BuiltinFunction {
     case "address":
       if !tokens.isEmpty { return nil }
       self = .addressOf
-    case "mark":
-      if tokens != ["uninitialized"] { return nil }
-      self = .markUninitialized
-
-    //    case "advanced":
-    //      guard let ((_, _), t) = (exactly("by") + exactly("bytes") + machineType)(&tokens)
-    //      else { return nil }
-    //      self = .advancedByBytes(byteOffset: t)
-
+    case "assume" where tokens.first == "initialized":
+      self = .assumeInitialized(true)
+    case "assume" where tokens.first == "uninitialized":
+      self = .assumeInitialized(false)
     case "add":
       guard let (p, t) = integerArithmeticTail(&tokens) else { return nil }
       self = .add(p, s.demand(t))

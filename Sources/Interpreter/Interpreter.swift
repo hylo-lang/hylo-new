@@ -40,7 +40,7 @@ private struct GlobalFunctionIdentity {
 
 extension Program {
 
-  /// Returns first instruction of `f`.
+  /// Returns the first instruction of `f`.
   ///
   /// - Precondition: `self` is sufficiently lowered for interpretation.
   fileprivate func firstInstruction(_ f: GlobalFunctionIdentity) -> AnyInstructionIdentity {
@@ -93,7 +93,7 @@ private struct Stack {
   /// Local variables, parameters, and return addresses.
   private var frames: [StackFrame] = []
 
-  /// Adds a frame for a call to the nullary `f`, a nullary function defined in `p`.
+  /// Adds a frame for a call to `f`, a nullary function defined in `p`.
   public mutating func enter(_ f: GlobalFunctionIdentity, definedIn p: Program) {
     // TODO: support parameters.
     let s = InstructionPointer(interpreting: f, definedIn: p)
@@ -109,9 +109,9 @@ private struct Stack {
 
   /// The top stack frame.
   public var top: StackFrame {
-    _read {
+    get {
       precondition(!isEmpty)
-      yield frames[frames.count - 1]
+      return frames[frames.count - 1]
     }
     _modify {
       precondition(!isEmpty)
@@ -139,12 +139,8 @@ public struct Interpreter {
 
   /// The next instruction to execute.
   private var programCounter: InstructionPointer {
-    _read {
-      yield topOfStack.currentStep
-    }
-    _modify {
-      yield &topOfStack.currentStep
-    }
+    get { topOfStack.currentStep }
+    set { topOfStack.currentStep = newValue }
   }
 
   /// `true` iff the program is still running.
@@ -155,8 +151,8 @@ public struct Interpreter {
 
   /// The top stack frame.
   private var topOfStack: StackFrame {
-    _read {
-      yield callStack.top
+    get {
+      callStack.top
     }
     _modify {
       yield &callStack.top
@@ -167,11 +163,9 @@ public struct Interpreter {
   ///
   /// - Precondition: the program is running.
   public var currentInstruction: any Instruction {
-    _read {
-      yield program[programCounter.container.module]
-        .functions[programCounter.container.function]
-        .at(programCounter.position)
-    }
+    program[programCounter.container.module]
+      .functions[programCounter.container.function]
+      .at(programCounter.position)
   }
 
   /// An instance executing `p`.

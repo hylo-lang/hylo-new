@@ -33,6 +33,26 @@ public struct IRFunction: Sendable {
     /// The identity of a plateau resulting from subscript decomposition.
     indirect case plateau(IRFunction.Name, Int)
 
+    /// Returns `true` iff `self` is the name of a function that implements `d` in Hylo IR.
+    public func isLoweredForm(of d: DeclarationIdentity) -> Bool {
+      switch self {
+      case .lowered(let x):
+        return d == x
+      case .initializer(let x):
+        return d == x
+      case .synthesized(let x, _):
+        return d == x
+      case .implementation(let x, _, _):
+        return d == x
+      case .existentialized(let n):
+        return n.isLoweredForm(of: d)
+      case .slide(let n, _):
+        return n.isLoweredForm(of: d)
+      case .plateau(let n, _):
+        return n.isLoweredForm(of: d)
+      }
+    }
+
   }
 
   /// The way in which an IR function returns its result.
@@ -111,6 +131,9 @@ public struct IRFunction: Sendable {
   /// The name of the function.
   public let name: Name
 
+  /// The region of the code to which this function is associated.
+  public let anchor: Anchor
+
   /// The way in which the function returns its result.
   public let output: Output
 
@@ -134,10 +157,11 @@ public struct IRFunction: Sendable {
 
   /// Creates an instance with the given properties.
   public init(
-    name: Name, output: Output,
-    typeParameters: [GenericParameter.ID], termParameters: [IRParameter],
+    name: Name, anchor: Anchor,
+    output: Output, typeParameters: [GenericParameter.ID], termParameters: [IRParameter],
   ) {
     self.name = name
+    self.anchor = anchor
     self.output = output
     self.typeParameters = typeParameters
     self.termParameters = termParameters
@@ -214,6 +238,12 @@ public struct IRFunction: Sendable {
       return false
     case IRAccess.self:
       return (at(i) as! IRAccess).capabilities == [.let]
+    case IRCase.self:
+      return isBoundImmutably((at(i) as! IRCase).source)
+    case IRPlaceCast.self:
+      return (at(i) as! IRPlaceCast).access == .let
+    case IRPointerToPlace.self:
+      return (at(i) as! IRPointerToPlace).access == .let
     case IRProject.self:
       return (at(i) as! IRProject).access == .let
     case IRSubfield.self:
@@ -765,7 +795,8 @@ public struct IRFunction: Sendable {
   /// moved back into `self` using `take(definition:)`.
   public mutating func move() -> IRFunction {
     var other = IRFunction(
-      name: name, output: output, typeParameters: typeParameters, termParameters: termParameters)
+      name: name, anchor: anchor, output: output,
+      typeParameters: typeParameters, termParameters: termParameters)
 
     swap(&self.bindings, &other.bindings)
     swap(&self.slots, &other.slots)
@@ -841,7 +872,7 @@ extension IRFunction.Name: Showable {
 
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
-      return "\(printer.program.debugName(of: d))<\(list: xs)>"
+      return "\(printer.program.debugName(of: d))$synthesized<\(list: xs)>"
 
     case .implementation(let d, _, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
@@ -904,6 +935,7 @@ extension IRFunction: Archivable {
 
   public init<A>(from archive: inout ReadableArchive<A>, in context: inout Any) throws {
     self.name = try archive.read(Name.self, in: &context)
+    self.anchor = try archive.read(Anchor.self, in: &context)
     self.output = try archive.read(Output.self, in: &context)
     self.typeParameters = try archive.read([GenericParameter.ID].self, in: &context)
     self.termParameters = try archive.read([IRParameter].self, in: &context)
@@ -941,6 +973,7 @@ extension IRFunction: Archivable {
 
   public func write<A>(to archive: inout WriteableArchive<A>, in context: inout Any) throws {
     try archive.write(name, in: &context)
+    try archive.write(anchor, in: &context)
     try archive.write(output, in: &context)
     try archive.write(typeParameters, in: &context)
     try archive.write(termParameters, in: &context)

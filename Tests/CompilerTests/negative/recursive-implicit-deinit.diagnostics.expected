@@ -1,0 +1,6 @@
+negative/recursive-implicit-deinit.hylo:27.53: error: implicit deinitialization of instances of '(Self::P).A' causes infinite recursion in this context
+    given A is Deinitializable { fun deinit() sink {} }
+                                                    ^
+negative/recursive-implicit-deinit.hylo:33.51: error: implicit deinitialization of instances of 'T' causes infinite recursion in this context
+  given A is Deinitializable { fun deinit() sink {} }
+                                                  ^

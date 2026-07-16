@@ -1,0 +1,3 @@
+negative/invalid-builtin-dereference.hylo:5.17-21: error: expected remote type
+  let q = p as* Void
+                ~~~~

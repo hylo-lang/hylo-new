@@ -112,8 +112,18 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRAccess.End.self), from: &f)
       case IRAlloca.self:
         pc = interpret(f.castUnchecked(i, to: IRAlloca.self), from: &f)
+      case IRCase.self:
+        pc = interpret(f.castUnchecked(i, to: IRCase.self), from: &f)
+      case IRCase.End.self:
+        pc = interpret(f.castUnchecked(i, to: IRCase.End.self), from: &f)
       case IRGlobalAccess.self:
         pc = interpret(f.castUnchecked(i, to: IRGlobalAccess.self), from: &f)
+      case IRPlaceCast.self:
+        pc = interpret(f.castUnchecked(i, to: IRPlaceCast.self), from: &f)
+      case IRPlaceCast.End.self:
+        pc = interpret(f.castUnchecked(i, to: IRPlaceCast.End.self), from: &f)
+      case IRPointerToPlace.self:
+        pc = interpret(f.castUnchecked(i, to: IRPointerToPlace.self), from: &f)
       case IRProject.self:
         pc = interpret(f.castUnchecked(i, to: IRProject.self), from: &f)
       case IRProject.End.self:
@@ -149,14 +159,14 @@ private struct Transfer: AbstractTransferFunction {
 
     let s = f.reborrowedSource(i)
     let a = context.locals[access.source]!.place!
-    let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, _) -> Diagnostic? in
+    let d = context.withObject(at: a, computingLayoutWith: &typer) { (o, tp) -> Diagnostic? in
       switch k {
       case .let:
         if f.isValidImmutableAccess(reborrowingFrom: s, sharedBy: borrowers(o.value)) {
           insertBorrower(i, into: &o.value)
           return nil
         } else {
-          return .illegalAccess(.let, at: access.anchor.site)
+          return tp.program.illegalAccess(.let, at: access.anchor)
         }
 
       case .inout, .set, .sink:
@@ -165,7 +175,7 @@ private struct Transfer: AbstractTransferFunction {
           insertBorrower(i, into: &o.value)
           return nil
         } else {
-          return .illegalAccess(k, at: access.anchor.site)
+          return tp.program.illegalAccess(k, at: access.anchor)
         }
 
       case .auto:
@@ -207,7 +217,49 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
+    _ i: IRCase.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRCase.End.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.memory[f.at(i).start] = nil
+    context.locals[f.at(i).start] = nil
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
     _ i: IRGlobalAccess.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRPlaceCast.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRPlaceCast.End.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.memory[f.at(i).start] = nil
+    context.locals[f.at(i).start] = nil
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRPointerToPlace.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     context.declare(i.erased, from: f, initially: .unique)
     return f.instruction(after: i.erased)
