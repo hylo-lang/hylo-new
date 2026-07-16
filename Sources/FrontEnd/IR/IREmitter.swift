@@ -2299,8 +2299,7 @@ internal struct IREmitter {
     properties[source.entry!] = target.block(defining: boundary)
 
     // Where control flow will jump on return.
-    let after: IRBlock.ID? =
-      (source.blocks.count > 1) ? target.split(before: boundary) : nil
+    let after: IRBlock.ID = target.split(before: boundary)
 
     // Initialize the insertion context.
     var formerContext = InsertionContext(function: target.move())
@@ -2324,10 +2323,8 @@ internal struct IREmitter {
         // If next instruction returns, then jump to the "after" block if it's been defined or
         // simply ignore the instruction otherwise.
         if source.tag(of: i) == IRReturn.self {
-          if let a = after {
-            insertionContext.anchor = properties.anchor(source.at(i))
-            _br(a)
-          }
+          insertionContext.anchor = properties.anchor(source.at(i))
+          _br(after)
         } else {
           _clone(i, from: source, substitutingOperandsWith: &properties)
         }
