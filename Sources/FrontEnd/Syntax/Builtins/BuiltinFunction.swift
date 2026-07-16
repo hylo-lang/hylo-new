@@ -759,11 +759,11 @@ extension BuiltinFunction: Showable {
     case .assumeInitialized(let b):
       return "assume_\(b ? "" : "un")initialized"
     case .add(let p, let t):
-      return printer.format((p != .ignore) ? "add_\(p)_%T" : "add_%T", [t.erased])
+      return printer.format((p != .ignore) ? "add_%S_%T" : "add_%T", [p, t.erased])
     case .sub(let p, let t):
-      return printer.format((p != .ignore) ? "sub_\(p)_%T" : "sub_%T", [t.erased])
+      return printer.format((p != .ignore) ? "sub_%S_%T" : "sub_%T", [p, t.erased])
     case .mul(let p, let t):
-      return printer.format((p != .ignore) ? "mul_\(p)_%T" : "mul_%T", [t.erased])
+      return printer.format((p != .ignore) ? "mul_%S_%T" : "mul_%T", [p, t.erased])
     //    case .shl(let p, let t):
     //      return (p != .ignore) ? "shl_\(p)_\(t)" : "shl_\(t)"
     //    case .udiv(let e, let t):
@@ -797,7 +797,7 @@ extension BuiltinFunction: Showable {
     case .unsignedMultiplicationWithOverflow(let t):
       return printer.format("umul_with_overflow_%T", [t.erased])
     case .icmp(let p, let t):
-      return printer.format("icmp_\(p)_%T", [t.erased])
+      return printer.format("icmp_%S_%T", [p, t.erased])
     //    case .trunc(let l, let r):
     //      return "trunc_\(l)_\(r)"
     //    case .zext(let l, let r):

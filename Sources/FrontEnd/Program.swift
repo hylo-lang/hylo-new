@@ -1679,7 +1679,7 @@ public struct Program: Sendable {
 
       case let c:
         let s = c.map(String.init(_:)) ?? ""
-        fatalError("invalid placeholder '%\(s)'", file: file, line: line)
+        fatalError("invalid placeholder '%\(s)' in message: \(message)", file: file, line: line)
       }
     }
 
