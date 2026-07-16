@@ -275,6 +275,10 @@ public struct Driver {
     // Compile the module from sources.
     let m = program.demandModule(module)
 
+    if !noStandardLibrary && module != Module.standardLibraryName {
+      program[m].addDependency(Module.standardLibraryName)
+    }
+
     await parse(sources, into: m)
     try throwIfContainsError(m)
 
@@ -297,7 +301,8 @@ public struct Driver {
     }
   }
 
-  /// Loads the standard library with `load(_:withSourcesAt:)`.
+  /// Loads the standard library with `load(_:withSourcesAt:)` and makes
+  /// standard library a dependency of modules loaded thereafter.
   /// 
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
@@ -308,6 +313,7 @@ public struct Driver {
     let sourceRoot = localStandardLibrarySources
     #endif
     try await load(Module.standardLibraryName, withSourcesAt: sourceRoot)
+    noStandardLibrary = false
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
