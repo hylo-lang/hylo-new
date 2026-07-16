@@ -1308,6 +1308,13 @@ internal struct ManglingEncoding: Sendable {
 
 }
 
+extension ManglingEncoding {
+
+  /// Prefix of all mangled Hylo symbols.
+  internal static let manglingPrefix = "$h"
+
+}
+
 extension ScopeIdentity {
 
   /// The mangling symbol corresponding to `self`.

@@ -42,6 +42,8 @@ struct TypeWitnessHeader {
 
 //given <T> => Pointer<TypeWitnessHeader> is Deinitializable {}
 given Pointer<TypeWitnessHeader> is Deinitializable {}
+given Pointer<TypeWitnessHeader> is Movable {}
+given Pointer<TypeWitnessHeader> is Copyable {}
 
 extension Pointer<TypeWitnessHeader> {
 
@@ -63,10 +65,6 @@ extension Pointer<TypeWitnessHeader> {
 
 /// Notionally, the type of a member of a record type
 type RecordMemberType = Pointer<TypeWitnessHeader>
-
-given RecordMemberType is Movable {}
-given RecordMemberType is Copyable {}
-given RecordMemberType is Deinitializable {}
 
 extension RecordMemberType {
 

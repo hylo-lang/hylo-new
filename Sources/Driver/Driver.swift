@@ -62,6 +62,14 @@ public struct Driver {
     #endif
   }
 
+  #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
+  /// The root folder of the standard library's sources.
+  private let chosenStandardLibraryRoot = bundledStandardLibrarySources
+  #else
+  /// The root folder of the standard library's sources.
+  private let chosenStandardLibraryRoot = localStandardLibrarySources
+  #endif
+
   /// Creates an instance with the given properties.
   public init(
     moduleCachePath: URL? = nil, targetSpecification: TargetSpecification,
@@ -194,20 +202,27 @@ public struct Driver {
   /// - Throws: if the parent folder of `output` doesn't exist.
   public mutating func generateExecutable(
     from module: Module.ID,
+    withCSources cSources: [URL] = [],
     writingTo output: URL
   ) throws -> PhaseResult {
     let elapsed = try ContinuousClock().measure {
       let modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
 
+      var cSources = cSources
+
       if !noStandardLibrary {
         // FIXME: Enable this after we can lower the standard library
         // modulesToLink.append(program.modules[.standardLibrary]!.identity)
+        cSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
       }
 
       try FileManager.default.withUniqueTemporaryDirectory { (d) in
-        let objects = try writeObjectFiles(for: modulesToLink, into: d)
-        try linkExecutable(from: objects, writingTo: output)
+        let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
+        let cObjects = try cSources.map { (s) in
+          try compileCToObject(source: s, destinationDirectory: d)
+        }
+        try linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }
     }
     return .init(elapsed: elapsed, containsError: program[module].containsError)
@@ -239,6 +254,24 @@ public struct Driver {
       try llvmModules[m]!.module.write(.objectFile, to: o.path)
       return o
     }
+  }
+
+  /// Compiles `source` using `clang` to an object file.
+  ///
+  /// Returns the path to the object file within `destinationDirectory`.
+  public func compileCToObject(source: URL, destinationDirectory: URL) throws -> URL {
+    let uniquePrefix = source.hashValue
+    let fileName = source.deletingPathExtension().appendingPathExtension("o").lastPathComponent
+
+    let o = destinationDirectory.appendingPathComponent("\(uniquePrefix)-\(fileName))",
+      isDirectory: false)
+
+    var a = ["-c", source.path, "-o", o.path]
+    if let r = relocation.asClangArgument { a.append(r) }
+
+    _ = try Process.executionOutput(
+      try Host.findNativeExecutable(invokedAs: "clang"), arguments: a)
+    return o
   }
 
   /// Loads `module`, whose sources are in `root`, into `program`.
@@ -308,13 +341,7 @@ public struct Driver {
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
-    let sourceRoot = bundledStandardLibrarySources
-    #else
-    let sourceRoot = localStandardLibrarySources
-    #endif
-    try await load(Module.standardLibraryName, withSourcesAt: sourceRoot, 
-      additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
+    try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot)
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
