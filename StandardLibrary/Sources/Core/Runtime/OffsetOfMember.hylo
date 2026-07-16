@@ -1,3 +1,18 @@
+/// The header of the structure representing information stored in all type witnesses.
+///
+/// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
+type Size = UInt32
+type Alignment = UInt16
+
+struct TypeWitnessHeader {
+  // TODO: verify that the type of `description` is correct.
+  // see https://github.com/hylo-lang/hylo-new/issues/306
+  let description: Pointer<UInt8>
+  let size: Size
+  let alignment: Alignment
+  let type_argument_or_parameter_count: UInt16
+}
+
 extension Pointer<TypeWitnessHeader> {
 
   type Pointee = TypeWitnessHeader
@@ -18,13 +33,6 @@ extension Pointer<TypeWitnessHeader> {
 /// Yields
 subscript pointer(to x: Metatype<RecordMemberType>) -> Pointer<Metatype<RecordMemberType>> {
   yield Pointer<Metatype<RecordMemberType>>(value: Builtin.address(of: x))
-}
-
-extension Int {
-
-  static fun f() {}
-  static fun g() { Self.f() } // error: type 'Int' has no static member 'f'
-
 }
 
 extension Metatype<RecordMemberType> {
@@ -88,8 +96,6 @@ extension Pointer<RecordMemberType> {
 }
 
 
-type Size = UInt32
-type Alignment = UInt16
 type MemberIndex = UInt32
 type WitnessIndex = UInt32
 type MemberCount = UInt32
@@ -116,18 +122,6 @@ extension UInt {
     self.value = Builtin.zext_i32_word(x.value)
   }
 
-}
-
-/// The header of the structure representing information stored in all type witnesses.
-///
-/// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
-struct TypeWitnessHeader {
-  // TODO: verify that the type of `description` is correct.
-  // see https://github.com/hylo-lang/hylo-new/issues/306
-  let description: Pointer<UInt8>
-  let size: Size
-  let alignment: Alignment
-  let type_argument_or_parameter_count: UInt16
 }
 
 /// Fatal error unless TypeWitnessHeader lays out in declaration
