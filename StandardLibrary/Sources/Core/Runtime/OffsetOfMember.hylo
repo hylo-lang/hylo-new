@@ -15,13 +15,43 @@ extension Pointer<TypeWitnessHeader> {
 
 }
 
+/// Yields
 subscript pointer(to x: Metatype<RecordMemberType>) -> Pointer<Metatype<RecordMemberType>> {
   yield Pointer<Metatype<RecordMemberType>>(value: Builtin.address(of: x))
 }
 
-subscript unsafe_bitcast(x: Metatype<RecordMemberType>) -> Pointer<TypeWitnessHeader> {
-  type Result = Pointer<TypeWitnessHeader>
-  yield Pointer<Result>(value: pointer[to: x].value).unsafe[]
+extension Int {
+
+  static fun f() {}
+  static fun g() { Self.f() } // error: type 'Int' has no static member 'f'
+
+}
+
+extension Metatype<RecordMemberType> {
+
+  type Subject = RecordMemberType
+
+  /// Yields `self`, granting access to details.
+  static subscript asPointerToTypeWitness() -> Pointer<TypeWitnessHeader> {
+    yield Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Self)
+    ).unsafe[]
+  }
+
+  /// Returns the size in bytes of the `Subject`.
+  static fun size() -> Size {
+    Self.asPointerToTypeWitness[].size()
+  }
+
+  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
+  static fun alignment() -> Alignment {
+    Self.asPointerToTypeWitness[].alignment()
+  }
+
+  /// Returns the number of bytes between elements in a buffer of `Subject`.
+  static fun stride() -> Size {
+    Self.alignment().first_aligned_offset(starting_from: Self.size())
+  }
+
 }
 
 
@@ -51,14 +81,8 @@ extension Pointer<RecordMemberType> {
     }
   }
 
-  static subscript pointee_witness() -> Pointer<TypeWitnessHeader> {
-    yield unsafe_bitcast[Pointee]
-  }
-
   fun infix+ (offset: UInt32) -> Self {
-    let w = Self.pointee_witness[]
-    let pointee_stride = w.alignment().first_aligned_offset(starting_from: w.size())
-    let byte_offset = UInt(value: pointee_stride) * UInt(value: offset)
+    let byte_offset = UInt(value: Metatype<Pointee>.stride()) * UInt(value: offset)
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 }
@@ -96,19 +120,11 @@ extension UInt {
 
 /// The header of the structure representing information stored in all type witnesses.
 ///
-/// A type witness is a 4-tuple optionally followed by a buffer of pointers containing:
-/// - A string describing the type being witnessed;
-/// - The size of the type, as a 32-bit unsigned integer;
-/// - The alignment of the type, as a 16-bit unsigned ingeter;
-/// - The number of type parameters or type arguments, encoded using a 16-bit signed integer.
-///
-/// Let `n` be the value of the 4-th component. If `n` is non-negative, then the witness is for a
-/// proper type, `n` is the arity of the constructor that formed this type, and the tail buffer
-/// contains a pointer to the witnesses the type arguments. Otherwise, the witness is for a type
-/// constructor of arity `-n` and the tail buffer contains a pointer to a function implementing
-/// that constructor.
+/// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
 struct TypeWitnessHeader {
-  let unused: Pointer<Void>
+  // TODO: verify that the type of `description` is correct.
+  // see https://github.com/hylo-lang/hylo-new/issues/306
+  let description: Pointer<UInt8>
   let size: Size
   let alignment: Alignment
   let type_argument_or_parameter_count: UInt16
@@ -251,11 +267,12 @@ extension RecordLayout {
         // Move the hole toward the front (by repeatedly moving an
         // element into the hole) until it's where ith should go.
 
-        while true {
+        var done = false
+        while !done {
           // Move jth back one, into the hole, leaving a hole at j - 1.
           self.at[j] = self.at[j - _1]
           j -= _1
-          if j == _0 || self.at[j - _1].alignment() >= w_alignment { break }
+          if j == _0 || self.at[j - _1].alignment() >= w_alignment { done = true }
         }
         // put w in the hole.
         self.at[j] = w
@@ -287,10 +304,10 @@ extension RecordLayout {
   /// Mutates `self` in arbitrary ways
   fun offset_of_member(_ n: MemberIndex) inout -> Size {
     let nth_alignment = self.at[n].alignment()
-    retain_only_elements(that_lay_out_before_element: n)
-    stable_sort_by_decreasing_alignment()
+    self.retain_only_elements(that_lay_out_before_element: n)
+    self.stable_sort_by_decreasing_alignment()
     return nth_alignment.first_aligned_offset(
-      starting_from: sizeForCurrentOrder())
+      starting_from: self.sizeForCurrentOrder())
   }
 
 }
