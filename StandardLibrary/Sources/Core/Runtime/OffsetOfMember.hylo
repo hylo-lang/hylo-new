@@ -1,35 +1,68 @@
 extension Pointer<TypeWitnessHeader> {
 
-  subscript unsafe() auto -> TypeWitnessHeader {
+  type Pointee = TypeWitnessHeader
+
+  subscript unsafe() auto -> Pointee {
     let {
-      yield self.value as* let TypeWitnessHeader
+      yield self.value as* let Pointee
     }
 
     // Because we don't have PointerToMutable yet.
     inout {
-      yield &(self.value as* inout TypeWitnessHeader)
+      yield &(self.value as* inout Pointee)
     }
   }
 
 }
+
+subscript pointer(to x: Metatype<RecordMemberType>) -> Pointer<Metatype<RecordMemberType>> {
+  yield Pointer<Metatype<RecordMemberType>>(value: Builtin.address(of: x))
+}
+
+subscript unsafe_bitcast(x: Metatype<RecordMemberType>) -> Pointer<TypeWitnessHeader> {
+  type Result = Pointer<TypeWitnessHeader>
+  yield Pointer<Result>(value: pointer[to: x].value).unsafe[]
+}
+
 
 extension Pointer<RecordMemberType> {
 
-  subscript unsafe(_ n: UInt32) auto -> RecordMemberType {
+  type Pointee = RecordMemberType
+
+  subscript unsafe() auto -> Pointee {
     let {
-      yield self.value as* let RecordMemberType
+      yield self.value as* let Pointee
     }
 
     // Because we don't have PointerToMutable yet.
     inout {
-      yield &(self.value as* inout RecordMemberType)
+      yield &(self.value as* inout Pointee)
     }
   }
 
-  fun infix+ (other: UInt32) -> Self {
+  subscript unsafe(offset: UInt32) auto -> RecordMemberType {
+    let {
+      yield (self + offset).unsafe[]
+    }
 
+    // Because we don't have PointerToMutable yet.
+    inout {
+      yield &(self + offset).unsafe[]
+    }
+  }
+
+  static subscript pointee_witness() -> Pointer<TypeWitnessHeader> {
+    yield unsafe_bitcast[Pointee]
+  }
+
+  fun infix+ (offset: UInt32) -> Self {
+    let w = Self.pointee_witness[]
+    let pointee_stride = w.alignment().first_aligned_offset(starting_from: w.size())
+    let byte_offset = UInt(value: pointee_stride) * UInt(value: offset)
+    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 }
+
 
 type Size = UInt32
 type Alignment = UInt16
@@ -47,6 +80,16 @@ extension UInt32 {
 
   fun infix% (other: Self) -> Self {
     Self(value: Builtin.urem_i32(self.value, other.value))
+  }
+
+}
+
+// Because the integer types are incomplete
+extension UInt {
+
+  /// Creates an instance with the value of `x`.
+  init(value x: UInt32) {
+    self.value = Builtin.zext_i32_word(x.value)
   }
 
 }
@@ -115,30 +158,31 @@ extension RecordMemberType {
 
 /// Notionally, a collection of Witnesses of unspecified size.
 struct RecordLayout {
-  type Count = UInt32
-  type Index = UInt32
+  // BUG: Local typealiases can't be accessed from members.
+//  type Count = UInt32
+//  type Index = UInt32
 
   let start: Pointer<RecordMemberType>
-  var count: Count
+  var count: MemberCount
 }
 
 extension RecordLayout {
 
   /// Accesses the nth element.
   subscript at(n: MemberIndex) auto -> RecordMemberType {
-    let { yield self.start.unsafe[Int(n)] }
-    inout { yield &self.start.unsafe[Int(n)] }
+    let { yield self.start.unsafe[n] }
+    inout { yield &self.start.unsafe[n] }
   }
 
   /// Discard element n and any with lesser alignments, or with the
   /// same alignment occurring at an initial index >= n.
-  fun retain_only_elements(that_lay_out_before_element n: Index) inout {
+  fun retain_only_elements(that_lay_out_before_element n: MemberIndex) inout {
     let nth_alignment = self.at[n].alignment()
     // Next element to process.
-    var i: Count = 0
+    var i: MemberCount = 0
     // Skip over initial retained sequence.
     while i < n && self.at[i].alignment() >= nth_alignment {
-      i += 1
+      i += 1 as MemberIndex
     }
     // The number of elements to retain.
     var new_count = i
@@ -146,7 +190,7 @@ extension RecordLayout {
     // ith is not retained, either because it is nth or because its
     // alignment was too low.  Therefore we have a hole at new_count
     // that we can write into.
-    i += 1
+    i += 1 as MemberIndex
 
     // From here on out, i > new_count
 
@@ -157,20 +201,20 @@ extension RecordLayout {
         self.at[new_count] = self.at[i]
         new_count += 1
       }
-      i += 1
+      i += 1 as MemberIndex
     }
 
     // Nth element is discarded.
-    if i == n { i += 1 }
+    if i == n { i += 1 as MemberIndex }
 
     // elements after the nth are retained iff they have greater
     // alignment.
     while i < count {
       if self.at[i].alignment() > nth_alignment {
         self.at[new_count] = self.at[i]
-        new_count += 1
+        new_count += 1 as MemberCount
       }
-      i += 1
+      i += 1 as MemberIndex
     }
 
     count = new_count
@@ -185,7 +229,7 @@ extension RecordLayout {
 
     var prior_alignment = self.at[0].alignment()
 
-    var i: Index = 1
+    var i: MemberIndex = 1
     while i < count {
       // invariant: elements 0..<i are sorted.
 
@@ -206,7 +250,7 @@ extension RecordLayout {
         while true {
           // Move jth back one, into the hole, leaving a hole at j - 1.
           self.at[j] = self.at[j - 1]
-          j -= 1
+          j -= 1 as MemberCount
           if j == 0 || self.at[j - 1].alignment() >= w_alignment { break }
         }
         // put w in the hole.
@@ -221,7 +265,7 @@ extension RecordLayout {
   /// the elements of `self` in that order.
   fun sizeForCurrentOrder() -> Size {
     var r: Size = 0
-    var i: Index = 0
+    var i: MemberIndex = 0
     while i < count {
       let w = self.at[i]
       let position = w.alignment().first_aligned_offset(starting_from: r)
@@ -234,7 +278,7 @@ extension RecordLayout {
   /// Returns the offset where the initial `nth` element would appear.
   ///
   /// Mutates `self` in arbitrary ways
-  fun offset_of_member(_ n: Index) inout -> Size {
+  fun offset_of_member(_ n: MemberIndex) inout -> Size {
     let nth_alignment = self.at[n].alignment()
     retain_only_elements(that_lay_out_before_element: n)
     stable_sort_by_decreasing_alignment()
