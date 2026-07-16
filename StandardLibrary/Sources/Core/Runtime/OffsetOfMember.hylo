@@ -2,7 +2,34 @@
 ///
 /// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
 type Size = UInt32
+
+// Because the integer types are incomplete
+extension UInt32 {
+
+  /// Creates an instance with the value of `x`.
+  init(x: UInt16) {
+    &self.value = Builtin.zext_i16_i32(x.value)
+  }
+
+  fun infix% (other: Self) -> Self {
+    Self(value: Builtin.urem_i32(self.value, other.value))
+  }
+
+}
+
 type Alignment = UInt16
+
+extension Alignment {
+
+  /// Returns the first n >= i that is a multiple of self
+  fun first_aligned_offset(starting_from i: Size) -> Size {
+    let a = Size(self)
+    // The distance from i to the nearest aligned offset <= i.
+    let excess = i % a
+    return if excess == (0 as Size) { i.copy() } else { i - excess + a }
+  }
+
+}
 
 struct TypeWitnessHeader {
   // TODO: verify that the type of `description` is correct.
@@ -21,6 +48,47 @@ extension Pointer<TypeWitnessHeader> {
     let {
       yield self.value as* let Pointee
     }
+/*
+    // Because we don't have PointerToMutable yet.
+    inout {
+      yield &(self.value as* inout Pointee)
+      }
+ */
+  }
+
+}
+
+/// Notionally, the type of a member of a record type
+type RecordMemberType = Pointer<TypeWitnessHeader>
+
+extension RecordMemberType {
+
+  /// Returns the size of an instance
+  fun size() -> Size { self.unsafe[].size.copy() }
+
+  /// Returns the alignment of an instance
+  fun alignment() -> UInt16 { self.unsafe[].alignment.copy() }
+
+}
+
+// Because the integer types are incomplete
+extension UInt {
+
+  /// Creates an instance with the value of `x`.
+  init(x: UInt32) {
+    &self.value = Builtin.zext_i32_word(x.value)
+  }
+
+}
+
+extension Pointer<RecordMemberType> {
+
+  type Pointee = RecordMemberType
+
+  subscript unsafe() auto -> Pointee {
+    let {
+      yield self.value as* let Pointee
+    }
 
     // Because we don't have PointerToMutable yet.
     inout {
@@ -30,10 +98,7 @@ extension Pointer<TypeWitnessHeader> {
 
 }
 
-/// Yields
-subscript pointer(to x: Metatype<RecordMemberType>) -> Pointer<Metatype<RecordMemberType>> {
-  yield Pointer<Metatype<RecordMemberType>>(value: Builtin.address(of: x))
-}
+/*
 
 extension Metatype<RecordMemberType> {
 
@@ -65,19 +130,6 @@ extension Metatype<RecordMemberType> {
 
 extension Pointer<RecordMemberType> {
 
-  type Pointee = RecordMemberType
-
-  subscript unsafe() auto -> Pointee {
-    let {
-      yield self.value as* let Pointee
-    }
-
-    // Because we don't have PointerToMutable yet.
-    inout {
-      yield &(self.value as* inout Pointee)
-    }
-  }
-
   subscript unsafe(offset: UInt32) auto -> RecordMemberType {
     let {
       yield (self + offset).unsafe[]
@@ -88,41 +140,20 @@ extension Pointer<RecordMemberType> {
       yield &(self + offset).unsafe[]
     }
   }
-
-  fun infix+ (offset: UInt32) -> Self {
-    let byte_offset = UInt(value: Metatype<Pointee>.stride()) * UInt(value: offset)
-    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
-  }
 }
 
+extension Pointer<RecordMemberType> {
+
+  fun infix+ (offset: UInt32) -> Self {
+    let byte_offset = UInt(Metatype<Pointee>.stride()) * UInt(offset)
+    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
+  }
+
+}
 
 type MemberIndex = UInt32
 type WitnessIndex = UInt32
 type MemberCount = UInt32
-
-// Because the integer types are incomplete
-extension UInt32 {
-
-  /// Creates an instance with the value of `x`.
-  init(value x: UInt16) {
-    self.value = Builtin.zext_i16_i32(x.value)
-  }
-
-  fun infix% (other: Self) -> Self {
-    Self(value: Builtin.urem_i32(self.value, other.value))
-  }
-
-}
-
-// Because the integer types are incomplete
-extension UInt {
-
-  /// Creates an instance with the value of `x`.
-  init(value x: UInt32) {
-    self.value = Builtin.zext_i32_word(x.value)
-  }
-
-}
 
 /// Fatal error unless TypeWitnessHeader lays out in declaration
 /// order in Hylo.
@@ -140,31 +171,6 @@ fun checkLayoutRequirements() {
 }
 
 let layoutRequirementsChecked: Void = checkLayoutRequirements()
-
-extension Alignment {
-
-  /// Returns the first n >= i that is a multiple of self
-  fun first_aligned_offset(starting_from i: Size) -> Size {
-    let a = Size(value: self)
-    // The distance from i to the nearest aligned offset <= i.
-    let excess = i % a
-    return if excess == (0 as Size) { i } else { i - excess + a }
-  }
-
-}
-
-/// Notionally, the type of a member of a record type
-type RecordMemberType = Pointer<TypeWitnessHeader>
-
-extension RecordMemberType {
-
-  /// Returns the size of an instance
-  fun size() -> Size { self.unsafe[].size }
-
-  /// Returns the alignment of an instance
-  fun alignment() -> UInt16 { self.unsafe[].alignment }
-
-}
 
 /// Notionally, a collection of Witnesses of unspecified size.
 struct RecordLayout {
@@ -312,3 +318,4 @@ fun offset_of_member(
 {
   return 0
 }
+ */
