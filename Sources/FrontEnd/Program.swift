@@ -1552,6 +1552,37 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns the definition of `f` iff such definition is visible from `m`.
+  ///
+  /// The result is the first definition of `f` found by inspecting `m` and then its dependencies,
+  /// in an arbitrary order. The method assumes all possible definitions of `f` to be equivalent,
+  /// which corresponds to LLVM's `linkonce` linkage type.
+  ///
+  /// - Requires: `f` is declared (possibly without a definition) in `m`.
+  public func definition(
+    of f: IRFunction.Name, visibleFrom m: Module.ID
+  ) -> (Module.ID, IRFunction)? {
+    guard let i = self[m].ir.identity(function: f) else {
+      preconditionFailure("'\(show(f))' not declared in module '\(self[m].name)'")
+    }
+
+    // Is `f` defined in `m`?
+    if self[m].ir[i].isDefined {
+      return (m, self[m].ir[i])
+    }
+
+    // Is `f` defined in a dependency?
+    for d in self[m].dependencies {
+      guard let n = self.identity(module: d) else { continue }
+      if let j = self[n].ir.identity(function: f), self[n].ir[j].isDefined {
+        return (n, self[n].ir[j])
+      }
+    }
+
+    // No definition available.
+    return nil
+  }
+
   /// Reports that `n` was not expected in the current execution path and exits the program.
   public func unexpected<T: SyntaxIdentity>(
     _ n: T, file: StaticString = #file, line: UInt = #line

@@ -21,40 +21,52 @@ extension IRFunction {
     return success
   }
 
-  /// Inlines the contents of the callees in `self` that have been resolved statically to a
-  /// declaration annotated with `@inline(always)`.
+  /// Inlines the contents of the callees in `self` that were resolved statically to a declaration
+  /// annotated with `@inline(always)`, and whose definition is visible from `m`.
   internal mutating func inlineSimpleCallees(emittingInto m: Module.ID, using typer: inout Typer) {
     var work = Array(blocks)
     while let b = work.popLast() {
       // Nothing to do if the block's empty.
-      guard var i = b.first else { continue }
+      guard var j = b.last else { continue }
 
-      // Look for calls to inline.
-      while i != b.last {
-        var j = instruction(after: i)!
+      // Look for calls to inline. `j` ranges over the identities of the block in reverse order so
+      // that we can set `i` to the instruction immediately before any split necessary to inline
+      // the contents of another function.
+      while j != b.first {
+        var i = instruction(before: j)!
+        defer { swap(&i, &j) }
 
-        if let s = at(i) as? IRApply, case .function(let f, _) = s.callee {
+        // TODO: Subscripts
+        if let s = at(j) as? IRApply, case .function(let f, _) = s.callee {
           // Should the callee be inlined?
-          let callee = typer.program[m].ir.functions[f]!
-          if !callee.isDefined || !typer.program.shouldInline(callee.name) { break }
+          let callee = typer.program[m].ir.functions[f]!.name
+          if !typer.program.shouldInline(callee) { continue }
+
+          // Can we access the callee's definition.
+          guard let (n, source) = typer.program.definition(of: callee, visibleFrom: m) else {
+            continue
+          }
+
+          for k in source.instructions() {
+            for case .function(let f, _) in source.at(k).operands {
+              typer.program[m].ir.declare(typer.program[n].ir.functions[f]!)
+            }
+          }
 
           // Construct a table mapping each parameter to its argument.
           var table = IRSubstitutionTable()
-          table[callee.returnRegister!] = s.result
+          table[source.returnRegister!] = s.result
           for (p, a) in s.arguments.enumerated() {
             table[.parameter(p)] = a
           }
 
           // Replace the call with the contents of the callee.
-          remove(i)
           typer.program.withEmitter(insertingIn: m) { (emitter) in
             emitter.insert(
-              contentsOf: callee, before: j, in: &self,
-              substitutingOperandsWith: table)
+              contentsOf: source, before: j, in: &self, substitutingOperandsWith: table)
           }
+          remove(j)
         }
-
-        swap(&i, &j)
       }
     }
   }
