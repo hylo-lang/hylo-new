@@ -49,8 +49,8 @@ extension MachineType: CustomStringConvertible {
 
   public var description: String {
     switch self {
-    case .i(let bitWidth):
-      return "i\(bitWidth)"
+    case .i(let width):
+      return "i\(width)"
     case .word:
       return "word"
     case .float16:
