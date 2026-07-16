@@ -307,7 +307,7 @@ struct RecordLayout {
     while i < self.count {
       // invariant: elements 0..<i are sorted.
 
-      let w = self.at[i]
+      let w = self.at[i].copy()
       let w_alignment = w.alignment()
 
       if prior_alignment >= w_alignment {
@@ -317,7 +317,7 @@ struct RecordLayout {
         // We moved ith out of self, so there's a hole at i.
 
         // The hole position,
-        var j = i
+        var j = i.copy()
 
         // Move the hole toward the front (by repeatedly moving an
         // element into the hole) until it's where ith should go.
@@ -329,7 +329,10 @@ struct RecordLayout {
           if j == _0 || self.at[j - _1].alignment() >= w_alignment { &done = true }
         }
         // put w in the hole.
-        &self.assign_at(j, w)
+        &self.assign_at(
+          j,
+          w.copy() // workaround https://github.com/hylo-lang/hylo-new/issues/313
+        )
       }
 
       i += _1
@@ -342,8 +345,8 @@ struct RecordLayout {
     let _1 = 1 as UInt32
     let _0 = 0 as UInt32
 
-    var r: Size = _0
-    var i: MemberIndex = _0
+    var r: Size = 0
+    var i: MemberIndex = 0
     while i < self.count {
       let w = &self.at[i]
       let position = w.alignment().first_aligned_offset(starting_from: r)
