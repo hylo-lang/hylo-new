@@ -1,0 +1,252 @@
+extension Pointer<TypeWitnessHeader> {
+
+  subscript unsafe() auto -> TypeWitnessHeader {
+    let {
+      yield self.value as* let TypeWitnessHeader
+    }
+
+    // Because we don't have PointerToMutable yet.
+    inout {
+      yield &(self.value as* inout TypeWitnessHeader)
+    }
+  }
+
+}
+
+extension Pointer<RecordMemberType> {
+
+  subscript unsafe(_ n: UInt32) auto -> RecordMemberType {
+    let {
+      yield self.value as* let RecordMemberType
+    }
+
+    // Because we don't have PointerToMutable yet.
+    inout {
+      yield &(self.value as* inout RecordMemberType)
+    }
+  }
+
+  fun infix+ (other: UInt32) -> Self {
+
+  }
+}
+
+type Size = UInt32
+type Alignment = UInt16
+type MemberIndex = UInt32
+type WitnessIndex = UInt32
+type MemberCount = UInt32
+
+// Because the integer types are incomplete
+extension UInt32 {
+
+  /// Creates an instance with the value of `x`.
+  init(value x: UInt16) {
+    self.value = Builtin.zext_i16_i32(x.value)
+  }
+
+  fun infix% (other: Self) -> Self {
+    Self(value: Builtin.urem_i32(self.value, other.value))
+  }
+
+}
+
+/// The header of the structure representing information stored in all type witnesses.
+///
+/// A type witness is a 4-tuple optionally followed by a buffer of pointers containing:
+/// - A string describing the type being witnessed;
+/// - The size of the type, as a 32-bit unsigned integer;
+/// - The alignment of the type, as a 16-bit unsigned ingeter;
+/// - The number of type parameters or type arguments, encoded using a 16-bit signed integer.
+///
+/// Let `n` be the value of the 4-th component. If `n` is non-negative, then the witness is for a
+/// proper type, `n` is the arity of the constructor that formed this type, and the tail buffer
+/// contains a pointer to the witnesses the type arguments. Otherwise, the witness is for a type
+/// constructor of arity `-n` and the tail buffer contains a pointer to a function implementing
+/// that constructor.
+struct TypeWitnessHeader {
+  let unused: Pointer<Void>
+  let size: Size
+  let alignment: Alignment
+  let type_argument_or_parameter_count: UInt16
+}
+
+/// Fatal error unless TypeWitnessHeader lays out in declaration
+/// order in Hylo.
+fun checkLayoutRequirements() {
+  /*
+  precondition(
+    MemoryLayout<Pointer<()>>.alignment >= MemoryLayout<Size>.alignment,
+    "Assumptions about TypeWitnessHeader tuple layout violated"
+  )
+  precondition(
+    MemoryLayout<Size>.alignment >= MemoryLayout<Alignment>.alignment,
+    "Assumptions about TypeWitnessHeader tuple layout violated"
+    )
+   */
+}
+
+let layoutRequirementsChecked: Void = checkLayoutRequirements()
+
+extension Alignment {
+
+  /// Returns the first n >= i that is a multiple of self
+  fun first_aligned_offset(starting_from i: Size) -> Size {
+    let a = Size(value: self)
+    // The distance from i to the nearest aligned offset <= i.
+    let excess = i % a
+    return if excess == (0 as Size) { i } else { i - excess + a }
+  }
+
+}
+
+/// Notionally, the type of a member of a record type
+type RecordMemberType = Pointer<TypeWitnessHeader>
+
+extension RecordMemberType {
+
+  /// Returns the size of an instance
+  fun size() -> Size { self.unsafe[].size }
+
+  /// Returns the alignment of an instance
+  fun alignment() -> UInt16 { self.unsafe[].alignment }
+
+}
+
+/// Notionally, a collection of Witnesses of unspecified size.
+struct RecordLayout {
+  type Count = UInt32
+  type Index = UInt32
+
+  let start: Pointer<RecordMemberType>
+  var count: Count
+}
+
+extension RecordLayout {
+
+  /// Accesses the nth element.
+  subscript at(n: MemberIndex) auto -> RecordMemberType {
+    let { yield self.start.unsafe[Int(n)] }
+    inout { yield &self.start.unsafe[Int(n)] }
+  }
+
+  /// Discard element n and any with lesser alignments, or with the
+  /// same alignment occurring at an initial index >= n.
+  fun retain_only_elements(that_lay_out_before_element n: Index) inout {
+    let nth_alignment = self.at[n].alignment()
+    // Next element to process.
+    var i: Count = 0
+    // Skip over initial retained sequence.
+    while i < n && self.at[i].alignment() >= nth_alignment {
+      i += 1
+    }
+    // The number of elements to retain.
+    var new_count = i
+
+    // ith is not retained, either because it is nth or because its
+    // alignment was too low.  Therefore we have a hole at new_count
+    // that we can write into.
+    i += 1
+
+    // From here on out, i > new_count
+
+    // elements before the nth are retained iff they have greater or
+    // equal alignment.
+    while i < n {
+      if self.at[i].alignment() >= nth_alignment {
+        self.at[new_count] = self.at[i]
+        new_count += 1
+      }
+      i += 1
+    }
+
+    // Nth element is discarded.
+    if i == n { i += 1 }
+
+    // elements after the nth are retained iff they have greater
+    // alignment.
+    while i < count {
+      if self.at[i].alignment() > nth_alignment {
+        self.at[new_count] = self.at[i]
+        new_count += 1
+      }
+      i += 1
+    }
+
+    count = new_count
+  }
+
+  /// Stably sorts the elements in decreasing alignment order.
+  ///
+  /// - Complexity: *O*(`count`²) (insertion sort)
+  fun stable_sort_by_decreasing_alignment() inout {
+    // Nothing to sort
+    if count < 2 { return }
+
+    var prior_alignment = self.at[0].alignment()
+
+    var i: Index = 1
+    while i < count {
+      // invariant: elements 0..<i are sorted.
+
+      let w = self.at[i]
+      let w_alignment = w.alignment()
+
+      if prior_alignment >= w_alignment {
+        // w was already in the right place
+        prior_alignment = w_alignment
+      } else {
+        // We moved ith out of self, so there's a hole at i.
+
+        // The hole position,
+        var j = i
+        // Move the hole toward the front (by repeatedly moving an
+        // element into the hole) until it's where ith should go.
+
+        while true {
+          // Move jth back one, into the hole, leaving a hole at j - 1.
+          self.at[j] = self.at[j - 1]
+          j -= 1
+          if j == 0 || self.at[j - 1].alignment() >= w_alignment { break }
+        }
+        // put w in the hole.
+        self.at[j] = w
+      }
+
+      i += 1
+    }
+  }
+
+  /// Returns the size required to store properties of types given by
+  /// the elements of `self` in that order.
+  fun sizeForCurrentOrder() -> Size {
+    var r: Size = 0
+    var i: Index = 0
+    while i < count {
+      let w = self.at[i]
+      let position = w.alignment().first_aligned_offset(starting_from: r)
+      r = position + w.size()
+      i += 1
+    }
+    return r
+  }
+
+  /// Returns the offset where the initial `nth` element would appear.
+  ///
+  /// Mutates `self` in arbitrary ways
+  fun offset_of_member(_ n: Index) inout -> Size {
+    let nth_alignment = self.at[n].alignment()
+    retain_only_elements(that_lay_out_before_element: n)
+    stable_sort_by_decreasing_alignment()
+    return nth_alignment.first_aligned_offset(
+      starting_from: sizeForCurrentOrder())
+  }
+
+}
+
+fun offset_of_member(
+  _ memberIndex: Int,
+  in propertyTypeWitnesses: Pointer<TypeWitnessHeader>, propertyCount: Int) -> Int32
+{
+  return 0
+}
