@@ -1393,7 +1393,8 @@ internal struct IREmitter {
       }
 
     default:
-      fatalError()
+      fatalError(
+        "Lowering not implemented for \(program.show(program.declaration(referredToBy: e)))")
     }
   }
 
