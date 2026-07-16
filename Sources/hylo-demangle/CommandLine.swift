@@ -67,7 +67,7 @@ import FrontEnd
     }
   }
 
-  /// Prints the demangled form of each matched mangled symbol om `input`.
+  /// Prints the demangled form of each matched mangled symbol in `input`.
   private func printDemangled(_ input: String) {
     input.enumerateTokens { (token) in
       if let demangled = String(token).demangled() {
