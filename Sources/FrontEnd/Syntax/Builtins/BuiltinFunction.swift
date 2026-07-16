@@ -102,7 +102,7 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   //  case trunc(MachineType.ID, MachineType.ID)
   //
-  //  case zext(MachineType.ID, MachineType.ID)
+  case zext(MachineType.ID, MachineType.ID)
   //
   //  case sext(MachineType.ID, MachineType.ID)
   //
@@ -464,7 +464,9 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: i1))
     //    case .trunc(let s, let d):
     //      return .init(^s, to: ^d)
-    //    case .zext(let s, let d):
+    case .zext(let src, let dst):
+      return s.demand(Arrow(src, to: dst))
+
     //      return .init(^s, to: ^d)
     //    case .sext(let s, let d):
     //      return .init(^s, to: ^d)
@@ -802,8 +804,8 @@ extension BuiltinFunction: Showable {
       return printer.format("icmp_%S_%T", [p, t.erased])
     //    case .trunc(let l, let r):
     //      return "trunc_\(l)_\(r)"
-    //    case .zext(let l, let r):
-    //      return "zext_\(l)_\(r)"
+    case .zext(let l, let r):
+      return "zext_\(l)_\(r)"
     //    case .sext(let l, let r):
     //      return "sext_\(l)_\(r)"
     //    case .uitofp(let l, let r):
@@ -1180,9 +1182,9 @@ extension BuiltinFunction {
     //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
     //      self = .trunc(s, d)
     //
-    //    case "zext":
-    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
-    //      self = .zext(s, d)
+    case "zext":
+      guard let (src, dst) = (machineType + machineType)(&tokens) else { return nil }
+      self = .zext(s.demand(src), s.demand(dst))
     //
     //    case "sext":
     //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
