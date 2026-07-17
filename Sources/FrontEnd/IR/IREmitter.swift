@@ -1379,6 +1379,9 @@ internal struct IREmitter {
         return lowering(e, { $0._emit(useOf: d, typed: t) })
       }
 
+    case .builtin(.alias):
+      return lowering(e, { $0._emitTypeWitnesse(expressedBy: .init(e)) })
+
     case .member(let d):
       // Emit the receiver.
       let q = lowered(lvalue: program[e].qualification!)
@@ -3214,6 +3217,8 @@ extension Program {
     switch cast(e, to: NameExpression.self).flatMap(declaration(referredToBy:)) {
     case .some(.direct(let d)):
       return isTypeDeclaration(d)
+    case .some(.builtin(.alias)):
+      return true
     default:
       return false
     }

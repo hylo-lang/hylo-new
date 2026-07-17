@@ -1,0 +1,9 @@
+//! stage:lowering
+
+struct S {
+
+  fun f() {
+    _ = Builtin.address(of: Self)
+  }
+
+}
