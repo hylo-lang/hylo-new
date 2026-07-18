@@ -31,7 +31,9 @@ extension Alignment {
 
 }
 
-struct TypeWitnessHeader {
+public struct TypeWitnessHeader {
+  public memberwise init
+
   // TODO: verify that the type of `description` is correct.
   // see https://github.com/hylo-lang/hylo-new/issues/306
   let description: Pointer<UInt8>
@@ -40,7 +42,6 @@ struct TypeWitnessHeader {
   let type_argument_or_parameter_count: UInt16
 }
 
-//given <T> => Pointer<TypeWitnessHeader> is Deinitializable {}
 given Pointer<TypeWitnessHeader> is Deinitializable {}
 given Pointer<TypeWitnessHeader> is Movable {}
 given Pointer<TypeWitnessHeader> is Copyable {}
