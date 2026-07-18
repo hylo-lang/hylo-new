@@ -53,12 +53,6 @@ extension Pointer<TypeWitnessHeader> {
     let {
       yield self.value as* let Pointee
     }
-/*
-    // Because we don't have PointerToMutable yet.
-    inout {
-      yield &(self.value as* inout Pointee)
-      }
- */
   }
 
 }
