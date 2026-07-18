@@ -248,4 +248,23 @@ final class ProgramTests: XCTestCase {
     XCTAssertNil(p.type(maybeAssignedTo: e))
   }
 
+  func testExternCName() async throws {
+    var p = Program(forTesting: true)
+    let m = p.demandModule("Main")
+    _ = p[m].addSource(
+      """
+      @extern_c_indirect("f_indirect")
+      fun f()
+      
+      @extern_c_indirect()
+      fun g()
+      """)
+    
+    let f = p.castToDeclaration(try XCTUnwrap(p.select(.name("f")).first))!
+    XCTAssertEqual(p.externCName(of: f), "f_indirect")
+
+    let g = p.castToDeclaration(try XCTUnwrap(p.select(.name("g")).first))!
+    XCTAssertNil(p.externCName(of: g)) // Resilience to parse errors.
+  }
+
 }

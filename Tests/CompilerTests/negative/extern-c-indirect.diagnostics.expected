@@ -1,0 +1,21 @@
+negative/extern-c-indirect.hylo:2.2-19: error: '@extern_c_indirect' requires exactly 1 string argument
+@extern_c_indirect
+ ~~~~~~~~~~~~~~~~~
+negative/extern-c-indirect.hylo:6.2-19: error: '@extern_c_indirect' requires exactly 1 string argument
+@extern_c_indirect()
+ ~~~~~~~~~~~~~~~~~
+negative/extern-c-indirect.hylo:10.20-22: error: expected string argument
+@extern_c_indirect(23)
+                   ~~
+negative/extern-c-indirect.hylo:14.20-22: error: expected string argument
+@extern_c_indirect(23, "f")
+                   ~~
+negative/extern-c-indirect.hylo:14.24-27: error: '@extern_c_indirect' accepts exactly 1 argument
+@extern_c_indirect(23, "f")
+                       ~~~
+negative/extern-c-indirect.hylo:18.25-28: error: '@extern_c_indirect' accepts exactly 1 argument
+@extern_c_indirect("f", "g", "h")
+                        ~~~
+negative/extern-c-indirect.hylo:22.20-22: error: expected non-empty string argument
+@extern_c_indirect("")
+                   ~~

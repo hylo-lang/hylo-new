@@ -1,5 +1,5 @@
 /// A typed memory address whose contents can be read.
-public struct Pointer<Pointee> {
+public struct Pointer<Pointee> is Deinitializable {
 
   /// The raw value of this instance.
   module var value: Builtin.ptr

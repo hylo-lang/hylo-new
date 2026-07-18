@@ -1,0 +1,57 @@
+struct Point is Deinitializable {
+
+  // TODO: use `private data: UInt8[16]`
+  var bytes_0_7: Int
+  var bytes_8_15: Int
+
+  @extern_c_indirect("Point_init_indirect")
+  public init(_ x: Int, _ y: Int)
+
+  @extern_c_indirect("Point_get_x_indirect")
+  fun x() -> Int
+
+  @extern_c_indirect("Point_get_y_indirect")
+  fun y() -> Int
+
+  @extern_c_indirect("Point_set_x_indirect")
+  fun set_x(new_value: Int) -> Void
+
+  @extern_c_indirect("Point_set_y_indirect")
+  fun set_y(new_value: Int) -> Void
+
+  @extern_c_indirect("Point_add_indirect")
+  fun infix+(other: Point) -> Point
+
+}
+
+// TODO: remove this once standard library compiles.
+extension Int {
+
+  @extern_c_indirect("Int_add_indirect")
+  fun infix+(other: Int) -> Int
+
+  @extern_c_indirect("Int_to_i32_indirect")
+  fun to_i32() -> Int32
+
+}
+
+@extern_c_indirect("set_value_to_3_at_address_indirect")
+fun set_value_to_3(of_byte_at address: Pointer<Never>)
+
+@extern_c_indirect("get_byte_value_at_address_indirect")
+fun get_value(of_byte_at address: Pointer<Never>) -> Int
+
+public fun main() -> Int32 {
+  var p = Point(x: 1, y: 2)
+  var q = Point(x: 3, y: 4)
+
+  &p.set_x(3)
+  &q.set_y(2)
+  let r = p + q // == Point(6, 4)
+  
+  let pointer = malloc(1)
+  set_value_to_3(of_byte_at: pointer)
+  let three = get_value(of_byte_at: pointer)
+  
+  return (r.x() + r.y() + three).to_i32() // 6 + 4 + 3 == 13
+}

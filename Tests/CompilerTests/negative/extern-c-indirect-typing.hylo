@@ -1,0 +1,12 @@
+// Must not have a body.
+@extern_c_indirect("f1")
+fun f1() {}
+
+// Cannot be combined with @extern.
+@extern
+@extern_c_indirect("f2")
+fun f2()
+
+// Must not be generic.
+@extern_c_indirect("f3")
+fun f3<T>()

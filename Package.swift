@@ -19,6 +19,7 @@ let package = Package(
   ],
   products: [
     .executable(name: "hc", targets: ["hc"]),
+    .executable(name: "hylo-demangle", targets: ["hylo-demangle"]),
     .library(name: "HyloStandardLibrary", targets: ["StandardLibrary"]),
     .library(name: "HyloFrontEnd", targets: ["FrontEnd"]),
   ],
@@ -56,6 +57,14 @@ let package = Package(
       name: "hc-tests",
       dependencies: [
         .product(name: "ArgumentParser", package: "swift-argument-parser")
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .executableTarget(
+      name: "hylo-demangle",
+      dependencies: [
+        .target(name: "FrontEnd"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       swiftSettings: commonSwiftSettings),
 

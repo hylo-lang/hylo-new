@@ -1,0 +1,25 @@
+// Missing parameter list.
+@extern_c_indirect
+fun f1()
+
+// Missing argument.
+@extern_c_indirect()
+fun f2()
+
+// String argument is required.
+@extern_c_indirect(23)
+fun f3()
+
+// Both diagnostics are reported.
+@extern_c_indirect(23, "f")
+fun f4()
+
+// Only the first excess argument is reported.
+@extern_c_indirect("f", "g", "h")
+fun f4()
+
+// Symbol name must not be empty.
+@extern_c_indirect("")
+fun f5()
+
+

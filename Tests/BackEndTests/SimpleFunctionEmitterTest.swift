@@ -31,7 +31,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     XCTAssert(
       llvmIR.containsOnce(
         """
-        define private void @"M6testvUpvirtualu6rky9fkv9x3F06mainlT01tR50tR5$gP71L1L1L"() {
+        define private void @"$hM6testvUpvirtualu6rky9fkv9x3F06mainlT01tR50tR5$gP71L1L1L"() {
           %1 = alloca {}, align 8
           ret void
         }
@@ -42,7 +42,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
       llvmIR.containsOnce(
         """
         define i32 @main() {
-          call void @"M6testvUpvirtualu6rky9fkv9x3F06mainlT01tR50tR5$gP71L1L1L"()
+          call void @"$hM6testvUpvirtualu6rky9fkv9x3F06mainlT01tR50tR5$gP71L1L1L"()
           ret i32 0
         }
         """))

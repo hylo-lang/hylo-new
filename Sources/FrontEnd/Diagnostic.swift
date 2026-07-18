@@ -123,7 +123,7 @@ extension Program {
     _ f: AnyTypeIdentity, mutably isAppliedMutably: Bool, at site: SourceSpan
   ) -> Diagnostic {
     let x = isAppliedMutably ? "mutably" : "immutably"
-    let m = format("cannot call bundle of type '%T' \(x)", [f])
+    let m = format("cannot call bundle of type '%T' %S", [f, x])
     return .init(.error, m, at: site)
   }
 
@@ -273,9 +273,9 @@ extension Program {
     let message: String = {
       if let u = t {
         if let m = types[u] as? Metatype {
-          return format("type '%T' has no static member '\(n)'", [m.inhabitant])
+          return format("type '%T' has no static member '%S'", [m.inhabitant, n])
         } else {
-          return format("type '%T' has no member '\(n)'", [u])
+          return format("type '%T' has no member '%S'", [u, n])
         }
       } else {
         return "undefined symbol '\(n)'"

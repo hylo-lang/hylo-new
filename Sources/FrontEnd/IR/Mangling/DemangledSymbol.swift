@@ -3,9 +3,16 @@ internal indirect enum DemangledSymbol: Hashable, Sendable {
 
   /// Creates an instance decoding the symbol mangled in `s`.
   ///
-  /// `self` is assigned to an error if `s` is malformed.
+  /// `self` is assigned to `.notMangled` if `s` doesn't start with the mangling prefix, or to
+  /// `.error` if `s` is malformed.
   internal init(_ s: String) {
-    if let x = String(assemblySanitized: s) {
+    guard s.starts(with: ManglingEncoding.manglingPrefix) else {
+      self = .notMangled
+      return
+    }
+
+    let m = String(s.dropFirst(ManglingEncoding.manglingPrefix.count))
+    if let x = String(assemblySanitized: m) {
       var source = DemanglingContext(stream: x[...])
       self = ManglingEncoding.demangle(from: &source)
     } else {
@@ -27,6 +34,9 @@ internal indirect enum DemangledSymbol: Hashable, Sendable {
   /// The payload captures what we could demangle until we encountered the error, if any, and the
   /// characters still remaining to be parsed.
   case error(DemangledSymbol?, remaining: String)
+
+  /// Indication that the symbol doesn't appear to be mangled at all.
+  case notMangled
 
   /// An instance decoding a reserved symbol identifier.
   internal init(reserved: ReservedSymbol) {
@@ -57,6 +67,8 @@ internal indirect enum DemangledSymbol: Hashable, Sendable {
       return "witness table"
     case .error:
       return "error"
+    case .notMangled:
+      return "not mangled"
     }
   }
 
@@ -78,6 +90,8 @@ extension DemangledSymbol: CustomStringConvertible {
       } else {
         return "#! (remaining: \(r))"
       }
+    case .notMangled:
+      return "#! not mangled"
     }
   }
 
@@ -439,6 +453,19 @@ extension DemangledType.Parameter: CustomStringConvertible {
     } else {
       return "\(type)"
     }
+  }
+
+}
+
+extension String {
+
+  /// Returns the demangled representation of `self` or `nil` if it is not a mangled symbol.
+  public func demangled() -> String? {
+    let d = DemangledSymbol(self)
+    if case .notMangled = d {
+      return nil
+    }
+    return d.description
   }
 
 }
