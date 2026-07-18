@@ -48,6 +48,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env: &distributable-env
       ARTIFACT_NAME: hylo-${{ github.ref_name }}-${{ matrix.target }}
+      RELEASE_TAG: ${{ github.ref_name }}
 
     steps:
       - uses: actions/checkout@v7
@@ -68,6 +69,12 @@ jobs:
           llvmBuildConfig: MinSizeRel
           addToPkgConfigPath: true
           addToPath: true
+
+      - name: Embed release version
+        run: |
+          $version = $env:RELEASE_TAG -replace '^v', ''
+          "internal let hyloVersion = `"$version`"" | Set-Content Sources/hc/Version.swift
+        shell: pwsh
 
       - name: Download Recent Visual Studio and Windows SDK
         uses: compnerd/gha-setup-vsdevenv@main
@@ -140,7 +147,11 @@ jobs:
 
           $binaryName = if ($env:RUNNER_OS -eq 'Windows') { 'hc.exe' } else { 'hc' }
           $binary = Join-Path $extractDir $binaryName
-          & $binary --help
+          $expectedVersion = $env:RELEASE_TAG -replace '^v', ''
+          $actualVersion = (& $binary --version).Trim()
+          if ($actualVersion -ne $expectedVersion) {
+            throw "Expected version '$expectedVersion', got '$actualVersion'"
+          }
         shell: pwsh
 
       - name: Upload distributable to draft release
