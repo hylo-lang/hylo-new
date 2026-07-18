@@ -1,1 +1,1 @@
-let hyloVersion = "development"
+internal let hyloVersion = "development"

@@ -73,7 +73,7 @@ jobs:
       - name: Embed release version
         run: |
           $version = $env:RELEASE_TAG -replace '^v', ''
-          "let hyloVersion = `"$version`"" | Set-Content Sources/hc/Version.swift
+          "internal let hyloVersion = `"$version`"" | Set-Content Sources/hc/Version.swift
         shell: pwsh
 
       - name: Download Recent Visual Studio and Windows SDK
@@ -147,7 +147,6 @@ jobs:
 
           $binaryName = if ($env:RUNNER_OS -eq 'Windows') { 'hc.exe' } else { 'hc' }
           $binary = Join-Path $extractDir $binaryName
-          & $binary --help
           $expectedVersion = $env:RELEASE_TAG -replace '^v', ''
           $actualVersion = (& $binary --version).Trim()
           if ($actualVersion -ne $expectedVersion) {

@@ -12,9 +12,7 @@ private typealias Module = FrontEnd.Module
 @main struct CommandLine: AsyncParsableCommand {
 
   /// Configuration for this command.
-  public static let configuration = CommandConfiguration(
-    commandName: "hc",
-    version: hyloVersion)
+  public static let configuration = CommandConfiguration(commandName: "hc", version: hyloVersion)
 
   /// The paths at which libraries may be found.
   @Option(
