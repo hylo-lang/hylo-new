@@ -274,7 +274,6 @@ public struct Driver {
     return o
   }
 
-
   /// Loads `module`, whose sources are at `root`, into `program`.
   ///
   /// If `moduleCachePath` is set, the module is loaded from cache if an archive is found and its
