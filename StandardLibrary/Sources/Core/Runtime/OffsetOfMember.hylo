@@ -7,11 +7,11 @@ type Size = UInt32
 extension UInt32 {
 
   /// Creates an instance with the value of `x`.
-  init(x: UInt16) {
+  public init(x: UInt16) {
     &self.value = Builtin.zext_i16_i32(x.value)
   }
 
-  fun infix% (other: Self) -> Self {
+  public fun infix% (other: Self) -> Self {
     Self(value: Builtin.urem_i32(self.value, other.value))
   }
 
@@ -31,6 +31,12 @@ extension Alignment {
 
 }
 
+public given Pointer<UInt8> is Deinitializable {}
+public given Pointer<UInt8> is Movable {}
+
+public given TypeWitnessHeader is Deinitializable {}
+public given TypeWitnessHeader is Movable {}
+
 public struct TypeWitnessHeader {
   public memberwise init
 
@@ -42,15 +48,15 @@ public struct TypeWitnessHeader {
   let type_argument_or_parameter_count: UInt16
 }
 
-given Pointer<TypeWitnessHeader> is Deinitializable {}
-given Pointer<TypeWitnessHeader> is Movable {}
-given Pointer<TypeWitnessHeader> is Copyable {}
+public given Pointer<TypeWitnessHeader> is Deinitializable {}
+public given Pointer<TypeWitnessHeader> is Movable {}
+public given Pointer<TypeWitnessHeader> is Copyable {}
 
 extension Pointer<TypeWitnessHeader> {
 
-  type Pointee = TypeWitnessHeader
+  public type Pointee = TypeWitnessHeader
 
-  subscript unsafe() auto -> Pointee {
+  public subscript unsafe() auto -> Pointee {
     let {
       yield self.value as* let Pointee
     }
@@ -83,21 +89,21 @@ extension RecordMemberType {
 extension UInt {
 
   /// Creates an instance with the value of `x`.
-  init(x: UInt32) {
+  public init(x: UInt32) {
     &self.value = Builtin.zext_i32_word(x.value)
   }
 
 }
 
-//given Pointer<RecordMemberType> is Movable {}
-//given Pointer<RecordMemberType> is Copyable {}
-given Pointer<RecordMemberType> is Deinitializable {}
+public given Pointer<RecordMemberType> is Movable {}
+public given Pointer<RecordMemberType> is Copyable {}
+public given Pointer<RecordMemberType> is Deinitializable {}
 
 extension Pointer<RecordMemberType> {
 
   type Pointee = RecordMemberType
 
-  subscript unsafe() auto -> Pointee {
+  public subscript unsafe() auto -> Pointee {
     let {
       yield self.value as* let Pointee
     }
@@ -108,7 +114,7 @@ extension Pointer<RecordMemberType> {
     }
   }
 
-  subscript unsafe(offset: UInt32) auto -> RecordMemberType {
+  public subscript unsafe(offset: UInt32) auto -> RecordMemberType {
     let {
       yield (self + offset).unsafe[]
     }
@@ -121,7 +127,7 @@ extension Pointer<RecordMemberType> {
     }
   }
 
-  fun infix+ (offset: UInt32) -> Self {
+  public fun infix+ (offset: UInt32) -> Self {
     let byte_offset = UInt(Metatype<Pointee>.stride()) * UInt(offset)
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
@@ -138,17 +144,17 @@ extension Metatype<RecordMemberType> {
   }
 
   /// Returns the size in bytes of the `Subject`.
-  static fun size() -> Size {
+  public static fun size() -> Size {
     Self.type_info[].size.copy()
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  static fun alignment() -> Alignment {
+  public static fun alignment() -> Alignment {
     Self.type_info[].alignment.copy()
   }
 
   /// Returns the number of bytes between elements in a buffer of `Subject`.
-  static fun stride() -> Size {
+  public static fun stride() -> Size {
     Self.alignment().first_aligned_offset(starting_from: Self.size())
   }
 }
@@ -167,7 +173,7 @@ extension Metatype<Pointer<UInt8>> {
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  static fun alignment() -> Alignment {
+  public static fun alignment() -> Alignment {
     Self.type_info[].alignment.copy()
   }
 
@@ -184,7 +190,7 @@ extension Metatype<UInt32> {
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  static fun alignment() -> Alignment {
+  public static fun alignment() -> Alignment {
     Self.type_info[].alignment.copy()
   }
 
@@ -200,7 +206,7 @@ extension Metatype<UInt16> {
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  static fun alignment() -> Alignment {
+  public static fun alignment() -> Alignment {
     Self.type_info[].alignment.copy()
   }
 
@@ -209,12 +215,14 @@ extension Metatype<UInt16> {
 /// Fatal error unless TypeWitnessHeader lays out in declaration
 /// order in Hylo.
 fun checkLayoutRequirements() {
+  precondition(false)
   precondition(
     Metatype<Pointer<UInt8>>.alignment() >= Metatype<Size>.alignment())
   precondition(
     Metatype<Size>.alignment() >= Metatype<Alignment>.alignment())
 }
 
+// Doesn't seem to work; see https://github.com/hylo-lang/hylo-new/issues/319
 let layoutRequirementsChecked: Void = checkLayoutRequirements()
 
 /// Notionally, a collection of Witnesses of unspecified size.
