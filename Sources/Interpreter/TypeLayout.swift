@@ -2,7 +2,7 @@ import FrontEnd
 import Utilities
 
 /// The layout of a type in memory, including the positions of its parts.
-public struct TypeLayout: Regular {
+struct TypeLayout: Regular {
 
   /// Memory layout of a type, without any detail about parts.
   public struct Bytes: Regular {
@@ -25,7 +25,7 @@ public struct TypeLayout: Regular {
     public let name: String?
 
     /// The type of the part.
-    public let type: AnyTypeIdentity
+    public let type: ConcreteTypeIdentity
 
     /// The byte offset of the part with respect to the layout.
     public let offset: Int
@@ -44,7 +44,7 @@ public struct TypeLayout: Regular {
   public var stride: Int { bytes.stride }
 
   /// The type whose layout is described by `self`.
-  public let type: AnyTypeIdentity
+  public let type: ConcreteTypeIdentity
 
   /// The structure.
   ///
@@ -93,7 +93,7 @@ extension TypeLayout.Bytes {
   /// represented by `self` and `t` respectively.
   ///
   /// - Note: the `T` instance is stored `t.size` bytes before the end of the tuple.
-  public func appending(_ t: Self) -> Self {
+  func appending(_ t: Self) -> Self {
     let r = self.size.rounded(upToNearestMultipleOf: t.alignment)
     return .init(alignment: max(self.alignment, t.alignment), size: r + t.size)
   }
@@ -102,7 +102,7 @@ extension TypeLayout.Bytes {
 
 extension TypeLayout.Part {
 
-  public struct Parentage: Regular, CustomStringConvertible {
+  struct Parentage: Regular, CustomStringConvertible {
 
     /// The type in which the part exists.
     public let parent: TypeLayout

@@ -1,7 +1,8 @@
 import FrontEnd
+import Utilities
 
 /// The identity of a concrete (non-generic) type.
-struct ConcreteTypeIdentity {
+struct ConcreteTypeIdentity: Regular {
 
   /// The underlying type identity, guaranteed to have no generic parameters.
   public let underlying: AnyTypeIdentity
