@@ -31,6 +31,30 @@ struct TypeLayoutCache {
 
   /// Returns the layout for `t`.
   private mutating func computeLayout(_ t: ConcreteTypeIdentity) -> TypeLayout {
+    if isMachineType(t) {
+      let u = p.types[p.types.cast(t.underlying, to: MachineType.self)!]
+      return TypeLayout(bytes: abi.layout(u), type: t, parts: [], isEnumLayout: false)
+    } else if isEnum(t) {
+      unimplemented()
+    } else if hasRecordLayout(t) {
+      unimplemented()
+    } else {
+      unreachable("\(p.show(t.underlying)) doesn't have any layout)")
+    }
+  }
+
+  /// Returns true iff `t` is of `MachineType`.
+  private mutating func isMachineType(_ t: ConcreteTypeIdentity) -> Bool {
+    p.types.tag(of: t.underlying).value == MachineType.self
+  }
+
+  /// Returns true iff `t` is of enum type.
+  private mutating func isEnum(_ t: ConcreteTypeIdentity) -> Bool {
+    unimplemented()
+  }
+
+  /// Returns true iff `t` has a record layout.
+  private mutating func hasRecordLayout(_ t: ConcreteTypeIdentity) -> Bool {
     unimplemented()
   }
 }
