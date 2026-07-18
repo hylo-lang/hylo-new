@@ -4610,7 +4610,7 @@ public struct Typer {
         if case .module(let m) = (program.types[t] as? Namespace)?.identifier {
           // Avoid importing a module more than once. We're using a linear search because `table`
           // is assumed to be small in practice.
-          if table.contains(m) { table.append(m) }
+          if !table.contains(m) { table.append(m) }
         }
       }
 
