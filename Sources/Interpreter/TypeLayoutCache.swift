@@ -31,12 +31,12 @@ struct TypeLayoutCache {
 
   /// Returns the layout for `t`.
   private mutating func computeLayout(_ t: ConcreteTypeIdentity) -> TypeLayout {
-    if isMachineType(t) {
-      let u = p.types[p.types.cast(t.underlying, to: MachineType.self)!]
+    if isMachineType(t.underlying) {
+      let u = type(t.underlying, as: MachineType.self)
       return TypeLayout(bytes: abi.layout(u), type: t, parts: [], isEnumLayout: false)
-    } else if isEnum(t) {
+    } else if isEnum(t.underlying) {
       unimplemented()
-    } else if hasRecordLayout(t) {
+    } else if hasRecordLayout(t.underlying) {
       unimplemented()
     } else {
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
@@ -44,17 +44,34 @@ struct TypeLayoutCache {
   }
 
   /// Returns true iff `t` is of `MachineType`.
-  private mutating func isMachineType(_ t: ConcreteTypeIdentity) -> Bool {
-    p.types.tag(of: t.underlying).value == MachineType.self
+  private mutating func isMachineType(_ t: AnyTypeIdentity) -> Bool {
+    tag(t) == MachineType.self
   }
 
   /// Returns true iff `t` is of enum type.
-  private mutating func isEnum(_ t: ConcreteTypeIdentity) -> Bool {
-    unimplemented()
+  private mutating func isEnum(_ t: AnyTypeIdentity) -> Bool {
+    let u = tag(t)
+    if u == Enum.self {
+      return true
+    } else if u == TypeApplication.self {
+      return isEnum(type(t, as: TypeApplication.self).abstraction)
+    } else {
+      return false
+    }
   }
 
   /// Returns true iff `t` has a record layout.
-  private mutating func hasRecordLayout(_ t: ConcreteTypeIdentity) -> Bool {
+  private mutating func hasRecordLayout(_ t: AnyTypeIdentity) -> Bool {
     unimplemented()
+  }
+
+  /// Returns the type identified by `t`, cast to `U`.
+  private func type<U: TypeTree>(_ t: AnyTypeIdentity, as u: U.Type) -> U {
+    p.types[p.types.cast(t, to: u)!]
+  }
+
+  /// Returns the tag of `t`.
+  private func tag(_ t: AnyTypeIdentity) -> any TypeTree.Type {
+    p.types.tag(of: t).value
   }
 }
