@@ -49,14 +49,16 @@ struct TypeLayout: Regular {
   /// The structure.
   ///
   /// For product types, info for each stored property in storage order.
-  /// For enum types, info for each case when it is active, followed by info for the discriminator.
+  /// For enum types, info for each case when it is active, followed by info
+  /// for the discriminator.
   /// Empty otherwise (built-in types).
   public let parts: [Part]
 
   /// The parentage of the parts.
   ///
   /// For product types, the parentage of each stored property in storage order.
-  /// For enum types, the parentage of each case when it is active, followed by the parentage of the discriminator.
+  /// For enum types, the parentage of each case when it is active, followed
+  /// by the parentage of the discriminator.
   /// Empty otherwise (built-in types).
   public var partParentages: some Collection<Part.Parentage> {
     parts.indices.lazy.map { .init(self, $0) }
