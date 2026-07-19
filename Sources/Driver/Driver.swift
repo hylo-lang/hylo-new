@@ -39,8 +39,8 @@ public struct Driver {
   /// The names of the native libraries to link.
   public var librariesToLink: [String]
 
-  /// `true` iff the standard library and its shim should be excluded from compilation and linking.
-  public var noStandardLibrary: Bool = false
+  /// `true` iff compilation and linking depend on the standard library and its shim.
+  public private(set) var usesStandardLibrary: Bool = false
 
   /// The program being compiled by the driver.
   public var program: Program
@@ -211,7 +211,7 @@ public struct Driver {
 
       var cSources = cSources
 
-      if !noStandardLibrary {
+      if usesStandardLibrary {
         // FIXME: Enable this after we can lower the standard library
         // modulesToLink.append(program.modules[.standardLibrary]!.identity)
         cSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
@@ -308,7 +308,7 @@ public struct Driver {
     // Compile the module from sources.
     let m = program.demandModule(module)
 
-    if !noStandardLibrary && module != Module.standardLibraryName {
+    if usesStandardLibrary && module != Module.standardLibraryName {
       program[m].addDependency(Module.standardLibraryName)
     }
 
@@ -341,7 +341,7 @@ public struct Driver {
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
     try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot)
-    noStandardLibrary = false
+    usesStandardLibrary = true
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
@@ -435,16 +435,16 @@ public struct Driver {
 
 }
 
-/// Returns the source files at `location`.
+/// Returns the source files at `path`.
 ///
-/// If `location` identifies a file, the result contains that file.
-/// If `location` ientifies a directory, the result contains all source files in that directory.
-private func sources(at location: URL) throws -> [SourceFile] {
-  if location.pathExtension == "hylo" {
-    return [try SourceFile(contentsOf: location)]
+/// If `path` is a file, the result contains that file.
+/// If `path` is a directory, the result contains all source files in that directory and subdirectories.
+private func sources(at path: URL) throws -> [SourceFile] {
+  if path.pathExtension == "hylo" {
+    return [try SourceFile(contentsOf: path)]
   } else {
     var s: [SourceFile] = []
-    try SourceFile.forEach(in: location) {
+    try SourceFile.forEach(in: path) {
       s.append($0)
     }
     return s
