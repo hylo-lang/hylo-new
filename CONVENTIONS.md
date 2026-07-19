@@ -77,6 +77,9 @@ error/return an optional (e.g. `myHashmap[key]` - returns nil if key is not foun
 Avoid typed `throws` unless you are confident that the immediate caller will be interested in handling the error and it
 doesn't just use its description but is interested in the specific error type.
 
+Prefer throwing over optional when absence is always an error: If every caller of an optional-returning function 
+immediately converts nil into the same error, the function should throw that error itself.
+
 ## Safety
 
 - When using an unsafe or unchecked construct (e.g. `@unchecked Sendable`), include a comment that justifies the need
