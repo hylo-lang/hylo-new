@@ -44,12 +44,12 @@ struct TypeLayoutCache {
   }
 
   /// Returns true iff `t` is of `MachineType`.
-  private mutating func isMachineType(_ t: AnyTypeIdentity) -> Bool {
+  private func isMachineType(_ t: AnyTypeIdentity) -> Bool {
     tag(t) == MachineType.self
   }
 
   /// Returns true iff `t` is of enum type.
-  private mutating func isEnum(_ t: AnyTypeIdentity) -> Bool {
+  private func isEnum(_ t: AnyTypeIdentity) -> Bool {
     let u = tag(t)
     if u == Enum.self {
       return true
@@ -61,7 +61,7 @@ struct TypeLayoutCache {
   }
 
   /// Returns true iff `t` has a record layout.
-  private mutating func hasRecordLayout(_ t: AnyTypeIdentity) -> Bool {
+  private func hasRecordLayout(_ t: AnyTypeIdentity) -> Bool {
     unimplemented()
   }
 

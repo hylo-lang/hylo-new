@@ -11,6 +11,7 @@ struct ConcreteTypeIdentity: Regular {
   ///
   /// - Precondition: `t` doesn't have any generic parameter.
   public init(_ t: AnyTypeIdentity) {
+    precondition(!t[.hasGenericParameter] && !t[.hasVariable])
     underlying = t
   }
 
