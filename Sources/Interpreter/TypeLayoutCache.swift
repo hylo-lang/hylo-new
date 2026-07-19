@@ -63,7 +63,7 @@ struct TypeLayoutCache {
   /// Returns true iff `t` has a record layout.
   private func hasRecordLayout(_ t: AnyTypeIdentity) -> Bool {
     let u = tag(t)
-    if u == Arrow.self || u == Struct.self || u == Tuple.self {
+    if u == Struct.self || u == Tuple.self {
       return true
     } else if u == TypeApplication.self {
       return hasRecordLayout(type(t, as: TypeApplication.self).abstraction)
