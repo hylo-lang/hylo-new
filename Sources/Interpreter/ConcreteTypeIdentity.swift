@@ -9,7 +9,7 @@ struct ConcreteTypeIdentity: Regular {
 
   /// Creates an instance wrapping `t` as `ConcreteTypeIdentity`.
   ///
-  /// - Precondition: `t` doesn't have any generic parameter.
+  /// - Precondition: `t` doesn't have any generic parameter and unification variable.
   public init(_ t: AnyTypeIdentity) {
     precondition(!t[.hasGenericParameter] && !t[.hasVariable])
     underlying = t

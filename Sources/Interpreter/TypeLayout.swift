@@ -64,20 +64,20 @@ struct TypeLayout: Regular {
     parts.indices.lazy.map { .init(self, $0) }
   }
 
-  /// True iff `self` is the layout of a enum type, which changes how
+  /// True iff `self` is the layout of an enum type, which changes how
   /// its `parts` are interpreted.
   public let isEnumLayout: Bool
 }
 
 extension TypeLayout {
 
-  /// The discriminator of a enum layout.,
+  /// The discriminator of an enum layout.,
   public var discriminator: Part {
     precondition(isEnumLayout)
     return parts.last!
   }
 
-  /// The id of the discriminator of a enum layout.,
+  /// The id of the discriminator of an enum layout.,
   public var discriminatorParentage: Part.Parentage {
     precondition(isEnumLayout)
     return .init(self, parts.count - 1)
