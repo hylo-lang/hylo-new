@@ -39,7 +39,7 @@ final class ProgramTests: XCTestCase {
       struct A {}
 
       fun f(x: A) {
-        let y = x % x
+        let y = x +* x
       }
       """)
 
@@ -48,7 +48,7 @@ final class ProgramTests: XCTestCase {
 
     XCTAssertEqual(
       p.diagnostics.map(\.message),
-      ["type 'A' has no member 'infix%'"])
+      ["type 'A' has no member 'infix+*'"])
   }
 
   func testArchiveConsistency() throws {
