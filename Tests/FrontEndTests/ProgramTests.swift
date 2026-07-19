@@ -31,6 +31,26 @@ final class ProgramTests: XCTestCase {
     XCTAssertEqual(p.format("> %% <", [v]), "> % <")
   }
 
+  func testUndefinedOperatorDiagnosticIncludesIdentifier() async {
+    var p = Program(forTesting: true)
+    let m = p.demandModule("Main")
+    _ = p[m].addSource(
+      """
+      struct A {}
+
+      fun f(x: A) {
+        let y = x % x
+      }
+      """)
+
+    await p.assignScopes(m)
+    p.assignTypes(m, loggingInferenceWhere: nil)
+
+    XCTAssertEqual(
+      p.diagnostics.map(\.message),
+      ["type 'A' has no member 'infix%'"])
+  }
+
   func testArchiveConsistency() throws {
     let p = Program.test
     let m = p.moduleIdentities.first!
