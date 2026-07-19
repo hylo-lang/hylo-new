@@ -438,7 +438,8 @@ public struct Driver {
 /// Returns the source files at `path`.
 ///
 /// If `path` is a file, the result contains that file.
-/// If `path` is a directory, the result contains all source files in that directory and subdirectories.
+/// If `path` is a directory, the result contains all source files in that
+/// directory and subdirectories.
 private func sources(at path: URL) throws -> [SourceFile] {
   if path.pathExtension == "hylo" {
     return [try SourceFile(contentsOf: path)]
