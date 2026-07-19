@@ -39,8 +39,8 @@ public struct Driver {
   /// The names of the native libraries to link.
   public var librariesToLink: [String]
 
-  /// `true` iff the standard library and its shim should be excluded from compilation and linking.
-  public var noStandardLibrary: Bool = false
+  /// `true` iff compilation and linking depend on the standard library and its shim.
+  public private(set) var usesStandardLibrary: Bool = false
 
   /// The program being compiled by the driver.
   public var program: Program
@@ -211,7 +211,7 @@ public struct Driver {
 
       var cSources = cSources
 
-      if !noStandardLibrary {
+      if usesStandardLibrary {
         // FIXME: Enable this after we can lower the standard library
         // modulesToLink.append(program.modules[.standardLibrary]!.identity)
         cSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
@@ -274,18 +274,14 @@ public struct Driver {
     return o
   }
 
-  /// Loads `module`, whose sources are in `root`, into `program`.
+  /// Loads `module`, whose sources are at `root`, into `program`.
   ///
   /// If `moduleCachePath` is set, the module is loaded from cache if an archive is found and its
   /// fingerprint matches the fingerprint of the source files in `root`. Otherwise, the module is
   /// compiled from sources and an archive is stored at `moduleCachePath`. If `moduleCachePath` is
   /// not set, the module is unconditionally compiled from sources and no archive is stored.
   public mutating func load(_ module: Module.Name, withSourcesAt root: URL) async throws {
-    // Compute a fingerprint of all source files.
-    var sources: [SourceFile] = []
-    try SourceFile.forEach(in: root) { (s) in
-      sources.append(s)
-    }
+    let sources = try sources(at: root)
 
     // Attempt to load the module from disk.
     do {
@@ -312,6 +308,10 @@ public struct Driver {
     // Compile the module from sources.
     let m = program.demandModule(module)
 
+    if usesStandardLibrary && module != Module.standardLibraryName {
+      program[m].addDependency(Module.standardLibraryName)
+    }
+
     await parse(sources, into: m)
     try throwIfContainsError(m)
 
@@ -334,12 +334,14 @@ public struct Driver {
     }
   }
 
-  /// Loads the standard library with `load(_:withSourcesAt:)`.
+  /// Loads the standard library with `load(_:withSourcesAt:)` and makes
+  /// standard library a dependency of modules loaded thereafter.
   /// 
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
     try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot)
+    usesStandardLibrary = true
   }
 
   /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
@@ -431,6 +433,23 @@ public struct Driver {
 
   }
 
+}
+
+/// Returns the source files at `path`.
+///
+/// If `path` is a file, the result contains that file.
+/// If `path` is a directory, the result contains all source files in that
+/// directory and subdirectories.
+private func sources(at path: URL) throws -> [SourceFile] {
+  if path.pathExtension == "hylo" {
+    return [try SourceFile(contentsOf: path)]
+  } else {
+    var s: [SourceFile] = []
+    try SourceFile.forEach(in: path) {
+      s.append($0)
+    }
+    return s
+  }
 }
 
 extension SwiftyLLVM.Module {
