@@ -60,7 +60,8 @@ struct TypeLayoutCache {
   /// Returns the layout for tuple `t`.
   private mutating func computeLayout(tuple t: MonomorphicTypeIdentity) -> TypeLayout {
     let u = ConcreteTypeIdentity<Tuple>(uncheckedFrom: t.underlying)
-    let (ms, _) = p.types.members(of: u)
+    let (ms, o) = p.types.members(of: u)
+    assert(o == false)
     return computeLayout(
       record: t,
       havingMembers: ms.map {
@@ -83,7 +84,7 @@ struct TypeLayoutCache {
     let f = ms.first!
     var b = self[f.type].bytes
     var parts: [TypeLayout.Part] = [.init(name: f.label ?? "0", type: f.type, offset: 0)]
-    for (i, p) in ms.enumerated() {
+    for (i, p) in ms.enumerated().dropFirst() {
       let c = self[p.type].bytes
       b = b.appending(c)
       parts.append(
