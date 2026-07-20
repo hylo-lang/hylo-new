@@ -1,18 +1,30 @@
-/// The header of the structure representing information stored in all type witnesses.
-///
-/// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
+extension Pointer<UInt8> {
+  /// Creates an instance that does not address any usable storage.
+  @inline(always)
+  public static fun null() -> Self {
+    .new(value: Builtin.zeroinitializer_ptr())
+  }
+}
+
 type Size = UInt32
 
 // Because the integer types are incomplete
 extension UInt32 {
 
   /// Creates an instance with the value of `x`.
+  @inline(always)
   public init(x: UInt16) {
     &self.value = Builtin.zext_i16_i32(x.value)
   }
 
+  @inline(always)
   public fun infix% (other: Self) -> Self {
     Self(value: Builtin.urem_i32(self.value, other.value))
+  }
+
+  @inline(always)
+  public static fun zero() -> Self {
+    Self(value: Builtin.zeroinitializer_i32())
   }
 
 }
@@ -34,10 +46,11 @@ extension Alignment {
 public given Pointer<UInt8> is Deinitializable {}
 public given Pointer<UInt8> is Movable {}
 
-public given TypeWitnessHeader is Deinitializable {}
-public given TypeWitnessHeader is Movable {}
-
+/// The header of the structure representing information stored in all type witnesses.
+///
+/// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
 public struct TypeWitnessHeader {
+  @inline(always)
   public memberwise init
 
   // TODO: verify that the type of `description` is correct.
@@ -48,6 +61,9 @@ public struct TypeWitnessHeader {
   let type_argument_or_parameter_count: UInt16
 }
 
+public given TypeWitnessHeader is Deinitializable {}
+public given TypeWitnessHeader is Movable {}
+
 public given Pointer<TypeWitnessHeader> is Deinitializable {}
 public given Pointer<TypeWitnessHeader> is Movable {}
 public given Pointer<TypeWitnessHeader> is Copyable {}
@@ -56,6 +72,7 @@ extension Pointer<TypeWitnessHeader> {
 
   public type Pointee = TypeWitnessHeader
 
+  @inline(always)
   public subscript unsafe() auto -> Pointee {
     let {
       yield self.value as* let Pointee
@@ -89,6 +106,7 @@ extension RecordMemberType {
 extension UInt {
 
   /// Creates an instance with the value of `x`.
+  @inline(always)
   public init(x: UInt32) {
     &self.value = Builtin.zext_i32_word(x.value)
   }
@@ -103,6 +121,7 @@ extension Pointer<RecordMemberType> {
 
   type Pointee = RecordMemberType
 
+  @inline(always)
   public subscript unsafe() auto -> Pointee {
     let {
       yield self.value as* let Pointee
@@ -114,6 +133,7 @@ extension Pointer<RecordMemberType> {
     }
   }
 
+  @inline(always)
   public subscript unsafe(offset: UInt32) auto -> RecordMemberType {
     let {
       yield (self + offset).unsafe[]
@@ -127,6 +147,7 @@ extension Pointer<RecordMemberType> {
     }
   }
 
+  @inline(always)
   public fun infix+ (offset: UInt32) -> Self {
     let byte_offset = UInt(Metatype<Pointee>.stride()) * UInt(offset)
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
@@ -144,16 +165,19 @@ extension Metatype<RecordMemberType> {
   }
 
   /// Returns the size in bytes of the `Subject`.
+  @inline(always)
   public static fun size() -> Size {
     Self.type_info[].size.copy()
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
+  @inline(always)
   public static fun alignment() -> Alignment {
     Self.type_info[].alignment.copy()
   }
 
   /// Returns the number of bytes between elements in a buffer of `Subject`.
+  @inline(always)
   public static fun stride() -> Size {
     Self.alignment().first_aligned_offset(starting_from: Self.size())
   }
@@ -173,6 +197,7 @@ extension Metatype<Pointer<UInt8>> {
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
+  @inline(always)
   public static fun alignment() -> Alignment {
     Self.type_info[].alignment.copy()
   }
@@ -190,6 +215,7 @@ extension Metatype<UInt32> {
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
+  @inline(always)
   public static fun alignment() -> Alignment {
     Self.type_info[].alignment.copy()
   }
@@ -206,6 +232,7 @@ extension Metatype<UInt16> {
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
+  @inline(always)
   public static fun alignment() -> Alignment {
     Self.type_info[].alignment.copy()
   }
@@ -226,10 +253,11 @@ fun checkLayoutRequirements() {
 let layoutRequirementsChecked: Void = checkLayoutRequirements()
 
 /// Notionally, a collection of Witnesses of unspecified size.
-struct RecordLayout {
+struct RecordLayout is Deinitializable {
 
   let start: Pointer<RecordMemberType>
   var count: MemberCount
+  memberwise init
 
   /// Accesses the nth element.
   subscript at(n: MemberIndex) auto -> RecordMemberType {
@@ -358,9 +386,7 @@ struct RecordLayout {
   }
 
   /// Returns the offset where the initial `nth` element would appear.
-  ///
-  /// Mutates `self` in arbitrary ways
-  fun offset_of_member(_ n: MemberIndex) inout -> Size {
+  fun offset_of_member(n: MemberIndex) sink -> Size {
     let nth_alignment = self.at[n].alignment()
     self.retain_only_elements(that_lay_out_before_element: n)
     self.stable_sort_by_decreasing_alignment()
