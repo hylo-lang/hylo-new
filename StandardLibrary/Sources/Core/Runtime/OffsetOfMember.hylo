@@ -396,11 +396,12 @@ struct RecordLayout is Deinitializable {
 
 }
 
-/*
+/// Returns the offset of the `n`th member in declaration order of a
+/// record type having members given by the array of length `l` at
+/// `memberArray`.
 fun offset_of_member(
-  _ memberIndex: Int,
-  in propertyTypeWitnesses: Pointer<TypeWitnessHeader>, propertyCount: Int) -> UInt32
+  n: UInt32,
+  in memberArray: Pointer<RecordMemberType>, ofLength l: UInt32) -> UInt32
 {
-  return 0
+  RecordLayout.new(start: memberArray.copy(), count: l.copy()).offset_of_member(n)
 }
-*/
