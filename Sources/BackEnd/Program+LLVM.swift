@@ -985,9 +985,9 @@ extension Program {
     _ xs: [FrontEnd.IRValue], of t: MachineType.ID, in ctx: inout FunctionGenerationContext
   ) -> [LLVMValue] {
     let m = metadata(of: t, in: &ctx.module)
-    let lhs = ctx.module.llvm.insertLoad(m.llvm, from: ctx.value[xs[0]]!, at: ctx.insertionPoint!)
-    let rhs = ctx.module.llvm.insertLoad(m.llvm, from: ctx.value[xs[1]]!, at: ctx.insertionPoint!)
-    return [lhs.v, rhs.v]
+    return xs.map { (x) in
+      ctx.module.llvm.insertLoad(m.llvm, from: ctx.value[x]!, at: ctx.insertionPoint!).v
+    }
   }
 
   /// Returns the representations of `arguments`, which are passed to `callee`, in LLVM IR.
