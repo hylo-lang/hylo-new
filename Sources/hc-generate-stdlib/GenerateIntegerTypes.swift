@@ -8,7 +8,7 @@ internal func generateIntegerTypes() -> String {
     types.append(
       .fixedSize(bits: bits, .signed, includedConformances: bits == 32 ? .minimal : .none))
     types.append(
-      .fixedSize(bits: bits, .unsigned, includedConformances: .none))
+      .fixedSize(bits: bits, .unsigned, includedConformances: .minimal))
   }
 
   types.append(
@@ -204,7 +204,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
 
       /// Returns `true` iff `self` is greater than or equal to `other`.
       @inline(always)
-      public fun infix>= (_ other: Self) -> Bool {
+      public fun infix>= (other: Self) -> Bool {
         .new(value: \
     Builtin.icmp_\(signedness.abbreviated)ge_\(builtinType)(self.value, other.value))
       }
