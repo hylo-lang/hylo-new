@@ -23,13 +23,16 @@ struct TypeLayoutCache {
   public subscript(_ t: MonomorphicTypeIdentity) -> TypeLayout {
     mutating get {
       if let r = storage[t] { return r }
-      let r = computeLayout(t)
+      let k = MonomorphicTypeIdentity(p.types.dealiased(t.underlying))
+      let r = computeLayout(k)
       storage[t] = r
       return r
     }
   }
 
   /// Returns the layout for `t`.
+  ///
+  /// - Precondition: `t` is not an alias.
   private mutating func computeLayout(_ t: MonomorphicTypeIdentity) -> TypeLayout {
     if isMachineType(t.underlying) {
       let u = type(t.underlying, as: MachineType.self)
@@ -126,14 +129,7 @@ struct TypeLayoutCache {
 
   /// Returns true iff `t` is a `Tuple`.
   private func isTuple(_ t: AnyTypeIdentity) -> Bool {
-    let u = tag(t)
-    if u == Tuple.self {
-      return true
-    } else if u == TypeApplication.self {
-      return isTuple(type(t, as: TypeApplication.self).abstraction)
-    } else {
-      return false
-    }
+    tag(t) == Tuple.self
   }
 
   /// Returns the type identified by `t`, cast to `U`.
