@@ -55,8 +55,8 @@ extension TargetABI {
   /// Returns a discriminator type for the enum of `n` types in `p`.
   ///
   /// Precondition: `n` is positive
-  func enumDiscriminator(count n: Int, in p: inout Program) -> ConcreteTypeIdentity {
-    if n == 1 { return ConcreteTypeIdentity(.void) }
+  func enumDiscriminator(count n: Int, in p: inout Program) -> MonomorphicTypeIdentity {
+    if n == 1 { return MonomorphicTypeIdentity(.void) }
     let bitsNeeded = UInt(n - 1).bitsInRepresentation
     // Integer sizes are a contiguous range of powers of 2 starting with 8
     let integerSize = max(8, bitsNeeded.roundedUpToPowerOf2)

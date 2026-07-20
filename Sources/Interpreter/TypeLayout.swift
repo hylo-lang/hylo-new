@@ -25,7 +25,7 @@ struct TypeLayout: Regular {
     public let name: String?
 
     /// The type of the part.
-    public let type: ConcreteTypeIdentity
+    public let type: MonomorphicTypeIdentity
 
     /// The byte offset of the part with respect to the layout.
     public let offset: Int
@@ -44,7 +44,7 @@ struct TypeLayout: Regular {
   public var stride: Int { bytes.stride }
 
   /// The type whose layout is described by `self`.
-  public let type: ConcreteTypeIdentity
+  public let type: MonomorphicTypeIdentity
 
   /// The structure.
   ///

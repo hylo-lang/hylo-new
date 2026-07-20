@@ -11,7 +11,7 @@ struct TypeLayoutCache {
   let abi: any TargetABI
 
   /// The memo of layouts computed so far.
-  private var storage: [ConcreteTypeIdentity: TypeLayout] = [:]
+  private var storage: [MonomorphicTypeIdentity: TypeLayout] = [:]
 
   /// An instance for laying out types in `p` according to `abi`.
   public init(typesIn p: Program, for abi: any TargetABI) {
@@ -20,7 +20,7 @@ struct TypeLayoutCache {
   }
 
   /// The layout for `t`.
-  public subscript(_ t: ConcreteTypeIdentity) -> TypeLayout {
+  public subscript(_ t: MonomorphicTypeIdentity) -> TypeLayout {
     mutating get {
       if let r = storage[t] { return r }
       let r = computeLayout(t)
@@ -30,17 +30,30 @@ struct TypeLayoutCache {
   }
 
   /// Returns the layout for `t`.
-  private mutating func computeLayout(_ t: ConcreteTypeIdentity) -> TypeLayout {
+  private mutating func computeLayout(_ t: MonomorphicTypeIdentity) -> TypeLayout {
     if isMachineType(t.underlying) {
       let u = type(t.underlying, as: MachineType.self)
       return TypeLayout(bytes: abi.layout(u), type: t, parts: [], isEnumLayout: false)
     } else if isEnum(t.underlying) {
       unimplemented()
-    } else if hasRecordLayout(t.underlying) {
-      unimplemented()
+    } else if isStruct(t.underlying) {
+      return computeLayout(struct: t)
+    } else if isTuple(t.underlying) {
+      return computeLayout(tuple: t)
     } else {
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
     }
+  }
+
+  /// Returns the layout for struct `t`.
+  private mutating func computeLayout(struct t: MonomorphicTypeIdentity) -> TypeLayout {
+    unimplemented()
+  }
+
+  /// Returns the layout for tuple `t`.
+  private mutating func computeLayout(tuple t: MonomorphicTypeIdentity) -> TypeLayout {
+    // let u = type(t.underlying, as: Tuple.self)
+    unimplemented()
   }
 
   /// Returns true iff `t` is of `MachineType`.
@@ -60,13 +73,25 @@ struct TypeLayoutCache {
     }
   }
 
-  /// Returns true iff `t` has a record layout.
-  private func hasRecordLayout(_ t: AnyTypeIdentity) -> Bool {
+  /// Returns true iff `t` is a `Struct`.
+  private func isStruct(_ t: AnyTypeIdentity) -> Bool {
     let u = tag(t)
-    if u == Struct.self || u == Tuple.self {
+    if u == Struct.self {
       return true
     } else if u == TypeApplication.self {
-      return hasRecordLayout(type(t, as: TypeApplication.self).abstraction)
+      return isStruct(type(t, as: TypeApplication.self).abstraction)
+    } else {
+      return false
+    }
+  }
+
+  /// Returns true iff `t` is a `Tuple`.
+  private func isTuple(_ t: AnyTypeIdentity) -> Bool {
+    let u = tag(t)
+    if u == Tuple.self {
+      return true
+    } else if u == TypeApplication.self {
+      return isTuple(type(t, as: TypeApplication.self).abstraction)
     } else {
       return false
     }
