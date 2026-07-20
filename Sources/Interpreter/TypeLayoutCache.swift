@@ -23,7 +23,7 @@ struct TypeLayoutCache {
     if let r = storage[t] { return r }
     let k = MonomorphicTypeIdentity(p.types.dealiased(t.underlying))
     let r = computeLayout(k, in: &p)
-    storage[t] = r
+    storage[k] = r
     return r
   }
 
