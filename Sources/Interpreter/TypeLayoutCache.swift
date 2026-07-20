@@ -5,7 +5,7 @@ import Utilities
 struct TypeLayoutCache {
 
   /// The program supplying the types.
-  let p: Program
+  var p: Program
 
   /// The ABI for which the types will be laid out.
   let abi: any TargetABI
@@ -47,13 +47,51 @@ struct TypeLayoutCache {
 
   /// Returns the layout for struct `t`.
   private mutating func computeLayout(struct t: MonomorphicTypeIdentity) -> TypeLayout {
-    unimplemented()
+    let d = p.declaration(of: t.underlying)!
+    let m = p.parent(containing: d).module
+    let ms = p.storage(of: t.underlying, visibleFrom: m)!
+    return computeLayout(
+      record: t,
+      havingMembers: ms.map {
+        (type: MonomorphicTypeIdentity($0), label: nil)
+      })
   }
 
   /// Returns the layout for tuple `t`.
   private mutating func computeLayout(tuple t: MonomorphicTypeIdentity) -> TypeLayout {
-    // let u = type(t.underlying, as: Tuple.self)
-    unimplemented()
+    let u = ConcreteTypeIdentity<Tuple>(uncheckedFrom: t.underlying)
+    let (ms, _) = p.types.members(of: u)
+    return computeLayout(
+      record: t,
+      havingMembers: ms.map {
+        (type: MonomorphicTypeIdentity($0), label: nil)
+      }
+    )
+  }
+
+  /// Returns the layout for a record `t` having members `ms`.
+  private mutating func computeLayout(
+    record t: MonomorphicTypeIdentity,
+    havingMembers ms: [(type: MonomorphicTypeIdentity, label: String?)]
+  ) -> TypeLayout {
+    if ms.isEmpty {
+      return TypeLayout(
+        bytes: .init(alignment: 1, size: 0), type: t,
+        parts: [], isEnumLayout: false
+      )
+    }
+    let f = ms.first!
+    var b = self[f.type].bytes
+    var parts: [TypeLayout.Part] = [.init(name: f.label ?? "0", type: f.type, offset: 0)]
+    for (i, p) in ms.enumerated() {
+      let c = self[p.type].bytes
+      b = b.appending(c)
+      parts.append(
+        .init(
+          name: p.label ?? String(describing: i + 1),
+          type: p.type, offset: b.size - c.size))
+    }
+    return TypeLayout(bytes: b, type: t, parts: parts, isEnumLayout: false)
   }
 
   /// Returns true iff `t` is of `MachineType`.
