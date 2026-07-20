@@ -769,7 +769,7 @@ extension BuiltinFunction: Showable {
     //    case .udiv(let e, let t):
     //      return e ? "udiv_exact_\(t)" : "udiv_\(t)"
     case .sdiv(let e, let t):
-      return printer.format(e ? "sdiv_exact_\(t)" : "sdiv_\(t)", [t.erased])
+      return printer.format(e ? "sdiv_exact_%T" : "sdiv_%T", [t.erased])
     //    case .lshr(let e, let t):
     //      return e ? "lshr_exact_\(t)" : "lshr_\(t)"
     //    case .ashr(let e, let t):
