@@ -1,16 +1,15 @@
 import Driver
-import XCTest
+import Testing
 
 @testable import FrontEnd
 
 /// A collection of tests that checks mangling/demangling for the standard library.
-final class StandardLibraryManglingTests: XCTestCase {
+struct StandardLibraryManglingTests {
 
   /// Tests the mangling and demangling of all the declarations in the standard library.
-  func testStandardLibraryMangling() async throws {
-    var driver = try Driver(
-      moduleCachePath: Self.moduleCachePath.url, targetSpecification: .native())
-    try await driver.loadStandardLibrary()
+  @Test func standardLibraryMangling() async throws {
+    var driver = try Driver(targetSpecification: .native())
+    try await driver.installCachedStandardLibrary()
 
     let m = driver.program.modules[Module.standardLibraryName]!
     for s in m.syntax {
@@ -18,23 +17,12 @@ final class StandardLibraryManglingTests: XCTestCase {
         let d = DeclarationIdentity(uncheckedFrom: s)
         let mangled = driver.program.mangled(d)
         let demangled = DemangledSymbol(mangled).description
-        XCTAssertFalse(
-          demangled.contains("#!"),
+        #expect(
+          !demangled.contains("#!"),
           "demangling of \(mangled) contains errors: \(demangled)"
         )
       }
     }
-  }
-
-  /// A temporary folder for caching compilation artifacts during testing.
-  ///
-  /// An new directory is generated every time this property is initialized and removed once all
-  /// tests have run.
-  private static let moduleCachePath = Driver.temporaryModuleCachePath()
-
-  /// Deletes cached compilation artifacts.
-  override class func tearDown() {
-    moduleCachePath.delete()
   }
 
 }

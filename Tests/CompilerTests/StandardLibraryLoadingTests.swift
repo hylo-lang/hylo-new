@@ -1,23 +1,23 @@
 import FrontEnd
-import XCTest
+import Testing
 import Driver
 import StandardLibrary
 
-final class StandardLibraryLoadingTests: XCTestCase {
+struct StandardLibraryLoadingTests {
 
-  func testStandardLibraryLoading() async throws {
+  @Test func standardLibraryLoading() async throws {
     var driver = try Driver(targetSpecification: .native())
     try await driver.loadStandardLibrary()
   }
 
-  func testStandardLibraryLoadingBundled() async throws {
+  @Test func standardLibraryLoadingBundled() async throws {
     var driver = try Driver(targetSpecification: .native())
     try await driver.load(
       Module.standardLibraryName, withSourcesAt: bundledStandardLibrarySources,
       additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
   }
 
-  func testStandardLibraryLoadingLocal() async throws {
+  @Test func standardLibraryLoadingLocal() async throws {
     var driver = try Driver(targetSpecification: .native())
     try await driver.load(
       Module.standardLibraryName, withSourcesAt: localStandardLibrarySources,

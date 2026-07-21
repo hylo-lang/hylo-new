@@ -1,20 +1,20 @@
-import XCTest
+import Testing
 
-final class IRMatchingTests: XCTestCase {
+struct IRMatchingTests {
 
   // MARK: comparisons
 
-  func testMarkerlessInputIsMatchedAsSections() {
+  @Test func markerlessInputIsMatchedAsSections() {
     let cs = IRMatching.comparisons(expected: "a\nb", observed: "a\nc")
-    XCTAssertEqual(cs, [.init(expected: "a\nb", observed: "a\nc")])
+    #expect(cs == [.init(expected: "a\nb", observed: "a\nc")])
   }
 
-  func testNormalizesLineEndings() {
+  @Test func normalizesLineEndings() {
     let cs = IRMatching.comparisons(expected: "a\r\nb", observed: "a\r\nb")
-    XCTAssertEqual(cs, [.init(expected: "a\nb", observed: "a\nb")])
+    #expect(cs == [.init(expected: "a\nb", observed: "a\nb")])
   }
 
-  func testPartialMatchesByGlobalSymbol() {
+  @Test func partialMatchesByGlobalSymbol() {
     let expected = """
       define i32 @"foo"() {
         ret i32 0
@@ -30,12 +30,12 @@ final class IRMatchingTests: XCTestCase {
       }
       """
     let cs = IRMatching.comparisons(expected: expected, observed: observed)
-    XCTAssertEqual(cs.count, 1)
-    XCTAssertEqual(cs[0].expected, "define i32 @\"foo\"() {\n  ret i32 0\n}")
-    XCTAssertEqual(cs[0].observed, cs[0].expected)
+    #expect(cs.count == 1)
+    #expect(cs[0].expected == "define i32 @\"foo\"() {\n  ret i32 0\n}")
+    #expect(cs[0].observed == cs[0].expected)
   }
 
-  func testPartialReportsMismatchInMatchedSection() {
+  @Test func partialReportsMismatchInMatchedSection() {
     let expected = """
       define i32 @"foo"() {
         ret i32 0
@@ -47,12 +47,12 @@ final class IRMatchingTests: XCTestCase {
       }
       """
     let cs = IRMatching.comparisons(expected: expected, observed: observed)
-    XCTAssertEqual(cs.count, 1)
-    XCTAssertNotNil(cs[0].observed)
-    XCTAssertNotEqual(cs[0].expected, cs[0].observed)
+    #expect(cs.count == 1)
+    #expect(cs[0].observed != nil)
+    #expect(cs[0].expected != cs[0].observed)
   }
 
-  func testPartialMatchesEachSectionIndependentlyAndIgnoresOrder() {
+  @Test func partialMatchesEachSectionIndependentlyAndIgnoresOrder() {
     let expected = """
       define i32 @"a"() {
         ret i32 0
@@ -72,11 +72,11 @@ final class IRMatchingTests: XCTestCase {
       }
       """
     let cs = IRMatching.comparisons(expected: expected, observed: observed)
-    XCTAssertEqual(cs.count, 2)
-    for c in cs { XCTAssertEqual(c.expected, c.observed) }
+    #expect(cs.count == 2)
+    for c in cs { #expect(c.expected == c.observed) }
   }
 
-  func testPartialFallsBackToClosestFirstLineWhenNoSymbol() {
+  @Test func partialFallsBackToClosestFirstLineWhenNoSymbol() {
     let expected = """
       %T = type { i32 }
       """
@@ -86,21 +86,21 @@ final class IRMatchingTests: XCTestCase {
       %T = type { i32. }
       """
     let cs = IRMatching.comparisons(expected: expected, observed: observed)
-    XCTAssertEqual(cs.count, 1)
+    #expect(cs.count == 1)
     // The closest observed section is chosen even though it isn't identical to the expected one.
-    XCTAssertEqual(cs[0].observed, "%T = type { i32. }")
+    #expect(cs[0].observed == "%T = type { i32. }")
   }
 
-  func testPartialUnmatchedWhenObservedHasNoSection() {
+  @Test func partialUnmatchedWhenObservedHasNoSection() {
     let cs = IRMatching.comparisons(
       expected: "define void @\"f\"() {\n}", observed: "\n  \n")
-    XCTAssertEqual(cs.count, 1)
-    XCTAssertNil(cs[0].observed)
+    #expect(cs.count == 1)
+    #expect(cs[0].observed == nil)
   }
 
   // MARK: comparisons (Hylo IR)
 
-  func testHyloPartialMatchesByFirstLineIgnoringOrder() {
+  @Test func hyloPartialMatchesByFirstLineIgnoringOrder() {
     let expected = """
       fun main(set %p0: Int32) {
         %r0 = return
@@ -116,12 +116,12 @@ final class IRMatchingTests: XCTestCase {
       }
       """
     let cs = IRMatching.comparisons(expected: expected, observed: observed)
-    XCTAssertEqual(cs.count, 1)
-    XCTAssertEqual(cs[0].expected, "fun main(set %p0: Int32) {\n  %r0 = return\n}")
-    XCTAssertEqual(cs[0].observed, cs[0].expected)
+    #expect(cs.count == 1)
+    #expect(cs[0].expected == "fun main(set %p0: Int32) {\n  %r0 = return\n}")
+    #expect(cs[0].observed == cs[0].expected)
   }
 
-  func testHyloPartialReportsMismatchInMatchedSection() {
+  @Test func hyloPartialReportsMismatchInMatchedSection() {
     let expected = """
       fun main(set %p0: Int32) {
         %r0 = return
@@ -134,12 +134,12 @@ final class IRMatchingTests: XCTestCase {
       }
       """
     let cs = IRMatching.comparisons(expected: expected, observed: observed)
-    XCTAssertEqual(cs.count, 1)
-    XCTAssertNotNil(cs[0].observed)
-    XCTAssertNotEqual(cs[0].expected, cs[0].observed)
+    #expect(cs.count == 1)
+    #expect(cs[0].observed != nil)
+    #expect(cs[0].expected != cs[0].observed)
   }
 
-  func testHyloPartialFallsBackToClosestFirstLine() {
+  @Test func hyloPartialFallsBackToClosestFirstLine() {
     let expected = """
       fun main(set %p0: Int32) {
         %r0 = return
@@ -156,54 +156,54 @@ final class IRMatchingTests: XCTestCase {
       }
       """
     let cs = IRMatching.comparisons(expected: expected, observed: observed)
-    XCTAssertEqual(cs.count, 1)
-    XCTAssertEqual(cs[0].observed, "fun main(set %p0: Int64) {\n  %r0 = return\n}")
+    #expect(cs.count == 1)
+    #expect(cs[0].observed == "fun main(set %p0: Int64) {\n  %r0 = return\n}")
   }
 
   // MARK: sections
 
-  func testSectionsSplitsOnBlankAndWhitespaceOnlyLines() {
+  @Test func sectionsSplitsOnBlankAndWhitespaceOnlyLines() {
     let s = "a\nb\n\nc\n   \nd\n"
-    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a\nb", "c", "d"])
+    #expect(Array(IRMatching.sections(of: s)) == ["a\nb", "c", "d"])
   }
 
-  func testSectionsOfEmptyInputIsEmpty() {
-    XCTAssertEqual(Array(IRMatching.sections(of: "")).count, 0)
-    XCTAssertEqual(Array(IRMatching.sections(of: "\n  \n")).count, 0)
+  @Test func sectionsOfEmptyInputIsEmpty() {
+    #expect(Array(IRMatching.sections(of: "")).count == 0)
+    #expect(Array(IRMatching.sections(of: "\n  \n")).count == 0)
   }
 
-  func testSectionsSkipsLeadingBlankLines() {
+  @Test func sectionsSkipsLeadingBlankLines() {
     let s = "\n  \n\t\na\nb"
-    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a\nb"])
+    #expect(Array(IRMatching.sections(of: s)) == ["a\nb"])
   }
 
-  func testSectionsIgnoresTrailingBlankLines() {
+  @Test func sectionsIgnoresTrailingBlankLines() {
     let s = "a\nb\n\n  \n"
-    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a\nb"])
+    #expect(Array(IRMatching.sections(of: s)) == ["a\nb"])
   }
 
-  func testSectionsCollapsesConsecutiveBlankLinesBetweenSections() {
+  @Test func sectionsCollapsesConsecutiveBlankLinesBetweenSections() {
     let s = "a\n\n\n\nb"
-    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a", "b"])
+    #expect(Array(IRMatching.sections(of: s)) == ["a", "b"])
   }
 
-  func testSectionsTreatsTabsAndSpacesAsBlankSeparators() {
+  @Test func sectionsTreatsTabsAndSpacesAsBlankSeparators() {
     let s = "a\n\t \t\nb"
-    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["a", "b"])
+    #expect(Array(IRMatching.sections(of: s)) == ["a", "b"])
   }
 
-  func testSectionsSingleSectionWithoutTrailingNewline() {
+  @Test func sectionsSingleSectionWithoutTrailingNewline() {
     let s = "only\nsection"
-    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["only\nsection"])
+    #expect(Array(IRMatching.sections(of: s)) == ["only\nsection"])
   }
 
-  func testSectionsPreservesLeadingAndInteriorWhitespaceWithinALine() {
+  @Test func sectionsPreservesLeadingAndInteriorWhitespaceWithinALine() {
     let s = "  indented\n    body  \n\nnext"
-    XCTAssertEqual(Array(IRMatching.sections(of: s)), ["  indented\n    body  ", "next"])
+    #expect(Array(IRMatching.sections(of: s)) == ["  indented\n    body  ", "next"])
   }
 
-  func testSectionsOfSingleNonBlankLine() {
-    XCTAssertEqual(Array(IRMatching.sections(of: "a")), ["a"])
+  @Test func sectionsOfSingleNonBlankLine() {
+    #expect(Array(IRMatching.sections(of: "a")) == ["a"])
   }
 
 }

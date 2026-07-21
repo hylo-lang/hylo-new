@@ -64,10 +64,10 @@ public struct Driver {
 
   #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
   /// The root folder of the standard library's sources.
-  private let chosenStandardLibraryRoot = bundledStandardLibrarySources
+  private static let chosenStandardLibraryRoot = bundledStandardLibrarySources
   #else
   /// The root folder of the standard library's sources.
-  private let chosenStandardLibraryRoot = localStandardLibrarySources
+  private static let chosenStandardLibraryRoot = localStandardLibrarySources
   #endif
 
   /// Creates an instance with the given properties.
@@ -186,13 +186,7 @@ public struct Driver {
     do {
       try module.verifyInDebugBuilds()
     } catch let e as LLVMError {
-      throw Error(
-        message: """
-        LLVM verification failed with the following message: \(e.description)
-
-        Module contents:
-        \(module.description)
-        """)
+      throw Error.llvmVerificationFailure(message: e.description, contents: module.description)
     }
   }
 
@@ -204,24 +198,22 @@ public struct Driver {
     from module: Module.ID,
     withCSources cSources: [URL] = [],
     writingTo output: URL
-  ) throws -> PhaseResult {
+  ) async throws -> PhaseResult {
+    // FIXME: Enable this after we can lower the standard library
+    // modulesToLink.append(program.modules[.standardLibrary]!.identity)
+    let shimObject = noStandardLibrary
+      ? nil : try await StandardLibraryShimCache.shared.object(compiledWith: relocation)
+
     let elapsed = try ContinuousClock().measure {
       let modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
 
-      var cSources = cSources
-
-      if !noStandardLibrary {
-        // FIXME: Enable this after we can lower the standard library
-        // modulesToLink.append(program.modules[.standardLibrary]!.identity)
-        cSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
-      }
-
       try FileManager.default.withUniqueTemporaryDirectory { (d) in
         let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
-        let cObjects = try cSources.map { (s) in
+        var cObjects = try cSources.map { (s) in
           try compileCToObject(source: s, destinationDirectory: d)
         }
+        if let shimObject { cObjects.append(shimObject) }
         try linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }
     }
@@ -238,7 +230,7 @@ public struct Driver {
   /// - Requires: module `m` has been lowered to LLVM.
   public func assembly(of m: Module.ID) throws -> String {
     try llvmModules[m]!.module.compile(.assembly).utf8Decoded
-      .unwrapOrThrow(Error(message: "Failed to decode assembly as an UTF8 string."))
+      .unwrapOrThrow(Error.invalidAssemblyEncoding)
   }
 
   /// Writes object files for `modules` into `destinationDirectory` and returns their paths.
@@ -263,7 +255,7 @@ public struct Driver {
     let uniquePrefix = source.hashValue
     let fileName = source.deletingPathExtension().appendingPathExtension("o").lastPathComponent
 
-    let o = destinationDirectory.appendingPathComponent("\(uniquePrefix)-\(fileName))",
+    let o = destinationDirectory.appendingPathComponent("\(uniquePrefix)-\(fileName)",
       isDirectory: false)
 
     var a = ["-c", source.path, "-o", o.path]
@@ -301,14 +293,8 @@ public struct Driver {
           return
         }
       }
-    } catch ArchiveError.invalidInput {
-      let m = """
-        Failed to parse module archive of '\(module)' at '\(moduleCachePath, default: "nil")'.
-
-        Maybe the archive was compiled with a different version of the compiler. \
-        Try erasing the module cache.
-        """
-      throw Error(message: m)
+    } catch is ArchiveError {
+      throw Error.invalidModuleArchive(module: module, location: moduleCachePath)
     }
 
     // Compile the module from sources.
@@ -341,7 +327,7 @@ public struct Driver {
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot,
+    try await load(Module.standardLibraryName, withSourcesAt: Self.chosenStandardLibraryRoot,
       additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
   }
 
@@ -403,14 +389,37 @@ public struct Driver {
   }
 
   /// An error thrown by the driver.
-  public struct Error: Swift.Error, CustomStringConvertible {
+  public enum Error: Swift.Error, CustomStringConvertible {
 
-    /// The error message.
-    public let message: String
+    /// The archive of `module`, cached at `location`, could not be parsed.
+    case invalidModuleArchive(module: Module.Name, location: URL?)
 
-    /// The error message.
+    /// LLVM verification failed with `message` while processing a module with `contents`.
+    case llvmVerificationFailure(message: String, contents: String)
+
+    /// The assembly of a module could not be decoded as an UTF-8 string.
+    case invalidAssemblyEncoding
+
+    /// A textual description of the error.
     public var description: String {
-      message
+      switch self {
+      case .invalidModuleArchive(let module, let location):
+        """
+        Failed to parse module archive of '\(module)' at '\(location, default: "nil")'.
+
+        Maybe the archive was compiled with a different version of the compiler. \
+        Try erasing the module cache.
+        """
+      case .llvmVerificationFailure(let message, let contents):
+        """
+        LLVM verification failed with the following message: \(message)
+
+        Module contents:
+        \(contents)
+        """
+      case .invalidAssemblyEncoding:
+        "Failed to decode assembly as an UTF8 string."
+      }
     }
 
   }
@@ -430,6 +439,37 @@ public struct Driver {
     public init(elapsed: Duration, containsError: Bool) {
       self.elapsed = elapsed
       self.containsError = containsError
+    }
+
+  }
+
+  /// A process-wide cache of object files compiled from the standard library's C shim, keyed by the
+  /// relocation model with which they were compiled.
+  private actor StandardLibraryShimCache {
+
+    /// The shared instance.
+    static let shared = StandardLibraryShimCache()
+
+    /// The location of the compiled shim for each relocation model.
+    private var objects: [RelocationModel: URL] = [:]
+
+    /// Returns an object file compiled from the standard library's C shim with `relocation`,
+    /// compiling it at most once per process into a temporary directory that lives until the
+    /// process exits.
+    func object(compiledWith relocation: RelocationModel) throws -> URL {
+      if let o = objects[relocation] { return o }
+
+      let d = try FileManager.default.createUniqueTemporaryDirectory()
+      let s = Driver.chosenStandardLibraryRoot.appending(component: cShimSource)
+      let o = d.appendingPathComponent("shims.o", isDirectory: false)
+
+      var a = ["-c", s.path, "-o", o.path]
+      if let r = relocation.asClangArgument { a.append(r) }
+
+      _ = try Process.executionOutput(
+        try Host.findNativeExecutable(invokedAs: "clang"), arguments: a)
+      objects[relocation] = o
+      return o
     }
 
   }
