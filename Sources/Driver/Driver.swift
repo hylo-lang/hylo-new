@@ -186,21 +186,15 @@ public struct Driver {
     return .init(elapsed: elapsed, containsError: program[module].containsError)
   }
 
-  /// Applies LLVM IR verification passes to `m` iff this file has been compiled in debug
+  /// Applies LLVM IR verification passes to `module` iff this file has been compiled in debug
   /// mode; does nothing otherwise.
   ///
-  /// - Throws: if the contents of `m` failed verification.
+  /// - Throws: if `module` failed verification.
   private func verify(_ m: borrowing SwiftyLLVM.Module) throws {
     do {
       try m.verifyInDebugBuilds()
     } catch let e as LLVMError {
-      throw Error(
-        message: """
-        LLVM verification failed with the following message: \(e.description)
-
-        Module contents:
-        \(m.description)
-        """)
+      throw Error.llvmVerificationFailure(message: e.description, contents: module.description)
     }
   }
 
@@ -213,23 +207,26 @@ public struct Driver {
     withCSources cSources: [URL] = [],
     writingTo output: URL
   ) async throws -> PhaseResult {
+    // FIXME: Enable this after we can lower the standard library
+    // modulesToLink.append(program.modules[.standardLibrary]!.identity)
+    let shimObject: URL? = if usesStandardLibrary {
+      try await StandardLibraryShimCache.shared.object(compiledWith: relocation)
+    } else {
+      nil
+    }
+
     let elapsed = try await ContinuousClock().measure {
       let modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
-
-      var cSources = cSources
-
-      if usesStandardLibrary {
-        // FIXME: Enable this after we can lower the standard library
-        // modulesToLink.append(program.modules[.standardLibrary]!.identity)
-        cSources.append(Driver.standardLibraryCShim)
-      }
 
       try await FileManager.default.withUniqueTemporaryDirectory { (d) in
         let hyloObjects = try emitObjectFiles(for: modulesToLink, into: d)
         var cObjects: [URL] = []
         for s in cSources {
           cObjects.append(try await compileCToObject(source: s, destinationDirectory: d))
+        }
+        if let o = shimObject {
+          cObjects.append(o)
         }
         try await linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }
@@ -247,7 +244,7 @@ public struct Driver {
   /// - Requires: `module` has been lowered to LLVM.
   public func assembly(of module: Module.ID) throws -> String {
     try llvmModules[module]!.module.compile(.assembly).utf8Decoded
-      .unwrapOrThrow(Error(message: "Failed to decode assembly as an UTF8 string."))
+      .unwrapOrThrow(Error.invalidAssemblyEncoding)
   }
 
   /// Writes object files for `modules` into `destinationDirectory` and returns their paths.
@@ -377,6 +374,15 @@ public struct Driver {
     try await load(
       Module.standardLibraryName, withSourcesAt: Driver.standardLibraryRoot,
       additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
+    usesStandardLibrary = true
+  }
+
+  /// Replaces the program of `self` with `p`, which contains an already loaded standard library,
+  /// and makes the standard library a dependency of modules loaded thereafter.
+  public mutating func installStandardLibrary(from p: Program) {
+    precondition(p.modules[Module.standardLibraryName] != nil,
+      "program does not contain the standard library")
+    program = p
     usesStandardLibrary = true
   }
 
@@ -533,14 +539,37 @@ public struct Driver {
   }
 
   /// An error thrown by the driver.
-  public struct Error: Swift.Error, CustomStringConvertible {
+  public enum Error: Swift.Error, CustomStringConvertible {
 
-    /// The error message.
-    public let message: String
+    /// The archive of `module`, cached at `location`, could not be parsed.
+    case invalidModuleArchive(module: Module.Name, location: URL?)
 
-    /// The error message.
+    /// LLVM verification failed with `message` while processing a module with `contents`.
+    case llvmVerificationFailure(message: String, contents: String)
+
+    /// The assembly of a module could not be decoded as an UTF-8 string.
+    case invalidAssemblyEncoding
+
+    /// A textual description of the error.
     public var description: String {
-      message
+      switch self {
+      case .invalidModuleArchive(let module, let location):
+        """
+        Failed to parse module archive of '\(module)' at '\(location, default: "nil")'.
+
+        Maybe the archive was compiled with a different version of the compiler. \
+        Try erasing the module cache.
+        """
+      case .llvmVerificationFailure(let message, let contents):
+        """
+        LLVM verification failed with the following message: \(message)
+
+        Module contents:
+        \(contents)
+        """
+      case .invalidAssemblyEncoding:
+        "Failed to decode assembly as an UTF8 string."
+      }
     }
 
   }
@@ -560,6 +589,36 @@ public struct Driver {
     public init(elapsed: Duration, containsError: Bool) {
       self.elapsed = elapsed
       self.containsError = containsError
+    }
+
+  }
+
+  /// A process-wide cache of object files compiled from the standard library's C shim, keyed by the
+  /// relocation model with which they were compiled.
+  private actor StandardLibraryShimCache {
+
+    /// The shared instance.
+    static let shared = StandardLibraryShimCache()
+
+    /// The location of the compiled shim for each relocation model.
+    private var objects: [RelocationModel: URL] = [:]
+
+    /// Returns an object file compiled from the standard library's C shim with `relocation`,
+    /// compiling it at most once per process into a temporary directory that lives until the
+    /// process exits.
+    func object(compiledWith relocation: RelocationModel) async throws -> URL {
+      if let o = objects[relocation] { return o }
+
+      let d = try FileManager.default.createUniqueTemporaryDirectory()
+      let s = Driver.chosenStandardLibraryRoot.appending(component: cShimSource)
+      let o = d.appendingPathComponent("shims.o", isDirectory: false)
+
+      var a = ["-c", s.path, "-o", o.path]
+      if let r = relocation.asClangArgument { a.append(r) }
+
+      _ = try await subprocessOutput(of: .name("clang"), arguments: a)
+      objects[relocation] = o
+      return o
     }
 
   }

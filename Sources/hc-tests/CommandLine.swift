@@ -99,14 +99,20 @@ import Foundation
 
   /// Generates a Swift source defining all test cases.
   private func generateSwiftSourceFile() throws {
-    var result = "extension CompilerTests {\n"
+    var result =
+      """
+      import Testing
+
+      extension CompilerTests {
+
+      """
 
     for u in try testCases(negative) {
       let i = testCaseIdentifier(u)
       result += """
 
-          func test_negative_\(i)() async throws {
-            try await negative(.init("\(u.absoluteURL.path())"))
+          @Test func negative_\(i)() async throws {
+            try await negative(.init("\(u.absoluteURL.path(percentEncoded: false))"))
           }
 
         """
@@ -116,8 +122,8 @@ import Foundation
       let i = testCaseIdentifier(u)
       result += """
 
-          func test_positive_\(i)() async throws {
-            try await positive(.init("\(u.absoluteURL.path())"))
+          @Test func positive_\(i)() async throws {
+            try await positive(.init("\(u.absoluteURL.path(percentEncoded: false))"))
           }
 
         """
