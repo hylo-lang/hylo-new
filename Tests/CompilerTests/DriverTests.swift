@@ -15,7 +15,7 @@ final class DriverTests: XCTestCase {
 
   func testNativeDriverCreation() throws {
     let driver = try Driver(targetSpecification: .native())
-    XCTAssertFalse(driver.target.cpu.isEmpty)
+    XCTAssertNotEqual(driver.target.cpu, "")
   }
 
   func testCreateDriverWithOptions() throws {
