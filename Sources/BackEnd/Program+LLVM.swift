@@ -297,8 +297,6 @@ extension Program {
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertUnsignedRem(
         xs[0], xs[1], at: ctx.insertionPoint!).v
-    case .zeroinitializer(let t):
-      ctx.value[v] = codegen(.integer(0, t), in: &ctx)
     case .signedAdditionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
