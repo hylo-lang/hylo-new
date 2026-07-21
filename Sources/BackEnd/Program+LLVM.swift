@@ -306,6 +306,9 @@ extension Program {
     case .signedSubtractionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.usub.with.overflow, for: t, with: s.arguments, in: &ctx)
     case .signedMultiplicationWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
