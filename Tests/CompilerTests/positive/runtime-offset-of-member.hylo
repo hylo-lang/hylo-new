@@ -1,13 +1,4 @@
-/*
-extension Pointer<UInt8> {
-  /// Creates an instance that does not address any usable storage.
-  @inline(always)
-  public static fun null() -> Self {
-    .new(value: Builtin.zeroinitializer_ptr())
-  }
-}
-
-type Size = UInt32
+ type Size = UInt32
 
 // Because the integer types are incomplete
 extension UInt32 {
@@ -240,6 +231,19 @@ extension Metatype<UInt16> {
 
 }
 
+/// Fatal error unless TypeWitnessHeader lays out in declaration
+/// order in Hylo.
+fun checkLayoutRequirements() {
+  precondition(false)
+  precondition(
+    Metatype<Pointer<UInt8>>.alignment() >= Metatype<Size>.alignment())
+  precondition(
+    Metatype<Size>.alignment() >= Metatype<Alignment>.alignment())
+}
+
+// Doesn't seem to work; see https://github.com/hylo-lang/hylo-new/issues/319
+let layoutRequirementsChecked: Void = checkLayoutRequirements()
+
 /// Notionally, a collection of Witnesses of unspecified size.
 struct RecordLayout is Deinitializable {
 
@@ -387,10 +391,24 @@ struct RecordLayout is Deinitializable {
 /// Returns the offset of the `n`th member in declaration order of a
 /// record type having members given by the array of length `l` at
 /// `memberArray`.
-fun offset_of_member(
+fun __hylo_offset_of_member(
   n: UInt32,
   in memberArray: Pointer<RecordMemberType>, ofLength l: UInt32) -> UInt32
 {
   RecordLayout.new(start: memberArray.copy(), count: l.copy()).offset_of_member(n)
 }
-*/
+
+
+// ---------------
+
+
+fun w(size: UInt32, alignment: UInt16) -> TypeWitnessHeader {
+  TypeWitnessHeader(
+    description: .null(), size: size.copy(), alignment: alignment.copy(),
+    type_argument_or_parameter_count: .zero())
+}
+
+fun main() {
+//  let x = w(0 as UInt32, 0 as UInt16)
+  precondition(true)
+}
