@@ -283,8 +283,6 @@ extension Program {
       insertTrap(in: &ctx)
     case .addressOf:
       ctx.value[v] = ctx.value[s.arguments[0]]!
-    case .zeroinitializer(let t):
-      ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
     case .udiv(let e, let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertUnsignedDiv(
