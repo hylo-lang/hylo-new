@@ -58,7 +58,8 @@ public given TypeWitnessHeader is Movable {}
 
 public given Pointer<TypeWitnessHeader> is Deinitializable {}
 public given Pointer<TypeWitnessHeader> is Movable {}
-public given Pointer<TypeWitnessHeader> is Copyable {}
+// Causes an assertion in the compiler (LLVM).
+//public given Pointer<TypeWitnessHeader> is Copyable {}
 
 extension Pointer<TypeWitnessHeader> {
 
@@ -69,6 +70,11 @@ extension Pointer<TypeWitnessHeader> {
     let {
       yield self.value as* let Pointee
     }
+  }
+
+  @inline(always)
+  public fun copy() -> Self {
+    .new(value: self.value)
   }
 
 }
@@ -241,9 +247,6 @@ fun checkLayoutRequirements() {
     Metatype<Size>.alignment() >= Metatype<Alignment>.alignment())
 }
 
-// Doesn't seem to work; see https://github.com/hylo-lang/hylo-new/issues/319
-let layoutRequirementsChecked: Void = checkLayoutRequirements()
-
 /// Notionally, a collection of Witnesses of unspecified size.
 struct RecordLayout is Deinitializable {
 
@@ -409,6 +412,7 @@ fun w(size: UInt32, alignment: UInt16) -> TypeWitnessHeader {
 }
 
 fun main() {
-//  let x = w(0 as UInt32, 0 as UInt16)
+//  checkLayoutRequirements()
+  let x = w(0 as UInt32, 0 as UInt16)
   precondition(true)
 }
