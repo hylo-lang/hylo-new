@@ -391,6 +391,7 @@ struct RecordLayout is Deinitializable {
 
 }
 
+/*
 /// Returns the offset of the `n`th member in declaration order of a
 /// record type having members given by the array of length `l` at
 /// `memberArray`.
@@ -400,19 +401,22 @@ fun __hylo_offset_of_member(
 {
   RecordLayout.new(start: memberArray.copy(), count: l.copy()).offset_of_member(n)
 }
+*/
 
+// --------------- TESTING
 
-// ---------------
-
-
+/*
 fun w(size: UInt32, alignment: UInt16) -> TypeWitnessHeader {
   TypeWitnessHeader(
     description: .null(), size: size.copy(), alignment: alignment.copy(),
     type_argument_or_parameter_count: .zero())
 }
+ */
 
 fun main() {
 //  checkLayoutRequirements()
-  let x = w(0 as UInt32, 0 as UInt16)
+//  let x = w(0 as UInt32, 0 as UInt16)
+//  let y = (w(0 as UInt32, 0 as UInt16), w(1 as UInt32, 2 as UInt16)) as TypeWitnessHeader[2]
+
   precondition(true)
 }
