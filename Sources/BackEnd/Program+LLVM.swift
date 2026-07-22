@@ -686,6 +686,16 @@ extension Program {
     }
 
     let tableType = metadata(of: s.witnessType, in: &ctx.module)
+
+    assert(entries.allSatisfy(\.unsafe[].isConstant), """
+      Runtime-defined IRWitnessTable operands are not yet supported.
+      See https://github.com/hylo-lang/hylo-new/issues/342
+
+      Problem occurred during LLVM lowering of:
+      \(show(ctx.ir))
+
+      """)
+
     let table = ctx.module.llvm.structConstant(
       of: StructType.UnsafeReference(tableType.llvm)!, aggregating: entries)
 
