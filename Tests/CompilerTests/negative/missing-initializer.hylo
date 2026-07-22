@@ -1,5 +1,8 @@
 //! no-std
 
+struct S { var m: Void }
+
 public fun main() {
-  let x: Void
+  let x: S
+  let y = x.m
 }
