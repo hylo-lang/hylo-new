@@ -109,12 +109,20 @@ extension UInt {
 }
 
 public given Pointer<RecordMemberType> is Movable {}
-public given Pointer<RecordMemberType> is Copyable {}
+//public given Pointer<RecordMemberType> is Copyable {}
+extension Pointer<RecordMemberType> {
+
+  @inline(always)
+  public fun copy() -> Self {
+    .new(value: self.value)
+  }
+
+}
 public given Pointer<RecordMemberType> is Deinitializable {}
 
 extension Pointer<RecordMemberType> {
 
-  type Pointee = RecordMemberType
+  type Pointee = Pointer<TypeWitnessHeader>
 
   /// Returns the size of an instance
   fun size() -> Size {
@@ -144,7 +152,7 @@ extension Pointer<RecordMemberType> {
 
 extension Metatype<RecordMemberType> {
 
-  type Subject = RecordMemberType
+  type Subject = Pointer<TypeWitnessHeader>
 
   /// Returns `self`, granting access to details.
   static fun type_info() -> Pointer<TypeWitnessHeader> {
