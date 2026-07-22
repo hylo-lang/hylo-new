@@ -738,7 +738,7 @@ internal struct IREmitter {
       } else {
         let t = program.type(assignedTo: program[e].callee, assuming: Arrow.self)
         lowering(e) { (me) in
-          let x0 = me._emitApply(builtin: f, typed: t, to: me.program[e].arguments)
+          let x0 = me._emitApply(builtin: f, ofType: t, to: me.program[e].arguments)
           me._emitInitialize(target, with: x0)
         }
       }
@@ -2640,18 +2640,20 @@ internal struct IREmitter {
     _ = _apply_builtin(.trap, ofType: u, to: [])
   }
 
-  /// Generates IR for applying `callee` to `arguments`.
+  /// Calls `f(arguments...)` where `f` is a builtin function of type `t`
+  /// other than `assume_[un]initialized`.
   ///
-  /// `callee` is any built-in function but `assume_[un]initialized`.
+  /// - Note: Calls to `Builtin.assume_[un]initialized` are lowered directly to `assume_state`
+  ///   instructions rather than function applications.
   private mutating func _emitApply(
-    builtin callee: BuiltinFunction, typed calleeType: Arrow.ID,
+    builtin f: BuiltinFunction, ofType t: Arrow.ID,
     to arguments: [LabeledExpression],
   ) -> IRValue {
-    let xs = zip(program.types[calleeType].inputs, arguments).map { (p, a) in
+    let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
       let x0 = lowered(lvalue: a.value)
       return _access([p.access], from: x0)
     }
-    return _apply_builtin(callee, ofType: calleeType, to: xs)
+    return _apply_builtin(f, ofType: t, to: xs)
   }
 
   /// Generates IR for defining a place projecting `source` as a place of type `target` with
