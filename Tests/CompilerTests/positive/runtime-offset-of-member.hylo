@@ -66,13 +66,6 @@ extension Pointer<TypeWitnessHeader> {
   public type Pointee = TypeWitnessHeader
 
   @inline(always)
-  public subscript unsafe() auto -> Pointee {
-    let {
-      yield self.value as* let Pointee
-    }
-  }
-
-  @inline(always)
   public fun copy() -> Self {
     .new(value: self.value)
   }
@@ -93,10 +86,14 @@ extension RecordMemberType {
 extension RecordMemberType {
 
   /// Returns the size of an instance
-  fun size() -> Size { self.unsafe[].size.copy() }
+  fun size() -> Size {
+    (self.value as* let Self.Pointee).size.copy()
+  }
 
   /// Returns the alignment of an instance
-  fun alignment() -> UInt16 { self.unsafe[].alignment.copy() }
+  fun alignment() -> Alignment {
+    (self.value as* let Self.Pointee).alignment.copy()
+  }
 
 }
 
@@ -119,35 +116,27 @@ extension Pointer<RecordMemberType> {
 
   type Pointee = RecordMemberType
 
-  @inline(always)
-  public subscript unsafe() auto -> Pointee {
-    let {
-      yield self.value as* let Pointee
-    }
-
-    // Because we don't have PointerToMutable yet.
-    inout {
-      yield &(self.value as* inout Pointee)
-    }
+  /// Returns the size of an instance
+  fun size() -> Size {
+    self.pointee().size()
   }
 
-  @inline(always)
-  public subscript unsafe(offset: UInt32) auto -> RecordMemberType {
-    let {
-      yield (self + offset).unsafe[]
-    }
+  /// Returns the alignment of an instance
+  fun alignment() -> Alignment {
+    self.pointee().alignment()
+  }
 
-    // Because we don't have PointerToMutable yet.
-    inout {
-      // workaround for https://github.com/hylo-lang/hylo-new/issues/310
-      yield &((self + offset).value as* inout Pointee)
-      // Should be: yield &(self + offset).unsafe[]
-    }
+  fun pointee() -> Pointee {
+    (self.value as* let Self.Pointee).copy()
+  }
+
+  fun set_pointee(x: sink Self.Pointee) {
+    &(self.value as* inout Self.Pointee) = x
   }
 
   @inline(always)
   public fun infix+ (offset: UInt32) -> Self {
-    let byte_offset = UInt(Metatype<Pointee>.stride()) * UInt(offset)
+    let byte_offset = UInt(Metatype<Self.Pointee>.stride()) * UInt(offset)
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
@@ -157,21 +146,21 @@ extension Metatype<RecordMemberType> {
 
   type Subject = RecordMemberType
 
-  /// Yields `self`, granting access to details.
-  static subscript type_info() -> TypeWitnessHeader {
-    yield Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).unsafe[].unsafe[]
+  /// Returns `self`, granting access to details.
+  static fun type_info() -> Pointer<TypeWitnessHeader> {
+    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
   }
 
   /// Returns the size in bytes of the `Subject`.
   @inline(always)
   public static fun size() -> Size {
-    Self.type_info[].size.copy()
+    Self.type_info().size()
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
   @inline(always)
   public static fun alignment() -> Alignment {
-    Self.type_info[].alignment.copy()
+    Self.type_info().alignment()
   }
 
   /// Returns the number of bytes between elements in a buffer of `Subject`.
@@ -189,33 +178,32 @@ extension Metatype<Pointer<UInt8>> {
 
   type Subject = Pointer<UInt8>
 
-  /// Yields `self`, granting access to details.
-  static subscript type_info() -> TypeWitnessHeader {
-    yield Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).unsafe[].unsafe[]
+  /// Returns `self`, granting access to details.
+  static fun type_info() -> Pointer<TypeWitnessHeader> {
+    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
   @inline(always)
   public static fun alignment() -> Alignment {
-    Self.type_info[].alignment.copy()
+    Self.type_info().alignment()
   }
 
 }
-
 
 extension Metatype<UInt32> {
 
   type Subject = UInt32
 
-  /// Yields `self`, granting access to details.
-  static subscript type_info() -> TypeWitnessHeader {
-    yield Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).unsafe[].unsafe[]
+  /// Returns `self`, granting access to details.
+  static fun type_info() -> Pointer<TypeWitnessHeader> {
+    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
   @inline(always)
   public static fun alignment() -> Alignment {
-    Self.type_info[].alignment.copy()
+    Self.type_info().alignment()
   }
 
 }
@@ -224,15 +212,15 @@ extension Metatype<UInt16> {
 
   type Subject = UInt16
 
-  /// Yields `self`, granting access to details.
-  static subscript type_info() -> TypeWitnessHeader {
-    yield Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).unsafe[].unsafe[]
+  /// Returns `self`, granting access to details.
+  static fun type_info() -> Pointer<TypeWitnessHeader> {
+    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
   @inline(always)
   public static fun alignment() -> Alignment {
-    Self.type_info[].alignment.copy()
+    Self.type_info().alignment()
   }
 
 }
@@ -254,29 +242,15 @@ struct RecordLayout is Deinitializable {
   var count: MemberCount
   memberwise init
 
-  /// Accesses the nth element.
-  subscript at(n: MemberIndex) auto -> RecordMemberType {
-    let { yield self.start.unsafe[n] }
-    inout {
-      // workaround for https://github.com/hylo-lang/hylo-new/issues/310
-      yield &((self.start + n).value as* inout RecordMemberType)
-      // Should be: yield &self.start.unsafe[n]
-    }
-  }
-
-  fun assign_at(n: MemberIndex, newValue: sink RecordMemberType) inout {
-    &((self.start + n).value as* inout RecordMemberType).assign(newValue)
-  }
-
   /// Discard element n and any with lesser alignments, or with the
   /// same alignment occurring at an initial index >= n.
   fun retain_only_elements(that_lay_out_before_element n: MemberIndex) inout {
     let _1 = 1 as UInt32
-    let nth_alignment = self.at[n].alignment()
+    let nth_alignment = (self.start + n).alignment()
     // Next element to process.
     var i: MemberCount = 0
     // Skip over initial retained sequence.
-    while i < n && self.at[i].alignment() >= nth_alignment {
+    while i < n && (self.start + i).alignment() >= nth_alignment {
       &i += _1
     }
     // The number of elements to retain.
@@ -292,8 +266,8 @@ struct RecordLayout is Deinitializable {
     // elements before the nth are retained iff they have greater or
     // equal alignment.
     while i < n {
-      if self.at[i].alignment() >= nth_alignment {
-        &self.assign_at(new_count, self.at[i].copy())
+      if (self.start + i).alignment() >= nth_alignment {
+        (self.start + new_count).set_pointee((self.start + i).pointee())
         &new_count += _1
       }
       &i += _1
@@ -305,8 +279,8 @@ struct RecordLayout is Deinitializable {
     // elements after the nth are retained iff they have greater
     // alignment.
     while i < self.count {
-      if self.at[i].alignment() > nth_alignment {
-        &self.assign_at(new_count, self.at[i].copy())
+      if (self.start + i).alignment() > nth_alignment {
+        (self.start + new_count).set_pointee((self.start + i).pointee())
         &new_count += _1
       }
       &i += _1
@@ -325,13 +299,13 @@ struct RecordLayout is Deinitializable {
     // Nothing to sort
     if self.count <= _1 { return }
 
-    var prior_alignment = self.at[_0].alignment()
+    var prior_alignment = self.start.pointee().alignment()
 
     var i: MemberIndex = 1
     while i < self.count {
       // invariant: elements 0..<i are sorted.
 
-      let w = self.at[i].copy()
+      let w = (self.start + i).pointee()
       let w_alignment = w.alignment()
 
       if prior_alignment >= w_alignment {
@@ -348,15 +322,14 @@ struct RecordLayout is Deinitializable {
         var done = false
         while !done {
           // Move jth back one, into the hole, leaving a hole at j - 1.
-          &self.assign_at(j, self.at[j - _1].copy())
-          j -= _1
-          if j == _0 || self.at[j - _1].alignment() >= w_alignment { &done = true }
+          sink let k = j - _1
+          let pk = (self.start + k)
+          (self.start + j).set_pointee(pk.pointee())
+          &j = k
+          if j == _0 || pk.alignment() >= w_alignment { &done = true }
         }
         // put w in the hole.
-        &self.assign_at(
-          j,
-          w.copy() // workaround https://github.com/hylo-lang/hylo-new/issues/313
-        )
+        (self.start + j).set_pointee(w.copy())
       }
 
       i += _1
@@ -372,7 +345,7 @@ struct RecordLayout is Deinitializable {
     var r: Size = 0
     var i: MemberIndex = 0
     while i < self.count {
-      let w = &self.at[i]
+      let w = (self.start + i).pointee()
       let position = w.alignment().first_aligned_offset(starting_from: r)
       &r = position + w.size()
       i += _1
@@ -382,7 +355,7 @@ struct RecordLayout is Deinitializable {
 
   /// Returns the offset where the initial `nth` element would appear.
   fun offset_of_member(n: MemberIndex) sink -> Size {
-    let nth_alignment = self.at[n].alignment()
+    let nth_alignment = (self.start + n).alignment()
     self.retain_only_elements(that_lay_out_before_element: n)
     self.stable_sort_by_decreasing_alignment()
     return nth_alignment.first_aligned_offset(
