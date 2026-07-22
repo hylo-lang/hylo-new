@@ -1,0 +1,11 @@
+subscript s0(x: Void) -> Int { 42 }
+
+// The parameter is erased and it's accessed after the yield.
+subscript s1(x: Void) -> Int {
+  yield 1
+  precondition(s0[x] == 42)
+}
+
+fun main() {
+  precondition(s1[()] == 1)
+}
