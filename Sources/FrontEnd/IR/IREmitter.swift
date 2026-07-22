@@ -736,8 +736,9 @@ internal struct IREmitter {
           me._assume_state(target, initialized: true)
         }
       } else {
+        let t = program.type(assignedTo: program[e].callee, assuming: Arrow.self)
         lowering(e) { (me) in
-          let x0 = me._emitApply(builtin: f, to: me.program[e].arguments)
+          let x0 = me._emitApply(builtin: f, typed: t, to: me.program[e].arguments)
           me._emitInitialize(target, with: x0)
         }
       }
@@ -2073,12 +2074,12 @@ internal struct IREmitter {
 
   /// Inserts a `apply_builtin` instruction.
   internal mutating func _apply_builtin(
-    _ callee: BuiltinFunction, typed f: Arrow.ID, to arguments: [IRValue]
+    _ callee: BuiltinFunction, typed calleeType: Arrow.ID, to arguments: [IRValue]
   ) -> IRValue {
-    assert(program.types[f].inputs.count == arguments.count)
-    let p = program.types[f].inputs.map(\.access)
+    assert(program.types[calleeType].inputs.count == arguments.count)
+    let p = program.types[calleeType].inputs.map(\.access)
     let s = IRApplyBuiltin(
-      callee: callee, inputs: p, output: program.types[f].output, arguments: arguments,
+      callee: callee, inputs: p, output: program.types[calleeType].output, arguments: arguments,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2634,22 +2635,23 @@ internal struct IREmitter {
 
   /// Generates IR for calling `Builtin.trap`.
   internal mutating func _emitTrap() {
-    let f = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
-    _ = _apply_builtin(.trap, typed: f, to: [])
+    let t = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
+    let u = program.types.castUnchecked(t, to: Arrow.self)
+    _ = _apply_builtin(.trap, typed: u, to: [])
   }
 
   /// Generates IR for applying `callee` to `arguments`.
   ///
   /// `callee` is any built-in function but `assume_[un]initialized`.
   private mutating func _emitApply(
-    builtin callee: BuiltinFunction, to arguments: [LabeledExpression],
+    builtin callee: BuiltinFunction, typed calleeType: Arrow.ID,
+    to arguments: [LabeledExpression],
   ) -> IRValue {
-    let t = callee.type(uniquingTypesWith: &program.types)
-    let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
+    let xs = zip(program.types[calleeType].inputs, arguments).map { (p, a) in
       let x0 = lowered(lvalue: a.value)
       return _access([p.access], from: x0)
     }
-    return _apply_builtin(callee, typed: t, to: xs)
+    return _apply_builtin(callee, typed: calleeType, to: xs)
   }
 
   /// Generates IR for defining a place projecting `source` as a place of type `target` with
