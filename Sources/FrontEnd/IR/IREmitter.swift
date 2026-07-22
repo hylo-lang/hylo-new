@@ -2072,14 +2072,14 @@ internal struct IREmitter {
     return result
   }
 
-  /// Inserts a `apply_builtin` instruction.
+  /// Calls `f(arguments...)`, where `f` has type `t`.
   internal mutating func _apply_builtin(
-    _ callee: BuiltinFunction, typed calleeType: Arrow.ID, to arguments: [IRValue]
+    _ callee: BuiltinFunction, ofType t: Arrow.ID, to arguments: [IRValue]
   ) -> IRValue {
-    assert(program.types[calleeType].inputs.count == arguments.count)
-    let p = program.types[calleeType].inputs.map(\.access)
+    assert(program.types[t].inputs.count == arguments.count)
+    let p = program.types[t].inputs.map(\.access)
     let s = IRApplyBuiltin(
-      callee: callee, inputs: p, output: program.types[calleeType].output, arguments: arguments,
+      callee: callee, inputs: p, output: program.types[t].output, arguments: arguments,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2637,7 +2637,7 @@ internal struct IREmitter {
   internal mutating func _emitTrap() {
     let t = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
     let u = program.types.castUnchecked(t, to: Arrow.self)
-    _ = _apply_builtin(.trap, typed: u, to: [])
+    _ = _apply_builtin(.trap, ofType: u, to: [])
   }
 
   /// Generates IR for applying `callee` to `arguments`.
@@ -2651,7 +2651,7 @@ internal struct IREmitter {
       let x0 = lowered(lvalue: a.value)
       return _access([p.access], from: x0)
     }
-    return _apply_builtin(callee, typed: calleeType, to: xs)
+    return _apply_builtin(callee, ofType: calleeType, to: xs)
   }
 
   /// Generates IR for defining a place projecting `source` as a place of type `target` with
