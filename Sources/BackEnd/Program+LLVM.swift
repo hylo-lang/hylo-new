@@ -312,6 +312,15 @@ extension Program {
     case .signedMultiplicationWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.umul.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .advancedByBytes(byteOffset: let t):
+      assert(s.arguments.count == 2)
+      let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
+      let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: p, typed: ctx.module.llvm.ptr, indices: offsets, at: ctx.insertionPoint!).v
     case .zext(_, let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       let mt = metadata(of: t, in: &ctx.module)
