@@ -28,8 +28,8 @@ let package = Package(
       url: "https://github.com/attaswift/BigInt.git",
       from: "5.7.0"),
     .package(
-      url: "https://github.com/kyouko-taiga/Archivist.git",
-      revision: "9d5540fe2b7143c4ee1bb40e0f578a29bbfdf86f"),
+      url: "https://github.com/tothambrus11/Archivist.git",
+      revision: "c7a5d710fbff1457e01cce0a207f1cb51c718189"),
     .package(
       url: "https://github.com/apple/swift-algorithms.git",
       from: "1.2.0"),
