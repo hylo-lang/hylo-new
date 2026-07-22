@@ -106,7 +106,7 @@ extension FunctionGenerationContext {
     let u = module.llvm.arrayType(captures.count, module.llvm.ptr).t
     let v = module.llvm.structType([t, u])
     return .init(
-      boundary: y, inputs: result.prototype.mapping.inputs, definitions: definitions,
+      boundary: y, inputs: prototype.mapping.inputs, definitions: definitions,
       captures: captures, captureFrame: v)
   }
 
