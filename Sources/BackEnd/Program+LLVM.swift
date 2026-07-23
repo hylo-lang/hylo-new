@@ -663,11 +663,11 @@ extension Program {
 
     let tableType = metadata(of: s.witnessType, in: &ctx.module)
 
-    assert(entries.allSatisfy(\.unsafe[].isConstant), """
-      Runtime-defined IRWitnessTable operands are not yet supported.
-      See https://github.com/hylo-lang/hylo-new/issues/342
+    unimplemented(if: !entries.allSatisfy(\.unsafe[].isConstant), 
+      """
+      Runtime-defined IRWitnessTable operand. https://github.com/hylo-lang/hylo-new/issues/342
 
-      Problem occurred during LLVM lowering of:
+      In:
       \(show(ctx.ir))
 
       """)
