@@ -1,0 +1,60 @@
+negative/integer-literal-bounds.hylo:4.18-22: error: integer literal '-129' is out of bounds for 'Int8'
+  let a1: Int8 = -129
+                 ~~~~
+negative/integer-literal-bounds.hylo:5.18-21: error: integer literal '128' is out of bounds for 'Int8'
+  let a2: Int8 = 128
+                 ~~~
+negative/integer-literal-bounds.hylo:6.19-21: error: integer literal '-1' is out of bounds for 'UInt8'
+  let a3: UInt8 = -1
+                  ~~
+negative/integer-literal-bounds.hylo:7.19-22: error: integer literal '300' is out of bounds for 'UInt8'
+  let a4: UInt8 = 300
+                  ~~~
+negative/integer-literal-bounds.hylo:9.19-25: error: integer literal '-32769' is out of bounds for 'Int16'
+  let a5: Int16 = -32769
+                  ~~~~~~
+negative/integer-literal-bounds.hylo:10.19-24: error: integer literal '32768' is out of bounds for 'Int16'
+  let a6: Int16 = 32768
+                  ~~~~~
+negative/integer-literal-bounds.hylo:11.20-22: error: integer literal '-1' is out of bounds for 'UInt16'
+  let a7: UInt16 = -1
+                   ~~
+negative/integer-literal-bounds.hylo:12.20-25: error: integer literal '65536' is out of bounds for 'UInt16'
+  let a8: UInt16 = 65536
+                   ~~~~~
+negative/integer-literal-bounds.hylo:14.19-30: error: integer literal '-2147483649' is out of bounds for 'Int32'
+  let a9: Int32 = -2147483649
+                  ~~~~~~~~~~~
+negative/integer-literal-bounds.hylo:15.20-30: error: integer literal '2147483648' is out of bounds for 'Int32'
+  let a10: Int32 = 2147483648
+                   ~~~~~~~~~~
+negative/integer-literal-bounds.hylo:16.21-23: error: integer literal '-1' is out of bounds for 'UInt32'
+  let a11: UInt32 = -1
+                    ~~
+negative/integer-literal-bounds.hylo:17.21-31: error: integer literal '4294967296' is out of bounds for 'UInt32'
+  let a12: UInt32 = 4294967296
+                    ~~~~~~~~~~
+negative/integer-literal-bounds.hylo:19.20-40: error: integer literal '-9223372036854775809' is out of bounds for 'Int64'
+  let a13: Int64 = -9223372036854775809
+                   ~~~~~~~~~~~~~~~~~~~~
+negative/integer-literal-bounds.hylo:20.20-39: error: integer literal '9223372036854775808' is out of bounds for 'Int64'
+  let a14: Int64 = 9223372036854775808
+                   ~~~~~~~~~~~~~~~~~~~
+negative/integer-literal-bounds.hylo:21.21-23: error: integer literal '-1' is out of bounds for 'UInt64'
+  let a15: UInt64 = -1
+                    ~~
+negative/integer-literal-bounds.hylo:22.21-41: error: integer literal '18446744073709551616' is out of bounds for 'UInt64'
+  let a16: UInt64 = 18446744073709551616
+                    ~~~~~~~~~~~~~~~~~~~~
+negative/integer-literal-bounds.hylo:24.18-38: error: integer literal '-9223372036854775809' is out of bounds for 'Int'
+  let a17: Int = -9223372036854775809
+                 ~~~~~~~~~~~~~~~~~~~~
+negative/integer-literal-bounds.hylo:25.18-37: error: integer literal '9223372036854775808' is out of bounds for 'Int'
+  let a18: Int = 9223372036854775808
+                 ~~~~~~~~~~~~~~~~~~~
+negative/integer-literal-bounds.hylo:26.19-21: error: integer literal '-1' is out of bounds for 'UInt'
+  let a19: UInt = -1
+                  ~~
+negative/integer-literal-bounds.hylo:27.19-39: error: integer literal '18446744073709551616' is out of bounds for 'UInt'
+  let a20: UInt = 18446744073709551616
+                  ~~~~~~~~~~~~~~~~~~~~

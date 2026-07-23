@@ -1446,20 +1446,47 @@ internal struct IREmitter {
   ) -> IRValue {
     let value = BigInt(hyloLiteral: program[source].value)!
 
+    let specification: (width: Int, isSigned: Bool, storage: MachineType, name: String)
     switch target {
-    case program.standardLibraryType(.int), program.standardLibraryType(.uint):
-      return .integer(value, program.types.demand(MachineType.word))
-    case program.standardLibraryType(.int8), program.standardLibraryType(.uint8):
-      return .integer(value, program.types.demand(MachineType.i(8)))
-    case program.standardLibraryType(.int16), program.standardLibraryType(.uint16):
-      return .integer(value, program.types.demand(MachineType.i(16)))
-    case program.standardLibraryType(.int32), program.standardLibraryType(.uint32):
-      return .integer(value, program.types.demand(MachineType.i(32)))
-    case program.standardLibraryType(.int64), program.standardLibraryType(.uint64):
-      return .integer(value, program.types.demand(MachineType.i(64)))
+    // Keep word-sized integer bounds in sync with the generated standard library.
+    case program.standardLibraryType(.int):
+      specification = (64, true, .word, "Int")
+    case program.standardLibraryType(.uint):
+      specification = (64, false, .word, "UInt")
+    case program.standardLibraryType(.int8):
+      specification = (8, true, .i(8), "Int8")
+    case program.standardLibraryType(.uint8):
+      specification = (8, false, .i(8), "UInt8")
+    case program.standardLibraryType(.int16):
+      specification = (16, true, .i(16), "Int16")
+    case program.standardLibraryType(.uint16):
+      specification = (16, false, .i(16), "UInt16")
+    case program.standardLibraryType(.int32):
+      specification = (32, true, .i(32), "Int32")
+    case program.standardLibraryType(.uint32):
+      specification = (32, false, .i(32), "UInt32")
+    case program.standardLibraryType(.int64):
+      specification = (64, true, .i(64), "Int64")
+    case program.standardLibraryType(.uint64):
+      specification = (64, false, .i(64), "UInt64")
     default:
       program.unexpected(target)
     }
+
+    let unit = BigInt(1)
+    let minimum = specification.isSigned ? -(unit << (specification.width - 1)) : 0
+    let maximum =
+      specification.isSigned
+      ? (unit << (specification.width - 1)) - 1
+      : (unit << specification.width) - 1
+    if !(minimum...maximum).contains(value) {
+      let message =
+        "integer literal '\(program[source].value)' is out of bounds for "
+        + "'\(specification.name)'"
+      report(.error, message, about: source)
+    }
+
+    return .integer(value, program.types.demand(specification.storage))
   }
 
   /// Returns the value denoted by `source` interpreted as the floating point

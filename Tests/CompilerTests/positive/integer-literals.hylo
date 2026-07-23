@@ -1,18 +1,28 @@
 //! stage:lowering
 
 fun integer_literal_conversions() {
-  let a1: Int8 = 1
-  let a2: UInt8 = 1
+  let a1: Int8 = -128
+  let a2: Int8 = 127
+  let a3: UInt8 = 0
+  let a4: UInt8 = 255
 
-  let a3: Int16 = 1
-  let a4: UInt16 = 1
+  let a5: Int16 = -32768
+  let a6: Int16 = 32767
+  let a7: UInt16 = 0
+  let a8: UInt16 = 65535
 
-  let a5: Int32 = 1
-  let a6: UInt32 = 1
+  let a9: Int32 = -2147483648
+  let a10: Int32 = 2147483647
+  let a11: UInt32 = 0
+  let a12: UInt32 = 4294967295
 
-  let a7: Int64 = 1
-  let a8: UInt64 = 1
+  let a13: Int64 = -9223372036854775808
+  let a14: Int64 = 9223372036854775807
+  let a15: UInt64 = 0
+  let a16: UInt64 = 18446744073709551615
 
-  let a9: Int = 1
-  let a10: UInt = 1
+  let a17: Int = -9223372036854775808
+  let a18: Int = 9223372036854775807
+  let a19: UInt = 0
+  let a20: UInt = 18446744073709551615
 }

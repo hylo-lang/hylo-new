@@ -1,0 +1,28 @@
+//! stage:lowering
+
+fun integer_literal_bounds() {
+  let a1: Int8 = -129
+  let a2: Int8 = 128
+  let a3: UInt8 = -1
+  let a4: UInt8 = 300
+
+  let a5: Int16 = -32769
+  let a6: Int16 = 32768
+  let a7: UInt16 = -1
+  let a8: UInt16 = 65536
+
+  let a9: Int32 = -2147483649
+  let a10: Int32 = 2147483648
+  let a11: UInt32 = -1
+  let a12: UInt32 = 4294967296
+
+  let a13: Int64 = -9223372036854775809
+  let a14: Int64 = 9223372036854775808
+  let a15: UInt64 = -1
+  let a16: UInt64 = 18446744073709551616
+
+  let a17: Int = -9223372036854775809
+  let a18: Int = 9223372036854775808
+  let a19: UInt = -1
+  let a20: UInt = 18446744073709551616
+}
