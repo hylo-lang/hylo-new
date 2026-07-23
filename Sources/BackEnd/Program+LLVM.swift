@@ -686,6 +686,16 @@ extension Program {
     }
 
     let tableType = metadata(of: s.witnessType, in: &ctx.module)
+
+    assert(entries.allSatisfy(\.unsafe[].isConstant), """
+      Runtime-defined IRWitnessTable operands are not yet supported.
+      See https://github.com/hylo-lang/hylo-new/issues/342
+
+      Problem occurred during LLVM lowering of:
+      \(show(ctx.ir))
+
+      """)
+
     let table = ctx.module.llvm.structConstant(
       of: StructType.UnsafeReference(tableType.llvm)!, aggregating: entries)
 
@@ -928,37 +938,51 @@ extension Program {
     switch g.name {
     case .lowered:
       fatalError("TODO: global bindings")
-
     case .witness(let t):
-      // TODO: type arguments/parameters
-      // TODO: witnesses of opaque types
-
-      // Declare the symbol.
-      let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
-      let symbol = ctx.llvm.declareGlobalVariable(name, storage)
-      ctx.llvm.setLinkage(.private, for: symbol)
-
-      // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
-      // the module. Otherwise, the witness is for a type whose layout is defined externally.
-      let m = metadata(of: t, in: &ctx)
-      guard let s = m.layout.size.fixed else { return symbol }
-
-      let fields: [LLVMValue] = [
-        demandGlobalString(show(t), in: &ctx).v,
-        ctx.llvm.i32.unsafe[].constant(s).v,
-        ctx.llvm.i16.unsafe[].constant(m.layout.alignment).v,
-        ctx.llvm.i16.unsafe[].zero.v,
-      ]
-
-      let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
-      ctx.llvm.setAlignment(alignment, for: symbol)
-
-      let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
-      ctx.llvm.setInitializer(initializer, for: symbol)
-      ctx.llvm.setGlobalConstant(true, for: symbol)
-
-      return symbol
+      return demandGlobalTypeWitness(of: t, in: &ctx)
     }
+  }
+
+  /// Returns the global LLVM variable containing the type witness of `t`, declaring it if
+  /// necessary.
+  ///
+  /// - Requires: `t` is dealiased.
+  private mutating func demandGlobalTypeWitness(
+    of t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
+  ) -> SwiftyLLVM.GlobalVariable.UnsafeReference {
+    // TODO: type arguments/parameters
+    // TODO: witnesses of opaque types
+
+    let name = llvmName(global: .witness(t))
+    if let existing = ctx.llvm.global(named: name) {
+      return existing
+    }
+
+    // Declare the symbol.
+    let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
+    let symbol = ctx.llvm.declareGlobalVariable(name, storage)
+    ctx.llvm.setLinkage(.private, for: symbol)
+
+    // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
+    // the module. Otherwise, the witness is for a type whose layout is defined externally.
+    let m = metadata(of: t, in: &ctx)
+    guard let s = m.layout.size.fixed else { return symbol }
+
+    let fields: [LLVMValue] = [
+      demandGlobalString(show(t), in: &ctx).v,
+      ctx.llvm.i32.unsafe[].constant(s).v,
+      ctx.llvm.i16.unsafe[].constant(m.layout.alignment).v,
+      ctx.llvm.i16.unsafe[].zero.v,
+    ]
+
+    let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
+    ctx.llvm.setAlignment(alignment, for: symbol)
+
+    let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
+    ctx.llvm.setInitializer(initializer, for: symbol)
+    ctx.llvm.setGlobalConstant(true, for: symbol)
+
+    return symbol
   }
 
   private func demandGlobalString(
@@ -1261,6 +1285,10 @@ extension Program {
       return codegen(integer: n, instanceOf: t, in: &ctx.module)
     case .function(let n, _):
       return demandFunction(named: n, in: &ctx.module).value.v
+    case .type(let t, _):
+      // A type witness is represented by the address of its global metadata (for now).
+      // Runtime type witnesses are not yet supported.
+      return demandGlobalTypeWitness(of: t, in: &ctx.module).v
     default:
       fatalError("no LLVM representation of the Hylo value '\(show(v))'")
     }

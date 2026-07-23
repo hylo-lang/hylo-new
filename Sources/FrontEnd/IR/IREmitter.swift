@@ -736,8 +736,9 @@ internal struct IREmitter {
           me._assume_state(target, initialized: true)
         }
       } else {
+        let t = program.type(assignedTo: program[e].callee, assuming: Arrow.self)
         lowering(e) { (me) in
-          let x0 = me._emitApply(builtin: f, to: me.program[e].arguments)
+          let x0 = me._emitApply(builtin: f, ofType: t, to: me.program[e].arguments)
           me._emitInitialize(target, with: x0)
         }
       }
@@ -2071,14 +2072,14 @@ internal struct IREmitter {
     return result
   }
 
-  /// Inserts a `apply_builtin` instruction.
+  /// Calls `f(arguments...)`, where `f` has type `t`.
   internal mutating func _apply_builtin(
-    _ callee: BuiltinFunction, typed f: Arrow.ID, to arguments: [IRValue]
+    _ callee: BuiltinFunction, ofType t: Arrow.ID, to arguments: [IRValue]
   ) -> IRValue {
-    assert(program.types[f].inputs.count == arguments.count)
-    let p = program.types[f].inputs.map(\.access)
+    assert(program.types[t].inputs.count == arguments.count)
+    let p = program.types[t].inputs.map(\.access)
     let s = IRApplyBuiltin(
-      callee: callee, inputs: p, output: program.types[f].output, arguments: arguments,
+      callee: callee, inputs: p, output: program.types[t].output, arguments: arguments,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2634,22 +2635,25 @@ internal struct IREmitter {
 
   /// Generates IR for calling `Builtin.trap`.
   internal mutating func _emitTrap() {
-    let f = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
-    _ = _apply_builtin(.trap, typed: f, to: [])
+    let t = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
+    let u = program.types.castUnchecked(t, to: Arrow.self)
+    _ = _apply_builtin(.trap, ofType: u, to: [])
   }
 
-  /// Generates IR for applying `callee` to `arguments`.
+  /// Calls `f(arguments...)` where `f` is a builtin function of type `t`
+  /// other than `assume_[un]initialized`.
   ///
-  /// `callee` is any built-in function but `assume_[un]initialized`.
+  /// - Note: Calls to `Builtin.assume_[un]initialized` are lowered directly to `assume_state`
+  ///   instructions rather than function applications.
   private mutating func _emitApply(
-    builtin callee: BuiltinFunction, to arguments: [LabeledExpression],
+    builtin f: BuiltinFunction, ofType t: Arrow.ID,
+    to arguments: [LabeledExpression],
   ) -> IRValue {
-    let t = callee.type(uniquingTypesWith: &program.types)
     let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
       let x0 = lowered(lvalue: a.value)
       return _access([p.access], from: x0)
     }
-    return _apply_builtin(callee, typed: t, to: xs)
+    return _apply_builtin(f, ofType: t, to: xs)
   }
 
   /// Generates IR for defining a place projecting `source` as a place of type `target` with

@@ -4221,8 +4221,17 @@ public struct Typer {
 
     // Are we selecting a built-in function?
     else if let f = BuiltinFunction(n.identifier, uniquingTypesWith: &program.types) {
+      let r = DeclarationReference.builtin(.function(f))
       let t = f.type(uniquingTypesWith: &program.types)
-      return [.init(reference: .builtin(.function(f)), type: t.erased)]
+
+      // If the built-in function has a generic type, then we replace its type parameters by fresh
+      // variables to avoid elaborating type applications, essentially pretending that there exists
+      // an overload for each possible instantiation.
+      if let u = program.types[t] as? UniversalType {
+        return [.init(reference: r, type: program.types.open(u.parameters, in: u.head))]
+      } else {
+        return [.init(reference: r, type: t)]
+      }
     }
 
     // Nothing that we know.
