@@ -1,0 +1,25 @@
+public struct TypeWitnessHeader {
+  public memberwise init
+
+  let description: Pointer<UInt8>
+  let size: UInt32
+  let alignment: UInt16
+  let type_argument_or_parameter_count: UInt16
+}
+
+public struct Victim {
+  public memberwise init
+  let a: UInt32
+  let b: UInt16
+}
+
+public fun main() -> Int32 {
+  // The address of a metatype value is the address of a pointer to the type's witness header.
+  let h = Builtin.address(of: Victim) as* (let Pointer<TypeWitnessHeader>)
+
+  // Access as value (`.unsafe[]`).
+  let w = h.value as* (let TypeWitnessHeader)
+
+  // `Victim` occupies 6 bytes, so this exits with 0.
+  return Int32(value: w.size.value) - (6 as Int32)
+}

@@ -800,15 +800,17 @@ public struct TypeStore: Sendable {
   /// Returns `n` without any type alias.
   public mutating func dealiased(_ n: AnyTypeIdentity) -> AnyTypeIdentity {
     self.map(n) { (s, t) in
-      if !t[.hasAliases] {
-        return .stepOver(t)
-      } else if let a = s[t] as? TypeAlias {
-        return .stepInto(a.aliasee)
-      } else if let a = s[t] as? TypeApplication, let f = s[a.abstraction] as? TypeAlias {
-        return .stepInto(s.substitute(a.arguments, in: f.aliasee))
-      } else {
-        return .stepInto(t)
+      var u = t
+      while u[.hasAliases] {
+        if let a = s[u] as? TypeAlias {
+          u = a.aliasee
+        } else if let a = s[u] as? TypeApplication, let f = s[a.abstraction] as? TypeAlias {
+          u = s.substitute(a.arguments, in: f.aliasee)
+        } else {
+          return .stepInto(u)
+        }
       }
+      return .stepOver(u)
     }
   }
 
