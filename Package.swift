@@ -169,6 +169,10 @@ let package = Package(
       swiftSettings: commonSwiftSettings),
 
     .testTarget(
+      name: "RuntimeTests",
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
       name: "StableCollectionsTests",
       dependencies: [
         .target(name: "StableCollections")

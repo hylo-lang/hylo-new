@@ -283,8 +283,6 @@ extension Program {
       insertTrap(in: &ctx)
     case .addressOf:
       ctx.value[v] = ctx.value[s.arguments[0]]!
-    case .zeroinitializer(let t):
-      ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
     case .udiv(let e, let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertUnsignedDiv(
@@ -293,16 +291,42 @@ extension Program {
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertSignedDiv(
         exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .urem(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertUnsignedRem(
+        xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .zeroinitializer(let t):
+      ctx.value[v] = codegen(.integer(0, t), in: &ctx)
     case .signedAdditionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedAdditionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.uadd.with.overflow, for: t, with: s.arguments, in: &ctx)
     case .signedSubtractionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.usub.with.overflow, for: t, with: s.arguments, in: &ctx)
     case .signedMultiplicationWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
-
+    case .unsignedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.umul.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .advancedByBytes(byteOffset: let t):
+      assert(s.arguments.count == 2)
+      let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
+      let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: p, typed: ctx.module.llvm.ptr, indices: offsets, at: ctx.insertionPoint!).v
+    case .zext(_, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let mt = metadata(of: t, in: &ctx.module)
+      let t1 = IntegerType.UnsafeReference(mt.llvm)!
+      ctx.value[v] = ctx.module.llvm.insertZeroExtend(
+        xs[0], to: t1, at: ctx.insertionPoint!).v
     case .icmp(let p, let t):
       ctx.value[v] = insertCallBuiltinPredicate(
         p, for: t, with: s.arguments, in: &ctx)
@@ -914,37 +938,51 @@ extension Program {
     switch g.name {
     case .lowered:
       fatalError("TODO: global bindings")
-
     case .witness(let t):
-      // TODO: type arguments/parameters
-      // TODO: witnesses of opaque types
-
-      // Declare the symbol.
-      let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
-      let symbol = ctx.llvm.declareGlobalVariable(name, storage)
-      ctx.llvm.setLinkage(.private, for: symbol)
-
-      // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
-      // the module. Otherwise, the witness is for a type whose layout is defined externally.
-      let m = metadata(of: t, in: &ctx)
-      guard let s = m.layout.size.fixed else { return symbol }
-
-      let fields: [LLVMValue] = [
-        demandGlobalString(show(t), in: &ctx).v,
-        ctx.llvm.i32.unsafe[].constant(s).v,
-        ctx.llvm.i16.unsafe[].constant(m.layout.alignment).v,
-        ctx.llvm.i16.unsafe[].zero.v,
-      ]
-
-      let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
-      ctx.llvm.setAlignment(alignment, for: symbol)
-
-      let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
-      ctx.llvm.setInitializer(initializer, for: symbol)
-      ctx.llvm.setGlobalConstant(true, for: symbol)
-
-      return symbol
+      return demandGlobalTypeWitness(of: t, in: &ctx)
     }
+  }
+
+  /// Returns the global LLVM variable containing the type witness of `t`, declaring it if
+  /// necessary.
+  ///
+  /// - Requires: `t` is dealiased.
+  private mutating func demandGlobalTypeWitness(
+    of t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
+  ) -> SwiftyLLVM.GlobalVariable.UnsafeReference {
+    // TODO: type arguments/parameters
+    // TODO: witnesses of opaque types
+
+    let name = llvmName(global: .witness(t))
+    if let existing = ctx.llvm.global(named: name) {
+      return existing
+    }
+
+    // Declare the symbol.
+    let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
+    let symbol = ctx.llvm.declareGlobalVariable(name, storage)
+    ctx.llvm.setLinkage(.private, for: symbol)
+
+    // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
+    // the module. Otherwise, the witness is for a type whose layout is defined externally.
+    let m = metadata(of: t, in: &ctx)
+    guard let s = m.layout.size.fixed else { return symbol }
+
+    let fields: [LLVMValue] = [
+      demandGlobalString(show(t), in: &ctx).v,
+      ctx.llvm.i32.unsafe[].constant(s).v,
+      ctx.llvm.i16.unsafe[].constant(m.layout.alignment).v,
+      ctx.llvm.i16.unsafe[].zero.v,
+    ]
+
+    let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
+    ctx.llvm.setAlignment(alignment, for: symbol)
+
+    let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
+    ctx.llvm.setInitializer(initializer, for: symbol)
+    ctx.llvm.setGlobalConstant(true, for: symbol)
+
+    return symbol
   }
 
   private func demandGlobalString(
@@ -1247,6 +1285,10 @@ extension Program {
       return codegen(integer: n, instanceOf: t, in: &ctx.module)
     case .function(let n, _):
       return demandFunction(named: n, in: &ctx.module).value.v
+    case .type(let t, _):
+      // A type witness is represented by the address of its global metadata (for now).
+      // Runtime type witnesses are not yet supported.
+      return demandGlobalTypeWitness(of: t, in: &ctx.module).v
     default:
       fatalError("no LLVM representation of the Hylo value '\(show(v))'")
     }
