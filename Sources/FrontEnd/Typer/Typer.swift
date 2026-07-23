@@ -1,4 +1,5 @@
 import Algorithms
+import BigInt
 import OrderedCollections
 import Utilities
 
@@ -2019,7 +2020,8 @@ public struct Typer {
     case IntegerLiteral.self:
       return inferredType(of: castUnchecked(e, to: IntegerLiteral.self), in: &context)
     case FloatingPointLiteral.self:
-      return inferredType(of: castUnchecked(e, to: FloatingPointLiteral.self), in: &context)
+      return inferredType(
+        ofPrimitiveLiteral: castUnchecked(e, to: FloatingPointLiteral.self), in: &context)
     case Lambda.self:
       return inferredType(of: castUnchecked(e, to: Lambda.self), in: &context)
     case NameExpression.self:
@@ -2315,10 +2317,21 @@ public struct Typer {
     return context.obligations.assume(e, hasType: t, at: program[e].site)
   }
 
+  /// Returns the inferred type of the integer literal `e`.
+  private mutating func inferredType(
+    of e: IntegerLiteral.ID, in context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    if program[e.module].type(assignedTo: e) == nil {
+      let t = context.expectedType ?? standardLibraryType(IntegerLiteral.defaultType)
+      checkIntegerLiteral(e, representableBy: t)
+    }
+    return inferredType(ofPrimitiveLiteral: e, in: &context)
+  }
+
   /// Returns the inferred type of a primitive literal `e`, ensuring `e` is elaborated to a call
   /// to `.new(x: e)`, where `x` is the constructor label of `T`.
   private mutating func inferredType<T: LiteralExpression>(
-    of e: T.ID, in context: inout InferenceContext
+    ofPrimitiveLiteral e: T.ID, in context: inout InferenceContext
   ) -> AnyTypeIdentity {
     // Did we already elaborate this expression?
     if let t = program[e.module].type(assignedTo: e) {
@@ -4712,12 +4725,77 @@ public struct Typer {
 
   // MARK: Standard library
 
+  /// The value ranges of standard library integer types.
+  private static let standardLibraryIntegerBounds:
+    [Program.StandardLibraryEntity: ClosedRange<BigInt>] = {
+      let one = BigInt(1)
+
+      func signed(_ width: Int) -> ClosedRange<BigInt> {
+        let magnitude = one << (width - 1)
+        return -magnitude...(magnitude - one)
+      }
+
+      func unsigned(_ width: Int) -> ClosedRange<BigInt> {
+        0...((one << width) - one)
+      }
+
+      let signed64 = signed(64)
+      let unsigned64 = unsigned(64)
+      return [
+        .int: signed64,
+        .uint: unsigned64,
+        .int8: signed(8),
+        .uint8: unsigned(8),
+        .int16: signed(16),
+        .uint16: unsigned(16),
+        .int32: signed(32),
+        .uint32: unsigned(32),
+        .int64: signed64,
+        .uint64: unsigned64,
+      ]
+    }()
+
+  /// Reports an error iff `e` is not representable by `t`.
+  private mutating func checkIntegerLiteral(
+    _ e: IntegerLiteral.ID, representableBy t: AnyTypeIdentity
+  ) {
+    guard
+      let bounds = standardLibraryIntegerBounds(of: t),
+      let value = BigInt(hyloLiteral: program[e].value),
+      !bounds.contains(value)
+    else { return }
+
+    report(
+      .error,
+      "integer literal '\(program.show(e))' is out of bounds for '\(program.show(t))'",
+      about: e)
+  }
+
+  /// Returns the value range of `t` iff it is a standard library integer type.
+  private mutating func standardLibraryIntegerBounds(
+    of t: AnyTypeIdentity
+  ) -> ClosedRange<BigInt>? {
+    guard let e = standardLibraryIntegerEntity(of: t) else { return nil }
+    return Self.standardLibraryIntegerBounds[e]
+  }
+
+  /// Returns the standard library entity denoted by integer type `t`.
+  private mutating func standardLibraryIntegerEntity(
+    of t: AnyTypeIdentity
+  ) -> Program.StandardLibraryEntity? {
+    guard program.containsStandardLibrary else { return nil }
+
+    let u = program.types.dealiased(t)
+    return Program.StandardLibraryEntity.allIntegerTypes.first(
+      where: { (e) in standardLibraryType(e) == u })
+  }
+
   /// Returns `true` iff `t` is a standard library integer type (e.g., `Hylo.Int`).
   ///
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
-    isStandardLibraryType(t, in: Program.StandardLibraryEntity.allIntegerTypes)
+    standardLibraryIntegerEntity(of: t) != nil
   }
 
   /// Returns `true` iff `t` is a standard library floating point type (e.g., `Hylo.Float32`).

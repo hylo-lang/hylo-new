@@ -1,10 +1,10 @@
-//! stage:lowering
+//! stage:typing
 
 fun integer_literal_bounds() {
   let a1: Int8 = -129
   let a2: Int8 = 128
   let a3: UInt8 = -1
-  let a4: UInt8 = 300
+  let a4: UInt8 = 256
 
   let a5: Int16 = -32769
   let a6: Int16 = 32768

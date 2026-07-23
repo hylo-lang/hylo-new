@@ -7,8 +7,8 @@ negative/integer-literal-bounds.hylo:5.18-21: error: integer literal '128' is ou
 negative/integer-literal-bounds.hylo:6.19-21: error: integer literal '-1' is out of bounds for 'UInt8'
   let a3: UInt8 = -1
                   ~~
-negative/integer-literal-bounds.hylo:7.19-22: error: integer literal '300' is out of bounds for 'UInt8'
-  let a4: UInt8 = 300
+negative/integer-literal-bounds.hylo:7.19-22: error: integer literal '256' is out of bounds for 'UInt8'
+  let a4: UInt8 = 256
                   ~~~
 negative/integer-literal-bounds.hylo:9.19-25: error: integer literal '-32769' is out of bounds for 'Int16'
   let a5: Int16 = -32769
