@@ -285,6 +285,43 @@ extension Program {
       ctx.value[v] = ctx.value[s.arguments[0]]!
     case .zeroinitializer(let t):
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
+    
+    case .add(let o, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertAdd(
+        overflow: o.llvm, xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .signedAdditionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedAdditionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.uadd.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .fadd(let f, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertFAdd(xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+      
+    case .sub(let o, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertSub(
+        overflow: o.llvm, xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .signedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.usub.with.overflow, for: t, with: s.arguments, in: &ctx)
+
+    case .mul(let o, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertMul(
+        overflow: o.llvm, xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .signedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.umul.with.overflow, for: t, with: s.arguments, in: &ctx)
+
     case .udiv(let e, let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertUnsignedDiv(
@@ -293,23 +330,51 @@ extension Program {
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertSignedDiv(
         exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
-    case .signedAdditionWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
-    case .signedSubtractionWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
-    case .signedMultiplicationWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
+
+    case .urem(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertUnsignedRem(xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .srem(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertSignedRem(xs[0], xs[1], at: ctx.insertionPoint!).v
 
     case .icmp(let p, let t):
-      ctx.value[v] = insertCallBuiltinPredicate(
-        p, for: t, with: s.arguments, in: &ctx)
+      ctx.value[v] = insertCallBuiltinPredicate(p, for: t, with: s.arguments, in: &ctx)
 
-    default:
-      unimplemented(String(describing: s.callee))
-    }
+    case .assumeInitialized(_):
+      unreachable("assume_initialized must have been lowered as IRAssumeState.")
+
+    case .and(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertBitwiseAnd(xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .or(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertBitwiseOr(xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .xor(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertBitwiseXor(xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+
+
+
+    case .fsub(_, _):
+
+    case .fmul(_, _):
+
+    case .fdiv(_, _):
+
+    case .frem(_, _):
+
+    case .fcmp(_, _, _):
+
+    case .fptrunc(_, _):
+
+    case .fpext(_, _):
+
+    case .fptoui(_, _):
+
+    case .fptosi(_, _):
+
+}
 
     return ctx.ir.instruction(after: i.erased)
   }
@@ -1082,6 +1147,8 @@ extension Program {
 
   /// Generates the LLVM IR code for applying `callee`, which is the name of a function in the
   /// family of `llvm.x.with.overflow`, to `xs`.
+  /// 
+  /// - Requires: `xs` is a list of pointers to the actual operands. 
   private mutating func insertCallBuiltinBinaryWithOverflow(
     _ callee: IntrinsicFunction.Name, for integer: MachineType.ID, with xs: [FrontEnd.IRValue],
     in ctx: inout FunctionGenerationContext
@@ -1584,6 +1651,19 @@ extension SwiftyLLVM.IntegerPredicate {
     case .sge: self = .sge
     case .sgt: self = .sgt
     case .sle: self = .sle
+    }
+  }
+
+}
+
+extension FrontEnd.OverflowBehavior {
+
+  /// The LLVM representation of `self`.
+  var llvm: SwiftyLLVM.OverflowBehavior {
+    switch self {
+      case .ignore: .ignore
+      case .nuw: .nuw
+      case .nsw: .nsw
     }
   }
 
