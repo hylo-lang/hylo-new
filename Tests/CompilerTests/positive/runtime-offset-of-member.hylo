@@ -36,7 +36,14 @@ extension Alignment {
 }
 
 public given Pointer<UInt8> is Deinitializable {}
-public given Pointer<UInt8> is Movable {}
+public given Pointer<UInt8> is Movable {
+
+  fun take_value(from source: sink Self) auto {
+    set { &self.value = source.value }
+    inout { &self.value = source.value }
+  }
+
+}
 
 /// The header of the structure representing information stored in all type witnesses.
 ///
@@ -54,10 +61,33 @@ public struct TypeWitnessHeader {
 }
 
 public given TypeWitnessHeader is Deinitializable {}
-public given TypeWitnessHeader is Movable {}
+public given TypeWitnessHeader is Movable {
+  fun take_value(from source: sink Self) auto {
+    set {
+      &self.description = source.description
+      &self.size = source.size
+      &self.alignment = source.alignment
+      &self.type_argument_or_parameter_count = source.type_argument_or_parameter_count
+    }
+    inout {
+      &self.description = source.description
+      &self.size = source.size
+      &self.alignment = source.alignment
+      &self.type_argument_or_parameter_count = source.type_argument_or_parameter_count
+    }
+  }
+
+}
 
 public given Pointer<TypeWitnessHeader> is Deinitializable {}
-public given Pointer<TypeWitnessHeader> is Movable {}
+public given Pointer<TypeWitnessHeader> is Movable {
+
+  fun take_value(from source: sink Self) auto {
+    set { &self.value = source.value }
+    inout { &self.value = source.value }
+  }
+
+}
 // Causes an assertion in the compiler (LLVM).
 //public given Pointer<TypeWitnessHeader> is Copyable {}
 
@@ -108,7 +138,14 @@ extension UInt {
 
 }
 
-public given Pointer<RecordMemberType> is Movable {}
+public given Pointer<RecordMemberType> is Movable {
+
+  fun take_value(from source: sink Self) auto {
+    set { &self.value = source.value }
+    inout { &self.value = source.value }
+  }
+
+}
 //public given Pointer<RecordMemberType> is Copyable {}
 extension Pointer<RecordMemberType> {
 
