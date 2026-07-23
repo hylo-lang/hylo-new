@@ -1,4 +1,5 @@
 @testable import Driver
+import Foundation
 import SwiftyLLVM
 import XCTest
 import FrontEnd
@@ -39,6 +40,28 @@ final class DriverTests: XCTestCase {
       moduleCachePath: FileManager.default.temporaryDirectory, 
       targetSpecification: .native())
     XCTAssertNil(d.archive(of: "test"))
+  }
+
+  func testLinkerErrorDemanglesHyloSymbols() {
+    let mangled = "$hR1F06initlT01tR516selfsTR1tR5"
+    let error = Process.NonzeroExit(
+      exitCode: 1,
+      standardOutput: "stdout: undefined reference to '\(mangled)'",
+      standardError: "stderr: undefined reference to '\(mangled)'",
+      executable: URL(fileURLWithPath: "/usr/bin/clang"),
+      arguments: ["-o", "Test"])
+
+    let demangled = error.demanglingHyloSymbols()
+
+    XCTAssertEqual(
+      demangled.standardOutput,
+      "stdout: undefined reference to 'Hylo.Bool.fun init: [Void](self: Hylo.Bool) let -> Void'")
+    XCTAssertEqual(
+      demangled.standardError,
+      "stderr: undefined reference to 'Hylo.Bool.fun init: [Void](self: Hylo.Bool) let -> Void'")
+    XCTAssertEqual(demangled.exitCode, error.exitCode)
+    XCTAssertEqual(demangled.executable, error.executable)
+    XCTAssertEqual(demangled.arguments, error.arguments)
   }
 
   func testInvalidArchive() async throws {

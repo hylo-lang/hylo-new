@@ -20,6 +20,18 @@ extension Process {
     /// The arguments passed to the process.
     public let arguments: [String]
 
+    /// Creates an instance with the given process result.
+    public init(
+      exitCode: Int32, standardOutput: String, standardError: String, executable: URL,
+      arguments: [String]
+    ) {
+      self.exitCode = exitCode
+      self.standardOutput = standardOutput
+      self.standardError = standardError
+      self.executable = executable
+      self.arguments = arguments
+    }
+
     /// A textual description of the failure.
     public var description: String {
       """

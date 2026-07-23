@@ -1,6 +1,6 @@
 import ArgumentParser
+import Demangler
 import Foundation
-import FrontEnd
 
 /// Demangles Hylo mangled symbols found in input text.
 @main struct CommandLine: ParsableCommand {
@@ -50,56 +50,14 @@ import FrontEnd
 
   /// Prints `input` with each matched mangled symbol replaced by its demangled form.
   private func printRewritten(_ input: String) {
-    var lastIndex = input.startIndex
-    input.enumerateTokens { (token) in
-      if lastIndex < token.startIndex {
-        print(input[lastIndex..<token.startIndex], terminator: "")
-      }
-      if let demangled = String(token).demangled() {
-        print(demangled, terminator: "")
-      } else {
-        print(token, terminator: "")
-      }
-      lastIndex = token.endIndex
-    }
-    if lastIndex < input.endIndex {
-      print(input[lastIndex..<input.endIndex], terminator: "")
-    }
+    print(TextDemangler.rewrite(input), terminator: "")
   }
 
   /// Prints the demangled form of each matched mangled symbol in `input`.
   private func printDemangled(_ input: String) {
-    input.enumerateTokens { (token) in
-      if let demangled = String(token).demangled() {
-        print("\(token) => \(demangled)")
-      }
+    for symbol in TextDemangler.symbols(in: input) {
+      print("\(symbol.mangled) => \(symbol.demangled)")
     }
-  }
-
-}
-
-extension String {
-
-  /// Enumerates candidate mangled symbols in `self`.
-  ///
-  /// A candidate starts at `$` and continues while characters remain valid mangling symbols.
-  fileprivate func enumerateTokens(_ action: (Substring) -> Void) {
-    var remaining = self[...]
-    while let start = remaining.firstIndex(of: "$") {
-      let token = remaining[start...]
-      let end = token.firstIndex(where: { (c) in !c.isValidManglingSymbol() }) ?? token.endIndex
-      action(token[..<end])
-      remaining = token[end...]
-    }
-  }
-
-}
-
-extension Character {
-
-  /// Returns `true` iff `self` is a valid symbol in a mangled Hylo symbol.
-  fileprivate func isValidManglingSymbol() -> Bool {
-    isASCII && (isLetter || isNumber || self == "_" || self == "." || self == "$")
   }
 
 }

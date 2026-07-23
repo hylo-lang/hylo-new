@@ -1,5 +1,6 @@
 import Archivist
 import BackEnd
+import Demangler
 import Foundation
 import FrontEnd
 import StandardLibrary
@@ -379,7 +380,11 @@ public struct Driver {
     #endif
 
     let clang = try Host.findNativeExecutable(invokedAs: "clang")
-    _ = try Process.executionOutput(clang, arguments: arguments)
+    do {
+      _ = try Process.executionOutput(clang, arguments: arguments)
+    } catch let error as Process.NonzeroExit {
+      throw error.demanglingHyloSymbols()
+    }
   }
 
   /// The name of `module`.
@@ -432,6 +437,20 @@ public struct Driver {
       self.containsError = containsError
     }
 
+  }
+
+}
+
+extension Process.NonzeroExit {
+
+  /// Returns a copy with Hylo symbols in the process output demangled.
+  func demanglingHyloSymbols() -> Self {
+    .init(
+      exitCode: exitCode,
+      standardOutput: TextDemangler.rewrite(standardOutput),
+      standardError: TextDemangler.rewrite(standardError),
+      executable: executable,
+      arguments: arguments)
   }
 
 }

@@ -63,7 +63,7 @@ let package = Package(
     .executableTarget(
       name: "hylo-demangle",
       dependencies: [
-        .target(name: "FrontEnd"),
+        .target(name: "Demangler"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       swiftSettings: commonSwiftSettings),
@@ -80,6 +80,7 @@ let package = Package(
       name: "Driver",
       dependencies: [
         .target(name: "BackEnd"),
+        .target(name: "Demangler"),
         .target(name: "FrontEnd"),
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
@@ -97,6 +98,13 @@ let package = Package(
       ],
       swiftSettings: commonSwiftSettings,
     ),
+
+    .target(
+      name: "Demangler",
+      dependencies: [
+        .target(name: "FrontEnd")
+      ],
+      swiftSettings: commonSwiftSettings),
 
     .target(
       name: "FrontEnd",
@@ -157,6 +165,13 @@ let package = Package(
       dependencies: [
         .target(name: "FrontEnd"),
         .target(name: "StandardLibrary"),
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
+      name: "DemanglerTests",
+      dependencies: [
+        .target(name: "Demangler")
       ],
       swiftSettings: commonSwiftSettings),
 
