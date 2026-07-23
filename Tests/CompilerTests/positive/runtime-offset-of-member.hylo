@@ -39,28 +39,20 @@ public given Pointer<UInt8> is Deinitializable {}
 
 public given Pointer<UInt8> is Movable {
 
-  // Without this body I get link errors unless I omit the conformance.
   fun take_value(from source: sink Self) auto {
     set { &self.value = source.value }
     inout { &self.value = source.value }
   }
+
 }
 
 extension Pointer<UInt8> {
 
-  /*
-  // Depends on the conformance above, but crashes the compiler.
-  public static fun null() -> Self {
+  // Workaround for https://github.com/hylo-lang/hylo-new/issues/357
+  static fun null_() -> Self {
     .new(value: Builtin.zeroinitializer_ptr())
   }
-   */
 
-  /*
-   // Doesn't depend on the conformance but also crashes the compiler.
-  public init() {
-    &self.value = Builtin.zeroinitializer_ptr()
-    }
-  */
 }
 
 /// The header of the structure representing information stored in all type witnesses.
@@ -411,14 +403,12 @@ fun __hylo_offset_of_member(
 
 extension TypeWitnessHeader {
 
-/*
   init(size: UInt32, alignment: UInt16) {
-    &self.description.value = Pointer<UInt8>().value
+    &self.description = .null_()
     &self.size = size.copy()
     &self.alignment = alignment.copy()
     &self.type_argument_or_parameter_count = .zero()
   }
- */
 
 }
 
