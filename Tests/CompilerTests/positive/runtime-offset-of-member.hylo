@@ -36,13 +36,31 @@ extension Alignment {
 }
 
 public given Pointer<UInt8> is Deinitializable {}
+
 public given Pointer<UInt8> is Movable {
 
+  // Without this body I get link errors unless I omit the conformance.
   fun take_value(from source: sink Self) auto {
     set { &self.value = source.value }
     inout { &self.value = source.value }
   }
+}
 
+extension Pointer<UInt8> {
+
+  /*
+  // Depends on the conformance above, but crashes the compiler.
+  public static fun null() -> Self {
+    .new(value: Builtin.zeroinitializer_ptr())
+  }
+   */
+
+  /*
+   // Doesn't depend on the conformance but also crashes the compiler.
+  public init() {
+    &self.value = Builtin.zeroinitializer_ptr()
+    }
+  */
 }
 
 /// The header of the structure representing information stored in all type witnesses.
@@ -61,33 +79,8 @@ public struct TypeWitnessHeader {
 }
 
 public given TypeWitnessHeader is Deinitializable {}
-public given TypeWitnessHeader is Movable {
-  fun take_value(from source: sink Self) auto {
-    set {
-      &self.description = source.description
-      &self.size = source.size
-      &self.alignment = source.alignment
-      &self.type_argument_or_parameter_count = source.type_argument_or_parameter_count
-    }
-    inout {
-      &self.description = source.description
-      &self.size = source.size
-      &self.alignment = source.alignment
-      &self.type_argument_or_parameter_count = source.type_argument_or_parameter_count
-    }
-  }
-
-}
-
 public given Pointer<TypeWitnessHeader> is Deinitializable {}
-public given Pointer<TypeWitnessHeader> is Movable {
 
-  fun take_value(from source: sink Self) auto {
-    set { &self.value = source.value }
-    inout { &self.value = source.value }
-  }
-
-}
 // Causes an assertion in the compiler (LLVM).
 //public given Pointer<TypeWitnessHeader> is Copyable {}
 
@@ -138,14 +131,6 @@ extension UInt {
 
 }
 
-public given Pointer<RecordMemberType> is Movable {
-
-  fun take_value(from source: sink Self) auto {
-    set { &self.value = source.value }
-    inout { &self.value = source.value }
-  }
-
-}
 //public given Pointer<RecordMemberType> is Copyable {}
 extension Pointer<RecordMemberType> {
 
@@ -176,7 +161,8 @@ extension Pointer<RecordMemberType> {
   }
 
   fun set_pointee(x: sink Self.Pointee) {
-    &(self.value as* inout Self.Pointee) = x
+    // Hack: can't seem to move x, even when take_value implemented manually.
+    &(self.value as* inout Self.Pointee).value = x.value
   }
 
   @inline(always)
@@ -423,13 +409,18 @@ fun __hylo_offset_of_member(
 
 // --------------- TESTING
 
+extension TypeWitnessHeader {
+
 /*
-fun w(size: UInt32, alignment: UInt16) -> TypeWitnessHeader {
-  TypeWitnessHeader(
-    description: .null(), size: size.copy(), alignment: alignment.copy(),
-    type_argument_or_parameter_count: .zero())
-}
+  init(size: UInt32, alignment: UInt16) {
+    &self.description.value = Pointer<UInt8>().value
+    &self.size = size.copy()
+    &self.alignment = alignment.copy()
+    &self.type_argument_or_parameter_count = .zero()
+  }
  */
+
+}
 
 fun main() {
 //  checkLayoutRequirements()
