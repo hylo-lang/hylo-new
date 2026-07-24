@@ -33,14 +33,19 @@ struct TypeLayoutCache {
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    if isMachineType(t.underlying, in: p) {
+    if !isCanonical(t) {
+      let l = layout(canonical(t, in: &p), in: &p)
+      return .init(bytes: l.bytes, type: t, parts: l.parts, isEnumLayout: l.isEnumLayout)
+    }
+    let u = tag(t.underlying, in: p)
+    if u == MachineType.self {
       let u = type(t.underlying, as: MachineType.self, in: p)
       return TypeLayout(bytes: abi.layout(u), type: t, parts: [], isEnumLayout: false)
-    } else if isTuple(t.underlying, in: p) {
+    } else if u == Tuple.self {
       return computeLayout(tuple: t, in: &p)
-    } else if hasRecordLayout(t.underlying, in: p) {
+    } else if u == Struct.self {
       return computeLayout(struct: t, in: &p)
-    } else if hasEnumLayout(t.underlying, in: p) {
+    } else if u == Enum.self {
       return computeLayout(enum: t, in: &p)
     } else {
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
@@ -171,20 +176,9 @@ struct TypeLayoutCache {
   }
 
   /// Returns true iff enum `t` in `p` has a representation.
-  ///
-  /// - Precondition: `t` has an enum layout.
   private func isTaggedEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    let u = tag(t, in: p)
-    if u == Enum.self {
-      let d = type(t, as: Enum.self, in: p).declaration
-      return p[d].representation == nil
-    } else if u == TypeAlias.self {
-      return isTaggedEnum(type(t, as: TypeAlias.self, in: p).aliasee, in: p)
-    } else if u == TypeApplication.self {
-      return isTaggedEnum(type(t, as: TypeApplication.self, in: p).abstraction, in: p)
-    } else {
-      unreachable()
-    }
+    let d = type(t, as: Enum.self, in: p).declaration
+    return p[d].representation == nil
   }
 
   /// Returns the types of stored parts of nominal `t` in `p`.
@@ -192,44 +186,6 @@ struct TypeLayoutCache {
     let d = p.declaration(of: t)!
     let m = p.parent(containing: d).module
     return p.storage(of: t, visibleFrom: m)!
-  }
-
-  /// Returns true iff `t` in `p` is of `MachineType`.
-  private func isMachineType(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    tag(t, in: p) == MachineType.self
-  }
-
-  /// Returns true iff `t` in `p` has enum layout.
-  private func hasEnumLayout(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    let u = tag(t, in: p)
-    if u == Enum.self {
-      return true
-    } else if u == TypeAlias.self {
-      return hasEnumLayout(type(t, as: TypeAlias.self, in: p).aliasee, in: p)
-    } else if u == TypeApplication.self {
-      return hasEnumLayout(type(t, as: TypeApplication.self, in: p).abstraction, in: p)
-    } else {
-      return false
-    }
-  }
-
-  /// Returns true iff `t` in `p` has a record layout.
-  private func hasRecordLayout(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    let u = tag(t, in: p)
-    if u == Struct.self {
-      return true
-    } else if u == TypeApplication.self {
-      return hasRecordLayout(type(t, as: TypeApplication.self, in: p).abstraction, in: p)
-    } else if u == TypeAlias.self {
-      return hasRecordLayout(type(t, as: TypeAlias.self, in: p).aliasee, in: p)
-    } else {
-      return false
-    }
-  }
-
-  /// Returns true iff `t` in `p` is a `Tuple`.
-  private func isTuple(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    tag(t, in: p) == Tuple.self
   }
 
   /// Returns the type identified by `t` in `p`, cast to `U`.
@@ -243,5 +199,22 @@ struct TypeLayoutCache {
   /// Returns the tag of `t` in `p`.
   private func tag(_ t: AnyTypeIdentity, in p: Program) -> any TypeTree.Type {
     p.types.tag(of: t).value
+  }
+
+  /// Returns the canonical form of `t` in `p` with all type aliases removed.
+  private func canonical(
+    _ t: MonomorphicTypeIdentity,
+    in p: inout Program
+  ) -> MonomorphicTypeIdentity {
+    var t = t.underlying
+    while t[.hasAliases] {
+      t = p.types.dealiased(t)
+    }
+    return .init(t)
+  }
+
+  /// Returns true iff `t` is a canonical type.
+  private func isCanonical(_ t: MonomorphicTypeIdentity) -> Bool {
+    return t.underlying[.hasAliases]
   }
 }
