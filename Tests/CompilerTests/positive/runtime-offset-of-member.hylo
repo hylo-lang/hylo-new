@@ -1,4 +1,4 @@
- type Size = UInt32
+type Size = UInt32
 
 // Because the integer types are incomplete
 extension UInt32 {
@@ -19,6 +19,12 @@ extension UInt32 {
     .new(value: Builtin.zeroinitializer_i32())
   }
 
+  /// Creates an instance having the low 32 bits of `x`.
+  @inline(always)
+  public init(truncating x: Int) {
+    &self.value = Builtin.trunc_word_i32(x.value)
+  }
+
 }
 
 type Alignment = UInt16
@@ -33,24 +39,22 @@ extension Alignment {
     return if excess == (0 as Size) { i.copy() } else { i - excess + a }
   }
 
+  /// Creates an instance having the low 16 bits of `x`.
+  @inline(always)
+  public init(truncating x: Int) {
+    &self.value = Builtin.trunc_word_i16(x.value)
+  }
 }
 
 public given Pointer<UInt8> is Deinitializable {}
 
-public given Pointer<UInt8> is Movable {
-
-  fun take_value(from source: sink Self) auto {
-    set { &self.value = source.value }
-    inout { &self.value = source.value }
-  }
-
-}
-
 extension Pointer<UInt8> {
 
   // Workaround for https://github.com/hylo-lang/hylo-new/issues/357
-  static fun null_() -> Self {
-    .new(value: Builtin.zeroinitializer_ptr())
+  // and https://github.com/hylo-lang/hylo-new/issues/365
+  /// Initializes s to the null pointer.
+  static fun null_(s: set Self) {
+    &s.value = Builtin.zeroinitializer_ptr()
   }
 
 }
@@ -70,7 +74,8 @@ public struct TypeWitnessHeader {
   let type_argument_or_parameter_count: UInt16
 }
 
-public given TypeWitnessHeader is Deinitializable {}
+given TypeWitnessHeader is Deinitializable {}
+
 public given Pointer<TypeWitnessHeader> is Deinitializable {}
 
 // Causes an assertion in the compiler (LLVM).
@@ -387,7 +392,6 @@ struct RecordLayout is Deinitializable {
 
 }
 
-/*
 /// Returns the offset of the `n`th member in declaration order of a
 /// record type having members given by the array of length `l` at
 /// `memberArray`.
@@ -397,14 +401,13 @@ fun __hylo_offset_of_member(
 {
   RecordLayout.new(start: memberArray.copy(), count: l.copy()).offset_of_member(n)
 }
-*/
 
-// --------------- TESTING
+// --------------- TESTING -------------
 
 extension TypeWitnessHeader {
 
   init(size: UInt32, alignment: UInt16) {
-    &self.description = .null_()
+    Pointer<UInt8>.null_(&self.description)
     &self.size = size.copy()
     &self.alignment = alignment.copy()
     &self.type_argument_or_parameter_count = .zero()
@@ -412,10 +415,25 @@ extension TypeWitnessHeader {
 
 }
 
+fun w(size: Int, alignment: Int) -> TypeWitnessHeader {
+  TypeWitnessHeader(.new(truncating: size), .new(truncating: alignment))
+}
+
+
 fun main() {
-//  checkLayoutRequirements()
-//  let x = w(0 as UInt32, 0 as UInt16)
-//  let y = (w(0 as UInt32, 0 as UInt16), w(1 as UInt32, 2 as UInt16)) as TypeWitnessHeader[2]
+  //  checkLayoutRequirements()
+  let q = TypeWitnessHeader(0 as UInt32, 1 as UInt16)
+  let r = w(17, 22)
+  /*
+   type W = TypeWitnessHeader
+  let x = Pointer<UInt8>.null_()
+  let y = (0 as UInt32).copy()
+  let z = (0 as UInt16).copy()
+  let q = UInt16.zero()
+   */
+//  let r = w(0 as UInt32, 0 as UInt16)
+//  let x =
+//  let y = (W(0 as UInt32, 0 as UInt16), W(1 as UInt32, 2 as UInt16)) as TypeWitnessHeader[2]
 
   precondition(true)
 }
