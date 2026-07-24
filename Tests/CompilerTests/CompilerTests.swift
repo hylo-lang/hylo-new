@@ -4,17 +4,19 @@ import FrontEnd
 import StandardLibrary
 import Utilities
 import StableCollections
-import XCTest
+import Testing
 
 /// `true` iff intermediate compilation artifacts shall be saved for successful tests.
 private let alwaysSaveArtifacts: Bool = false
 
 /// The driver for generated compiler tests.
 ///
-/// This class is used as a driver to run the negative and positive tests. Its test cases are meant
+/// This type is used as a driver to run the negative and positive tests. Its test cases are meant
 /// to be defined in an extension that is generated either automatically as part of the build or by
 /// manually invoking `hc-tests`.
-final class CompilerTests: XCTestCase {
+/// 
+/// - Note: Test assertions are expected to be issued through `FailureLog`. 
+struct CompilerTests {
 
   private typealias Host = Utilities.Host
 
@@ -211,80 +213,110 @@ final class CompilerTests: XCTestCase {
 
   }
 
-  /// A temporary folder for caching compilation artifacts during testing.
+
+  /// The record of any test failures during a CompilerTest.
   ///
-  /// An new directory is generated every time this property is initialized and removed once all
-  /// tests have run.
-  private static let moduleCachePath = Driver.temporaryModuleCachePath()
+  /// CompilerTest's assertions are required to report issues through this interface.
+  struct FailureLog: ~Copyable {
 
-  /// `true` iff the test case has recorded a failure or an uncaught exception.
-  private var testFailed: Bool {
-    (testRun?.totalFailureCount ?? 0) > 0
-  }
+    /// `true` iff an issue has been recorded through `self`.
+    private(set) var failed = false
 
-  /// Deletes cached compilation artifacts.
-  override class func tearDown() {
-    moduleCachePath.delete()
+    /// Records an issue described by `message`.
+    mutating func fail(
+      _ message: String, sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+      failed = true
+      Issue.record(Comment(rawValue: message), sourceLocation: sourceLocation)
+    }
+
+    /// Records an issue described by `message` iff `condition` is `false`.
+    mutating func expect(
+      _ condition: Bool, _ message: @autoclosure () -> String,
+      sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+      if !condition {
+        failed = true
+        #expect(condition, Comment(rawValue: message()), sourceLocation: sourceLocation)
+      }
+    }
+
+    /// Records an issue described by `message` iff `observed` is not equal to `expected`.
+    mutating func expectEqual<T: Equatable>(
+      _ observed: T, _ expected: T, _ message: @autoclosure () -> String,
+      sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+      if observed != expected {
+        failed = true
+        #expect(observed == expected, Comment(rawValue: message()), sourceLocation: sourceLocation)
+      }
+    }
+
   }
 
   /// Compiles and runs `input` expecting no compilation error.
   func positive(_ input: TestDescription) async throws {
-    await loggingSourceOnFailure(root: input.root) {
+    await loggingSourceOnFailure(root: input.root) { (log) in
       // Compile the input up until the specified stage.
       let o = input.manifest.optimizations != .none
-      let r = try await compile(input, withOptimizations: o)
+      let r = try await compile(input, withOptimizations: o, reportingFailuresTo: &log)
       try assertSansError(r.driver.program)
 
       // Should an executable be tested?
       if input.manifest.stage == .execution {
-        let e = try XCTUnwrap(r.artifacts.executable)
+        let e = try #require(r.artifacts.executable)
         let x = try Process.execute(e)
         if input.manifest.shouldTrap {
-          XCTAssert(x.terminationReason == .uncaughtSignal, "program did not trap")
+          log.expectEqual(x.terminationReason, .uncaughtSignal, "program did not trap")
         } else {
-          assertExitStatus(x, describedBy: input)
+          assertExitStatus(x, describedBy: input, reportingFailuresTo: &log)
         }
       }
 
-      if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
+      if log.failed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
     }
   }
 
   /// Compiles `input` expecting at least one compilation error.
   func negative(_ input: TestDescription) async throws {
-    await loggingSourceOnFailure(root: input.root) {
-      let r = try await compile(input, withOptimizations: false)
+    await loggingSourceOnFailure(root: input.root) { (log) in
+      let r = try await compile(input, withOptimizations: false, reportingFailuresTo: &log)
       let m = "program compiled but an error was expected.\nSource: \(input.root.path)\n"
-      XCTAssert(r.driver.program.containsError, m)
-      assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics)
+      log.expect(r.driver.program.containsError, m)
+      assertExpectations(r.expectedDiagnostics, r.driver.program.diagnostics,
+        reportingFailuresTo: &log)
 
-      if testFailed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
+      if log.failed || alwaysSaveArtifacts { try r.artifacts.save(into: input) }
     }
   }
 
-  /// Executes `action`, and logs the test case's `root` on test failure for easier diagnostics.
+  /// Executes `action` with a fresh failure log, and logs the test case's `root` on test failure
+  /// for easier diagnosis.
   ///
   /// Also logs and catches any error thrown by `action`, failing the test case.
-  private func loggingSourceOnFailure<T>(root: URL, _ action: () async throws -> T) async {
+  private func loggingSourceOnFailure(
+    root: URL, _ action: (inout FailureLog) async throws -> Void
+  ) async {
+    var log = FailureLog()
     do {
-      _ = try await action()
-      if testFailed {
-        XCTFail("\nSource: \(root.path)\n")
+      try await action(&log)
+      if log.failed {
+        log.fail("\nSource: \(root.path)\n")
       }
     } catch let e {
-      XCTFail("\(e)\nSource: \(root.path)\n")
+      log.fail("\(e)\nSource: \(root.path)\n")
     }
   }
 
   /// Compiles `input` and returns the resulting artifacts.
   private func compile(
-    _ input: TestDescription, withOptimizations optimized: Bool
+    _ input: TestDescription, withOptimizations optimized: Bool,
+    reportingFailuresTo log: inout FailureLog
   ) async throws -> CompilationResult {
-    var driver = try Driver(
-      moduleCachePath: CompilerTests.moduleCachePath.url, targetSpecification: .native())
+    var driver = try Driver(targetSpecification: .native())
 
     if input.manifest.requiresStandardLibrary {
-      try await driver.loadStandardLibrary()
+      try await driver.installCachedStandardLibrary()
     }
 
     let m = driver.program.demandModule(.init("Test"))
@@ -299,7 +331,7 @@ final class CompilerTests: XCTestCase {
       try await compile(
         m, until: input.manifest.stage, using: &driver, withCSources: cSources,
         accumulatingArtifactsInto: &artifacts,
-        expectedArtifacts: input.manifest.artifactExpectations)
+        expectedArtifacts: input.manifest.artifactExpectations, reportingFailuresTo: &log)
     } catch let e {
       try artifacts.save(into: input)
       throw e
@@ -355,7 +387,8 @@ final class CompilerTests: XCTestCase {
   private func compile(
     _ m: Module.ID, until stage: Manifest.Stage, using driver: inout Driver,
     withCSources cSources: [URL], accumulatingArtifactsInto artifacts: inout Artifacts,
-    expectedArtifacts: SortedDictionary<ArtifactTag, String>
+    expectedArtifacts: SortedDictionary<ArtifactTag, String>,
+    reportingFailuresTo log: inout FailureLog
   ) async throws {
     // Exit if there are parsing errors or if the stage is set to `parsing`.
     if driver.program[m].containsError || (stage == .parsing) { return }
@@ -370,7 +403,8 @@ final class CompilerTests: XCTestCase {
     if l.containsError { return }
     let rawIR = driver.program.show(driver.program[m].ir)
     artifacts.record(rawIR, for: .rawIR)
-    assertArtifact(.rawIR, expected: expectedArtifacts[.rawIR], observed: rawIR)
+    assertArtifact(.rawIR, expected: expectedArtifacts[.rawIR], observed: rawIR,
+      reportingFailuresTo: &log)
 
     // IR Transformation passes.
     let t = await driver.applyTransformationPasses(m)
@@ -378,14 +412,15 @@ final class CompilerTests: XCTestCase {
     let refinedIR = driver.program.show(driver.program[m].ir)
     artifacts.record(refinedIR, for: .refinedIR)
     assertArtifact(.refinedIR, expected: expectedArtifacts[.refinedIR],
-      observed: refinedIR)
+      observed: refinedIR, reportingFailuresTo: &log)
     if stage == .lowering { return }
 
     // LLVM Lowering.
     if (try driver.compileToLLVM(m)).containsError { return }
     let llvmIR = driver.llvmIR(of: m)!
     artifacts.record(llvmIR, for: .llvmIR)
-    assertArtifact(.llvmIR, expected: expectedArtifacts[.llvmIR], observed: llvmIR)
+    assertArtifact(.llvmIR, expected: expectedArtifacts[.llvmIR], observed: llvmIR, 
+      reportingFailuresTo: &log)
     if stage == .llvm { return }
 
     // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
@@ -397,29 +432,33 @@ final class CompilerTests: XCTestCase {
     if stage == .execution {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
-      _ = try driver.generateExecutable(from: m, withCSources: cSources, writingTo: executable)
+      _ = try await driver.generateExecutable(
+        from: m, withCSources: cSources, writingTo: executable)
       artifacts.executable = executable
     }
   }
 
   /// Asserts that the `observed` artifact tagged `tag` matches `expected`, if present.
-  private func assertArtifact(_ tag: ArtifactTag, expected: String?, observed: String) {
+  private func assertArtifact(
+    _ tag: ArtifactTag, expected: String?, observed: String, 
+    reportingFailuresTo log: inout FailureLog
+  ) {
     guard let e = expected else { return }
 
     for c in IRMatching.comparisons(expected: e, observed: observed) {
       guard let o = c.observed else {
-        XCTFail("No section in observed \(tag) matches:\n```\(c.expected)```\n")
+        log.fail("No section in observed \(tag) matches:\n```\(c.expected)```\n")
         continue
       }
 
-      XCTAssertEqual(o, c.expected, "\(tag) did not meet expectations.")
+      log.expectEqual(o, c.expected, "\(tag) did not meet expectations.")
     }
   }
 
   /// Asserts that the expected `diagnostics` of each source file in `expectations` match those
   /// obtained during compilation.
   private func assertExpectations<T: Collection<Diagnostic>>(
-    _ expectations: [FileName: String], _ diagnostics: T
+    _ expectations: [FileName: String], _ diagnostics: T, reportingFailuresTo log: inout FailureLog
   ) {
     if expectations.isEmpty { return }
 
@@ -448,7 +487,7 @@ final class CompilerTests: XCTestCase {
     }
 
     if !report.isEmpty {
-      XCTFail("observed output does match expectation:" + report)
+      log.fail("observed output does match expectation:" + report)
     }
   }
 
@@ -477,9 +516,10 @@ final class CompilerTests: XCTestCase {
 
   /// Asserts that the exit code of `observed` matches the one described by `input`.
   private func assertExitStatus(
-    _ observed: Process.ExecutionReport, describedBy input: TestDescription
+    _ observed: Process.ExecutionReport, describedBy input: TestDescription,
+    reportingFailuresTo log: inout FailureLog
   ) {
-    XCTAssertEqual(
+    log.expectEqual(
       observed.exitCode, input.manifest.exitStatus,
       "mismatched exit code.\n\(observed.details(reportingAt: input.root))")
   }

@@ -1,0 +1,29 @@
+define i32 @"$hM6TestUggenericcall1cDpTcTK1C3P1gcTK20tR50$fJ5J"(ptr %0, ptr %1) {
+  %3 = alloca { {}, [1 x ptr] }, align 8
+  %4 = alloca %"$hpTcTM6TestUggenericcall1C3P1gcTK20tR5$jJ5J", align 8
+  %5 = alloca {}, align 8
+  store %"$hpTcTM6TestUggenericcall1C3P1gcTK20tR5$jJ5J" { ptr @"$hmFM6TestUggenericcall1C3PF03flT01tR516selfgcTK20sTR0UbGeneratedS7Int32cDpTcTK21L3tR501L3tR5$hJ5J" }, ptr %4, align 8
+  %6 = getelementptr inbounds { {}, [1 x ptr] }, ptr %3, i32 0, i32 1, i32 0
+  store ptr %4, ptr %6, align 8
+  %7 = call i32 %0(ptr %4, ptr %1, ptr @"$hlFM6TestUggenericcall1cDpTcTK1C3P1gcTK20tR500$hJ5J", ptr %3)
+  ret i32 %7
+}
+
+define private %"$hsTR0UbGeneratedS7Int32" @"$hmFM6TestUggenericcall1C3PF03flT01tR516selfgcTK20sTR0UbGeneratedS7Int32cDpTcTK21L3tR501L3tR5$hJ5J"(%"$hpTcTM6TestUggenericcall1C3P1gcTK20tR5$jJ5J" %0) {
+  %2 = alloca %"$hsTR0UbGeneratedS7Int32", align 4
+  %3 = alloca %"$hpTcTM6TestUggenericcall1C3P1gcTK20tR5$jJ5J", align 8
+  store %"$hpTcTM6TestUggenericcall1C3P1gcTK20tR5$jJ5J" %0, ptr %3, align 8
+  %4 = alloca {}, align 8
+  %5 = call %"$hsTR0UbGeneratedS7Int32" @"$hM6TestUggenericcall1cDpTcTK1C3P1gcTK20tR50F03flT01tR516selftR5sTR0UbGeneratedS7Int32$fJ5J"()
+  store %"$hsTR0UbGeneratedS7Int32" %5, ptr %2, align 8
+  %6 = load %"$hsTR0UbGeneratedS7Int32", ptr %2, align 1
+  ret %"$hsTR0UbGeneratedS7Int32" %6
+}
+
+define private i32 @"$hlPM6TestUggenericcall1F06mainlT01tR50sTR0UbGeneratedS7Int324$hJ5J"(ptr %0, ptr %1, ptr %2, ptr %3) {
+  %5 = getelementptr inbounds { {}, [2 x ptr] }, ptr %1, i32 0, i32 1
+  %6 = load [2 x ptr], ptr %5, align 8
+  %7 = extractvalue [2 x ptr] %6, 0
+  %8 = extractvalue [2 x ptr] %6, 1
+  br label %9
+

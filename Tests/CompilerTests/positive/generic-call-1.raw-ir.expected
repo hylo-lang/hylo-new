@@ -1,0 +1,31 @@
+fun $<ConformanceDeclaration at generic-call-1:7.1>.f(let %p0: Void, set %p1: Int32) {
+%b0:
+  %r0 = alloca Void, #preferred
+  %r1 = type_apply use(_:)<Void>
+  %r2 = access [let] %p0
+  %r3 = access [set] %r0
+  %r4 = apply %r1(%r2) => %r3
+  %r5 = access [sink] %r0
+  %r6 = assume_state %r5 uninitialized
+  %r7 = end %r5
+  %r8 = subfield %p1 at 0 as i32
+  %r9 = access [set] %r8
+  %r10 = store i32 42 to %r9
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r0 = alloca Void, #preferred
+  %r1 = access [set] %r0
+  %r2 = assume_state %r1 initialized
+  %r3 = end %r1
+  %r4 = project $<ConformanceDeclaration at generic-call-1:7.1>[]
+  %r5 = property "f" of %r4
+  %r6 = access [let] %r0
+  %r7 = access [set] %p0
+  %r8 = apply %r5(%r6) => %r7
+  %r9 = return
+}
+
