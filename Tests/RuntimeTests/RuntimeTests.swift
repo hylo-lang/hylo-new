@@ -310,24 +310,41 @@ final class LayoutTests: XCTestCase {
     }
   }
 
-  fileprivate func check_offsets(members: [(size: Size, alignment: Alignment)]) {
-    if members.count == 0 { return }
-    let offsets = offsets(members: members)
-    let member_order = members.indices.sorted { (i, j) in
+  private func hylo_check_code(
+    members sas: [(size: Size, alignment: Alignment)],
+    offsets os: [UInt32]
+  ) -> String {
+    let sas1 = sas + repeatElement((size: 0, alignment: 0), count: 10 - sas.count)
+    let os1 = os + repeatElement(0, count: 10 - os.count)
+
+    return """
+        verify_offsets(
+          forFirst: \(os.count),
+          in: \(sas1.map { sa in "\(sa.size), \(sa.alignment)" }.joined(separator: ", ")),
+          to_be: \(os1.map { "\($0)" }.joined(separator: ", ")))
+      """
+  }
+
+  private func check_offsets(members sa: [(size: Size, alignment: Alignment)]) {
+    if sa.count == 0 { return }
+    let offsets = offsets(members: sa)
+//    print(hylo_check_code(members: sa, offsets: offsets))
+
+    let member_order = sa.indices.sorted { (i, j) in
       offsets[i] < offsets[j]
-        || offsets[i] == offsets[j] && members[i].alignment > members[j].alignment
+        || offsets[i] == offsets[j] && sa[i].alignment > sa[j].alignment
     }
 
     // First member always sits at offset 0
     XCTAssertEqual(offsets[member_order.first!], 0)
     for (i0, i1) in zip(member_order, member_order.dropFirst()) {
-      let (m0, o0) = (members[i0], offsets[i0])
-      let (m1, o1) = (members[i1], offsets[i1])
+      let (m0, o0) = (sa[i0], offsets[i0])
+      let (m1, o1) = (sa[i1], offsets[i1])
       XCTAssertGreaterThanOrEqual(
         m0.alignment, m1.alignment,
         """
         Member \(i0) with alignment \(m0.alignment) ordered before member \(i1) with alignment \(m1.alignment) !
-        \(zip(members, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
         """
       )
       if m0.alignment == m1.alignment {
@@ -335,7 +352,7 @@ final class LayoutTests: XCTestCase {
           i0, i1,
           """
           Members \(i0) and \(i1) with the same alignment are out of order!
-          \(zip(members, offsets).map {"\n\($0), offset: \($1)"}.joined())
+          \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
           """
         )
 
@@ -344,7 +361,7 @@ final class LayoutTests: XCTestCase {
         m0.alignment, m1.alignment,
         """
         Increasing alignment between consecutive members \(i0) and \(i1)!
-        \(zip(members, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
         """
       )
 
@@ -352,7 +369,7 @@ final class LayoutTests: XCTestCase {
         o1 % UInt32(m1.alignment) == 0,
         """
           member \(i1) at offset \(o1) not aligned to \(m1.alignment)!
-        \(zip(members, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
         """
       )
 
@@ -361,7 +378,7 @@ final class LayoutTests: XCTestCase {
         end0, o1,
         """
         member \(i1) at offset \(o1) overlaps preceding member \(i0) at \(o0)!
-        \(zip(members, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
         """
       )
       let padding = o1 &- end0
@@ -370,7 +387,7 @@ final class LayoutTests: XCTestCase {
         padding, UInt32(m1.alignment),
         """
         Needless padding \(padding) before member at offset \(o1)
-        \(zip(members, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
         """)
 
       
