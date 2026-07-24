@@ -1,0 +1,19 @@
+struct Q is Deinitializable {
+
+  init(){}
+
+  subscript s0() inout -> Int {
+    var x = 42
+    yield &x
+  }
+
+  subscript s1() inout -> Int {
+    yield &self.s0[]
+  }
+
+}
+
+fun main(){
+  precondition(Q().s0[] == 42)
+  precondition(Q().s1[] == 42)
+}

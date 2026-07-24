@@ -69,10 +69,10 @@ public enum BuiltinFunction: Hashable, Sendable {
   //  case lshr(exact: Bool, MachineType.ID)
   //
   //  case ashr(exact: Bool, MachineType.ID)
-  //
-  //  case urem(MachineType.ID)
-  //
-  //  case srem(MachineType.ID)
+
+  case urem(MachineType.ID)
+
+  case srem(MachineType.ID)
 
   case and(MachineType.ID)
 
@@ -427,8 +427,6 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: t)).erased
     //    case .shl(_, let t):
     //      return .init(^t, ^t, to: ^t)
-    //    case .udiv(_, let t):
-    //      return .init(^t, ^t, to: ^t)
     case .udiv(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .sdiv(_, let t):
@@ -437,10 +435,10 @@ extension BuiltinFunction {
     //      return .init(^t, ^t, to: ^t)
     //    case .ashr(_, let t):
     //      return .init(^t, ^t, to: ^t)
-    //    case .urem(let t):
-    //      return .init(^t, ^t, to: ^t)
-    //    case .srem(let t):
-    //      return .init(^t, ^t, to: ^t)
+    case .urem(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
+    case .srem(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
     case .and(let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .or(let t):
@@ -781,10 +779,10 @@ extension BuiltinFunction: Showable {
     //      return e ? "lshr_exact_\(t)" : "lshr_\(t)"
     //    case .ashr(let e, let t):
     //      return e ? "ashr_exact_\(t)" : "ashr_\(t)"
-    //    case .urem(let t):
-    //      return "urem_\(t)"
-    //    case .srem(let t):
-    //      return "srem_\(t)"
+    case .urem(let t):
+      return printer.format("urem_%T", [t.erased])
+    case .srem(let t):
+      return printer.format("srem_%T", [t.erased])
     case .and(let t):
       return printer.format("and_%T", [t.erased])
     case .or(let t):
