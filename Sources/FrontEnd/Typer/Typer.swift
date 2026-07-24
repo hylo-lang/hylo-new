@@ -91,7 +91,7 @@ public struct Typer {
     fileprivate var scopeToTypeOfSelf: [ScopeIdentity: AnyTypeIdentity?]
 
     /// The cache of `Typer.canDeriveCoercions(_:_:in:where:)`.
-    fileprivate var scopeToPossibleCoercions: [ScopeIdentity: [TypePair: Bool]]
+    fileprivate var scopeToPotentialCoercions: [ScopeIdentity: [TypePair: Bool]]
 
     /// The cache of `Typer.typeOfTraitSelf(in:)`.
     fileprivate var traitToTypeOfTraitSelf: [TraitDeclaration.ID: AnyTypeIdentity]
@@ -123,7 +123,7 @@ public struct Typer {
       self.scopeToGivens = [:]
       self.scopeToSummoned = [:]
       self.scopeToTypeOfSelf = [:]
-      self.scopeToPossibleCoercions = [:]
+      self.scopeToPotentialCoercions = [:]
       self.traitToTypeOfTraitSelf = [:]
       self.witnessToAliases = [:]
       self.declarationToTentativeType = [:]
@@ -3953,20 +3953,20 @@ public struct Typer {
 
     // Make sure the cache key does not depend on the order in which `a` and `b` have been passed.
     let p = (b.bits < a.bits) ? Pair(b, a) : Pair(a, b)
-    if let memoized = cache.scopeToPossibleCoercions[scopeOfUse]?[p] { return memoized }
+    if let memoized = cache.scopeToPotentialCoercions[scopeOfUse]?[p] { return memoized }
 
     // Check if there are givens in scope that could be used to derive a coercion.
     var result: UInt8 = 0
     for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined())  {
       result |= canDeriveCoercion(p, applying: g)
       if result == 0b11 {
-        cache.scopeToPossibleCoercions[scopeOfUse, default: [:]][p] = true
+        cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = true
         return true
       }
     }
 
     assert((result & 0b11) != 0b11)
-    cache.scopeToPossibleCoercions[scopeOfUse, default: [:]][p] = false
+    cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = false
     return false
   }
 
