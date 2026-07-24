@@ -1,0 +1,31 @@
+extension Pointer<UInt8> {
+
+  // Workaround for https://github.com/hylo-lang/hylo-new/issues/357
+  static fun null_() -> Self {
+    .new(value: Builtin.zeroinitializer_ptr())
+  }
+
+}
+
+given Pointer<UInt8> is Movable {
+
+  fun take_value(from source: sink Self) auto {
+    set { &self.value = source.value }
+    inout { &self.value = source.value }
+  }
+
+}
+
+struct X is Deinitializable {
+  let description: Pointer<UInt8>
+
+  init() {
+    // Works:
+    // let z: UInt8 = .zero; &self.description.value = Builtin.address(of: z)
+    &self.description = .null_()
+  }
+}
+
+fun main() {
+  let x = X()
+}

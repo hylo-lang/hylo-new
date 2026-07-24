@@ -293,16 +293,40 @@ extension Program {
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertSignedDiv(
         exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .urem(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertUnsignedRem(
+        xs[0], xs[1], at: ctx.insertionPoint!).v
     case .signedAdditionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedAdditionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.uadd.with.overflow, for: t, with: s.arguments, in: &ctx)
     case .signedSubtractionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.usub.with.overflow, for: t, with: s.arguments, in: &ctx)
     case .signedMultiplicationWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
-
+    case .unsignedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.umul.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .advancedByBytes(byteOffset: let t):
+      assert(s.arguments.count == 2)
+      let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
+      let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: p, typed: ctx.module.llvm.ptr, indices: offsets, at: ctx.insertionPoint!).v
+    case .zext(_, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let mt = metadata(of: t, in: &ctx.module)
+      let t1 = IntegerType.UnsafeReference(mt.llvm)!
+      ctx.value[v] = ctx.module.llvm.insertZeroExtend(
+        xs[0], to: t1, at: ctx.insertionPoint!).v
     case .icmp(let p, let t):
       ctx.value[v] = insertCallBuiltinPredicate(
         p, for: t, with: s.arguments, in: &ctx)
