@@ -38,7 +38,7 @@ struct TypeLayoutCache {
       let u = type(t.underlying, as: MachineType.self, in: p)
       return TypeLayout(bytes: abi.layout(u), type: t, parts: [], isEnumLayout: false)
     } else if isEnum(t.underlying, in: p) {
-      unimplemented()
+      return computeLayout(enum: t, in: &p)
     } else if isStruct(t.underlying, in: p) {
       return computeLayout(struct: t, in: &p)
     } else if isTuple(t.underlying, in: p) {
@@ -53,9 +53,7 @@ struct TypeLayoutCache {
     struct t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let d = p.declaration(of: t.underlying)!
-    let m = p.parent(containing: d).module
-    let ms = p.storage(of: t.underlying, visibleFrom: m)!
+    let ms = storage(t.underlying, in: &p)
     return computeLayout(
       record: t,
       havingMembers: ms.map {
@@ -97,6 +95,54 @@ struct TypeLayoutCache {
         .init(name: m.label ?? String(i), type: m.type, offset: b.size - c.size))
     }
     return TypeLayout(bytes: b, type: t, parts: parts, isEnumLayout: false)
+  }
+
+  /// Returns the layout for an enum `t` in `p`.
+  private mutating func computeLayout(
+    enum t: MonomorphicTypeIdentity,
+    in p: inout Program
+  ) -> TypeLayout {
+    let basis = storage(t.underlying, in: &p)
+      .map { layout(MonomorphicTypeIdentity($0), in: &p) }
+
+    let discriminator = abi.enumDiscriminator(count: basis.count, in: &p)
+    let discriminatorLayout = layout(discriminator, in: &p)
+
+    let payloadBytes = TypeLayout.Bytes(
+      alignment: basis.lazy.map(\.alignment).max()!,
+      size: basis.lazy.map(\.size).max()!)
+
+    let payloadFirst = payloadBytes.appending(discriminatorLayout.bytes)
+    let discriminatorFirst = discriminatorLayout.bytes.appending(payloadBytes)
+
+    let payloadOffset: Int
+    let discriminatorOffset: Int
+    let l: TypeLayout.Bytes
+
+    if payloadFirst.size < discriminatorFirst.size {
+      l = payloadFirst
+      payloadOffset = 0
+      discriminatorOffset = l.size - discriminatorLayout.size
+    } else {
+      l = discriminatorFirst
+      payloadOffset = l.size - payloadBytes.size
+      discriminatorOffset = 0
+    }
+
+    return TypeLayout(
+      bytes: l,
+      type: t,
+      parts:
+        basis.map { .init(name: String(describing: $0.type), type: $0.type, offset: payloadOffset) }
+        + [.init(name: "discriminator", type: discriminator, offset: discriminatorOffset)],
+      isEnumLayout: true)
+  }
+
+  /// Returns the types of stored parts of nominal `t` in `p`.
+  private func storage(_ t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
+    let d = p.declaration(of: t)!
+    let m = p.parent(containing: d).module
+    return p.storage(of: t, visibleFrom: m)!
   }
 
   /// Returns true iff `t` in `p` is of `MachineType`.
