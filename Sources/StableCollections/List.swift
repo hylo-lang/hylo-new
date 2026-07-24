@@ -225,7 +225,7 @@ public struct List<Element> {
 
   /// Inserts `newElement` after the element at `address` and returns its address.
   ///
-  /// - Requires: `address` must be a valid an address in `self`.
+  /// - Requires: `address` must be a valid address in `self`.
   @discardableResult
   public mutating func insert(_ newElement: Element, after address: Address) -> Address {
     precondition(isInBounds(address), "address out of bounds")
@@ -250,15 +250,33 @@ public struct List<Element> {
         element: newElement)
     }
 
+    linkNeighborsToPreallocated(newAddress, after: address)
+
+    count += 1
+    return newAddress
+  }
+
+  /// Links up an already allocated bucket at `newAddress` right after `address`.
+  ///
+  /// - Requires:
+  ///   - `newAddress` and `address` must be valid and unique addresses in `self`.
+  ///   - `newAddress`'s bucket is already linked towards the neighbors but not vice versa.
+  @inline(__always) 
+  private mutating func linkNeighborsToPreallocated(
+    _ newAddress: Address, after address: Address
+  ) {
+    assert(isInBounds(newAddress), "newAddress out of bounds")
+    assert(isInBounds(address), "address out of bounds")
+    assert(newAddress != address)
+    assert(storage[newAddress.rawValue].previousOffset == address.rawValue)
+    assert(storage[newAddress.rawValue].nextOffset == storage[address.rawValue].nextOffset)
+
     if address.rawValue == tailOffset {
       tailOffset = newAddress.rawValue
     } else {
       storage[storage[address.rawValue].nextOffset].previousOffset = newAddress.rawValue
     }
     storage[address.rawValue].nextOffset = newAddress.rawValue
-
-    count += 1
-    return newAddress
   }
 
   /// Inserts `newElement` before the element at `address` and returns its address.
@@ -288,15 +306,32 @@ public struct List<Element> {
         element: newElement)
     }
 
+    linkNeighborsToPreallocated(newAddress, before: address)
+    count += 1
+    return newAddress
+  }
+
+  /// Links up an already allocated bucket at `newAddress` right before `address`.
+  ///
+  /// - Requires:
+  ///   - `newAddress` and `address` must be present and unique addresses in `self`.
+  ///   - `newAddress`'s bucket is already linked towards the neighbors but not vice versa.
+  @inline(__always)
+  private mutating func linkNeighborsToPreallocated(
+    _ newAddress: Address, before address: Address
+  ) {
+    assert(isInBounds(newAddress), "newAddress out of bounds")
+    assert(isInBounds(address), "address out of bounds")
+    assert(newAddress != address)
+    assert(storage[newAddress.rawValue].previousOffset == storage[address.rawValue].previousOffset)
+    assert(storage[newAddress.rawValue].nextOffset == address.rawValue)
+
     if address.rawValue == headOffset {
       headOffset = newAddress.rawValue
     } else {
       storage[storage[address.rawValue].previousOffset].nextOffset = newAddress.rawValue
     }
     storage[address.rawValue].previousOffset = newAddress.rawValue
-
-    count += 1
-    return newAddress
   }
 
   /// Inserts `newElement` at the given position and returns its address.
@@ -317,6 +352,18 @@ public struct List<Element> {
   public mutating func remove(at address: Address) -> Element {
     precondition(isInBounds(address), "address out of bounds")
 
+    unlink(address)
+
+    storage[address.rawValue].nextOffset = freeOffset
+
+    count -= 1
+    freeOffset = address.rawValue
+
+    return storage[address.rawValue].element.sink()
+  }
+
+  /// Unlinks the node at `address` from its neighbors without changing the free list.
+  private mutating func unlink(_ address: Address) {
     let previous = storage[address.rawValue].previousOffset
     if previous != -1 {
       storage[previous].nextOffset = storage[address.rawValue].nextOffset
@@ -327,18 +374,82 @@ public struct List<Element> {
       storage[next].previousOffset = storage[address.rawValue].previousOffset
     }
 
-    storage[address.rawValue].nextOffset = freeOffset
-
-    count -= 1
-    freeOffset = address.rawValue
     if address.rawValue == headOffset {
       headOffset = next
     }
     if address.rawValue == tailOffset {
       tailOffset = previous
     }
+  }
 
-    return storage[address.rawValue].element.sink()
+  /// Moves the element at `address` to appear before `b`.
+  ///
+  /// - Requires:
+  ///   - `address` != `b`
+  ///   - `address` and `b` are both live addresses in `self`.
+  public mutating func move(_ address: Address, before b: Address) {
+    precondition(isInBounds(address), "address out of bounds")
+    precondition(isInBounds(b), "b out of bounds")
+    precondition(address != b, "address and b must be different")
+    unlink(address)
+
+    storage[address.rawValue].previousOffset = storage[b.rawValue].previousOffset
+    storage[address.rawValue].nextOffset = b.rawValue
+
+    linkNeighborsToPreallocated(address, before: b)
+  }
+
+  /// Moves the bucket at `address` to appear after `a`, without invalidating addresses.
+  /// 
+  /// - Requires: `address` != `a`.
+  public mutating func move(_ address: Address, after a: Address) {
+    precondition(isInBounds(address), "address out of bounds")
+    precondition(isInBounds(a), "a out of bounds")
+    precondition(address != a, "address and a must be different")
+    unlink(address)
+
+    storage[address.rawValue].previousOffset = a.rawValue
+    storage[address.rawValue].nextOffset = storage[a.rawValue].nextOffset
+
+    linkNeighborsToPreallocated(address, after: a)
+  }
+
+  /// Moves the element at `address` to appear at the start of the list without invalidating
+  /// addresses.
+  public mutating func moveToStart(_ address: Address) {
+    precondition(isInBounds(address), "address out of bounds")
+    
+    guard address.rawValue != headOffset else { return } // Already at start.
+
+    unlink(address)
+   
+    storage[address.rawValue].previousOffset = -1
+    storage[address.rawValue].nextOffset = headOffset
+    
+    if headOffset != -1 {
+      storage[headOffset].previousOffset = address.rawValue
+    }
+    
+    headOffset = address.rawValue
+  }
+
+  /// Moves the element at `address` to appear at the end of the list without invalidating
+  /// addresses.
+  public mutating func moveToEnd(_ address: Address) {
+    precondition(isInBounds(address), "address out of bounds")
+    
+    guard address.rawValue != tailOffset else { return } // Already at end.
+    
+    unlink(address)
+    
+    storage[address.rawValue].previousOffset = tailOffset
+    storage[address.rawValue].nextOffset = -1
+    
+    if tailOffset != -1 {
+      storage[tailOffset].nextOffset = address.rawValue
+    }
+    
+    tailOffset = address.rawValue 
   }
 
   /// Reserves enough space to store the `minimumCapacity` elements without allocating new storage.
