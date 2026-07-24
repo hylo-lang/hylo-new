@@ -33,48 +33,29 @@ struct TypeLayoutCache {
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    if !isCanonical(t) {
-      let l = layout(canonical(t, in: &p), in: &p)
+    if t.underlying[.hasAliases] {
+      let l = layout(.init(p.types.dealiased(t.underlying)), in: &p)
       return .init(bytes: l.bytes, type: t, parts: l.parts, isEnumLayout: l.isEnumLayout)
     }
     let u = tag(t.underlying, in: p)
     if u == MachineType.self {
       let u = type(t.underlying, as: MachineType.self, in: p)
       return TypeLayout(bytes: abi.layout(u), type: t, parts: [], isEnumLayout: false)
-    } else if u == Tuple.self {
-      return computeLayout(tuple: t, in: &p)
-    } else if u == Struct.self {
-      return computeLayout(struct: t, in: &p)
-    } else if u == Enum.self {
+    } else if hasRecordLayout(t.underlying, in: p) {
+      return computeLayout(record: t, in: &p)
+    } else if hasEnumLayout(t.underlying, in: p) {
       return computeLayout(enum: t, in: &p)
     } else {
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
     }
   }
 
-  /// Returns the layout for struct `t` in `p`.
+  /// Returns the layout for record `t` in `p`.
   private mutating func computeLayout(
-    struct t: MonomorphicTypeIdentity,
+    record t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let ms = storage(t.underlying, in: &p)
-    return computeLayout(
-      record: t,
-      havingMembers: ms.map {
-        (type: MonomorphicTypeIdentity($0), label: nil)
-      },
-      in: &p
-    )
-  }
-
-  /// Returns the layout for tuple `t` in `p`.
-  private mutating func computeLayout(
-    tuple t: MonomorphicTypeIdentity,
-    in p: inout Program
-  ) -> TypeLayout {
-    let u = ConcreteTypeIdentity<Tuple>(uncheckedFrom: t.underlying)
-    let (ms, o) = p.types.members(of: u)
-    assert(o == false)
+    let ms = storage(record: t.underlying, in: &p)
     return computeLayout(
       record: t,
       havingMembers: ms.map {
@@ -118,7 +99,7 @@ struct TypeLayoutCache {
     taggedEnum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let basis = storage(t.underlying, in: &p)
+    let basis = storage(nominal: t.underlying, in: &p)
       .map { layout(MonomorphicTypeIdentity($0), in: &p) }
 
     if basis.count == 0 {
@@ -165,7 +146,8 @@ struct TypeLayoutCache {
     rawEnum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let discriminator = MonomorphicTypeIdentity(storage(t.underlying, in: &p).first!)
+    let discriminator = MonomorphicTypeIdentity(
+      storage(nominal: t.underlying, in: &p).first!)
     let discriminatorLayout = layout(discriminator, in: &p)
     return TypeLayout(
       bytes: discriminatorLayout.bytes,
@@ -175,14 +157,65 @@ struct TypeLayoutCache {
     )
   }
 
+  /// Returns true iff `t` in `p` has a record layout.
+  private func hasRecordLayout(_ t: AnyTypeIdentity, in p: Program) -> Bool {
+    precondition(!t[.hasAliases])
+    let u = tag(t, in: p)
+    if u == Struct.self || u == Tuple.self {
+      return true
+    } else if u == TypeApplication.self {
+      let a = type(t, as: TypeApplication.self, in: p)
+      let v = tag(a.abstraction, in: p)
+      return v == Struct.self || v == Tuple.self
+    } else {
+      return false
+    }
+  }
+
+  /// Returns true iff `t` in `p` has an enum layout.
+  private func hasEnumLayout(_ t: AnyTypeIdentity, in p: Program) -> Bool {
+    precondition(!t[.hasAliases])
+    let u = tag(t, in: p)
+    if u == Enum.self {
+      return true
+    } else if u == TypeApplication.self {
+      let a = type(t, as: TypeApplication.self, in: p)
+      let v = tag(a.abstraction, in: p)
+      return v == Enum.self
+    } else {
+      return false
+    }
+  }
+
   /// Returns true iff enum `t` in `p` has a representation.
   private func isTaggedEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    let d = type(t, as: Enum.self, in: p).declaration
-    return p[d].representation == nil
+    precondition(!t[.hasAliases])
+    let u = tag(t, in: p)
+    if u == Enum.self {
+      let d = type(t, as: Enum.self, in: p).declaration
+      return p[d].representation == nil
+    } else {
+      let a = type(t, as: TypeApplication.self, in: p)
+      let d = type(a.abstraction, as: Enum.self, in: p).declaration
+      return p[d].representation == nil
+    }
+  }
+
+  /// Returns the types of stored parts of record `t` in `p`.
+  private func storage(record t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
+    let u = tag(t, in: p)
+    if u == Tuple.self {
+      let v = ConcreteTypeIdentity<Tuple>(uncheckedFrom: t)
+      let (ms, o) = p.types.members(of: v)
+      assert(o == false)
+      return ms
+    } else {
+      return storage(nominal: t, in: &p)
+    }
   }
 
   /// Returns the types of stored parts of nominal `t` in `p`.
-  private func storage(_ t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
+  private func storage(nominal t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
     let d = p.declaration(of: t)!
     let m = p.parent(containing: d).module
     return p.storage(of: t, visibleFrom: m)!
@@ -199,22 +232,5 @@ struct TypeLayoutCache {
   /// Returns the tag of `t` in `p`.
   private func tag(_ t: AnyTypeIdentity, in p: Program) -> any TypeTree.Type {
     p.types.tag(of: t).value
-  }
-
-  /// Returns the canonical form of `t` in `p` with all type aliases removed.
-  private func canonical(
-    _ t: MonomorphicTypeIdentity,
-    in p: inout Program
-  ) -> MonomorphicTypeIdentity {
-    var t = t.underlying
-    while t[.hasAliases] {
-      t = p.types.dealiased(t)
-    }
-    return .init(t)
-  }
-
-  /// Returns true iff `t` is a canonical type.
-  private func isCanonical(_ t: MonomorphicTypeIdentity) -> Bool {
-    return t.underlying[.hasAliases]
   }
 }
