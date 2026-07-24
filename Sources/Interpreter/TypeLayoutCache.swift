@@ -20,10 +20,9 @@ struct TypeLayoutCache {
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let k = MonomorphicTypeIdentity(p.types.dealiased(t.underlying))
-    if let r = storage[k] { return r }
-    let r = computeLayout(k, in: &p)
-    storage[k] = r
+    if let r = storage[t] { return r }
+    let r = computeLayout(t, in: &p)
+    storage[t] = r
     return r
   }
 
@@ -37,12 +36,12 @@ struct TypeLayoutCache {
     if isMachineType(t.underlying, in: p) {
       let u = type(t.underlying, as: MachineType.self, in: p)
       return TypeLayout(bytes: abi.layout(u), type: t, parts: [], isEnumLayout: false)
-    } else if isEnum(t.underlying, in: p) {
-      return computeLayout(enum: t, in: &p)
-    } else if isStruct(t.underlying, in: p) {
-      return computeLayout(struct: t, in: &p)
     } else if isTuple(t.underlying, in: p) {
       return computeLayout(tuple: t, in: &p)
+    } else if hasRecordLayout(t.underlying, in: p) {
+      return computeLayout(struct: t, in: &p)
+    } else if isEnum(t.underlying, in: p) {
+      return computeLayout(enum: t, in: &p)
     } else {
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
     }
@@ -102,6 +101,8 @@ struct TypeLayoutCache {
     enum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
+    if hasRepresentation(enum: t) {
+    }
     let basis = storage(t.underlying, in: &p)
       .map { layout(MonomorphicTypeIdentity($0), in: &p) }
 
@@ -162,13 +163,15 @@ struct TypeLayoutCache {
     }
   }
 
-  /// Returns true iff `t` in `p` is a `Struct`.
-  private func isStruct(_ t: AnyTypeIdentity, in p: Program) -> Bool {
+  /// Returns true iff `t` in `p` has a record layout.
+  private func hasRecordLayout(_ t: AnyTypeIdentity, in p: Program) -> Bool {
     let u = tag(t, in: p)
     if u == Struct.self {
       return true
     } else if u == TypeApplication.self {
-      return isStruct(type(t, as: TypeApplication.self, in: p).abstraction, in: p)
+      return hasRecordLayout(type(t, as: TypeApplication.self, in: p).abstraction, in: p)
+    } else if u == TypeAlias.self {
+      return hasRecordLayout(type(t, as: TypeAlias.self, in: p).aliasee, in: p)
     } else {
       return false
     }
