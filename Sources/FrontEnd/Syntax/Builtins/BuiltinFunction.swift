@@ -100,8 +100,8 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case icmp(IntegerPredicate, MachineType.ID)
 
-  //  case trunc(MachineType.ID, MachineType.ID)
-  //
+  case trunc(MachineType.ID, MachineType.ID)
+
   case zext(MachineType.ID, MachineType.ID)
   //
   //  case sext(MachineType.ID, MachineType.ID)
@@ -468,8 +468,8 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: u)).erased
     case .icmp(_, let t):
       return s.demand(Arrow(t, t, to: i1)).erased
-    //    case .trunc(let s, let d):
-    //      return .init(^s, to: ^d)
+    case .trunc(let src, let dst):
+      return s.demand(Arrow(src, to: dst)).erased
     case .zext(let src, let dst):
       return s.demand(Arrow(src, to: dst)).erased
 
@@ -810,10 +810,10 @@ extension BuiltinFunction: Showable {
       return printer.format("umul_with_overflow_%T", [t.erased])
     case .icmp(let p, let t):
       return printer.format("icmp_%S_%T", [p, t.erased])
-    //    case .trunc(let l, let r):
-    //      return "trunc_\(l)_\(r)"
-    case .zext(let l, let r):
-      return "zext_\(l)_\(r)"
+    case .trunc(let s, let d):
+      return printer.format("trunc_%T_%T", [s.erased, d.erased])
+    case .zext(let s, let d):
+      return printer.format("trunc_%T_%T", [s.erased, d.erased])
     //    case .sext(let l, let r):
     //      return "sext_\(l)_\(r)"
     //    case .uitofp(let l, let r):
@@ -1189,10 +1189,9 @@ extension BuiltinFunction {
       guard let (p, t) = integerComparisonTail(&tokens) else { return nil }
       self = .icmp(p, s.demand(t))
 
-    //    case "trunc":
-    //      guard let (s, d) = (machineType + machineType)(&tokens) else { return nil }
-    //      self = .trunc(s, d)
-    //
+    case "trunc":
+      guard let (src, dst) = (machineType + machineType)(&tokens) else { return nil }
+      self = .trunc(s.demand(src), s.demand(dst))
     case "zext":
       guard let (src, dst) = (machineType + machineType)(&tokens) else { return nil }
       self = .zext(s.demand(src), s.demand(dst))

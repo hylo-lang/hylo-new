@@ -327,6 +327,12 @@ extension Program {
       let t1 = IntegerType.UnsafeReference(mt.llvm)!
       ctx.value[v] = ctx.module.llvm.insertZeroExtend(
         xs[0], to: t1, at: ctx.insertionPoint!).v
+    case .trunc(_, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let mt = metadata(of: t, in: &ctx.module)
+      let t1 = IntegerType.UnsafeReference(mt.llvm)!
+      ctx.value[v] = ctx.module.llvm.insertTrunc(
+        xs[0], to: t1, at: ctx.insertionPoint!).v
     case .icmp(let p, let t):
       ctx.value[v] = insertCallBuiltinPredicate(
         p, for: t, with: s.arguments, in: &ctx)
