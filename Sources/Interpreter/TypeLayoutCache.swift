@@ -40,7 +40,7 @@ struct TypeLayoutCache {
       return computeLayout(tuple: t, in: &p)
     } else if hasRecordLayout(t.underlying, in: p) {
       return computeLayout(struct: t, in: &p)
-    } else if isEnum(t.underlying, in: p) {
+    } else if hasEnumLayout(t.underlying, in: p) {
       return computeLayout(enum: t, in: &p)
     } else {
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
@@ -101,10 +101,26 @@ struct TypeLayoutCache {
     enum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    if hasRepresentation(enum: t) {
+    if isTaggedEnum(t.underlying, in: p) {
+      computeLayout(taggedEnum: t, in: &p)
+    } else {
+      computeLayout(rawEnum: t, in: &p)
     }
+  }
+
+  /// Returns the layout for a tagged enum `t` in `p`.
+  private mutating func computeLayout(
+    taggedEnum t: MonomorphicTypeIdentity,
+    in p: inout Program
+  ) -> TypeLayout {
     let basis = storage(t.underlying, in: &p)
       .map { layout(MonomorphicTypeIdentity($0), in: &p) }
+
+    if basis.count == 0 {
+      return TypeLayout(
+        bytes: .init(alignment: 1, size: 0), type: t,
+        parts: [], isEnumLayout: true)
+    }
 
     let discriminator = abi.enumDiscriminator(count: basis.count, in: &p)
     let discriminatorLayout = layout(discriminator, in: &p)
@@ -139,6 +155,31 @@ struct TypeLayoutCache {
       isEnumLayout: true)
   }
 
+  /// Returns the layout for a raw enum `t` in `p`.
+  private mutating func computeLayout(
+    rawEnum t: MonomorphicTypeIdentity,
+    in p: inout Program
+  ) -> TypeLayout {
+    unimplemented()
+  }
+
+  /// Returns true iff enum `t` in `p` has a representation.
+  ///
+  /// - Precondition: `t` has an enum layout.
+  private func isTaggedEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
+    let u = tag(t, in: p)
+    if u == Enum.self {
+      let d = type(t, as: Enum.self, in: p).declaration
+      return p[d].representation == nil
+    } else if u == TypeAlias.self {
+      return isTaggedEnum(type(t, as: TypeAlias.self, in: p).aliasee, in: p)
+    } else if u == TypeApplication.self {
+      return isTaggedEnum(type(t, as: TypeApplication.self, in: p).abstraction, in: p)
+    } else {
+      unreachable()
+    }
+  }
+
   /// Returns the types of stored parts of nominal `t` in `p`.
   private func storage(_ t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
     let d = p.declaration(of: t)!
@@ -151,13 +192,15 @@ struct TypeLayoutCache {
     tag(t, in: p) == MachineType.self
   }
 
-  /// Returns true iff `t` in `p` is of enum type.
-  private func isEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
+  /// Returns true iff `t` in `p` has enum layout.
+  private func hasEnumLayout(_ t: AnyTypeIdentity, in p: Program) -> Bool {
     let u = tag(t, in: p)
     if u == Enum.self {
       return true
+    } else if u == TypeAlias.self {
+      return hasEnumLayout(type(t, as: TypeAlias.self, in: p).aliasee, in: p)
     } else if u == TypeApplication.self {
-      return isEnum(type(t, as: TypeApplication.self, in: p).abstraction, in: p)
+      return hasEnumLayout(type(t, as: TypeApplication.self, in: p).abstraction, in: p)
     } else {
       return false
     }
