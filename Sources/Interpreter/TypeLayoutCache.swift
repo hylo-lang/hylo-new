@@ -160,7 +160,14 @@ struct TypeLayoutCache {
     rawEnum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    unimplemented()
+    let discriminator = MonomorphicTypeIdentity(storage(t.underlying, in: &p).first!)
+    let discriminatorLayout = layout(discriminator, in: &p)
+    return TypeLayout(
+      bytes: discriminatorLayout.bytes,
+      type: t,
+      parts: [.init(name: "discriminator", type: discriminator, offset: 0)],
+      isEnumLayout: true
+    )
   }
 
   /// Returns true iff enum `t` in `p` has a representation.
