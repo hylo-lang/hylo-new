@@ -959,8 +959,6 @@ public struct TypeStore: Sendable {
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (_ as ErrorType, _ as ErrorType):
       result = false
-    case (let t as EqualityWitness, let u as EqualityWitness):
-      result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (let t as FunctionPointer, let u as FunctionPointer):
       result = unifiable(t, u, extending: &ss, handlingCoercionsWith: areCoercible)
     case (_ as GenericParameter, _ as GenericParameter):
