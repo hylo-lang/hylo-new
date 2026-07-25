@@ -105,7 +105,8 @@ struct TypeLayoutCache {
     if basis.count == 0 {
       return TypeLayout(
         bytes: .init(alignment: 1, size: 0), type: t,
-        parts: [], isEnumLayout: true)
+        parts: [.init(name: "discriminator", type: .init(.void), offset: 0)],
+        isEnumLayout: true)
     }
 
     let discriminator = abi.enumDiscriminator(count: basis.count, in: &p)
@@ -136,7 +137,7 @@ struct TypeLayoutCache {
       bytes: l,
       type: t,
       parts:
-        basis.map { .init(name: String(describing: $0.type), type: $0.type, offset: payloadOffset) }
+        basis.map { .init(name: p.show($0.type.underlying), type: $0.type, offset: payloadOffset) }
         + [.init(name: "discriminator", type: discriminator, offset: discriminatorOffset)],
       isEnumLayout: true)
   }
