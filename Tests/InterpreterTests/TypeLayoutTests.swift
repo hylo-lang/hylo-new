@@ -153,6 +153,30 @@ final class TypeLayoutTests: XCTestCase {
       ])
   }
 
+  // TODO: uncomment when raw enum representation gets supported.
+  //
+  // func testRawEnum() async throws {
+  //   let color = layout(
+  //     await type(
+  //       named: "Color",
+  //       in: """
+  //         public enum Color(Int) {
+  //           case red = 0
+  //           case blue = 1
+  //         }
+  //         """))
+  //
+  //   let i8 = id(MachineType.i(8))
+  //
+  //   XCTAssertEqual(color.size, 3)
+  //   XCTAssertEqual(color.alignment, 2)
+  //   XCTAssertEqual(
+  //     color.parts,
+  //     [
+  //       .init(name: "discriminator", type: .init(i8), offset: 0)
+  //     ])
+  // }
+
   /// Returns type declared as `n` in `s`.
   ///
   /// - Precondition: `n` should be unique across `p`.
