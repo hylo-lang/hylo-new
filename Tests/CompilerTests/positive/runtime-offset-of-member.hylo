@@ -76,6 +76,34 @@ public struct TypeWitnessHeader {
 
 given TypeWitnessHeader is Deinitializable {}
 
+extension Metatype<TypeWitnessHeader> {
+
+  type Subject = TypeWitnessHeader
+
+  /// Returns `self`, granting access to details.
+  static fun type_info() -> Pointer<TypeWitnessHeader> {
+    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
+  }
+
+  /// Returns the size in bytes of the `Subject`.
+  @inline(always)
+  public static fun size() -> Size {
+    Self.type_info().size()
+  }
+
+  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
+  @inline(always)
+  public static fun alignment() -> Alignment {
+    Self.type_info().alignment()
+  }
+
+  /// Returns the number of bytes between elements in a buffer of `Subject`.
+  @inline(always)
+  public static fun stride() -> Size {
+    Self.alignment().first_aligned_offset(starting_from: Self.size())
+  }
+}
+
 public given Pointer<TypeWitnessHeader> is Deinitializable {}
 
 // Causes an assertion in the compiler (LLVM).
@@ -88,6 +116,12 @@ extension Pointer<TypeWitnessHeader> {
   @inline(always)
   public fun copy() -> Self {
     .new(value: self.value)
+  }
+
+  @inline(always)
+  public fun infix+ (offset: Int) -> Self {
+    let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
+    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
 }
@@ -119,6 +153,16 @@ extension RecordMemberType {
 
 // Because the integer types are incomplete
 extension UInt {
+
+  /// Creates an instance with the value of `x`.
+  @inline(always)
+  public init(x: UInt32) {
+    &self.value = Builtin.zext_i32_word(x.value)
+  }
+
+}
+
+extension Int {
 
   /// Creates an instance with the value of `x`.
   @inline(always)
@@ -165,6 +209,12 @@ extension Pointer<RecordMemberType> {
   @inline(always)
   public fun infix+ (offset: UInt32) -> Self {
     let byte_offset = UInt(Metatype<Self.Pointee>.stride()) * UInt(offset)
+    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
+  }
+
+  @inline(always)
+  public fun infix+ (offset: Int) -> Self {
+    let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
@@ -373,6 +423,23 @@ struct RecordLayout is Deinitializable {
 
   /// Returns the offset where the initial `nth` element would appear.
   fun offset_of_member(n: MemberIndex) sink -> Size {
+    let q = self.start + 1
+    print(self.start.value); print_newline()
+    print(q.value); print_newline()
+
+    print((self.start + 1).value); print_newline()
+    print((self.start + 0).pointee()); print_comma()
+
+    print((self.start + 1).pointee()); print_comma()
+    print((self.start + 2).pointee()); print_comma()
+    print((self.start + 3).pointee()); print_comma()
+    print((self.start + 4).pointee()); print_comma()
+    print((self.start + 5).pointee()); print_comma()
+    print((self.start + 6).pointee()); print_comma()
+    print((self.start + 7).pointee()); print_comma()
+    print((self.start + 8).pointee()); print_comma()
+    print((self.start + 9).pointee())
+    print_newline()
     let nth_alignment = (self.start + n).alignment()
     self.retain_only_elements(that_lay_out_before_element: n)
     self.stable_sort_by_decreasing_alignment()
@@ -380,6 +447,21 @@ struct RecordLayout is Deinitializable {
       starting_from: self.sizeForCurrentOrder())
   }
 
+}
+
+@extern_c_indirect("print_intptr_indirect") fun print(x: Builtin.ptr)
+@extern_c_indirect("print_u32_indirect") fun print(x: UInt32)
+@extern_c_indirect("print_u16_indirect") fun print(x: UInt16)
+@extern_c_indirect("print_newline_indirect") fun print_newline()
+@extern_c_indirect("print_space_indirect") fun print_space()
+@extern_c_indirect("print_comma_indirect") fun print_comma()
+@extern_c_indirect("print_size_indirect") fun print_size(x: UInt32)
+@extern_c_indirect("print_alignment_indirect") fun print_alignment(x: UInt16)
+
+fun print(p: RecordMemberType) {
+  print_size(p.size())
+  print_space()
+  print_alignment(p.alignment())
 }
 
 /// Returns the offset of the `n`th member in declaration order of a
@@ -422,30 +504,23 @@ subscript pointer(to x: TypeWitnessHeader) -> Pointer<TypeWitnessHeader> {
 
 fun verify_offset(
   i: Int,
-  in h0: H, h1: H, h2: H, h3: H, h4: H, h5: H, h6: H, h7: H, h8: H, h9: H,
+  in headers: H[10],
   of_length l: Int,
   to_be x: Int
 ) {
-  let p0 = pointer[to: h0]
-  let p1 = pointer[to: h1]
-  let p2 = pointer[to: h2]
-  let p3 = pointer[to: h3]
-  let p4 = pointer[to: h4]
-  let p5 = pointer[to: h5]
-  let p6 = pointer[to: h6]
-  let p7 = pointer[to: h7]
-  let p8 = pointer[to: h8]
-  let p9 = pointer[to: h9]
-  var buffer: Pointer<TypeWitnessHeader>[10] = (p0.copy(), p1.copy(), p2.copy(), p3.copy(), p4.copy(), p5.copy(), p6.copy(), p7.copy(), p8.copy(), p9.copy())
+  let p = Pointer<H>(value: Builtin.address(of: headers))
+  var witnesses: Pointer<TypeWitnessHeader>[10] = (
+    p + 0, p + 1, p + 2, p + 3, p + 4, p + 5, p + 6, p + 7, p + 8, p + 9)
 
   let o = __hylo_offset_of_member(
     .new(truncating: i),
-    in: .new(value: Builtin.address(of: buffer)),
+    in: .new(value: Builtin.address(of: witnesses)),
     of_length: .new(truncating: l))
 
-  precondition(o == UInt32(truncating: x))
+    precondition(o == UInt32(truncating: x))
 }
 
+/*
 fun verify_offsets(
     forFirst n: Int,
     in s0: Int, a0: Int, s1: Int, a1: Int, s2: Int, a2: Int, s3: Int, a3: Int, s4: Int, a4: Int, s5: Int, a5: Int, s6: Int, a6: Int, s7: Int, a7: Int, s8: Int, a8: Int, s9: Int, a9: Int,
@@ -492,12 +567,13 @@ fun verify_offsets(
     verify_offset(9, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o9)
   }
 }
+ */
 
 fun main() {
   TypeWitnessHeader.checkLayoutAssumptions()
   verify_offset(
     0,
-    in: H(5, 1), H(3, 2), H(5, 9), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0),
+    in: (H(5, 1), H(3, 2), H(5, 9), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
     of_length: 1
     to_be: 0)
   /*
