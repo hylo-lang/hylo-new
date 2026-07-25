@@ -128,6 +128,11 @@ extension Pointer<TypeWitnessHeader> {
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
+  @inline(always)
+  public fun infix+= (offset: Int) inout {
+    &self = self + offset
+  }
+
 }
 
 /// Notionally, the type of a member of a record type
@@ -228,6 +233,40 @@ extension Pointer<RecordMemberType> {
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
+  @inline(always)
+  public fun infix+= (offset: Int) inout {
+    &self = self + offset
+  }
+
+  @inline(always)
+  public fun infix- (offset: Int) -> Self {
+    let byte_offset = Int(Metatype<Self.Pointee>.stride()) * (0 - offset)
+    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
+  }
+
+  @inline(always)
+  public fun infix-= (offset: Int) inout {
+    &self = self - offset
+  }
+
+  /// Returns `true` iff `other` has an equivalent value.
+  @inline(always)
+  public fun infix== (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_eq_ptr(self.value, other.value))
+  }
+
+  @inline(always)
+  public fun infix!= (other: Self) -> Bool {
+    !(self == other)
+  }
+
+  /// Returns `true` iff `other` follows `self` in memory.
+  @inline(always)
+  public fun infix< (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_ult_ptr(self.value, other.value))
+  }
+
+
 }
 
 extension Metatype<RecordMemberType> {
@@ -313,148 +352,188 @@ extension Metatype<UInt16> {
 
 }
 
-/// Notionally, a collection of Witnesses of unspecified size.
-struct RecordLayout is Deinitializable {
+/// Make it so the pointees start..<end contain only the elements with
+/// alignments greater than that of n, or with the same alignment as n
+/// but occurring at a position < n.
+fun retain_only_elements(
+  from start: inout Pointer<RecordMemberType>,
+  to end: inout Pointer<RecordMemberType>,
+  that_lay_out_before n: Pointer<RecordMemberType>
+) {
+  let n_alignment = n.pointee().alignment()
 
-  let start: Pointer<RecordMemberType>
-  var count: MemberCount
-  memberwise init
-
-  /// Discard element n and any with lesser alignments, or with the
-  /// same alignment occurring at an initial index >= n.
-  fun retain_only_elements(that_lay_out_before_element n: MemberIndex) inout {
-    let _1 = 1 as UInt32
-    let nth_alignment = (self.start + n).alignment()
-    // Next element to process.
-    var i: MemberCount = 0
-    // Skip over initial retained sequence.
-    while i < n && (self.start + i).alignment() >= nth_alignment {
-      &i += _1
-    }
-    // The number of elements to retain.
-    var new_count = i.copy()
-
-    // ith is not retained, either because it is nth or because its
-    // alignment was too low.  Therefore we have a hole at new_count
-    // that we can write into.
-    &i += _1
-
-    // From here on out, i > new_count
-
-    // elements before the nth are retained iff they have greater or
-    // equal alignment.
-    while i < n {
-      if (self.start + i).alignment() >= nth_alignment {
-        (self.start + new_count).set_pointee((self.start + i).pointee())
-        &new_count += _1
-      }
-      &i += _1
-    }
-
-    // Nth element is discarded.
-    if i == n { i += _1 }
-
-    // elements after the nth are retained iff they have greater
-    // alignment.
-    while i < self.count {
-      if (self.start + i).alignment() > nth_alignment {
-        (self.start + new_count).set_pointee((self.start + i).pointee())
-        &new_count += _1
-      }
-      &i += _1
-    }
-
-    &self.count = new_count
+  // Drop initial unretained elements before n
+  while start < n && start.pointee().alignment() < n_alignment {
+    start += 1
   }
 
-  /// Stably sorts the elements in decreasing alignment order.
-  ///
-  /// - Complexity: *O*(`count`²) (insertion sort)
-  fun stable_sort_by_decreasing_alignment() inout {
-    let _1 = 1 as UInt32
-    let _0 = 0 as UInt32
+  if start < n {
+    // start..<n..<end begins with a retained element
 
-    // Nothing to sort
-    if self.count <= _1 { return }
+    // Find first unretained; n is always unretained so we can stop
+    // there.
+    var i = start + 1
+    while i < n && i.pointee().alignment() >= n_alignment {
+      i += 1
+    }
 
-    var prior_alignment = self.start.pointee().alignment()
+    // The position of the first unretained element, or end if all are
+    // retained.
+    var hole = i.copy()
 
-    var i: MemberIndex = 1
-    while i < self.count {
-      // invariant: elements 0..<i are sorted.
+    // Next candidate for moving into the hole.
+    var j = hole + 1
 
-      let w = (self.start + i).pointee()
-      let w_alignment = w.alignment()
+      // Copy remaining retained elements backward into the unretained
+      // space we found.
+    while j < n {
+      let w = j.pointee()
+      if w.alignment() >= n_alignment {
+        hole.set_pointee(w)
+        hole += 1
+      }
+      j += 1
+    }
 
-      if prior_alignment >= w_alignment {
-        // w was already in the right place
-        &prior_alignment = w_alignment.copy()
-      } else {
-        // We moved ith out of self, so there's a hole at i.
+    // skip over n, it's always unretained.
+    if j == n { j += 1 }
 
-        // The hole position,
-        var j = i.copy()
+    while j != end {
+      let w = j.pointee()
+      if w.alignment() > n_alignment {
+        hole.set_pointee(w)
+        hole += 1
+      }
+      j += 1
+    }
+    &end = hole
 
-        // Move the hole toward the front (by repeatedly moving an
-        // element into the hole) until it's where ith should go.
-        var done = false
-        while !done {
-          // Move jth back one, into the hole, leaving a hole at j - 1.
-          sink let k = j - _1
-          let pk = (self.start + k)
-          (self.start + j).set_pointee(pk.pointee())
-          &j = k
-          if j == _0 || pk.alignment() >= w_alignment { &done = true }
+  } else {  // None retained before n?
+    // Drop n, which is always unretained
+    &start = n + 1
+
+    // Drop remaining initial unretained elements
+    while start < end && start.pointee().alignment() <= n_alignment {
+      start += 1
+    }
+
+    // No elements remain to retain.
+    if start == end { return }
+
+    // start..<end begins with a retained element; start > n
+
+    // Find first unretained
+    var i = start + 1
+    while i != end && i.pointee().alignment() > n_alignment {
+      i += 1
+    }
+    if i == end { return }  // all the rest are retained.
+
+    // The position of the first unretained element, or end if all are
+    // retained.
+    var hole = i.copy()
+
+    // Copy remaining retained elements backward into the unretained
+    // sypace we found.
+    var j = hole + 1
+    // precondition(j > n)
+    while j != end {
+      let w = j.pointee()
+      if w.alignment() > n_alignment {
+        hole.set_pointee(w)
+        hole += 1
+      }
+      j += 1
+    }
+    &end = hole
+  }
+}
+
+/// Stably sorts the elements in decreasing alignment order.
+///
+/// - Precondition: start != end
+///
+/// - Complexity: *O*(`end-start`²) (insertion sort)
+fun stable_sort_by_decreasing_alignment(
+  from start: Pointer<RecordMemberType>,
+  to end: Pointer<RecordMemberType>
+) {
+  var prior_alignment = start.pointee().alignment()
+  var i = start + 1
+
+  while i < end {
+    // invariant: elements start..<w are sorted.
+
+    let w = i.pointee()
+    let w_alignment = w.alignment()
+
+    if prior_alignment >= w_alignment {
+      // w was already in the right place
+      &prior_alignment = w_alignment
+    } else {
+
+      // Since we copied from i into w, we can consider i a hole
+      var hole = i
+      // Shuffle the hole towared the front until it's in the right
+      // place.
+      var prior_to_hole = hole - 1
+      var done = false
+      while !done {
+        hole.set_pointee(prior_to_hole.pointee())
+        &hole = prior_to_hole
+        if hole == start {
+          &done = true
         }
-        // put w in the hole.
-        (self.start + j).set_pointee(w.copy())
+        else {
+          &hole = prior_to_hole
+          &prior_to_hole = hole - 1
+          if prior_to_hole.pointee().alignment() >= w_alignment {
+            &done = true
+          }
+        }
       }
-
-      i += _1
+      // put w in the hole.
+      hole.set_pointee(w)
     }
+
+    i += 1
   }
+}
 
-  /// Returns the size required to store properties of types given by
-  /// the elements of `self` in that order.
-  fun sizeForCurrentOrder() -> Size {
-    let _1 = 1 as UInt32
-    let _0 = 0 as UInt32
-
-    var r: Size = 0
-    var i: MemberIndex = 0
-    while i < self.count {
-      let w = (self.start + i).pointee()
-      let position = w.alignment().first_aligned_offset(starting_from: r)
-      &r = position + w.size()
-      i += _1
-    }
-    return r
+fun size_of_record_having_ordered_members(
+  from start_: Pointer<RecordMemberType>,
+  to end: Pointer<RecordMemberType>
+) -> Size {
+  var r: Size = 0
+  var start = start_.copy()
+  while start < end {
+    let w = start.pointee()
+    let position = w.alignment().first_aligned_offset(starting_from: r)
+    &r = position + w.size()
+    start += 1
   }
+  return r
+}
 
-  /// Returns the offset where the initial `nth` element would appear.
-  fun offset_of_member(n: MemberIndex) sink -> Size {
-    print((self.start + 0).pointee()); print_comma()
-    print((self.start + 1).pointee()); print_comma()
-    print((self.start + 2).pointee()); print_comma()
-    print((self.start + 3).pointee()); print_comma()
-    print((self.start + 4).pointee()); print_comma()
-    print((self.start + 5).pointee()); print_comma()
-    print((self.start + 6).pointee()); print_comma()
-    print((self.start + 7).pointee()); print_comma()
-    print((self.start + 8).pointee()); print_comma()
-    print((self.start + 9).pointee())
-    print_newline()
-    print(n); print_space(); print(self.count)
-    print_newline()
-    print_newline()
-    print_newline()
-    let nth_alignment = (self.start + n).alignment()
-    self.retain_only_elements(that_lay_out_before_element: n)
-    self.stable_sort_by_decreasing_alignment()
-    return nth_alignment.first_aligned_offset(
-      starting_from: self.sizeForCurrentOrder())
-  }
+/// Returns the offset of the `n`th member in declaration order of a
+/// record type having members given by the array of length `l` at
+/// `memberArray`.
+///
+/// Mutates the elements in the array in arbitrary ways.
+fun __hylo_offset_of_member(
+  n: UInt32,
+  in memberArray: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
+{
+  let p = memberArray + Int(n)
+  let nth_alignment = p.pointee().alignment()
+  var start = memberArray
+  var end = memberArray + Int(l)
 
+  retain_only_elements(from: &start, to: &end, that_lay_out_before: p)
+  if start == end { return 0 }
+  stable_sort_by_decreasing_alignment(from: start, to: end)
+  let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
+  return nth_alignment.first_aligned_offset(starting_from: preceding_size)
 }
 
 @extern_c_indirect("print_intptr_indirect") fun print_ptr(x: Builtin.ptr)
@@ -471,16 +550,6 @@ fun print(p: RecordMemberType) {
   print_size(p.size())
   print_space()
   print_alignment(p.alignment())
-}
-
-/// Returns the offset of the `n`th member in declaration order of a
-/// record type having members given by the array of length `l` at
-/// `memberArray`.
-fun __hylo_offset_of_member(
-  n: UInt32,
-  in memberArray: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
-{
-  RecordLayout.new(start: memberArray.copy(), count: l.copy()).offset_of_member(n)
 }
 
 // --------------- TESTING -------------
