@@ -108,8 +108,8 @@ final class TypeLayoutTests: XCTestCase {
     XCTAssertEqual(
       i816.parts,
       [
-        .init(name: "0", type: .init(i8), offset: 0),
-        .init(name: "1", type: .init(i16), offset: 2),
+        .init(name: "x", type: .init(i8), offset: 0),
+        .init(name: "y", type: .init(i16), offset: 2),
       ])
   }
 
@@ -126,6 +126,31 @@ final class TypeLayoutTests: XCTestCase {
     XCTAssertEqual(
       emptyEnum.parts,
       [.init(name: "discriminator", type: .init(.void), offset: 0)])
+  }
+
+  func testOptionalEnum() async throws {
+    let optional = layout(
+      await type(
+        named: "Optional",
+        in: """
+          public enum Optional {
+            case some(wrapped: Builtin.i16)
+            case none
+          }
+          """))
+
+    let i8 = id(MachineType.i(8))
+    let i16Tuple = p.types.tuple(of: [id(MachineType.i(16))])
+
+    XCTAssertEqual(optional.size, 3)
+    XCTAssertEqual(optional.alignment, 2)
+    XCTAssertEqual(
+      optional.parts,
+      [
+        .init(name: "some", type: .init(i16Tuple), offset: 0),
+        .init(name: "none", type: .init(.void), offset: 0),
+        .init(name: "discriminator", type: .init(i8), offset: 2),
+      ])
   }
 
   /// Returns type declared as `n` in `s`.

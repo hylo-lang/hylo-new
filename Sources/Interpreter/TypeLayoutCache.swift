@@ -56,13 +56,13 @@ struct TypeLayoutCache {
     in p: inout Program
   ) -> TypeLayout {
     let ms = storage(record: t.underlying, in: &p)
+    let ns =
+      names(record: t.underlying, in: &p)
+      ?? .init(repeating: nil, count: ms.count)
     return computeLayout(
       record: t,
-      havingMembers: ms.map {
-        (type: MonomorphicTypeIdentity($0), label: nil)
-      },
-      in: &p
-    )
+      havingMembers: zip(ms, ns).map { (type: .init($0.0), label: $0.1) },
+      in: &p)
   }
 
   /// Returns the layout for a record `t` in `p` having members `ms`.
@@ -133,13 +133,12 @@ struct TypeLayoutCache {
       discriminatorOffset = 0
     }
 
-    return TypeLayout(
-      bytes: l,
-      type: t,
-      parts:
-        basis.map { .init(name: p.show($0.type.underlying), type: $0.type, offset: payloadOffset) }
-        + [.init(name: "discriminator", type: discriminator, offset: discriminatorOffset)],
-      isEnumLayout: true)
+    let ns = names(enum: t.underlying, in: &p)
+    let parts =
+      zip(basis, ns).map { TypeLayout.Part(name: $0.1, type: $0.0.type, offset: payloadOffset) }
+      + [.init(name: "discriminator", type: discriminator, offset: discriminatorOffset)]
+
+    return .init(bytes: l, type: t, parts: parts, isEnumLayout: true)
   }
 
   /// Returns the layout for a raw enum `t` in `p`.
@@ -220,6 +219,26 @@ struct TypeLayoutCache {
     let d = p.declaration(of: t)!
     let m = p.parent(containing: d).module
     return p.storage(of: t, visibleFrom: m)!
+  }
+
+  /// Returns the declared names (if any) of stored parts of record `t` in `p`,
+  /// in storage order.
+  private func names(record t: AnyTypeIdentity, in p: inout Program) -> [String?]? {
+    precondition(!t[.hasAliases])
+    guard let d = p.declaration(of: t) else { return nil }
+    let s = p.cast(d, to: StructDeclaration.self)!
+    return p.storedProperties(of: s).map { p[$0].identifier.value }
+  }
+
+  /// Returns the declared names of stored parts of enum `t` in `p`,
+  /// in storage order.
+  private func names(enum t: AnyTypeIdentity, in p: inout Program) -> [String] {
+    precondition(!t[.hasAliases])
+    let d = p.declaration(of: t)!
+    let e = p.cast(d, to: EnumDeclaration.self)!
+    return p[e].members
+      .compactMap { p.cast($0, to: EnumCaseDeclaration.self) }
+      .map { p[$0].identifier.value }
   }
 
   /// Returns the type identified by `t` in `p`, cast to `U`.
