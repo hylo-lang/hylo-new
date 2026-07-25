@@ -153,6 +153,20 @@ final class TypeLayoutTests: XCTestCase {
       ])
   }
 
+  func testTypeAlias() async throws {
+    let int8 = layout(
+      await type(
+        named: "Int8",
+        in: """
+          public typealias I8 = Builtin.i8
+          public typealias Int8 = I8
+          """))
+
+    XCTAssertEqual(int8.size, 1)
+    XCTAssertEqual(int8.alignment, 1)
+    XCTAssert(int8.parts.isEmpty)
+  }
+
   // TODO: uncomment when raw enum representation gets supported.
   //
   // func testRawEnum() async throws {
