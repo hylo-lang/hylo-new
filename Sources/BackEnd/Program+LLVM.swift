@@ -321,19 +321,16 @@ extension Program {
       let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
         of: p, typed: ctx.module.llvm.ptr, indices: offsets, at: ctx.insertionPoint!).v
-    case .zext(_, let t):
-      let xs = insertLoad(s.arguments, of: t, in: &ctx)
-      let mt = metadata(of: t, in: &ctx.module)
-      let t1 = IntegerType.UnsafeReference(mt.llvm)!
+    case .zext(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      let t = metadata(of: to, in: &ctx.module).llvm
       ctx.value[v] = ctx.module.llvm.insertZeroExtend(
-        xs[0], to: t1, at: ctx.insertionPoint!).v
-    case .trunc(_, let t):
-      let xs = insertLoad(s.arguments, of: t, in: &ctx)
-      let mt = metadata(of: t, in: &ctx.module)
-      let t1 = IntegerType.UnsafeReference(mt.llvm)!
+        xs[0], to: t, at: ctx.insertionPoint!).v
+    case .trunc(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      let t = metadata(of: to, in: &ctx.module).llvm
       ctx.value[v] = ctx.module.llvm.insertTrunc(
-        xs[0], to: t1, at: ctx.insertionPoint!).v
-    case .icmp(let p, let t):
+        xs[0], to: t, at: ctx.insertionPoint!).v    case .icmp(let p, let t):
       ctx.value[v] = insertCallBuiltinPredicate(
         p, for: t, with: s.arguments, in: &ctx)
 
