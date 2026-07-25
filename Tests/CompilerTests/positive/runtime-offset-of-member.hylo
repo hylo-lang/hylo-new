@@ -130,7 +130,7 @@ extension Pointer<TypeWitnessHeader> {
 
   @inline(always)
   public fun infix+= (offset: Int) inout {
-    &self = self + offset
+    &self.value = (self + offset).value
   }
 
 }
@@ -190,6 +190,23 @@ extension Pointer<RecordMemberType> {
   }
 
 }
+
+public given Pointer<RecordMemberType> is Movable {
+
+  /// Gives `self` the value of a consumed `source`.
+  fun take_value(from source: sink Self) auto {
+    set {
+      &self.value = source.value
+      _ = source
+    }
+    inout {
+      &self.value = source.value
+      _ = source
+    }
+  }
+
+}
+
 public given Pointer<RecordMemberType> is Deinitializable {}
 
 extension Pointer<RecordMemberType> {
@@ -235,7 +252,7 @@ extension Pointer<RecordMemberType> {
 
   @inline(always)
   public fun infix+= (offset: Int) inout {
-    &self = self + offset
+    &self.value = (self + offset).value
   }
 
   @inline(always)
@@ -246,7 +263,7 @@ extension Pointer<RecordMemberType> {
 
   @inline(always)
   public fun infix-= (offset: Int) inout {
-    &self = self - offset
+    &self.value = (self - offset).value
   }
 
   /// Returns `true` iff `other` has an equivalent value.
@@ -266,6 +283,9 @@ extension Pointer<RecordMemberType> {
     Bool(value: Builtin.icmp_ult_ptr(self.value, other.value))
   }
 
+  fun assign(other: Self) inout {
+    &self.value = other.value
+  }
 
 }
 
