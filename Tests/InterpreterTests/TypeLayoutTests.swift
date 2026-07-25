@@ -131,9 +131,9 @@ final class TypeLayoutTests: XCTestCase {
   func testOptionalEnum() async throws {
     let optional = layout(
       await type(
-        named: "Optional",
+        named: "OptionalInt",
         in: """
-          public enum Optional {
+          public enum OptionalInt {
             case some(wrapped: Builtin.i16)
             case none
           }
@@ -158,13 +158,66 @@ final class TypeLayoutTests: XCTestCase {
       await type(
         named: "Int8",
         in: """
-          public typealias I8 = Builtin.i8
-          public typealias Int8 = I8
+          public type I8 = Builtin.i8
+          public type Int8 = I8
           """))
 
     XCTAssertEqual(int8.size, 1)
     XCTAssertEqual(int8.alignment, 1)
     XCTAssert(int8.parts.isEmpty)
+  }
+
+  func testStructWithTypeApplication() async throws {
+    let i8 = id(MachineType.i(8))
+    let i16 = id(MachineType.i(16))
+
+    let i816 = layout(
+      await type(
+        named: "Pair",
+        appliedTo: [i8, i16],
+        in: """
+          public struct Pair<T, U> {
+            let x: T
+            let y: U
+          }
+          """))
+
+    XCTAssertEqual(i816.size, 4)
+    XCTAssertEqual(i816.alignment, 2)
+    XCTAssertEqual(
+      i816.parts,
+      [
+        .init(name: "x", type: .init(i8), offset: 0),
+        .init(name: "y", type: .init(i16), offset: 2),
+      ])
+  }
+
+  func testEnumWithTypeApplication() async throws {
+    let i16 = id(MachineType.i(16))
+
+    let optional = layout(
+      await type(
+        named: "Optional",
+        appliedTo: [i16],
+        in: """
+          public enum Optional<T> {
+            case some(wrapped: T)
+            case none
+          }
+          """))
+
+    let i8 = id(MachineType.i(8))
+    let i16Tuple = p.types.tuple(of: [id(MachineType.i(16))])
+
+    XCTAssertEqual(optional.size, 3)
+    XCTAssertEqual(optional.alignment, 2)
+    XCTAssertEqual(
+      optional.parts,
+      [
+        .init(name: "some", type: .init(i16Tuple), offset: 0),
+        .init(name: "none", type: .init(.void), offset: 0),
+        .init(name: "discriminator", type: .init(i8), offset: 2),
+      ])
   }
 
   // TODO: uncomment when raw enum representation gets supported.
@@ -200,6 +253,16 @@ final class TypeLayoutTests: XCTestCase {
     let d = p.castToDeclaration(p.select(.name(.init(identifier: n))).first!)!
     let mt = p.type(assignedTo: d, assuming: Metatype.self)
     return p.types[mt].inhabitant
+  }
+
+  /// Returns `n<arguments...>` declared in `s`.
+  private func type(
+    named n: String, appliedTo arguments: [AnyTypeIdentity],
+    in s: SourceFile
+  ) async -> AnyTypeIdentity {
+    let u = await type(named: n, in: s)
+    let f = p.types.cast(u, to: UniversalType.self)!
+    return p.types.application(of: f, to: arguments)
   }
 
   /// Adds `s` with no dependency to `p`.
