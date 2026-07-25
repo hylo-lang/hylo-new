@@ -34,8 +34,12 @@ extension Alignment {
   /// Returns the first n >= i that is a multiple of self
   fun first_aligned_offset(starting_from i: Size) -> Size {
     let a = Size(self)
+    // print_space(); print_space(); print(self); print_space(); print(a); print_space()
     // The distance from i to the nearest aligned offset <= i.
     let excess = i % a
+    // print(excess); print_space();
+    // print(if excess == (0 as Size) { 1 } else { 0 }); print_space()
+    // print(i - excess + a); print_newline()
     return if excess == (0 as Size) { i.copy() } else { i - excess + a }
   }
 
@@ -214,7 +218,13 @@ extension Pointer<RecordMemberType> {
 
   @inline(always)
   public fun infix+ (offset: Int) -> Self {
+    print_space(); print_size(Metatype<Self.Pointee>.size()); print_space()
+    print_alignment(Metatype<Self.Pointee>.alignment()); print_newline()
+
+    print_space(); print_size(Metatype<Self.Pointee>.stride()); print_space()
+    print(Int(Metatype<Self.Pointee>.stride())); print_newline()
     let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
+    print_space(); print(offset); print_space(); print(byte_offset); print_newline()
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
@@ -424,10 +434,10 @@ struct RecordLayout is Deinitializable {
   /// Returns the offset where the initial `nth` element would appear.
   fun offset_of_member(n: MemberIndex) sink -> Size {
     let q = self.start + 1
-    print(self.start.value); print_newline()
-    print(q.value); print_newline()
+    print_ptr(self.start.value); print_newline()
+    print_ptr(q.value); print_newline()
+    print_newline()
 
-    print((self.start + 1).value); print_newline()
     print((self.start + 0).pointee()); print_comma()
 
     print((self.start + 1).pointee()); print_comma()
@@ -449,7 +459,8 @@ struct RecordLayout is Deinitializable {
 
 }
 
-@extern_c_indirect("print_intptr_indirect") fun print(x: Builtin.ptr)
+@extern_c_indirect("print_intptr_indirect") fun print_ptr(x: Builtin.ptr)
+@extern_c_indirect("print_long_indirect") fun print(x: Int)
 @extern_c_indirect("print_u32_indirect") fun print(x: UInt32)
 @extern_c_indirect("print_u16_indirect") fun print(x: UInt16)
 @extern_c_indirect("print_newline_indirect") fun print_newline()
@@ -520,7 +531,6 @@ fun verify_offset(
     precondition(o == UInt32(truncating: x))
 }
 
-/*
 fun verify_offsets(
     forFirst n: Int,
     in s0: Int, a0: Int, s1: Int, a1: Int, s2: Int, a2: Int, s3: Int, a3: Int, s4: Int, a4: Int, s5: Int, a5: Int, s6: Int, a6: Int, s7: Int, a7: Int, s8: Int, a8: Int, s9: Int, a9: Int,
@@ -537,46 +547,45 @@ fun verify_offsets(
   let h9 = H(s9, a9)
 
   if n > 0 {
-    verify_offset(0, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o0)
+    verify_offset(0, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o0)
   }
   if n > 1 {
-    verify_offset(1, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o1)
+    verify_offset(1, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o1)
   }
   if n > 2 {
-    verify_offset(2, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o2)
+    verify_offset(2, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o2)
   }
   if n > 3 {
-    verify_offset(3, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o3)
+    verify_offset(3, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o3)
   }
   if n > 4 {
-    verify_offset(4, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o4)
+    verify_offset(4, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o4)
   }
   if n > 5 {
-    verify_offset(5, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o5)
+    verify_offset(5, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o5)
   }
   if n > 6 {
-    verify_offset(6, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o6)
+    verify_offset(6, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o6)
   }
   if n > 7 {
-    verify_offset(7, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o7)
+    verify_offset(7, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o7)
   }
   if n > 8 {
-    verify_offset(8, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o8)
+    verify_offset(8, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o8)
   }
   if n > 9 {
-    verify_offset(9, in: h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, of_length: n, to_be: o9)
+    verify_offset(9, in: (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9), of_length: n, to_be: o9)
   }
 }
- */
 
 fun main() {
   TypeWitnessHeader.checkLayoutAssumptions()
   verify_offset(
     0,
     in: (H(5, 1), H(3, 2), H(5, 9), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
-    of_length: 1
-    to_be: 0)
-  /*
+    of_length: 3
+    to_be: 9)
+
   verify_offsets(
     forFirst: 3,
     in: 5, 1, 3, 2, 5, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -597,6 +606,7 @@ fun main() {
     forFirst: 1,
     in: 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     to_be: 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+  /*
   verify_offsets(
     forFirst: 2,
     in: 4, 2, 9, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -8997,5 +9007,5 @@ fun main() {
     forFirst: 10,
     in: 0, 1, 6, 8, 7, 1, 3, 5, 8, 8, 1, 8, 0, 9, 6, 4, 1, 2, 8, 7,
     to_be: 43, 0, 43, 30, 8, 16, 0, 36, 42, 21)
-   */
+  */
 }

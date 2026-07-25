@@ -320,7 +320,7 @@ extension Program {
       let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
       let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: p, typed: ctx.module.llvm.ptr, indices: offsets, at: ctx.insertionPoint!).v
+        of: p, typed: ctx.module.llvm.i8, indices: offsets, at: ctx.insertionPoint!).v
     case .zext(let from, let to):
       let xs = insertLoad(s.arguments, of: from, in: &ctx)
       let t = metadata(of: to, in: &ctx.module).llvm
