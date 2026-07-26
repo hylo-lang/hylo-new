@@ -1,0 +1,4 @@
+//! trap
+public fun main() {
+  _ = (-128 as Int8) / (-1 as Int8) // 128 is out of bounds.
+}

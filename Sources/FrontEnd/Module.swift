@@ -184,6 +184,27 @@ public struct Module: Sendable {
       functions.index(forKey: name)
     }
 
+    /// Declares `f` in this module.
+    ///
+    /// Either `f` is not declared in `self` or the function named `f.name` in `self` has the same
+    /// signature as that of `f`. In either case, the definition of `f` (if any) is not copied.
+    @discardableResult
+    internal mutating func declare(_ f: IRFunction) -> (inserted: Bool, identity: IRFunction.ID) {
+      let inserted = modify(&functions[f.name]) { (slot) in
+        if let g = slot {
+          assert(f.signature() == g.signature())
+          return false
+        } else {
+          let g = IRFunction(
+            name: f.name, anchor: f.anchor, output: f.output,
+            typeParameters: f.typeParameters, termParameters: f.termParameters)
+          slot = .some(g)
+          return true
+        }
+      }
+      return (inserted, functions.index(forKey: f.name)!)
+    }
+
     /// Adds `f` to this module.
     ///
     /// - Requires: `self` contains no IR function having the name of `f`.

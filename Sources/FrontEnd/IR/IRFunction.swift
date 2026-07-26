@@ -104,7 +104,7 @@ public struct IRFunction: Sendable {
   }
 
   /// The types of an IR function's parameters and return value.
-  public struct Signature: Sendable {
+  public struct Signature: Equatable, Sendable {
 
     /// The generic type parameters that the function accepts.
     public let context: [GenericParameter.ID]

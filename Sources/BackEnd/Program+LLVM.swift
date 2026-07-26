@@ -256,7 +256,7 @@ extension Program {
     if case .function(let n, _) = s.callee {
       let f = demandFunction(named: n, in: &ctx.module)
       let x = insertArguments(s.arguments, mappedWith: f.prototype.mapping, in: &ctx)
-      insertCall(applying: f, to: x, writingResultTo: s.result, in: &ctx)
+      insertCall(f, with: x, writingResultTo: s.result, in: &ctx)
     }
 
     // Is the call indirect?
@@ -265,7 +265,7 @@ extension Program {
       let a = types.seenAsTermAbstraction(ctx.ir.result(of: s.callee)!.type)!
       let p = prototype(types[a], in: &ctx.module)
       let x = insertArguments(s.arguments, mappedWith: p.mapping, in: &ctx)
-      insertCall(applying: f, describedBy: p, to: x, writingResultTo: s.result, in: &ctx)
+      insertCall(f, describedBy: p, with: x, writingResultTo: s.result, in: &ctx)
     }
 
     return ctx.ir.instruction(after: i.erased)
@@ -276,12 +276,37 @@ extension Program {
     _ i: IRApplyBuiltin.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
+    let v = FrontEnd.IRValue.register(i.erased)
 
     switch s.callee {
     case .trap:
       insertTrap(in: &ctx)
     case .addressOf:
-      ctx.value[.register(i.erased)] = ctx.value[s.arguments[0]]!
+      ctx.value[v] = ctx.value[s.arguments[0]]!
+    case .zeroinitializer(let t):
+      ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
+    case .udiv(let e, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertUnsignedDiv(
+        exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .sdiv(let e, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertSignedDiv(
+        exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .signedAdditionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .signedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .signedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
+
+    case .icmp(let p, let t):
+      ctx.value[v] = insertCallBuiltinPredicate(
+        p, for: t, with: s.arguments, in: &ctx)
+
     default:
       unimplemented(String(describing: s.callee))
     }
@@ -637,6 +662,16 @@ extension Program {
     }
 
     let tableType = metadata(of: s.witnessType, in: &ctx.module)
+
+    unimplemented(if: !entries.allSatisfy(\.unsafe[].isConstant), 
+      """
+      Runtime-defined IRWitnessTable operand. https://github.com/hylo-lang/hylo-new/issues/342
+
+      In:
+      \(show(ctx.ir))
+
+      """)
+
     let table = ctx.module.llvm.structConstant(
       of: StructType.UnsafeReference(tableType.llvm)!, aggregating: entries)
 
@@ -879,37 +914,51 @@ extension Program {
     switch g.name {
     case .lowered:
       fatalError("TODO: global bindings")
-
     case .witness(let t):
-      // TODO: type arguments/parameters
-      // TODO: witnesses of opaque types
-
-      // Declare the symbol.
-      let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
-      let symbol = ctx.llvm.declareGlobalVariable(name, storage)
-      ctx.llvm.setLinkage(.private, for: symbol)
-
-      // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
-      // the module. Otherwise, the witness is for a type whose layout is defined externally.
-      let m = metadata(of: t, in: &ctx)
-      guard let s = m.layout.size.fixed else { return symbol }
-
-      let fields: [LLVMValue] = [
-        demandGlobalString(show(t), in: &ctx).v,
-        ctx.llvm.i32.unsafe[].constant(s).v,
-        ctx.llvm.i16.unsafe[].constant(m.layout.alignment).v,
-        ctx.llvm.i16.unsafe[].zero.v,
-      ]
-
-      let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
-      ctx.llvm.setAlignment(alignment, for: symbol)
-
-      let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
-      ctx.llvm.setInitializer(initializer, for: symbol)
-      ctx.llvm.setGlobalConstant(true, for: symbol)
-
-      return symbol
+      return demandGlobalTypeWitness(of: t, in: &ctx)
     }
+  }
+
+  /// Returns the global LLVM variable containing the type witness of `t`, declaring it if
+  /// necessary.
+  ///
+  /// - Requires: `t` is dealiased.
+  private mutating func demandGlobalTypeWitness(
+    of t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
+  ) -> SwiftyLLVM.GlobalVariable.UnsafeReference {
+    // TODO: type arguments/parameters
+    // TODO: witnesses of opaque types
+
+    let name = llvmName(global: .witness(t))
+    if let existing = ctx.llvm.global(named: name) {
+      return existing
+    }
+
+    // Declare the symbol.
+    let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
+    let symbol = ctx.llvm.declareGlobalVariable(name, storage)
+    ctx.llvm.setLinkage(.private, for: symbol)
+
+    // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
+    // the module. Otherwise, the witness is for a type whose layout is defined externally.
+    let m = metadata(of: t, in: &ctx)
+    guard let s = m.layout.size.fixed else { return symbol }
+
+    let fields: [LLVMValue] = [
+      demandGlobalString(show(t), in: &ctx).v,
+      ctx.llvm.i32.unsafe[].constant(s).v,
+      ctx.llvm.i16.unsafe[].constant(m.layout.alignment).v,
+      ctx.llvm.i16.unsafe[].zero.v,
+    ]
+
+    let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
+    ctx.llvm.setAlignment(alignment, for: symbol)
+
+    let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
+    ctx.llvm.setInitializer(initializer, for: symbol)
+    ctx.llvm.setGlobalConstant(true, for: symbol)
+
+    return symbol
   }
 
   private func demandGlobalString(
@@ -956,6 +1005,19 @@ extension Program {
     return w
   }
 
+  /// Returns the LLVM values corresponding to `xs`, which are instances of `t`, loaded in memory.
+  ///
+  /// `xs` is an array of IR values denoting places of type `t`, which are defined in the current
+  /// context. This method inserts a load for each of these values in the compiled function.
+  private mutating func insertLoad(
+    _ xs: [FrontEnd.IRValue], of t: MachineType.ID, in ctx: inout FunctionGenerationContext
+  ) -> [LLVMValue] {
+    let m = metadata(of: t, in: &ctx.module)
+    return xs.map { (x) in
+      ctx.module.llvm.insertLoad(m.llvm, from: ctx.value[x]!, at: ctx.insertionPoint!).v
+    }
+  }
+
   /// Returns the representations of `arguments`, which are passed to `callee`, in LLVM IR.
   ///
   /// The result contains a LLVM IR value for each non-erased parameter of the callee, computed
@@ -982,22 +1044,22 @@ extension Program {
     return actual
   }
 
-  /// Generates the LLVM IR code for applying `callee` to `xs`, writing the result of the call to
-  /// the storage represented by `result`.
+  /// Generates LLVM IR code for applying `callee` to `xs`, writing the result of the call to the
+  /// storage represented by `result`.
   private mutating func insertCall(
-    applying callee: FunctionMetadata, to xs: consuming [LLVMValue],
+    _ callee: FunctionMetadata, with xs: consuming [LLVMValue],
     writingResultTo result: FrontEnd.IRValue,
     in ctx: inout FunctionGenerationContext
   ) {
     insertCall(
-      applying: callee.value, describedBy: callee.prototype, to: xs,
+      callee.value, describedBy: callee.prototype, with: xs,
       writingResultTo: result, in: &ctx)
   }
 
-  /// Generates the LLVM IR code for applying `callee`, which is described by `shape`, to `xs`,
-  /// writing the result of the call to the storage represented by `result`.
+  /// Generates LLVM IR code for applying `callee`, which is described by `shape`, to `xs`, writing
+  /// the result of the call to the storage represented by `result`.
   private mutating func insertCall<F: SwiftyLLVM.IRValue>(
-    applying callee: F.UnsafeReference, describedBy shape: Prototype, to xs: consuming [LLVMValue],
+    _ callee: F.UnsafeReference, describedBy shape: Prototype, with xs: consuming [LLVMValue],
     writingResultTo result: FrontEnd.IRValue,
     in ctx: inout FunctionGenerationContext
   ) {
@@ -1019,6 +1081,46 @@ extension Program {
       _ = ctx.module.llvm.insertCall(
         callee.v, typed: shape.signature.t, on: xs, at: ctx.insertionPoint!)
     }
+  }
+
+  /// Generates LLVM IR code for applying `callee`, which is an integer predicate, to `xs`.
+  private mutating func insertCallBuiltinPredicate(
+    _ callee: FrontEnd.IntegerPredicate, for integer: MachineType.ID, with xs: [FrontEnd.IRValue],
+    in ctx: inout FunctionGenerationContext
+  ) -> LLVMValue {
+    let loaded = insertLoad(xs, of: integer, in: &ctx)
+    let result = ctx.module.llvm.insertIntegerComparison(
+      .init(callee), loaded[0], loaded[1], at: ctx.insertionPoint!)
+    return result.v
+  }
+
+  /// Generates the LLVM IR code for applying `callee`, which is the name of a function in the
+  /// family of `llvm.x.with.overflow`, to `xs`.
+  private mutating func insertCallBuiltinBinaryWithOverflow(
+    _ callee: IntrinsicFunction.Name, for integer: MachineType.ID, with xs: [FrontEnd.IRValue],
+    in ctx: inout FunctionGenerationContext
+  ) -> LLVMValue {
+    let bool = types.demand(MachineType.i(1))
+    let pair = types.tuple(of: [integer.erased, bool.erased])
+
+    let m = metadata(of: integer, in: &ctx.module)
+    let n = metadata(of: pair, in: &ctx.module)
+    let f = ctx.module.llvm.intrinsic(named: callee, for: [m.llvm])!
+
+    // Apply the intrinsic.
+    let loaded = insertLoad(xs, of: integer, in: &ctx)
+    let result = ctx.module.llvm.insertCall(f, on: loaded, at: ctx.insertionPoint!)
+
+    // Unpack the tuple returned by the intrinsic and re-pack it with Hylo's layout.
+    var adapted = ctx.module.llvm.poisonValue(of: n.llvm).v
+    let x0 = ctx.module.llvm.insertExtractValue(from: result, at: 0, at: ctx.insertionPoint!)
+    adapted = ctx.module.llvm.insertInsertValue(
+      x0, at: n.layout.propertyToField[0], into: adapted, at: ctx.insertionPoint!).v
+    let x1 = ctx.module.llvm.insertExtractValue(from: result, at: 1, at: ctx.insertionPoint!)
+    adapted = ctx.module.llvm.insertInsertValue(
+      x1, at: n.layout.propertyToField[1], into: adapted, at: ctx.insertionPoint!).v
+
+    return adapted
   }
 
   /// Generates the LLVM IR code for returning from the function being compiled.
@@ -1102,7 +1204,7 @@ extension Program {
       switch input.convention {
       case .erased:
         if case .lowered(let d) = self[ctx.hylo].ir[f].name {
-          self[ctx.hylo].addDiagnostic(.init(.error, 
+          self[ctx.hylo].addDiagnostic(.init(.error,
             "zero-sized types have no counterpart in C.", at: spanForDiagnostic(about: d)))
         } else {
           unreachable("@extern_c_indirect must have been lowered directly from a declaration")
@@ -1159,6 +1261,10 @@ extension Program {
       return codegen(integer: n, instanceOf: t, in: &ctx.module)
     case .function(let n, _):
       return demandFunction(named: n, in: &ctx.module).value.v
+    case .type(let t, _):
+      // A type witness is represented by the address of its global metadata (for now).
+      // Runtime type witnesses are not yet supported.
+      return demandGlobalTypeWitness(of: t, in: &ctx.module).v
     default:
       fatalError("no LLVM representation of the Hylo value '\(show(v))'")
     }
@@ -1218,6 +1324,8 @@ extension Program {
       metadata(of: types.castUnchecked(t, to: TypeApplication.self), in: &ctx)
     case TypeWitness.self:
       metadata(of: types.castUnchecked(t, to: TypeWitness.self), in: &ctx)
+    case UniversalType.self:
+      metadata(of: types.castUnchecked(t, to: UniversalType.self), in: &ctx)
     default:
       unimplemented("no LLVM representation of the type '\(show(t))'")
     }
@@ -1328,7 +1436,7 @@ extension Program {
       } else if let properties = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
         return program.metadata(record: n, fields: properties, in: &ctx)
       } else {
-        fatalError("no LLVM metadata representation of the type '\(program.show(t))'")
+        unimplemented("no LLVM representation of the type '\(program.show(t))'")
       }
     }
   }
@@ -1339,6 +1447,19 @@ extension Program {
   ) -> TypeMetadata {
     let p = types.demand(MachineType.ptr)
     return metadata(of: p, in: &ctx)
+  }
+
+  /// Returns the LLVM type representation of the Hylo type `t`.
+  private mutating func metadata(
+    of t: UniversalType.ID, in ctx: inout ModuleGenerationContext
+  ) -> TypeMetadata {
+    metadata(of: t, in: &ctx) { (program, ctx, t, n) in
+      if t.erased == .never {
+        return program.metadata(record: n, fields: [], in: &ctx)
+      } else {
+        unimplemented("no LLVM representation of the type '\(program.show(t))'")
+      }
+    }
   }
 
   /// Returns the LLVM type representation of a record type having the given name and fields.
@@ -1461,6 +1582,26 @@ extension Program {
 
     default:
       return nil
+    }
+  }
+
+}
+
+extension SwiftyLLVM.IntegerPredicate {
+
+  /// Creates an instance representing the same predicate as `other`.
+  fileprivate init(_ other: FrontEnd.IntegerPredicate) {
+    switch other {
+    case .eq: self = .eq
+    case .ne: self = .ne
+    case .ugt: self = .ugt
+    case .uge: self = .uge
+    case .ult: self = .ult
+    case .ule: self = .ule
+    case .slt: self = .slt
+    case .sge: self = .sge
+    case .sgt: self = .sgt
+    case .sle: self = .sle
     }
   }
 

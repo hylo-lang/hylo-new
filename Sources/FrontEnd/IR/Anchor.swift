@@ -41,7 +41,7 @@ extension Program {
 
   /// Creates an anchor attached to `site`, which is the same file as `scope`.
   public func anchor(at site: SourceSpan, in scope: ScopeIdentity) -> Anchor {
-    assert(modules.values[scope.module][scope.file].source == site.source)
+    assert(self[scope.module][scope.file].source == site.source)
     return .init(site: site, scope: scope)
   }
 
@@ -72,7 +72,7 @@ extension Program {
 
   /// Returns the region of text to which `anchor` is attached.
   public func span(_ anchor: Anchor) -> SourceSpan {
-    let source = modules.values[anchor.scope.module][anchor.scope.file].source
+    let source = self[anchor.scope.module][anchor.scope.file].source
     let x0 = source.index(line: anchor.start.line, utf16Offset: anchor.start.offset)
     let x1 = source.index(line: anchor.end.line, utf16Offset: anchor.end.offset)
     return .init(x0 ..< x1, in: source)

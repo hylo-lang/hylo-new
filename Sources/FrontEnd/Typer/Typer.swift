@@ -90,6 +90,9 @@ public struct Typer {
     /// The cache of `Typer.typeOfSelf(in:)`.
     fileprivate var scopeToTypeOfSelf: [ScopeIdentity: AnyTypeIdentity?]
 
+    /// The cache of `Typer.canDeriveCoercions(_:_:in:where:)`.
+    fileprivate var scopeToPotentialCoercions: [ScopeIdentity: [TypePair: Bool]]
+
     /// The cache of `Typer.typeOfTraitSelf(in:)`.
     fileprivate var traitToTypeOfTraitSelf: [TraitDeclaration.ID: AnyTypeIdentity]
 
@@ -105,8 +108,8 @@ public struct Typer {
     /// The cache of `Typer.standardLibraryType(_:)`.
     fileprivate var standardLibraryEntityToType: [Program.StandardLibraryEntity: AnyTypeIdentity]
 
-    /// The cache of `Typer.canDeriveCoercion(_:_:applying:)`.
-    fileprivate var canDeriveCoercion: [Given: [TypePair: (Bool, Bool)]]
+    /// The cache of `Typer.canDeriveCoercion(_:applying:)`.
+    fileprivate var canDeriveCoercion: [Given: [TypePair: UInt8]]
 
     /// Creates an instance for typing `m`, which is a module in `p`.
     fileprivate init(typing m: Module.ID, in p: Program) {
@@ -120,6 +123,7 @@ public struct Typer {
       self.scopeToGivens = [:]
       self.scopeToSummoned = [:]
       self.scopeToTypeOfSelf = [:]
+      self.scopeToPotentialCoercions = [:]
       self.traitToTypeOfTraitSelf = [:]
       self.witnessToAliases = [:]
       self.declarationToTentativeType = [:]
@@ -396,7 +400,7 @@ public struct Typer {
 
   /// Type checks `d`, which occurs as a condition item iff `conditional` is true.
   ///
-  /// If `conditional` is `true`, then `d` occurs in the condition of a 
+  /// If `conditional` is `true`, then `d` occurs in the condition of a
   private mutating func check(_ d: BindingDeclaration.ID) {
     let t = declaredType(of: d)
 
@@ -2315,7 +2319,7 @@ public struct Typer {
     return context.obligations.assume(e, hasType: t, at: program[e].site)
   }
 
-  /// Returns the inferred type of a primitive literal `e`, ensuring `e` is elaborated to a call 
+  /// Returns the inferred type of a primitive literal `e`, ensuring `e` is elaborated to a call
   /// to `.new(x: e)`, where `x` is the constructor label of `T`.
   private mutating func inferredType<T: LiteralExpression>(
     of e: T.ID, in context: inout InferenceContext
@@ -3942,27 +3946,38 @@ public struct Typer {
     _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, in scopeOfUse: ScopeIdentity,
     where environment: ResolutionThread.Environment
   ) -> Bool {
-    var lhs = false
-    var rhs = false
-
-    for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined())  {
-      let (x, y) = canDeriveCoercion(a, b, applying: g)
-      lhs = lhs || x
-      rhs = rhs || y
-      if lhs && rhs { return true }
+    // If there aren't any givens in `scopeOfUse`, forward the query to the parent scope.
+    if givens(lexicallyIn: scopeOfUse).isEmpty, let p = program.parent(containing: scopeOfUse) {
+      return canDeriveCoercions(a, b, in: p, where: environment)
     }
 
-    assert(!lhs || !rhs)
+    // Make sure the cache key does not depend on the order in which `a` and `b` have been passed.
+    let p = (b.bits < a.bits) ? Pair(b, a) : Pair(a, b)
+    if let memoized = cache.scopeToPotentialCoercions[scopeOfUse]?[p] { return memoized }
+
+    // Check if there are givens in scope that could be used to derive a coercion.
+    var result: UInt8 = 0
+    for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined())  {
+      result |= canDeriveCoercion(p, applying: g)
+      if result == 0b11 {
+        cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = true
+        return true
+      }
+    }
+
+    assert((result & 0b11) != 0b11)
+    cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = false
     return false
   }
 
-  /// Returns `(lhs, rhs)` where `lhs` (respectively `rhs`) is `true` iff `g` might be used to
-  /// prove a coercion from from `a` to `x` (respectively `x` to `b`) for some type `x`.
-  private mutating func canDeriveCoercion(
-    _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, applying g: Given
-  ) -> (Bool, Bool) {
-    // Make sure the cache key does not depend on the order in which `a` and `b` have been passed.
-    let p = (b.bits < a.bits) ? Pair(b, a) : Pair(a, b)
+  /// Returns two bits indicating whether `g` may be used to prove a coercion from `p.first` to `x`
+  /// and from `x` to `p.second`, respectively.
+  ///
+  /// The two least significant bits of the result encode a pair of Boolean values, satisfying the
+  /// two following statements:
+  /// - `r & 0b10 != 0` iff `g` may witness a coercion from `p.first` to `x`; and
+  /// - `r & 0b01 != 0` iff `g` may witness a coercion from `p.second` to `x`.
+  private mutating func canDeriveCoercion(_ p: Memos.TypePair, applying g: Given) -> UInt8 {
     if let memoized = cache.canDeriveCoercion[g]?[p] { return memoized }
 
     let t = declaredType(of: g)
@@ -3970,24 +3985,25 @@ public struct Typer {
 
     // Can the given match any type (e.g., `<T> T`)?
     if u.context.parameters.contains(where: { (p) in p == u.head }) {
-      cache.canDeriveCoercion[g, default: [:]][p] = (true, true)
-      return (true, true)
+      cache.canDeriveCoercion[g, default: [:]][p] = 0b11
+      return 0b11
     }
 
     // Is the given of the form `T ~ U`?
-    if let e = program.types.cast(u.head, to: EqualityWitness.self) {
+    else if let e = program.types.cast(u.head, to: EqualityWitness.self) {
       let l = program.types.open(u.context.parameters, in: program.types[e].lhs)
       let r = program.types.open(u.context.parameters, in: program.types[e].rhs)
 
-      let lhs = unifiable(a, l) || unifiable(a, r)
-      let rhs = unifiable(b, l) || unifiable(b, r)
-      cache.canDeriveCoercion[g, default: [:]][p] = (lhs, rhs)
-      return (lhs, rhs)
+      var result: UInt8 = 0
+      if unifiable(p.first, l) || unifiable(p.first, r) { result |= 0b10 }
+      if unifiable(p.second, l) || unifiable(p.second, r) { result |= 0b01 }
+      cache.canDeriveCoercion[g, default: [:]][p] = result
+      return result
     }
 
     // The given can't be used to form a coercion.
-    cache.canDeriveCoercion[g, default: [:]][p] = (false, false)
-    return (false, false)
+    cache.canDeriveCoercion[g, default: [:]][p] = 0b00
+    return 0b00
   }
 
   // MARK: Name resolution
@@ -4221,8 +4237,17 @@ public struct Typer {
 
     // Are we selecting a built-in function?
     else if let f = BuiltinFunction(n.identifier, uniquingTypesWith: &program.types) {
+      let r = DeclarationReference.builtin(.function(f))
       let t = f.type(uniquingTypesWith: &program.types)
-      return [.init(reference: .builtin(.function(f)), type: t.erased)]
+
+      // If the built-in function has a generic type, then we replace its type parameters by fresh
+      // variables to avoid elaborating type applications, essentially pretending that there exists
+      // an overload for each possible instantiation.
+      if let u = program.types[t] as? UniversalType {
+        return [.init(reference: r, type: program.types.open(u.parameters, in: u.head))]
+      } else {
+        return [.init(reference: r, type: t)]
+      }
     }
 
     // Nothing that we know.
@@ -4610,7 +4635,7 @@ public struct Typer {
         if case .module(let m) = (program.types[t] as? Namespace)?.identifier {
           // Avoid importing a module more than once. We're using a linear search because `table`
           // is assumed to be small in practice.
-          if table.contains(m) { table.append(m) }
+          if !table.contains(m) { table.append(m) }
         }
       }
 
@@ -4708,7 +4733,7 @@ public struct Typer {
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryIntegerType(_ t: AnyTypeIdentity) -> Bool {
-    isStandardLibraryType(t, in: [.int, .int32, .int64])
+    isStandardLibraryType(t, in: Program.StandardLibraryEntity.allIntegerTypes)
   }
 
   /// Returns `true` iff `t` is a standard library floating point type (e.g., `Hylo.Float32`).
@@ -4716,7 +4741,7 @@ public struct Typer {
   /// The module containing the standard library must have been loaded in the `self.program`, or
   /// `self.module` is the standard library.
   private mutating func isStandardLibraryFloatingPointType(_ t: AnyTypeIdentity) -> Bool {
-    isStandardLibraryType(t, in: [.float32, .float64])
+    isStandardLibraryType(t, in: Program.StandardLibraryEntity.allFloatingPointTypes)
   }
 
   /// Returns `true` iff `t` is one of the standard library types `ts`.

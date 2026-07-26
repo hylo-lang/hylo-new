@@ -59,6 +59,7 @@ extension Program {
     try SourceFile.forEach(in: StandardLibrary.localStandardLibrarySources) { (s) in
       p[m].addSource(s)
     }
+    p[m].addSource(try SourceFile(contentsOf: generatedStandardLibrarySource))
     return await p.typeChecked()
   }
 

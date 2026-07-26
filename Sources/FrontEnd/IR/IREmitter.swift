@@ -120,6 +120,8 @@ internal struct IREmitter {
       break
     case VariableDeclaration.self:
       break
+    case TypeAliasDeclaration.self:
+      break
     default:
       program.unexpected(d)
     }
@@ -144,13 +146,13 @@ internal struct IREmitter {
 
   /// Generates the IR of `d`, which declares stored local bindings.
   private mutating func lower(storedBinding d: BindingDeclaration.ID) {
-    let p = program[d].pattern
+    let binder = program[d].pattern
     assert(program.isLocal(d))
-    assert(program[p].introducer.value == anyOf(.var, .sinklet))
+    assert(program[binder].introducer.value == anyOf(.var, .sinklet))
 
     // Allocate storage for all the names declared by `d` in a single aggregate.
     let storage = lowering(d, { $0._alloca($0.program.type(assignedTo: d)) })
-    let lhs = program[p].pattern
+    let lhs = program[binder].pattern
 
     // Declare all names introduced by the binding, initializing them if possible.
     if let rhs = program[d].initializer {
@@ -162,25 +164,23 @@ internal struct IREmitter {
 
   /// Generates the IR of `d`, which declares remote local bindings.
   private mutating func lower(remoteBinding d: BindingDeclaration.ID) {
-    let p = program[d].pattern
+    let binder = program[d].pattern
     assert(program.isLocal(d))
-    assert(program[p].introducer.value == anyOf(.let, .set, .inout))
+    assert(program[binder].introducer.value == anyOf(.let, .set, .inout))
 
     // Is there an initializer?
     if let rhs = program[d].initializer {
-      let request = AccessEffect(program[p].introducer.value)
+      let request = AccessEffect(program[binder].introducer.value)
       let x0 = lowered(lvalue: rhs)
       let x1 = lowering(rhs, { (me) in  me._access([request], from: x0) })
-      declareBindings(in: program[p].pattern, relativeTo: x1)
+      declareBindings(in: program[binder].pattern, relativeTo: x1)
     }
 
-    // Otherwise report an error and introduce each declared symbol as a poison value.
+    // Otherwise report an error and introduce bindings as though they were uninitialized.
     else {
+      let storage = lowering(d, { $0._alloca($0.program.type(assignedTo: d)) })
+      declareBindings(in: program[binder].pattern, relativeTo: storage)
       report(program.missingBindingInitializer(d))
-      program.forEachVariable(introducedBy: d) { (v, _) in
-        let t = program.type(assignedTo: v)
-        associate(.init(v), with: .poison(program.types.ir(place: t)))
-      }
     }
   }
 
@@ -736,8 +736,9 @@ internal struct IREmitter {
           me._assume_state(target, initialized: true)
         }
       } else {
+        let t = program.type(assignedTo: program[e].callee, assuming: Arrow.self)
         lowering(e) { (me) in
-          let x0 = me._emitApply(builtin: f, to: me.program[e].arguments)
+          let x0 = me._emitApply(builtin: f, ofType: t, to: me.program[e].arguments)
           me._emitInitialize(target, with: x0)
         }
       }
@@ -1446,11 +1447,15 @@ internal struct IREmitter {
     let value = BigInt(hyloLiteral: program[source].value)!
 
     switch target {
-    case program.standardLibraryType(.int):
+    case program.standardLibraryType(.int), program.standardLibraryType(.uint):
       return .integer(value, program.types.demand(MachineType.word))
-    case program.standardLibraryType(.int32):
+    case program.standardLibraryType(.int8), program.standardLibraryType(.uint8):
+      return .integer(value, program.types.demand(MachineType.i(8)))
+    case program.standardLibraryType(.int16), program.standardLibraryType(.uint16):
+      return .integer(value, program.types.demand(MachineType.i(16)))
+    case program.standardLibraryType(.int32), program.standardLibraryType(.uint32):
       return .integer(value, program.types.demand(MachineType.i(32)))
-    case program.standardLibraryType(.int64):
+    case program.standardLibraryType(.int64), program.standardLibraryType(.uint64):
       return .integer(value, program.types.demand(MachineType.i(64)))
     default:
       program.unexpected(target)
@@ -2066,14 +2071,14 @@ internal struct IREmitter {
     return result
   }
 
-  /// Inserts a `apply_builtin` instruction.
+  /// Calls `f(arguments...)`, where `f` has type `t`.
   internal mutating func _apply_builtin(
-    _ callee: BuiltinFunction, typed f: Arrow.ID, to arguments: [IRValue]
+    _ callee: BuiltinFunction, ofType t: Arrow.ID, to arguments: [IRValue]
   ) -> IRValue {
-    assert(program.types[f].inputs.count == arguments.count)
-    let p = program.types[f].inputs.map(\.access)
+    assert(program.types[t].inputs.count == arguments.count)
+    let p = program.types[t].inputs.map(\.access)
     let s = IRApplyBuiltin(
-      callee: callee, inputs: p, output: program.types[f].output, arguments: arguments,
+      callee: callee, inputs: p, output: program.types[t].output, arguments: arguments,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2299,8 +2304,7 @@ internal struct IREmitter {
     properties[source.entry!] = target.block(defining: boundary)
 
     // Where control flow will jump on return.
-    let after: IRBlock.ID? =
-      (source.blocks.count > 1) ? target.split(before: boundary) : nil
+    let after: IRBlock.ID = target.split(before: boundary)
 
     // Initialize the insertion context.
     var formerContext = InsertionContext(function: target.move())
@@ -2324,10 +2328,8 @@ internal struct IREmitter {
         // If next instruction returns, then jump to the "after" block if it's been defined or
         // simply ignore the instruction otherwise.
         if source.tag(of: i) == IRReturn.self {
-          if let a = after {
-            insertionContext.anchor = properties.anchor(source.at(i))
-            _br(a)
-          }
+          insertionContext.anchor = properties.anchor(source.at(i))
+          _br(after)
         } else {
           _clone(i, from: source, substitutingOperandsWith: &properties)
         }
@@ -2632,22 +2634,25 @@ internal struct IREmitter {
 
   /// Generates IR for calling `Builtin.trap`.
   internal mutating func _emitTrap() {
-    let f = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
-    _ = _apply_builtin(.trap, typed: f, to: [])
+    let t = BuiltinFunction.trap.type(uniquingTypesWith: &program.types)
+    let u = program.types.castUnchecked(t, to: Arrow.self)
+    _ = _apply_builtin(.trap, ofType: u, to: [])
   }
 
-  /// Generates IR for applying `callee` to `arguments`.
+  /// Calls `f(arguments...)` where `f` is a builtin function of type `t`
+  /// other than `assume_[un]initialized`.
   ///
-  /// `callee` is any built-in function but `assume_[un]initialized`.
+  /// - Note: Calls to `Builtin.assume_[un]initialized` are lowered directly to `assume_state`
+  ///   instructions rather than function applications.
   private mutating func _emitApply(
-    builtin callee: BuiltinFunction, to arguments: [LabeledExpression],
+    builtin f: BuiltinFunction, ofType t: Arrow.ID,
+    to arguments: [LabeledExpression],
   ) -> IRValue {
-    let t = callee.type(uniquingTypesWith: &program.types)
     let xs = zip(program.types[t].inputs, arguments).map { (p, a) in
       let x0 = lowered(lvalue: a.value)
       return _access([p.access], from: x0)
     }
-    return _apply_builtin(callee, typed: t, to: xs)
+    return _apply_builtin(f, ofType: t, to: xs)
   }
 
   /// Generates IR for defining a place projecting `source` as a place of type `target` with
