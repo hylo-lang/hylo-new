@@ -192,6 +192,28 @@ final class TypeLayoutTests: XCTestCase {
       ])
   }
 
+  func testTupleWithTypeApplication() async throws {
+    let i8 = id(MachineType.i(8))
+    let i16 = id(MachineType.i(16))
+
+    let i816 = layout(
+      await type(
+        named: "PairTuple",
+        appliedTo: [i8, i16],
+        in: """
+          type PairTuple<T, U> = {T, U}
+          """))
+
+    XCTAssertEqual(i816.size, 4)
+    XCTAssertEqual(i816.alignment, 2)
+    XCTAssertEqual(
+      i816.parts,
+      [
+        .init(name: "0", type: .init(i8), offset: 0),
+        .init(name: "1", type: .init(i16), offset: 2),
+      ])
+  }
+
   func testEnumWithTypeApplication() async throws {
     let i16 = id(MachineType.i(16))
 
