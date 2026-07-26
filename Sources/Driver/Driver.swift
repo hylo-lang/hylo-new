@@ -285,32 +285,56 @@ public struct Driver {
   ) async throws {
     let sources = additionalSources + (try sources(at: root))
 
-    // Attempt to load the module from disk.
+    if cachingIsEnabled {
+      if try loadCached(module, matching: sources) {
+        return
+      }
+    }
+    let m = try await compile(module, from: sources)
+    if cachingIsEnabled {
+      let a = try program.archive(module: m)
+      let f = moduleCachePath!.appending(component: module + ".hylomodule")
+      try a.write(into: f)
+    }
+  }
+
+  /// Attempts to load `m` from the module cache if its fingerprint matches `s`,
+  /// returning whether `m` was loaded.
+  private mutating func loadCached(
+    _ m: Module.Name,
+    matching s: [SourceFile]
+  ) throws -> Bool {
     do {
-      if cachingIsEnabled, let data = archive(of: module) {
-        let h = SourceFile.fingerprint(contentsOf: sources)
+      if let data = archive(of: m) {
+        let h = SourceFile.fingerprint(contentsOf: s)
         var a = ReadableArchive(data)
         let (_, fingerprint) = try Module.header(&a)
         if h == fingerprint {
           a = ReadableArchive(data)
-          try program.load(module: module, from: &a)
-          return
+          try program.load(module: m, from: &a)
+          return true
         }
       }
+      return false
     } catch ArchiveError.invalidInput {
       let m = """
-        Failed to parse module archive of '\(module)' at '\(moduleCachePath, default: "nil")'.
+        Failed to parse module archive of '\(m)' at '\(moduleCachePath, default: "nil")'.
 
         Maybe the archive was compiled with a different version of the compiler. \
         Try erasing the module cache.
         """
       throw Error(message: m)
     }
+  }
 
-    // Compile the module from sources.
-    let m = program.demandModule(module)
+  /// Compile module named `n` from `sources` and returns its identifier.
+  private mutating func compile(
+    _ n: Module.Name,
+    from sources: [SourceFile]
+  ) async throws -> Module.ID {
+    let m = program.demandModule(n)
 
-    if usesStandardLibrary && module != Module.standardLibraryName {
+    if usesStandardLibrary && n != Module.standardLibraryName {
       program[m].addDependency(Module.standardLibraryName)
     }
 
@@ -329,11 +353,7 @@ public struct Driver {
     await applyTransformationPasses(m)
     try throwIfContainsError(m)
 
-    if cachingIsEnabled {
-      let a = try program.archive(module: m)
-      let f = moduleCachePath!.appending(component: module + ".hylomodule")
-      try a.write(into: f)
-    }
+    return m
   }
 
   /// Loads the standard library with `load(_:withSourcesAt:)` and makes
