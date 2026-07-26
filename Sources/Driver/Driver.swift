@@ -283,7 +283,7 @@ public struct Driver {
   public mutating func load(
     _ module: Module.Name, withSourcesAt root: URL, additionalSources: [SourceFile] = []
   ) async throws {
-    let sources = try sources(at: root) + additionalSources
+    let sources = additionalSources + (try sources(at: root))
 
     // Attempt to load the module from disk.
     do {
@@ -342,8 +342,7 @@ public struct Driver {
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
-    try await load(
-      Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot,
+    try await load(Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot,
       additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
     usesStandardLibrary = true
   }
