@@ -407,9 +407,15 @@ fun retain_only_elements(
       // Copy remaining retained elements backward into the unretained
       // space we found.
     while j < n {
+      /* Workaround https://github.com/hylo-lang/hylo-new/issues/370
       let w = j.pointee()
       if w.alignment() >= n_alignment {
         hole.set_pointee(w)
+        hole += 1
+      }
+       */
+      if j.pointee().alignment() >= n_alignment {
+        hole.set_pointee(j.pointee())
         hole += 1
       }
       j += 1
@@ -419,9 +425,15 @@ fun retain_only_elements(
     if j == n { j += 1 }
 
     while j != end {
+      /* Workaround https://github.com/hylo-lang/hylo-new/issues/370
       let w = j.pointee()
       if w.alignment() > n_alignment {
         hole.set_pointee(w)
+        hole += 1
+      }
+       */
+      if j.pointee().alignment() > n_alignment {
+        hole.set_pointee(j.pointee())
         hole += 1
       }
       j += 1
@@ -458,9 +470,15 @@ fun retain_only_elements(
     var j = hole + 1
     // precondition(j > n)
     while j != end {
-      let w = j.pointee()
-      if w.alignment() > n_alignment {
-        hole.set_pointee(w)
+      /* Workaround https://github.com/hylo-lang/hylo-new/issues/370
+       let w = j.pointee()
+       if w.alignment() > n_alignment {
+         hole.set_pointee(w)
+         hole += 1
+       }
+         */
+      if j.pointee().alignment() > n_alignment {
+        hole.set_pointee(j.pointee())
         hole += 1
       }
       j += 1
