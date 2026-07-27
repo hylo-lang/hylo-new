@@ -387,6 +387,8 @@ fun retain_only_elements(
     start += 1
   }
 
+  print_space(); print(from: start, to: end)
+
   if start < n {
     // start..<n..<end begins with a retained element
 
@@ -449,6 +451,8 @@ fun retain_only_elements(
       start += 1
     }
 
+    print_space(); print(from: start, to: end)
+
     // No elements remain to retain.
     if start == end { return }
 
@@ -461,12 +465,14 @@ fun retain_only_elements(
     }
     if i == end { return }  // all the rest are retained.
 
+    print_space(); print_space(); print(from: i, to: end)
+
     // The position of the first unretained element, or end if all are
     // retained.
     var hole = i.copy()
 
     // Copy remaining retained elements backward into the unretained
-    // sypace we found.
+    // space we found.
     var j = hole + 1
     // precondition(j > n)
     while j != end {
@@ -482,8 +488,12 @@ fun retain_only_elements(
         hole += 1
       }
       j += 1
+
+      print_space(); print_space(); print_space(); print(from: start, to: hole)
     }
+    print_comma_space(); print(from: start, to: hole)
     &end = hole
+    print_comma_space(); print(from: start, to: end)
   }
 }
 
@@ -567,11 +577,17 @@ fun __hylo_offset_of_member(
   var start = memberArray.copy()
   var end = memberArray + Int(l)
 
+  print(from: start, to: end)
   retain_only_elements(from: &start, to: &end, that_lay_out_before: p)
+  print(from: start, to: end)
   if start == end { return 0 }
   stable_sort_by_decreasing_alignment(from: start, to: end)
+  print(from: start, to: end)
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
-  return nth_alignment.first_aligned_offset(starting_from: preceding_size)
+  print_space(); print(preceding_size); print_space(); print(nth_alignment)
+  sink let r = nth_alignment.first_aligned_offset(starting_from: preceding_size)
+  print(r); print_newline();
+  return r
 }
 
 @extern_c_indirect("print_intptr_indirect") fun print_ptr(x: Builtin.ptr)
@@ -581,13 +597,26 @@ fun __hylo_offset_of_member(
 @extern_c_indirect("print_newline_indirect") fun print_newline()
 @extern_c_indirect("print_space_indirect") fun print_space()
 @extern_c_indirect("print_comma_indirect") fun print_comma()
+@extern_c_indirect("print_open_paren_indirect") fun print_open_paren()
+@extern_c_indirect("print_close_paren_indirect") fun print_close_paren()
 @extern_c_indirect("print_size_indirect") fun print_size(x: UInt32)
 @extern_c_indirect("print_alignment_indirect") fun print_alignment(x: UInt16)
 
+fun print_comma_space() { print_comma(); print_space() }
+
 fun print(p: RecordMemberType) {
-  print_size(p.size())
-  print_space()
-  print_alignment(p.alignment())
+  print_open_paren();
+  print(p.size()); print_space(); print(p.alignment());
+  print_close_paren()
+}
+
+fun print(from start: Pointer<RecordMemberType>, to end: Pointer<RecordMemberType>) {
+  var s = start.copy()
+  while s != end {
+    print(s.pointee()); print_comma_space()
+    s += 1
+  }
+  print_newline()
 }
 
 // --------------- TESTING -------------
@@ -633,7 +662,7 @@ fun verify_offset(
     in: .new(value: Builtin.address(of: witnesses)),
     of_length: .new(truncating: l))
 
-  print_comma();print_comma();print_comma(); print(i); print_comma(); print(o); print_space(); print(x); print_space(); print(UInt32(truncating: x)); print_newline()
+  print_comma();print_comma();print_comma(); print(i); print_comma(); print(o); print_space(); print(x); print_newline()
   return o == UInt32(truncating: x)
 }
 
@@ -690,6 +719,16 @@ fun main() {
   TypeWitnessHeader.checkLayoutAssumptions()
   _ = verify_offset(
     0,
+    in: (H(7, 4), H(5, 8), H(0, 3), H(9, 4), H(1, 7), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
+    of_length: 5
+    to_be: 8)
+   verify_offsets(
+    forFirst: 5,
+    in: 7, 4, 5, 8, 0, 3, 9, 4, 1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    to_be: 8, 0, 27, 16, 7, 0, 0, 0, 0, 0)
+  /*
+  _ = verify_offset(
+    0,
     in: (H(5, 1), H(3, 2), H(5, 9), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
     of_length: 3
     to_be: 9)
@@ -702,6 +741,7 @@ fun main() {
     forFirst: 5,
     in: 7, 4, 5, 8, 0, 3, 9, 4, 1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     to_be: 8, 0, 27, 16, 7, 0, 0, 0, 0, 0)
+   */
 /*
   verify_offsets(
     forFirst: 1,
