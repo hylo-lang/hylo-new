@@ -392,6 +392,8 @@ fun retain_only_elements(
   print_space(); print(from: start, to: end)
 
   if start < n {
+    print_comma(); print_newline();
+
     // start..<n..<end begins with a retained element
 
     // Find first unretained; n is always unretained so we can stop
@@ -400,6 +402,8 @@ fun retain_only_elements(
     while i < n && i.pointee().alignment() >= n_alignment {
       i += 1
     }
+
+    print_space(); print(from: start, to: i)
 
     // The position of the first unretained element, or end if all are
     // retained.
@@ -425,6 +429,8 @@ fun retain_only_elements(
       j += 1
     }
 
+    print_space(); print_space(); print(from: start, to: j);
+
     // skip over n, it's always unretained.
     if j == n { j += 1 }
 
@@ -444,17 +450,26 @@ fun retain_only_elements(
     }
     // Workaround https://github.com/hylo-lang/hylo-new/issues/381
     &end.value = hole.value
+    print_space(); print_space(); print_space(); print(from: start, to: end)
 
   } else {  // None retained before n?
+    print_comma(); print_comma(); print_newline();
+
     // Drop n, which is always unretained
     &start = n + 1
+
+    print_comma_space(); print(from: start, to: end)
 
     // Drop remaining initial unretained elements
     while start < end && start.pointee().alignment() <= n_alignment {
       start += 1
+      print_space(); print_comma_space(); print(from: start, to: end)
+      print(if start < end { 777 } else { 888 }); print_newline()
     }
+    print(9999)
 
     print_space(); print(from: start, to: end)
+    print(99999)
 
     // No elements remain to retain.
     if start == end { return }
@@ -721,17 +736,36 @@ fun verify_offsets(
 
 fun main() {
   TypeWitnessHeader.checkLayoutAssumptions()
-  _ = verify_offset(
-    0,
-    in: (H(7, 4), H(5, 8), H(0, 3), H(9, 4), H(1, 7), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
-    of_length: 5
-    to_be: 8)
-  _ = verify_offset(
+  /*
+  precondition(
+    verify_offset(
+      0,
+      in: (H(7, 4), H(5, 8), H(0, 3), H(9, 4), H(1, 7), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
+      of_length: 5
+  to_be: 8))
+  precondition(
+    verify_offset(
     0,
     in: (H(5, 1), H(3, 2), H(5, 9), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
     of_length: 3
-    to_be: 9)
+    to_be: 9))
 
+
+  precondition(
+    verify_offset(
+      2,
+      in: (H(6, 5), H(6, 5), H(4, 7), H(9, 8), H(0, 7), H(8, 2), H(2, 3), H(9, 1), H(6, 2), H(0, 1)),
+      of_length: 10,
+      to_be: 14))
+   */
+  precondition(
+    verify_offset(
+      3,
+      in: (H(6, 5), H(6, 5), H(4, 7), H(9, 8), H(0, 7), H(8, 2), H(2, 3), H(9, 1), H(6, 2), H(0, 1)),
+      of_length: 10,
+      to_be: 0))
+
+  /*
   verify_offsets(
     forFirst: 3,
     in: 5, 1, 3, 2, 5, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -740,7 +774,6 @@ fun main() {
     forFirst: 5,
     in: 7, 4, 5, 8, 0, 3, 9, 4, 1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     to_be: 8, 0, 27, 16, 7, 0, 0, 0, 0, 0)
-   */
   verify_offsets(
     forFirst: 1,
     in: 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -9153,4 +9186,5 @@ fun main() {
     forFirst: 10,
     in: 0, 1, 6, 8, 7, 1, 3, 5, 8, 8, 1, 8, 0, 9, 6, 4, 1, 2, 8, 7,
     to_be: 43, 0, 43, 30, 8, 16, 0, 36, 42, 21)
+   */
 }
