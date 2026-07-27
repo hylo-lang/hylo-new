@@ -518,12 +518,12 @@ fun stable_sort_by_decreasing_alignment(
       var done = false
       while !done {
         hole.set_pointee(prior_to_hole.pointee())
-        &hole = prior_to_hole
+        &hole = prior_to_hole.copy()
         if hole == start {
           &done = true
         }
         else {
-          &hole = prior_to_hole
+          &hole = prior_to_hole.copy()
           &prior_to_hole = hole - 1
           if prior_to_hole.pointee().alignment() >= w_alignment {
             &done = true
@@ -562,9 +562,9 @@ fun __hylo_offset_of_member(
   n: UInt32,
   in memberArray: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
 {
-  let p = memberArray + Int(n)
-  let nth_alignment = p.pointee().alignment()
-  var start = memberArray
+  sink let p = memberArray + Int(n)
+  sink let nth_alignment = p.pointee().alignment()
+  var start = memberArray.copy()
   var end = memberArray + Int(l)
 
   retain_only_elements(from: &start, to: &end, that_lay_out_before: p)
