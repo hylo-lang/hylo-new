@@ -191,6 +191,7 @@ extension Pointer<RecordMemberType> {
 
 }
 
+/* Workaround https://github.com/hylo-lang/hylo-new/issues/381
 public given Pointer<RecordMemberType> is Movable {
 
   /// Gives `self` the value of a consumed `source`.
@@ -206,6 +207,7 @@ public given Pointer<RecordMemberType> is Movable {
   }
 
 }
+*/
 
 public given Pointer<RecordMemberType> is Deinitializable {}
 
@@ -440,7 +442,8 @@ fun retain_only_elements(
       }
       j += 1
     }
-    &end = hole
+    // Workaround https://github.com/hylo-lang/hylo-new/issues/381
+    &end.value = hole.value
 
   } else {  // None retained before n?
     // Drop n, which is always unretained
@@ -492,7 +495,8 @@ fun retain_only_elements(
       print_space(); print_space(); print_space(); print(from: start, to: hole)
     }
     print_comma_space(); print(from: start, to: hole)
-    &end = hole
+    // Workaround https://github.com/hylo-lang/hylo-new/issues/381
+    &end.value = hole.value
     print_comma_space(); print(from: start, to: end)
   }
 }
