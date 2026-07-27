@@ -502,8 +502,8 @@ fun stable_sort_by_decreasing_alignment(
   while i < end {
     // invariant: elements start..<w are sorted.
 
-    let w = i.pointee()
-    let w_alignment = w.alignment()
+    sink let w = i.pointee()
+    sink let w_alignment = w.alignment()
 
     if prior_alignment >= w_alignment {
       // w was already in the right place
@@ -511,7 +511,7 @@ fun stable_sort_by_decreasing_alignment(
     } else {
 
       // Since we copied from i into w, we can consider i a hole
-      var hole = i
+      var hole = i.copy()
       // Shuffle the hole towared the front until it's in the right
       // place.
       var prior_to_hole = hole - 1
