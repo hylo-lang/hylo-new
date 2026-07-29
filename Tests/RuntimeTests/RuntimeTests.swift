@@ -57,101 +57,125 @@ fileprivate extension RecordMemberType {
 
 }
 
+private func first(
+  from start: UnsafeMutablePointer<RecordMemberType>,
+  to end: UnsafeMutablePointer<RecordMemberType>,
+  `where` p: (RecordMemberType)->Bool
+) -> UnsafeMutablePointer<RecordMemberType> {
+  var i = start
+  while i < end && !p(i.pointee) {
+    i += 1
+  }
+  return i
+}
+
+private func drop_last(
+  from start: UnsafeMutablePointer<RecordMemberType>,
+  to end: inout UnsafeMutablePointer<RecordMemberType>,
+  `while` p: (RecordMemberType)->Bool
+) {
+  while end != start && p((end - 1).pointee) {
+    end -= 1
+  }
+}
+
+private func drop(
+  from start: inout UnsafeMutablePointer<RecordMemberType>,
+  to end: UnsafeMutablePointer<RecordMemberType>,
+  `while` p: (RecordMemberType)->Bool
+) {
+  start = first(from: start, to: end, where: { (x: RecordMemberType) in !p(x) })
+}
+
+/// Shift the contents of `start..<end` one position later in memory.
+private func shift_backward1(
+  from start: UnsafeMutablePointer<RecordMemberType>,
+  until end: UnsafeMutablePointer<RecordMemberType>
+) {
+  var e = end
+  while e != start {
+    let e0 = e - 1
+    e.pointee = e0.pointee
+    e = e0
+  }
+}
+
+private func insert_backward_stably_sorted_by_decreasing_alignment(
+  into destinationStart: UnsafeMutablePointer<RecordMemberType>,
+  until destinationEnd: inout UnsafeMutablePointer<RecordMemberType>,
+  from source: UnsafeMutablePointer<RecordMemberType>
+) {
+  let r = source.pointee
+  let a = r.alignment()
+
+  var i = destinationEnd
+  drop_last(from: destinationStart, to: &i, while: { (x: RecordMemberType)->Bool in x.alignment() < a })
+
+  if source != i {
+    shift_backward1(from: i, until: destinationEnd)
+    i.pointee = r
+  }
+  destinationEnd += 1
+}
+
+private func insert_backward_stably_sorted_by_decreasing_alignment(
+  into destinationStart: UnsafeMutablePointer<RecordMemberType>,
+  until destinationEnd: inout UnsafeMutablePointer<RecordMemberType>,
+  from sourceStart_: UnsafeMutablePointer<RecordMemberType>,
+  until sourceEnd: UnsafeMutablePointer<RecordMemberType>,
+  where p: (RecordMemberType)->Bool
+) {
+  var sourceStart = sourceStart_
+  while sourceStart != sourceEnd {
+    if p(sourceStart.pointee) {
+      insert_backward_stably_sorted_by_decreasing_alignment(
+        into: destinationStart, until: &destinationEnd, from: sourceStart)
+    }
+    sourceStart += 1
+  }
+}
+
 /// Make it so the pointees start..<end contain only the elements with
 /// alignments greater than that of n, or with the same alignment as n
 /// but occurring at a position < n.
-private func retain_only_elements(
+private func filter_and_stable_sort_elements(
   from start: inout UnsafeMutablePointer<RecordMemberType>,
   to end: inout UnsafeMutablePointer<RecordMemberType>,
-  that_lay_out_before n: UnsafeMutablePointer<RecordMemberType>
+  that_lay_out_before n: UnsafeMutablePointer<RecordMemberType>,
+  having_alignment n_alignment: Alignment
 ) {
-  let n_alignment = n.pointee.alignment()
-
   // Drop initial unretained elements before n
-  while start < n && start.pointee.alignment() < n_alignment {
-    start += 1
+  drop(
+    from: &start, to: n,
+    while: { (x: RecordMemberType) in x.alignment() < n_alignment })
+
+  var new_end: UnsafeMutablePointer<RecordMemberType>
+  let tail_start: UnsafeMutablePointer<RecordMemberType>
+
+  if start != n {
+    new_end = start + 1
+
+    insert_backward_stably_sorted_by_decreasing_alignment(
+      into: start, until: &new_end, from: start + 1, until: n,
+      where: { (x: RecordMemberType) in x.alignment() >= n_alignment })
+
+    tail_start = n + 1
   }
-
-  if start < n {
-    // start..<n..<end begins with a retained element
-
-    // Find first unretained; n is always unretained so we can stop
-    // there.
-    var i = start + 1
-    while i < n && i.pointee.alignment() >= n_alignment {
-      i += 1
-    }
-
-    // The position of the first unretained element, or end if all are
-    // retained.
-    var hole = i
-    
-    // Next candidate for moving into the hole.
-    var j = hole + 1
-
-      // Copy remaining retained elements backward into the unretained
-      // space we found.
-    while j < n {
-      let w = j.pointee
-      if w.alignment() >= n_alignment {
-        hole.pointee = w
-        hole += 1
-      }
-      j += 1
-    }
-    
-    // skip over n, it's always unretained.
-    if j == n { j += 1 }
-
-    while j != end {
-      let w = j.pointee
-      if w.alignment() > n_alignment {
-        hole.pointee = w
-        hole += 1
-      }
-      j += 1
-    }
-    end = hole
-    
-  } else {  // None retained before n?
-    // Drop n, which is always unretained
+  else {
     start = n + 1
-
-    // Drop remaining initial unretained elements
-    while start < end && start.pointee.alignment() <= n_alignment {
-      start += 1
-    }
-
-    // No elements remain to retain.
+    drop(
+      from: &start, to: end,
+      while: { (x: RecordMemberType) in x.alignment() <= n_alignment })
+    
     if start == end { return }
-
-    // start..<end begins with a retained element; start > n
-
-    // Find first unretained
-    var i = start + 1
-    while i != end && i.pointee.alignment() > n_alignment {
-      i += 1
-    }
-    if i == end { return }  // all the rest are retained.
-
-    // The position of the first unretained element, or end if all are
-    // retained.
-    var hole = i
-
-    // Copy remaining retained elements backward into the unretained
-    // space we found.
-    var j = hole + 1
-    assert(j > n)
-    while j != end {
-      let w = j.pointee
-      if w.alignment() > n_alignment {
-        hole.pointee = w
-        hole += 1
-      }
-      j += 1
-    }
-    end = hole
+    
+    new_end = start + 1
+    tail_start = new_end
   }
+  insert_backward_stably_sorted_by_decreasing_alignment(
+    into: start, until: &new_end, from: tail_start, until: end,
+    where: { (x: RecordMemberType) in x.alignment() > n_alignment })
+  end = new_end
 }
 
 /// Stably sorts the elements in decreasing alignment order.
@@ -233,9 +257,8 @@ private func __hylo_offset_of_member(
   var start = memberArray
   var end = memberArray + Int(l)
 
-  retain_only_elements(from: &start, to: &end, that_lay_out_before: p)
+  filter_and_stable_sort_elements(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
   if start == end { return 0 }
-  stable_sort_by_decreasing_alignment(from: start, to: end)
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
   return nth_alignment.first_aligned_offset(starting_from: preceding_size)
 }
