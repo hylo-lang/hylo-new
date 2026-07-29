@@ -57,10 +57,12 @@ fileprivate extension RecordMemberType {
 
 }
 
-private func first(
+/// Returns the first element `x` of `start..<end` such that
+/// `p(x.pointee)` is true.
+private func first_position(
   from start: UnsafeMutablePointer<RecordMemberType>,
   to end: UnsafeMutablePointer<RecordMemberType>,
-  `where` p: (RecordMemberType)->Bool
+  where p: (RecordMemberType)->Bool
 ) -> UnsafeMutablePointer<RecordMemberType> {
   var i = start
   while i < end && !p(i.pointee) {
@@ -69,6 +71,8 @@ private func first(
   return i
 }
 
+/// Removes the contiguous elements at the tail of `start..<end` whose
+/// pointees satisify `p`.
 private func drop_last(
   from start: UnsafeMutablePointer<RecordMemberType>,
   to end: inout UnsafeMutablePointer<RecordMemberType>,
@@ -79,15 +83,17 @@ private func drop_last(
   }
 }
 
+/// Removes the contiguous elements at the head of `start..<end` whose
+/// pointees satisify `p`.
 private func drop(
   from start: inout UnsafeMutablePointer<RecordMemberType>,
   to end: UnsafeMutablePointer<RecordMemberType>,
   `while` p: (RecordMemberType)->Bool
 ) {
-  start = first(from: start, to: end, where: { (x: RecordMemberType) in !p(x) })
+  start = first_position(from: start, to: end, where: { !p($0) })
 }
 
-/// Shift the contents of `start..<end` one position later in memory.
+/// Shifts the contents of `start..<end` one position later in memory.
 private func shift_backward1(
   from start: UnsafeMutablePointer<RecordMemberType>,
   until end: UnsafeMutablePointer<RecordMemberType>
@@ -100,6 +106,15 @@ private func shift_backward1(
   }
 }
 
+/// Inserts `source.pointee` at the latest position *q* in
+/// `destinationStart...destinationEnd` such that all its
+/// predecessors' `pointee`s have `alignment` ≥
+/// *q*`.pointee.alignment()`.
+///
+/// - Precondition: the pointees of
+///   `destinationStart..<destinationEnd` are sorted by decreasing
+///   alignment.
+/// - Precondition: `source >= destinationEnd`.
 private func insert_backward_stably_sorted_by_decreasing_alignment(
   into destinationStart: UnsafeMutablePointer<RecordMemberType>,
   until destinationEnd: inout UnsafeMutablePointer<RecordMemberType>,
@@ -109,7 +124,8 @@ private func insert_backward_stably_sorted_by_decreasing_alignment(
   let a = r.alignment()
 
   var i = destinationEnd
-  drop_last(from: destinationStart, to: &i, while: { (x: RecordMemberType)->Bool in x.alignment() < a })
+  drop_last(
+    from: destinationStart, to: &i, while: { $0.alignment() < a })
 
   if source != i {
     shift_backward1(from: i, until: destinationEnd)
@@ -118,6 +134,16 @@ private func insert_backward_stably_sorted_by_decreasing_alignment(
   destinationEnd += 1
 }
 
+/// Inserts the pointees in `sourceStart_..<sourceEnd` that satisfy
+/// `p` at the latest position `q` in
+/// `destinationStart...destinationEnd` such that all their
+/// predecessors' `pointee`s have `alignment` ≥
+/// *q*`.pointee.alignment()`.
+///
+/// - Precondition: the pointees of
+///   `destinationStart..<destinationEnd` are sorted by decreasing
+///   alignment.
+/// - Precondition: `sourceStart_ >= destinationEnd`.
 private func insert_backward_stably_sorted_by_decreasing_alignment(
   into destinationStart: UnsafeMutablePointer<RecordMemberType>,
   until destinationEnd: inout UnsafeMutablePointer<RecordMemberType>,
@@ -135,98 +161,49 @@ private func insert_backward_stably_sorted_by_decreasing_alignment(
   }
 }
 
-/// Make it so the pointees start..<end contain only the elements with
-/// alignments greater than that of n, or with the same alignment as n
-/// but occurring at a position < n.
-private func filter_and_stable_sort_elements(
+/// Removes from start..<end the elements with alignments less than
+/// that of n, or with the same alignment as n but occurring at a
+/// position > n, and stably sorts them by decreasing alignment.
+private func filter_and_stable_sort_elements_by_decreasing_alignment(
   from start: inout UnsafeMutablePointer<RecordMemberType>,
   to end: inout UnsafeMutablePointer<RecordMemberType>,
   that_lay_out_before n: UnsafeMutablePointer<RecordMemberType>,
   having_alignment n_alignment: Alignment
 ) {
   // Drop initial unretained elements before n
-  drop(
-    from: &start, to: n,
-    while: { (x: RecordMemberType) in x.alignment() < n_alignment })
+  drop(from: &start, to: n, while: { $0.alignment() < n_alignment })
 
   var new_end: UnsafeMutablePointer<RecordMemberType>
   let tail_start: UnsafeMutablePointer<RecordMemberType>
 
   if start != n {
+    // insert elements up to n
     new_end = start + 1
 
     insert_backward_stably_sorted_by_decreasing_alignment(
       into: start, until: &new_end, from: start + 1, until: n,
-      where: { (x: RecordMemberType) in x.alignment() >= n_alignment })
+      where: { $0.alignment() >= n_alignment })
 
     tail_start = n + 1
   }
   else {
+    // Drop unretained elments after n
     start = n + 1
     drop(
       from: &start, to: end,
-      while: { (x: RecordMemberType) in x.alignment() <= n_alignment })
+      while: { $0.alignment() <= n_alignment })
     
     if start == end { return }
     
     new_end = start + 1
     tail_start = new_end
   }
+
+  // insert elements after n
   insert_backward_stably_sorted_by_decreasing_alignment(
     into: start, until: &new_end, from: tail_start, until: end,
-    where: { (x: RecordMemberType) in x.alignment() > n_alignment })
+    where: { $0.alignment() > n_alignment })
   end = new_end
-}
-
-/// Stably sorts the elements in decreasing alignment order.
-///
-/// - Precondition: start != end
-///
-/// - Complexity: *O*(`end-start`²) (insertion sort)
-private func stable_sort_by_decreasing_alignment(
-  from start: UnsafeMutablePointer<RecordMemberType>,
-  to end: UnsafeMutablePointer<RecordMemberType>
-) {
-  var prior_alignment = start.pointee.alignment()
-  var i = start + 1
-
-  while i < end {
-    // invariant: elements start..<w are sorted.
-
-    let w = i.pointee
-    let w_alignment = w.alignment()
-
-    if prior_alignment >= w_alignment {
-      // w was already in the right place
-      prior_alignment = w_alignment
-    } else {
-
-      // Since we copied from i into w, we can consider i a hole
-      var hole = i
-      // Shuffle the hole towared the front until it's in the right
-      // place.
-      var prior_to_hole = hole - 1
-      var done = false
-      while !done {
-        hole.pointee = prior_to_hole.pointee
-        hole = prior_to_hole
-        if hole == start {
-          done = true
-        }
-        else {
-          hole = prior_to_hole
-          prior_to_hole = hole - 1
-          if prior_to_hole.pointee.alignment() >= w_alignment {
-            done = true
-          }
-        }
-      }
-      // put w in the hole.
-      hole.pointee = w
-    }
-
-    i += 1
-  }
 }
 
 private func size_of_record_having_ordered_members(
@@ -257,7 +234,7 @@ private func __hylo_offset_of_member(
   var start = memberArray
   var end = memberArray + Int(l)
 
-  filter_and_stable_sort_elements(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
+  filter_and_stable_sort_elements_by_decreasing_alignment(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
   if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
   return nth_alignment.first_aligned_offset(starting_from: preceding_size)
