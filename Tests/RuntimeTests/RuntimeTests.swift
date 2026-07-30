@@ -57,15 +57,38 @@ fileprivate extension RecordMemberType {
 
 }
 
+// ====== Make the code read like disabled Hylo. =======
+private extension UnsafePointer {
+
+  func pointee() -> Pointee { self[0] }
+  func copy() -> Self { self }
+
+}
+
+private extension UnsafeMutablePointer {
+
+  func pointee() -> Pointee { self[0] }
+  mutating func set_pointee(_ x: Pointee) { self[0] = x }
+  func copy() -> Self { self }
+
+}
+
+private extension BinaryInteger {
+
+  func copy() -> Self { self }
+
+}
+// ===================================================
+
 /// Returns the first element `x` of `start..<end` such that
-/// `p(x.pointee)` is true.
+/// `p(x.pointee())` is true.
 private func first_position(
   from start: UnsafeMutablePointer<RecordMemberType>,
   to end: UnsafeMutablePointer<RecordMemberType>,
   where p: (RecordMemberType)->Bool
 ) -> UnsafeMutablePointer<RecordMemberType> {
-  var i = start
-  while i < end && !p(i.pointee) {
+  var i = start.copy()
+  while i < end && !p(i.pointee()) {
     i += 1
   }
   return i
@@ -78,7 +101,7 @@ private func drop_last(
   to end: inout UnsafeMutablePointer<RecordMemberType>,
   `while` p: (RecordMemberType)->Bool
 ) {
-  while end != start && p((end - 1).pointee) {
+  while end != start && p((end - 1).pointee()) {
     end -= 1
   }
 }
@@ -98,18 +121,18 @@ private func shift_backward1(
   from start: UnsafeMutablePointer<RecordMemberType>,
   until end: UnsafeMutablePointer<RecordMemberType>
 ) {
-  var e = end
+  var e = end.copy()
   while e != start {
     let e0 = e - 1
-    e.pointee = e0.pointee
+    e.set_pointee(e0.pointee())
     e = e0
   }
 }
 
-/// Inserts `source.pointee` at the latest position *q* in
+/// Inserts `source.pointee()` at the latest position *q* in
 /// `destinationStart...destinationEnd` such that all its
 /// predecessors' `pointee`s have `alignment` ≥
-/// *q*`.pointee.alignment()`.
+/// *q*`.pointee().alignment()`.
 ///
 /// - Precondition: the pointees of
 ///   `destinationStart..<destinationEnd` are sorted by decreasing
@@ -120,16 +143,16 @@ private func insert_backward_stably_sorted_by_decreasing_alignment(
   until destinationEnd: inout UnsafeMutablePointer<RecordMemberType>,
   from source: UnsafeMutablePointer<RecordMemberType>
 ) {
-  let r = source.pointee
+  let r = source.pointee()
   let a = r.alignment()
 
-  var i = destinationEnd
+  var i = destinationEnd.copy()
   drop_last(
     from: destinationStart, to: &i, while: { $0.alignment() < a })
 
   if source != i {
     shift_backward1(from: i, until: destinationEnd)
-    i.pointee = r
+    i.set_pointee(r)
   }
   destinationEnd += 1
 }
@@ -138,7 +161,7 @@ private func insert_backward_stably_sorted_by_decreasing_alignment(
 /// `p` at the latest position `q` in
 /// `destinationStart...destinationEnd` such that all their
 /// predecessors' `pointee`s have `alignment` ≥
-/// *q*`.pointee.alignment()`.
+/// *q*`.pointee().alignment()`.
 ///
 /// - Precondition: the pointees of
 ///   `destinationStart..<destinationEnd` are sorted by decreasing
@@ -147,13 +170,12 @@ private func insert_backward_stably_sorted_by_decreasing_alignment(
 private func insert_backward_stably_sorted_by_decreasing_alignment(
   into destinationStart: UnsafeMutablePointer<RecordMemberType>,
   until destinationEnd: inout UnsafeMutablePointer<RecordMemberType>,
-  from sourceStart_: UnsafeMutablePointer<RecordMemberType>,
+  from sourceStart: consuming UnsafeMutablePointer<RecordMemberType>,
   until sourceEnd: UnsafeMutablePointer<RecordMemberType>,
   where p: (RecordMemberType)->Bool
 ) {
-  var sourceStart = sourceStart_
   while sourceStart != sourceEnd {
-    if p(sourceStart.pointee) {
+    if p(sourceStart.pointee()) {
       insert_backward_stably_sorted_by_decreasing_alignment(
         into: destinationStart, until: &destinationEnd, from: sourceStart)
     }
@@ -206,13 +228,15 @@ private func filter_and_stable_sort_elements_by_decreasing_alignment(
   end = new_end
 }
 
+/// Returns the size a record type would have were its members given
+/// in storage order by `start..<end`.
 private func size_of_record_having_ordered_members(
   from start: consuming UnsafePointer<RecordMemberType>,
   to end: UnsafePointer<RecordMemberType>
 ) -> Size {
-  var r: Size = 0
+  var r = 0 as Size
   while start < end {
-    let w = start.pointee
+    let w = start.pointee()
     let position = w.alignment().first_aligned_offset(starting_from: r)
     r = position + w.size()
     start += 1
@@ -230,7 +254,7 @@ private func __hylo_offset_of_member(
   in memberArray: UnsafeMutablePointer<RecordMemberType>, of_length l: UInt32) -> UInt32
 {
   let p = memberArray + Int(n)
-  let nth_alignment = p.pointee.alignment()
+  let nth_alignment = p.pointee().alignment()
   var start = memberArray
   var end = memberArray + Int(l)
 
