@@ -374,41 +374,26 @@ extension Metatype<UInt16> {
 
 }
 
-
-/// Returns the first element `x` of `start..<end` such that
-/// `p(x.pointee())` is true.
-fun first_position(
-  from start: Pointer<RecordMemberType>,
-  to end: Pointer<RecordMemberType>,
-  where p: [{Alignment}](RecordMemberType)->Bool
-) -> Pointer<RecordMemberType> {
-  var i = start.copy()
-  while i < end && !p(i.pointee()) {
-    i += 1
-  }
-  return i
-}
-
 /// Removes the contiguous elements at the tail of `start..<end` whose
-/// pointees satisify `p`.
+/// alignment is less than `a`.
 fun drop_last(
   from start: Pointer<RecordMemberType>,
   to end: inout Pointer<RecordMemberType>,
-  while p: [{Alignment}](RecordMemberType)->Bool
+  while_alignment_less_than a: Alignment
 ) {
-  while end != start && p((end - 1).pointee()) {
+  while end != start && (end - 1).pointee().alignment() < a {
     end -= 1
   }
 }
 
 /// Removes the contiguous elements at the head of `start..<end` whose
-/// pointees satisify `p`.
-fun drop(
+/// pointees have alignment less than or equal to `a`.
+fun drop_first(
   from start: inout Pointer<RecordMemberType>,
   to end: Pointer<RecordMemberType>,
-  while p: [{Alignment}](RecordMemberType)->Bool
+  while_alignment_no_greater_than a: Alignment
 ) {
-  while start != end && p(start.pointee()) {
+  while start != end && start.pointee().alignment() <= a {
     start += 1
   }
 }
@@ -422,7 +407,7 @@ fun shift_backward1(
   while e != start {
     let e0 = e - 1
     e.set_pointee(e0.pointee())
-    e = e0
+    &e = e0
   }
 }
 
@@ -445,8 +430,7 @@ fun insert_backward_stably_sorted_by_decreasing_alignment(
 
   var i = destinationEnd.copy()
   drop_last(
-    from: destinationStart, to: &i,
-    while: fun[let a = r_alignment](x){ x.alignment() < a })
+    from: destinationStart, to: &i, while_alignment_less_than: r_alignment)
 
   if source != i {
     shift_backward1(from: i, until: destinationEnd)
@@ -455,8 +439,8 @@ fun insert_backward_stably_sorted_by_decreasing_alignment(
   destinationEnd += 1
 }
 
-/// Inserts the pointees in `sourceStart_..<sourceEnd` that satisfy
-/// `p` at the latest position `q` in
+/// Inserts each pointee in `sourceStart_..<sourceEnd` whose
+/// `alignment()` is greater than `a` into
 /// `destinationStart...destinationEnd` such that all their
 /// predecessors' `pointee`s have `alignment` ≥
 /// *q*`.pointee().alignment()`.
@@ -470,10 +454,10 @@ fun insert_backward_stably_sorted_by_decreasing_alignment(
   until destinationEnd: inout Pointer<RecordMemberType>,
   from sourceStart: sink Pointer<RecordMemberType>,
   until sourceEnd: Pointer<RecordMemberType>,
-  where p: [{Alignment}](RecordMemberType)->Bool
+  where_alignment_exceeds a: Alignment
 ) {
   while sourceStart != sourceEnd {
-    if p(sourceStart.pointee()) {
+    if sourceStart.pointee().alignment() > a {
       insert_backward_stably_sorted_by_decreasing_alignment(
         into: destinationStart, until: &destinationEnd, from: sourceStart)
     }
@@ -491,39 +475,37 @@ fun filter_and_stable_sort_elements_by_decreasing_alignment(
   having_alignment n_alignment: Alignment
 ) {
   // Drop initial unretained elements before n
-  drop(from: &start, to: n, while: fun[let a = n_alignment](x) { x.alignment() < a })
+  drop_first(from: &start, to: n, while_alignment_no_greater_than: n_alignment - (1 as Alignment))
 
   var new_end: Pointer<RecordMemberType>
-  let tail_start: Pointer<RecordMemberType>
+  sink let tail_start: Pointer<RecordMemberType>
 
   if start != n {
     // insert elements up to n
-    new_end = start + 1
+    &new_end = start + 1
 
     insert_backward_stably_sorted_by_decreasing_alignment(
       into: start, until: &new_end, from: start + 1, until: n,
-      where: fun[let a = n_alignment](x) { x.alignment() >= a })
+      where_alignment_exceeds: n_alignment - (1 as Alignment))
 
-    tail_start = n + 1
+    &tail_start = n + 1
   }
   else {
     // Drop unretained elments after n
-    start = n + 1
-    drop(
-      from: &start, to: end,
-      while: fun[let a = n_alignment](x) { x.alignment() <= a })
+    &start = n + 1
+    drop_first(from: &start, to: end, while_alignment_no_greater_than: n_alignment)
 
     if start == end { return }
 
-    new_end = start + 1
-    tail_start = new_end
+    &new_end = start + 1
+    &tail_start = new_end
   }
 
   // insert elements after n
   insert_backward_stably_sorted_by_decreasing_alignment(
     into: start, until: &new_end, from: tail_start, until: end,
-    where: fun[let a = n_alignment](x) { x.alignment() > a })
-  end = new_end
+    where_alignment_exceeds: n_alignment)
+  &end = new_end
 }
 
 /// Returns the size a record type would have were its members given
@@ -538,7 +520,7 @@ fun size_of_record_having_ordered_members(
     let w = start.pointee()
     let position = w.alignment().first_aligned_offset(starting_from: r)
     &r = position + w.size()
-    start += 1
+    &start += 1
   }
   return r
 }
