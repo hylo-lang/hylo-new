@@ -374,199 +374,160 @@ extension Metatype<UInt16> {
 
 }
 
-/// Make it so the pointees start..<end contain only the elements with
-/// alignments greater than that of n, or with the same alignment as n
-/// but occurring at a position < n.
-fun retain_only_elements(
-  from start: inout Pointer<RecordMemberType>,
-  to end: inout Pointer<RecordMemberType>,
-  that_lay_out_before n: Pointer<RecordMemberType>
-) {
-  let n_alignment = n.pointee().alignment()
 
-  // Drop initial unretained elements before n
-  while start < n && start.pointee().alignment() < n_alignment {
-    start += 1
-  }
-
-  print_space(); print(from: start, to: end)
-
-  if start < n {
-    print_comma(); print_newline();
-
-    // start..<n..<end begins with a retained element
-
-    // Find first unretained; n is always unretained so we can stop
-    // there.
-    var i = start + 1
-    while i < n && i.pointee().alignment() >= n_alignment {
-      i += 1
-    }
-
-    print_space(); print(from: start, to: i)
-
-    // The position of the first unretained element, or end if all are
-    // retained.
-    var hole = i.copy()
-
-    // Next candidate for moving into the hole.
-    var j = hole + 1
-
-      // Copy remaining retained elements backward into the unretained
-      // space we found.
-    while j < n {
-      /* Workaround https://github.com/hylo-lang/hylo-new/issues/370
-      let w = j.pointee()
-      if w.alignment() >= n_alignment {
-        hole.set_pointee(w)
-        hole += 1
-      }
-       */
-      if j.pointee().alignment() >= n_alignment {
-        hole.set_pointee(j.pointee())
-        hole += 1
-      }
-      j += 1
-    }
-
-    print_space(); print_space(); print(from: start, to: j);
-
-    // skip over n, it's always unretained.
-    if j == n { j += 1 }
-
-    while j != end {
-      /* Workaround https://github.com/hylo-lang/hylo-new/issues/370
-      let w = j.pointee()
-      if w.alignment() > n_alignment {
-        hole.set_pointee(w)
-        hole += 1
-      }
-       */
-      if j.pointee().alignment() > n_alignment {
-        hole.set_pointee(j.pointee())
-        hole += 1
-      }
-      j += 1
-    }
-    // Workaround https://github.com/hylo-lang/hylo-new/issues/381
-    &end.value = hole.value
-    print_space(); print_space(); print_space(); print(from: start, to: end)
-
-  } else {  // None retained before n?
-    print_comma(); print_comma(); print_newline();
-
-    // Drop n, which is always unretained
-    &start = n + 1
-
-    print_comma_space(); print(from: start, to: end)
-
-    // Drop remaining initial unretained elements
-    while start < end && start.pointee().alignment() <= n_alignment {
-      start += 1
-      print_space(); print_comma_space(); print(from: start, to: end)
-      print(if start < end { 777 } else { 888 }); print_newline()
-    }
-    print(9999)
-
-    print_space(); print(from: start, to: end)
-    print(99999)
-
-    // No elements remain to retain.
-    if start == end { return }
-
-    // start..<end begins with a retained element; start > n
-
-    // Find first unretained
-    var i = start + 1
-    while i != end && i.pointee().alignment() > n_alignment {
-      i += 1
-    }
-    if i == end { return }  // all the rest are retained.
-
-    print_space(); print_space(); print(from: i, to: end)
-
-    // The position of the first unretained element, or end if all are
-    // retained.
-    var hole = i.copy()
-
-    // Copy remaining retained elements backward into the unretained
-    // space we found.
-    var j = hole + 1
-    // precondition(j > n)
-    while j != end {
-      /* Workaround https://github.com/hylo-lang/hylo-new/issues/370
-       let w = j.pointee()
-       if w.alignment() > n_alignment {
-         hole.set_pointee(w)
-         hole += 1
-       }
-         */
-      if j.pointee().alignment() > n_alignment {
-        hole.set_pointee(j.pointee())
-        hole += 1
-      }
-      j += 1
-
-      print_space(); print_space(); print_space(); print(from: start, to: hole)
-    }
-    print_comma_space(); print(from: start, to: hole)
-    // Workaround https://github.com/hylo-lang/hylo-new/issues/381
-    &end.value = hole.value
-    print_comma_space(); print(from: start, to: end)
-  }
-}
-
-/// Stably sorts the elements in decreasing alignment order.
-///
-/// - Precondition: start != end
-///
-/// - Complexity: *O*(`end-start`²) (insertion sort)
-fun stable_sort_by_decreasing_alignment(
+/// Returns the first element `x` of `start..<end` such that
+/// `p(x.pointee())` is true.
+fun first_position(
   from start: Pointer<RecordMemberType>,
-  to end: Pointer<RecordMemberType>
-) {
-  var prior_alignment = start.pointee().alignment()
-  var i = start + 1
-
-  while i < end {
-    // invariant: elements start..<w are sorted.
-
-    sink let w = i.pointee()
-    sink let w_alignment = w.alignment()
-
-    if prior_alignment >= w_alignment {
-      // w was already in the right place
-      &prior_alignment = w_alignment
-    } else {
-
-      // Since we copied from i into w, we can consider i a hole
-      var hole = i.copy()
-      // Shuffle the hole towared the front until it's in the right
-      // place.
-      var prior_to_hole = hole - 1
-      var done = false
-      while !done {
-        hole.set_pointee(prior_to_hole.pointee())
-        &hole = prior_to_hole.copy()
-        if hole == start {
-          &done = true
-        }
-        else {
-          &hole = prior_to_hole.copy()
-          &prior_to_hole = hole - 1
-          if prior_to_hole.pointee().alignment() >= w_alignment {
-            &done = true
-          }
-        }
-      }
-      // put w in the hole.
-      hole.set_pointee(w)
-    }
-
+  to end: Pointer<RecordMemberType>,
+  where p: [{Alignment}](RecordMemberType)->Bool
+) -> Pointer<RecordMemberType> {
+  var i = start.copy()
+  while i < end && !p(i.pointee()) {
     i += 1
   }
+  return i
 }
 
+/// Removes the contiguous elements at the tail of `start..<end` whose
+/// pointees satisify `p`.
+fun drop_last(
+  from start: Pointer<RecordMemberType>,
+  to end: inout Pointer<RecordMemberType>,
+  while p: [{Alignment}](RecordMemberType)->Bool
+) {
+  while end != start && p((end - 1).pointee()) {
+    end -= 1
+  }
+}
+
+/// Removes the contiguous elements at the head of `start..<end` whose
+/// pointees satisify `p`.
+fun drop(
+  from start: inout Pointer<RecordMemberType>,
+  to end: Pointer<RecordMemberType>,
+  while p: [{Alignment}](RecordMemberType)->Bool
+) {
+  while start != end && p(start.pointee()) {
+    start += 1
+  }
+}
+
+/// Shifts the contents of `start..<end` one position later in memory.
+fun shift_backward1(
+  from start: Pointer<RecordMemberType>,
+  until end: Pointer<RecordMemberType>
+) {
+  var e = end.copy()
+  while e != start {
+    let e0 = e - 1
+    e.set_pointee(e0.pointee())
+    e = e0
+  }
+}
+
+/// Inserts `source.pointee()` at the latest position *q* in
+/// `destinationStart...destinationEnd` such that all its
+/// predecessors' `pointee`s have `alignment` ≥
+/// *q*`.pointee().alignment()`.
+///
+/// - Precondition: the pointees of
+///   `destinationStart..<destinationEnd` are sorted by decreasing
+///   alignment.
+/// - Precondition: `source >= destinationEnd`.
+fun insert_backward_stably_sorted_by_decreasing_alignment(
+  into destinationStart: Pointer<RecordMemberType>,
+  until destinationEnd: inout Pointer<RecordMemberType>,
+  from source: Pointer<RecordMemberType>
+) {
+  let r = source.pointee()
+  let r_alignment = r.alignment()
+
+  var i = destinationEnd.copy()
+  drop_last(
+    from: destinationStart, to: &i,
+    while: fun[let a = r_alignment](x){ x.alignment() < a })
+
+  if source != i {
+    shift_backward1(from: i, until: destinationEnd)
+    i.set_pointee(r)
+  }
+  destinationEnd += 1
+}
+
+/// Inserts the pointees in `sourceStart_..<sourceEnd` that satisfy
+/// `p` at the latest position `q` in
+/// `destinationStart...destinationEnd` such that all their
+/// predecessors' `pointee`s have `alignment` ≥
+/// *q*`.pointee().alignment()`.
+///
+/// - Precondition: the pointees of
+///   `destinationStart..<destinationEnd` are sorted by decreasing
+///   alignment.
+/// - Precondition: `sourceStart_ >= destinationEnd`.
+fun insert_backward_stably_sorted_by_decreasing_alignment(
+  into destinationStart: Pointer<RecordMemberType>,
+  until destinationEnd: inout Pointer<RecordMemberType>,
+  from sourceStart: sink Pointer<RecordMemberType>,
+  until sourceEnd: Pointer<RecordMemberType>,
+  where p: [{Alignment}](RecordMemberType)->Bool
+) {
+  while sourceStart != sourceEnd {
+    if p(sourceStart.pointee()) {
+      insert_backward_stably_sorted_by_decreasing_alignment(
+        into: destinationStart, until: &destinationEnd, from: sourceStart)
+    }
+    sourceStart += 1
+  }
+}
+
+/// Removes from start..<end the elements with alignments less than
+/// that of n, or with the same alignment as n but occurring at a
+/// position > n, and stably sorts them by decreasing alignment.
+fun filter_and_stable_sort_elements_by_decreasing_alignment(
+  from start: inout Pointer<RecordMemberType>,
+  to end: inout Pointer<RecordMemberType>,
+  that_lay_out_before n: Pointer<RecordMemberType>,
+  having_alignment n_alignment: Alignment
+) {
+  // Drop initial unretained elements before n
+  drop(from: &start, to: n, while: fun[let a = n_alignment](x) { x.alignment() < a })
+
+  var new_end: Pointer<RecordMemberType>
+  let tail_start: Pointer<RecordMemberType>
+
+  if start != n {
+    // insert elements up to n
+    new_end = start + 1
+
+    insert_backward_stably_sorted_by_decreasing_alignment(
+      into: start, until: &new_end, from: start + 1, until: n,
+      where: fun[let a = n_alignment](x) { x.alignment() >= a })
+
+    tail_start = n + 1
+  }
+  else {
+    // Drop unretained elments after n
+    start = n + 1
+    drop(
+      from: &start, to: end,
+      while: fun[let a = n_alignment](x) { x.alignment() <= a })
+
+    if start == end { return }
+
+    new_end = start + 1
+    tail_start = new_end
+  }
+
+  // insert elements after n
+  insert_backward_stably_sorted_by_decreasing_alignment(
+    into: start, until: &new_end, from: tail_start, until: end,
+    where: fun[let a = n_alignment](x) { x.alignment() > a })
+  end = new_end
+}
+
+/// Returns the size a record type would have were its members given
+/// in storage order by `start..<end`.
 fun size_of_record_having_ordered_members(
   from start_: Pointer<RecordMemberType>,
   to end: Pointer<RecordMemberType>
@@ -597,11 +558,9 @@ fun __hylo_offset_of_member(
   var end = memberArray + Int(l)
 
   print(from: start, to: end)
-  retain_only_elements(from: &start, to: &end, that_lay_out_before: p)
+  filter_and_stable_sort_elements_by_decreasing_alignment(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
   print(from: start, to: end)
   if start == end { return 0 }
-  stable_sort_by_decreasing_alignment(from: start, to: end)
-  print(from: start, to: end)
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
   print_space(); print(preceding_size); print_space(); print(nth_alignment)
   sink let r = nth_alignment.first_aligned_offset(starting_from: preceding_size)
