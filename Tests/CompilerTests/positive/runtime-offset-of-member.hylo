@@ -386,6 +386,11 @@ fun drop_last(
   }
 }
 
+fun print_marker() -> Bool {
+  print_comma_space(); print_comma_space(); print_newline()
+  return true
+}
+
 /// Removes the contiguous elements at the head of `start..<end` whose
 /// pointees have alignment less than or equal to `a`.
 fun drop_first(
@@ -393,9 +398,24 @@ fun drop_first(
   to end: Pointer<RecordMemberType>,
   while_alignment_no_greater_than a: Alignment
 ) {
-  while start != end && start.pointee().alignment() <= a {
+  print_comma_space(); print(from: start, to: end)
+  while start != end && print_marker() && start.pointee().alignment() <= a {
+    print_space(); print(start.pointee()); print_newline()
     start += 1
   }
+  print_comma_space(); print(from: start, to: end)
+  /*
+  print_comma_space(); print(from: start, to: end)
+  while start != end {
+    if start.pointee().alignment() > a {
+      print_comma_space(); print(from: start, to: end)
+      return
+    }
+    print_space(); print(start.pointee()); print_newline()
+    start += 1
+  }
+  print_comma_space(); print(from: start, to: end)
+   */
 }
 
 /// Shifts the contents of `start..<end` one position later in memory.
@@ -406,8 +426,8 @@ fun shift_backward1(
   var e = end.copy()
   while e != start {
     let e0 = e - 1
-    e.set_pointee(e0.pointee())
-    &e = e0
+    e.set_pointee(e0.pointee().copy())
+    &e.value = e0.value
   }
 }
 
@@ -432,11 +452,19 @@ fun insert_backward_stably_sorted_by_decreasing_alignment(
   drop_last(
     from: destinationStart, to: &i, while_alignment_less_than: r_alignment)
 
+  // Workaround #370
+  insert_backward_stably_sorted_by_decreasing_alignment1(source, i, destinationEnd, r)
+  destinationEnd += 1
+}
+
+fun insert_backward_stably_sorted_by_decreasing_alignment1(
+  source: Pointer<RecordMemberType>, i: Pointer<RecordMemberType>,
+  destinationEnd: Pointer<RecordMemberType>, r: RecordMemberType)
+{
   if source != i {
     shift_backward1(from: i, until: destinationEnd)
-    i.set_pointee(r)
+    i.set_pointee(r.copy())
   }
-  destinationEnd += 1
 }
 
 /// Inserts each pointee in `sourceStart_..<sourceEnd` whose
@@ -474,13 +502,20 @@ fun filter_and_stable_sort_elements_by_decreasing_alignment(
   that_lay_out_before n: Pointer<RecordMemberType>,
   having_alignment n_alignment: Alignment
 ) {
+  print_comma(); print_comma(); print_comma(); print_comma(); print_comma(); print_newline();
+  print(from: start, to: n)
+  print_alignment(n_alignment); print_newline()
+
   // Drop initial unretained elements before n
   drop_first(from: &start, to: n, while_alignment_no_greater_than: n_alignment - (1 as Alignment))
+
+  print(from: start, to: n)
 
   var new_end: Pointer<RecordMemberType>
   sink let tail_start: Pointer<RecordMemberType>
 
   if start != n {
+    print_comma(); print_newline()
     // insert elements up to n
     &new_end = start + 1
 
@@ -488,24 +523,34 @@ fun filter_and_stable_sort_elements_by_decreasing_alignment(
       into: start, until: &new_end, from: start + 1, until: n,
       where_alignment_exceeds: n_alignment - (1 as Alignment))
 
-    &tail_start = n + 1
+    print(from: start, to: new_end)
+    &tail_start.value = (n + 1).value
   }
   else {
+    print_comma(); print_comma(); print_newline()
     // Drop unretained elments after n
     &start = n + 1
+    print(from: start, to: end)
     drop_first(from: &start, to: end, while_alignment_no_greater_than: n_alignment)
 
-    if start == end { return }
+    if start == end {
+      print_space(); print_comma(); print_comma(); print_comma(); print_comma(); print_comma(); print_newline();
+      return
+    }
+    print(from: start, to: end)
 
-    &new_end = start + 1
-    &tail_start = new_end
+    &new_end.value = (start + 1).value
+    &tail_start.value = new_end.value
   }
+  print_comma(); print_comma(); print_comma(); print_newline()
+  print(from: start, to: new_end)
 
   // insert elements after n
   insert_backward_stably_sorted_by_decreasing_alignment(
     into: start, until: &new_end, from: tail_start, until: end,
     where_alignment_exceeds: n_alignment)
-  &end = new_end
+  &end.value = new_end.value
+  print(from: start, to: end)
 }
 
 /// Returns the size a record type would have were its members given
