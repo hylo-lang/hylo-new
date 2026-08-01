@@ -111,6 +111,23 @@ public struct Typer {
     /// The cache of `Typer.canDeriveCoercion(_:applying:)`.
     fileprivate var canDeriveCoercion: [Given: [TypePair: UInt8]]
 
+    /// A key identifying an extension-applicability query.
+    fileprivate struct AppliesKey: Hashable {
+
+      /// The scope in which the extension is being applied.
+      let s: ScopeIdentity
+
+      /// The extension being tested.
+      let d: ExtensionDeclaration.ID
+
+      /// The subject type.
+      let t: AnyTypeIdentity
+
+    }
+
+    /// The cache of `Typer.applies(_:to:in:)`.
+    fileprivate var applies: [AppliesKey: SummonResult?]
+
     /// Creates an instance for typing `m`, which is a module in `p`.
     fileprivate init(typing m: Module.ID, in p: Program) {
       self.moduleToIdentifierToDeclaration = .init(repeating: nil, count: p.modules.count)
@@ -130,6 +147,7 @@ public struct Typer {
       self.predefinedGivens = [:]
       self.standardLibraryEntityToType = [:]
       self.canDeriveCoercion = [:]
+      self.applies = [:]
     }
 
   }
@@ -4604,12 +4622,23 @@ public struct Typer {
     // Fast path: types are trivially equal.
     if t == u { return .init(witness: w, substitutions: .init(), penalties: 0) }
 
+    // Consult the cache.
+    let key = Memos.AppliesKey(s: s, d: d, t: t)
+    if !t[.hasVariable], let m = cache.applies[key] {
+      return m
+    }
+
     // Slow path: use the match judgement of implicit resolution to create a witness describing
     // "how" the type matches the extension.
     let (context, head) = program.types.contextAndHead(t)
     assert(context.usings.isEmpty)
     let thread = formThread(matching: w, to: head, in: .empty)
-    return takeSummonResults(from: [thread], in: s).uniqueElement
+    let result = takeSummonResults(from: [thread], in: s).uniqueElement
+
+    if !t[.hasVariable] && !hasImplicitOnStack() {
+      cache.applies[key] = result
+    }
+    return result
   }
 
   /// Returns the modules that are imported by `f`, which is in the module being typed.
