@@ -334,8 +334,10 @@ final class LayoutTests: XCTestCase {
     }
   }
 
+  /// Fragments of Hylo test code for these cases.
   var hyloChecks: [String] = []
 
+  /// Returns the Hylo code for a particular test case.
   private func hylo_check_code(
     members sas: [(size: Size, alignment: Alignment)],
     offsets os: [UInt32]
@@ -351,6 +353,7 @@ final class LayoutTests: XCTestCase {
       """
   }
 
+  /// Returns the accumulated code of the Hylo tests.
   private func hyloCode() -> String {
     var r = ""
     let batchSize = 10
@@ -380,7 +383,7 @@ final class LayoutTests: XCTestCase {
   private func check_offsets(members sa: [(size: Size, alignment: Alignment)]) {
     if sa.count == 0 { return }
     let offsets = offsets(members: sa)
-    hyloChecks.append(hylo_check_code(members: sa, offsets: offsets))
+    // hyloChecks.append(hylo_check_code(members: sa, offsets: offsets))
 
     let member_order = sa.indices.sorted { (i, j) in
       offsets[i] < offsets[j]
@@ -2579,7 +2582,7 @@ final class LayoutTests: XCTestCase {
     check_offsets(members: [(size: 5, alignment: 9), (size: 8, alignment: 1), (size: 3, alignment: 9), (size: 5, alignment: 4), (size: 3, alignment: 9), (size: 3, alignment: 7), (size: 2, alignment: 6), (size: 9, alignment: 4), (size: 2, alignment: 9), (size: 8, alignment: 3)])
     check_offsets(members: [(size: 0, alignment: 1), (size: 6, alignment: 8), (size: 7, alignment: 1), (size: 3, alignment: 5), (size: 8, alignment: 8), (size: 1, alignment: 8), (size: 0, alignment: 9), (size: 6, alignment: 4), (size: 1, alignment: 2), (size: 8, alignment: 7)])
 
-    print(hyloCode())
+    // print(hyloCode())
   }
 
 }
