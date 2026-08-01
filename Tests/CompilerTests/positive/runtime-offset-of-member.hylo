@@ -212,17 +212,20 @@ extension Pointer<RecordMemberType> {
     (self.value as* let Self.Pointee).copy()
   }
 
+  /// Replaces the pointee with `x`
   fun set_pointee(x: sink Self.Pointee) {
     // Hack: can't seem to move x, even when take_value implemented manually.
     &(self.value as* inout Self.Pointee).value = x.value
   }
 
+  /// Returns `self` advanced in memory by `offset` `Pointee`s.
   @inline(always)
   public fun infix+ (offset: UInt32) -> Self {
     let byte_offset = UInt(Metatype<Self.Pointee>.stride()) * UInt(offset)
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
+  /// Returns `self` advanced in memory by `offset` `Pointee`s.
   @inline(always)
   public fun infix+ (offset: Int) -> Self {
     //print_space(); print_size(Metatype<Self.Pointee>.size()); print_space()
@@ -235,17 +238,20 @@ extension Pointer<RecordMemberType> {
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
+  /// Advances `self` in memory by `offset` `Pointee`s.
   @inline(always)
   public fun infix+= (offset: Int) inout {
     &self.value = (self + offset).value
   }
 
+  /// Returns `self` advanced in memory by `-offset` `Pointee`s.
   @inline(always)
   public fun infix- (offset: Int) -> Self {
     let byte_offset = Int(Metatype<Self.Pointee>.stride()) * (0 - offset)
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
+  /// Advances `self` in memory by `-offset` `Pointee`s.
   @inline(always)
   public fun infix-= (offset: Int) inout {
     &self.value = (self - offset).value
@@ -257,6 +263,7 @@ extension Pointer<RecordMemberType> {
     Bool(value: Builtin.icmp_eq_ptr(self.value, other.value))
   }
 
+  /// Returns `false` iff `other` has an equivalent value.
   @inline(always)
   public fun infix!= (other: Self) -> Bool {
     !(self == other)
@@ -268,6 +275,7 @@ extension Pointer<RecordMemberType> {
     Bool(value: Builtin.icmp_ult_ptr(self.value, other.value))
   }
 
+  /// Replaces `sef` with `other`.
   fun assign(other: Self) inout {
     &self.value = other.value
   }
