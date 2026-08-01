@@ -34,12 +34,8 @@ extension Alignment {
   /// Returns the first n >= i that is a multiple of self
   fun first_aligned_offset(starting_from i: Size) -> Size {
     let a = Size(self)
-    //print_space(); print_space(); print(self); print_space(); print(a); print_space()
     // The distance from i to the nearest aligned offset <= i.
     let excess = i % a
-    //print(excess); print_space();
-    //print(if excess == (0 as Size) { 1 } else { 0 }); print_space()
-    //print(i - excess + a); print_newline()
     return if excess == (0 as Size) { i.copy() } else { i - excess + a }
   }
 
@@ -228,13 +224,7 @@ extension Pointer<RecordMemberType> {
   /// Returns `self` advanced in memory by `offset` `Pointee`s.
   @inline(always)
   public fun infix+ (offset: Int) -> Self {
-    //print_space(); print_size(Metatype<Self.Pointee>.size()); print_space()
-    //print_alignment(Metatype<Self.Pointee>.alignment()); print_newline()
-
-    //print_space(); print_size(Metatype<Self.Pointee>.stride()); print_space()
-    //print(Int(Metatype<Self.Pointee>.stride())); print_newline()
     let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
-    //print_space(); print(offset); print_space(); print(byte_offset); print_newline()
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
@@ -378,11 +368,6 @@ fun drop_last(
   }
 }
 
-fun print_marker() -> Bool {
-  print_comma_space(); print_comma_space(); print_newline()
-  return true
-}
-
 /// Removes the contiguous elements at the head of `start..<end` whose
 /// pointees have alignment less than or equal to `a`.
 fun drop_first(
@@ -390,16 +375,12 @@ fun drop_first(
   to end: Pointer<RecordMemberType>,
   while_alignment_no_greater_than a: Alignment
 ) {
-  // print_comma_space(); print(from: start, to: end)
   while start != end {
     if start.pointee().alignment() > a {
-      // print_comma_space(); print(from: start, to: end)
       return
     }
-    // print_space(); print(start.pointee()); print_newline()
     start += 1
   }
-  // print_comma_space(); print(from: start, to: end)
 }
 
 /// Shifts the contents of `start..<end` one position later in memory.
@@ -486,20 +467,13 @@ fun filter_and_stable_sort_elements_by_decreasing_alignment(
   that_lay_out_before n: Pointer<RecordMemberType>,
   having_alignment n_alignment: Alignment
 ) {
-  // print_comma(); print_comma(); print_comma(); print_comma(); print_comma(); print_newline();
-  // print(from: start, to: n)
-  // print_alignment(n_alignment); print_newline()
-
   // Drop initial unretained elements before n
   drop_first(from: &start, to: n, while_alignment_no_greater_than: n_alignment - (1 as Alignment))
-
-  // print(from: start, to: n)
 
   var new_end: Pointer<RecordMemberType>
   sink let tail_start: Pointer<RecordMemberType>
 
   if start != n {
-    // print_comma(); print_newline()
     // insert elements up to n
     &new_end = start + 1
 
@@ -507,34 +481,26 @@ fun filter_and_stable_sort_elements_by_decreasing_alignment(
       into: start, until: &new_end, from: start + 1, until: n,
       where_alignment_exceeds: n_alignment - (1 as Alignment))
 
-    // print(from: start, to: new_end)
     &tail_start.value = (n + 1).value
   }
   else {
-    // print_comma(); print_comma(); print_newline()
     // Drop unretained elments after n
     &start = n + 1
-    // print(from: start, to: end)
     drop_first(from: &start, to: end, while_alignment_no_greater_than: n_alignment)
 
     if start == end {
-      // print_space(); print_comma(); print_comma(); print_comma(); print_comma(); print_comma(); print_newline();
       return
     }
-    // print(from: start, to: end)
 
     &new_end.value = (start + 1).value
     &tail_start.value = new_end.value
   }
-  // print_comma(); print_comma(); print_comma(); print_newline()
-  // print(from: start, to: new_end)
 
   // insert elements after n
   insert_backward_stably_sorted_by_decreasing_alignment(
     into: start, until: &new_end, from: tail_start, until: end,
     where_alignment_exceeds: n_alignment)
   &end.value = new_end.value
-  // print(from: start, to: end)
 }
 
 /// Returns the size a record type would have were its members given
@@ -568,46 +534,11 @@ fun __hylo_offset_of_member(
   var start = memberArray.copy()
   var end = memberArray + Int(l)
 
-  // print(from: start, to: end)
   filter_and_stable_sort_elements_by_decreasing_alignment(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
-  // print(from: start, to: end)
   if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
-  // print_space(); print(preceding_size); print_space(); print(nth_alignment)
   sink let r = nth_alignment.first_aligned_offset(starting_from: preceding_size)
-  // print(r); print_newline();
   return r
-}
-
-@extern_c_indirect("print_intptr_indirect") fun print_ptr(x: Builtin.ptr)
-@extern_c_indirect("print_long_indirect") fun print(x: Int)
-@extern_c_indirect("print_u32_indirect") fun print(x: UInt32)
-@extern_c_indirect("print_u16_indirect") fun print(x: UInt16)
-@extern_c_indirect("print_newline_indirect") fun print_newline()
-@extern_c_indirect("print_space_indirect") fun print_space()
-@extern_c_indirect("print_comma_indirect") fun print_comma()
-@extern_c_indirect("print_open_paren_indirect") fun print_open_paren()
-@extern_c_indirect("print_close_paren_indirect") fun print_close_paren()
-@extern_c_indirect("print_size_indirect") fun print_size(x: UInt32)
-@extern_c_indirect("print_alignment_indirect") fun print_alignment(x: UInt16)
-
-fun print_comma_space() {
-  // print_comma(); print_space()
-}
-
-fun print(p: RecordMemberType) {
-  print_open_paren();
-  print(p.size()); print_space(); print(p.alignment());
-  print_close_paren()
-}
-
-fun print(from start: Pointer<RecordMemberType>, to end: Pointer<RecordMemberType>) {
-  var s = start.copy()
-  while s != end {
-    print(s.pointee()); print_comma_space()
-    s += 1
-  }
-  print_newline()
 }
 
 // --------------- TESTING -------------
@@ -705,7 +636,6 @@ fun verify_offset(
     in: .new(value: Builtin.address(of: witnesses)),
     of_length: .new(truncating: l))
 
-  // print_comma();print_comma();print_comma(); print(i); print_comma(); print(o); print_space(); print(x); print_newline()
   precondition(o == UInt32(truncating: x))
 }
 
