@@ -192,24 +192,6 @@ extension Pointer<RecordMemberType> {
 
 }
 
-/* Workaround https://github.com/hylo-lang/hylo-new/issues/381
-public given Pointer<RecordMemberType> is Movable {
-
-  /// Gives `self` the value of a consumed `source`.
-  fun take_value(from source: sink Self) auto {
-    set {
-      &self.value = source.value
-      _ = source
-    }
-    inout {
-      &self.value = source.value
-      _ = source
-    }
-  }
-
-}
-*/
-
 public given Pointer<RecordMemberType> is Deinitializable {}
 
 extension Pointer<RecordMemberType> {
