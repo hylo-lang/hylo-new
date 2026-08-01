@@ -334,6 +334,8 @@ final class LayoutTests: XCTestCase {
     }
   }
 
+  var hyloChecks: [String] = []
+
   private func hylo_check_code(
     members sas: [(size: Size, alignment: Alignment)],
     offsets os: [UInt32]
@@ -344,15 +346,41 @@ final class LayoutTests: XCTestCase {
     return """
         verify_offsets(
           forFirst: \(os.count),
-          in: \(sas1.map { sa in "\(sa.size), \(sa.alignment)" }.joined(separator: ", ")),
+          in: (\(sas1.map { sa in "H(\(sa.size), \(sa.alignment))" }.joined(separator: ", "))),
           to_be: \(os1.map { "\($0)" }.joined(separator: ", ")))
       """
+  }
+
+  private func hyloCode() -> String {
+    var r = ""
+    let batchSize = 10
+    var functionCount = 0
+    var nextChecks: [String] = []
+    while hyloChecks.count > 1 {
+      var remaining = hyloChecks[...]
+      while !remaining.isEmpty {
+        r +=
+        """
+          
+        fun test\(functionCount)() {
+        \(remaining.prefix(batchSize).joined(separator: "\n"))
+        }
+
+        """
+        remaining = remaining.dropFirst(batchSize)
+        nextChecks.append("  test\(functionCount)()")
+        functionCount += 1
+      }
+      hyloChecks = nextChecks
+      nextChecks = []
+    }
+    return r
   }
 
   private func check_offsets(members sa: [(size: Size, alignment: Alignment)]) {
     if sa.count == 0 { return }
     let offsets = offsets(members: sa)
-//    print(hylo_check_code(members: sa, offsets: offsets))
+    hyloChecks.append(hylo_check_code(members: sa, offsets: offsets))
 
     let member_order = sa.indices.sorted { (i, j) in
       offsets[i] < offsets[j]
@@ -413,8 +441,6 @@ final class LayoutTests: XCTestCase {
         Needless padding \(padding) before member at offset \(o1)
         \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
         """)
-
-      
     }
   }
 
@@ -2552,6 +2578,8 @@ final class LayoutTests: XCTestCase {
     check_offsets(members: [(size: 3, alignment: 9), (size: 2, alignment: 9), (size: 2, alignment: 6), (size: 0, alignment: 4), (size: 3, alignment: 8), (size: 8, alignment: 9), (size: 9, alignment: 8), (size: 2, alignment: 7), (size: 0, alignment: 6), (size: 0, alignment: 4)])
     check_offsets(members: [(size: 5, alignment: 9), (size: 8, alignment: 1), (size: 3, alignment: 9), (size: 5, alignment: 4), (size: 3, alignment: 9), (size: 3, alignment: 7), (size: 2, alignment: 6), (size: 9, alignment: 4), (size: 2, alignment: 9), (size: 8, alignment: 3)])
     check_offsets(members: [(size: 0, alignment: 1), (size: 6, alignment: 8), (size: 7, alignment: 1), (size: 3, alignment: 5), (size: 8, alignment: 8), (size: 1, alignment: 8), (size: 0, alignment: 9), (size: 6, alignment: 4), (size: 1, alignment: 2), (size: 8, alignment: 7)])
+
+    print(hyloCode())
   }
 
 }
