@@ -4,7 +4,7 @@ import OrderedCollections
 internal struct Obligations {
 
   /// A set of constraints to solve.
-  internal private(set) var constraints: [any Constraint]
+  internal private(set) var constraints: [ConstraintEnum]
 
   /// A table from syntax tree to its type.
   internal private(set) var syntaxToType: OrderedDictionary<AnySyntaxIdentity, AnyTypeIdentity>
@@ -28,7 +28,7 @@ internal struct Obligations {
   }
 
   /// Creates a set from a finite sequence of constraints.
-  internal init<S: Sequence<any Constraint>>(_ constraints: S) {
+  internal init<S: Sequence<ConstraintEnum>>(_ constraints: S) {
     self.init()
     for c in constraints { assume(c) }
   }
@@ -39,7 +39,7 @@ internal struct Obligations {
   }
 
   /// Assumes that `k` holds.
-  internal mutating func assume(_ k: any Constraint) {
+  internal mutating func assume(_ k: ConstraintEnum) {
     if !k.isTrivial { constraints.append(k) }
   }
 
@@ -54,7 +54,7 @@ internal struct Obligations {
     _ n: T, hasType t: AnyTypeIdentity, at site: SourceSpan
   ) -> AnyTypeIdentity {
     if let u = syntaxToType[n.erased] {
-      assume(EqualityConstraint(lhs: t, rhs: u, site: site))
+      assume(.equality(.init(lhs: t, rhs: u, site: site)))
     } else {
       syntaxToType[.init(n)] = t
     }

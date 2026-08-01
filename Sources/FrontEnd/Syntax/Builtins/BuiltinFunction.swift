@@ -440,7 +440,7 @@ extension BuiltinFunction {
     //    case .ashr(_, let t):
     //      return .init(^t, ^t, to: ^t)
     case .urem(let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
 
     //    case .srem(let t):
     //      return .init(^t, ^t, to: ^t)
@@ -473,7 +473,7 @@ extension BuiltinFunction {
     case .trunc(let src, let dst):
       return s.demand(Arrow(src, to: dst)).erased
     case .zext(let src, let dst):
-      return s.demand(Arrow(src, to: dst))
+      return s.demand(Arrow(src, to: dst)).erased
 
     //      return .init(^s, to: ^d)
     //    case .sext(let s, let d):
@@ -516,7 +516,7 @@ extension BuiltinFunction {
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
     case .advancedByBytes(let t):
       let p = s.demand(MachineType.ptr)
-      return s.demand(Arrow(p, t, to: p))
+      return s.demand(Arrow(p, t, to: p)).erased
     //    case .atomic_store_relaxed(let t):
     //      return .init(.builtin(.ptr), ^t, to: .void)
     //    case .atomic_store_release(let t):

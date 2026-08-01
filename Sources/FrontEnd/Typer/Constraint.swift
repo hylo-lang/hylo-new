@@ -14,6 +14,82 @@ internal protocol Constraint: Showable {
 
 }
 
+internal enum ConstraintEnum: Constraint {
+  @inline(always)
+  var site: SourceSpan {
+    switch self {
+    case .equality(let k): return k.site
+    case .coercion(let k): return k.site
+    case .widening(let k): return k.site
+    case .constructorConversion(let k): return k.site
+    case .call(let k): return k.site
+    case .argument(let k): return k.site
+    case .staticCall(let k): return k.site
+    case .member(let k): return k.site
+    case .tupleMember(let k): return k.site
+    case .overload(let k): return k.site
+    }
+  }
+
+  @inline(always)
+  mutating func update(_ transform: (AnyTypeIdentity) -> AnyTypeIdentity) {
+    switch self {
+    case .equality(var k): k.update(transform); self = .equality(k)
+    case .coercion(var k): k.update(transform); self = .coercion(k)
+    case .widening(var k): k.update(transform); self = .widening(k)
+    case .constructorConversion(var k): k.update(transform); self = .constructorConversion(k)
+    case .call(var k): k.update(transform); self = .call(k)
+    case .argument(var k): k.update(transform); self = .argument(k)
+    case .staticCall(var k): k.update(transform); self = .staticCall(k)
+    case .member(var k): k.update(transform); self = .member(k)
+    case .tupleMember(var k): k.update(transform); self = .tupleMember(k)
+    case .overload(var k): k.update(transform); self = .overload(k)
+    }
+  }
+
+  @inline(always)
+  func show(using printer: inout TreePrinter) -> String {
+    switch self {
+    case .equality(let k): return k.show(using: &printer)
+    case .coercion(let k): return k.show(using: &printer)
+    case .widening(let k): return k.show(using: &printer)
+    case .constructorConversion(let k): return k.show(using: &printer)
+    case .call(let k): return k.show(using: &printer)
+    case .argument(let k): return k.show(using: &printer)
+    case .staticCall(let k): return k.show(using: &printer)
+    case .member(let k): return k.show(using: &printer)
+    case .tupleMember(let k): return k.show(using: &printer)
+    case .overload(let k): return k.show(using: &printer)
+    }
+  }
+
+  // func lift<T>(action: (Constraint) -> T) -> T {
+  //   switch self {
+  //   case .equality(let k): return action(k)
+  //   case .coercion(let k): return action(k)
+  //   case .widening(let k): return action(k)
+  //   case .constructorConversion(let k): return action(k)
+  //   case .call(let k): return action(k)
+  //   case .argument(let k): return action(k)
+  //   case .staticCall(let k): return action(k)
+  //   case .member(let k): return action(k)
+  //   case .tupleMember(let k): return action(k)
+  //   case .overload(let k): return action(k)
+  //   }
+  // }
+
+  case equality(EqualityConstraint)
+  case coercion(CoercionConstraint)
+  case widening(WideningConstraint)
+  case constructorConversion(ConstructorConversionConstraint)
+  case call(CallConstraint)
+  case argument(ArgumentConstraint)
+  case staticCall(StaticCallConstraint)
+  case member(MemberConstraint)
+  case tupleMember(TupleMemberConstraint)
+  case overload(OverloadConstraint)
+}
+
 extension Constraint {
 
   /// `true` iff `self` trivially holds and solving it will not enable any new deductions.

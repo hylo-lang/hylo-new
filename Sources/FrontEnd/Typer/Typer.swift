@@ -1100,7 +1100,7 @@ public struct Typer {
     if !equal(t, r) && !c.obligations.isUnsatisfiable {
       let k = CoercionConstraint(
         on: e, from: t, to: r, reason: reason, at: program.spanForDiagnostic(about: e))
-      c.obligations.assume(k)
+      c.obligations.assume(.coercion(k))
     }
 
     discharge(c.obligations, relatedTo: e)
@@ -2102,7 +2102,7 @@ public struct Typer {
     let o = fresh().erased
     let k = CallConstraint(callee: f, arguments: i, output: o, origin: e, site: program[e].site)
 
-    context.obligations.assume(k)
+    context.obligations.assume(.call(k))
     return context.obligations.assume(e, hasType: o, at: program[e].site)
   }
 
@@ -2198,16 +2198,16 @@ public struct Typer {
 
       switch program[e].semantics.value {
       case .up:
-        context.obligations.assume(WideningConstraint(lhs: lhs, rhs: rhs, site: sourceSite))
+        context.obligations.assume(.widening(.init(lhs: lhs, rhs: rhs, site: sourceSite)))
         return context.obligations.assume(e, hasType: rhs, at: operatorSite)
 
       case .down:
-        context.obligations.assume(WideningConstraint(lhs: rhs, rhs: lhs, site: targetSite))
+        context.obligations.assume(.widening(.init(lhs: rhs, rhs: lhs, site: targetSite)))
         return context.obligations.assume(e, hasType: rhs, at: operatorSite)
 
       case .pointer:
         let p = program.types.demand(MachineType.ptr)
-        context.obligations.assume(EqualityConstraint(lhs: lhs, rhs: p.erased, site: sourceSite))
+        context.obligations.assume(.equality(.init(lhs: lhs, rhs: p.erased, site: sourceSite)))
 
         if let t = program.types.cast(rhs, to: RemoteType.self) {
           let u = program.types[t].projectee
@@ -2283,8 +2283,8 @@ public struct Typer {
 
       // Slow path: we may need coercions.
       let t = fresh().erased
-      context.obligations.assume(CoercionConstraint(on: e0, from: t0, to: t, at: program[e0].site))
-      context.obligations.assume(CoercionConstraint(on: e1, from: t1, to: t, at: program[e1].site))
+      context.obligations.assume(.coercion(.init(on: e0, from: t0, to: t, at: program[e0].site)))
+      context.obligations.assume(.coercion(.init(on: e1, from: t1, to: t, at: program[e1].site)))
       return context.obligations.assume(e, hasType: t, at: site)
     }
 
@@ -2506,12 +2506,11 @@ public struct Typer {
     let u = fresh().erased
 
     context.obligations.assume(
-      MemberConstraint(
-        member: program[e].target, role: role, qualification: s, type: u, site: site))
+      .member(.init(member: program[e].target, role: role, qualification: s, type: u, site: site)))
     context.obligations.assume(program[e].target, hasType: u, at: site)
 
     let v = fresh().erased
-    context.obligations.assume(ConstructorConversionConstraint(lhs: u, rhs: v, site: site))
+    context.obligations.assume(.constructorConversion(.init(lhs: u, rhs: v, site: site)))
     return context.obligations.assume(e, hasType: v, at: site)
   }
 
@@ -2564,7 +2563,7 @@ public struct Typer {
     else if let b = program.singleExpression(of: program[e].body) {
       let t = inferredType(of: b, in: &context)
       if let u = r {
-        context.obligations.assume(CoercionConstraint(on: b, from: t, to: u, at: program[b].site))
+        context.obligations.assume(.coercion(.init(on: b, from: t, to: u, at: program[b].site)))
       }
       return context.obligations.assume(e, hasType: t, at: site)
     }
@@ -2616,7 +2615,7 @@ public struct Typer {
     func assumeApplicable(_ f: AnyTypeIdentity) {
       let k = StaticCallConstraint(
         callee: f, arguments: i, output: o, origin: e, site: program[e].site)
-      context.obligations.assume(k)
+      context.obligations.assume(.staticCall(k))
     }
   }
 
@@ -2675,7 +2674,7 @@ public struct Typer {
     let t = fresh().erased
     let k = TupleMemberConstraint(
       member: program[e].member, parent: parent, type: t, site: s)
-    context.obligations.assume(k)
+    context.obligations.assume(.tupleMember(k))
     return context.obligations.assume(e, hasType: t, at: s)
   }
 
@@ -2775,7 +2774,7 @@ public struct Typer {
     if isPartial, let i = program[d].initializer {
       let v = context.withSubcontext(expectedType: p, { (s) in inferredType(of: i, in: &s) })
       if v != .error {
-        context.obligations.assume(CoercionConstraint(on: i, from: v, to: p, at: program[i].site))
+        context.obligations.assume(.coercion(.init(on: i, from: v, to: p, at: program[i].site)))
       }
     }
 
@@ -2946,7 +2945,7 @@ public struct Typer {
     // Otherwise, create an overload set.
     else {
       let t = fresh().erased
-      o.assume(OverloadConstraint(name: n, type: t, candidates: candidates, site: site))
+      o.assume(.overload(.init(name: n, type: t, candidates: candidates, site: site)))
       return .left(t)
     }
   }
@@ -4026,7 +4025,7 @@ public struct Typer {
         let t = fresh().erased
         let k = MemberConstraint(
           member: e, role: context.role, qualification: q, type: t, site: site)
-        context.obligations.assume(k)
+        context.obligations.assume(.member(k))
         return context.obligations.assume(e, hasType: t, at: site)
       }
 

@@ -13,7 +13,7 @@ internal struct Solver {
   private var current: SolutionScore = .zero
 
   /// The constraints to satisfy.
-  private var goals: [any Constraint] = []
+  private var goals: [ConstraintEnum] = []
 
   /// A map from goal its outcome.
   private var outcomes: [GoalOutcome] = []
@@ -104,24 +104,24 @@ internal struct Solver {
 
           let o: GoalOutcome
           switch me.goals[g] {
-          case is EqualityConstraint:
-            o = me.solve(equality: g)
-          case is CoercionConstraint:
-            o = me.solve(coercion: g)
-          case is WideningConstraint:
-            o = me.solve(widening: g)
-          case is ConstructorConversionConstraint:
-            o = me.solve(constructorConversion: g)
-          case is CallConstraint:
-            o = me.solve(call: g)
-          case is StaticCallConstraint:
-            o = me.solve(staticCall: g)
-          case is MemberConstraint:
-            o = me.solve(member: g)
-          case is TupleMemberConstraint:
-            o = me.solve(tupleMember: g)
-          case is OverloadConstraint:
-            return me.solve(overload: g)
+          case .equality(let k):
+            o = me.solve(equality: k)
+          case .coercion(let k):
+            o = me.solve(coercion: k, goal: g)
+          case .widening(let k):
+            o = me.solve(widening: k, goal: g)
+          case .constructorConversion(let k):
+            o = me.solve(constructorConversion: k, goal: g)
+          case .call(let k):
+            o = me.solve(call: k, goal: g)
+          case .staticCall(let k):
+            o = me.solve(staticCall: k, goal: g)
+          case .member(let k):
+            o = me.solve(member: k, goal: g)
+          case .tupleMember(let k):
+            o = me.solve(tupleMember: k, goal: g)
+          case .overload(let k):
+            return me.solve(overload: k, goal: g)
           default:
             unreachable()
           }
@@ -150,9 +150,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is an equality constraint.
-  private mutating func solve(equality g: GoalIdentity) -> GoalOutcome {
-    let k = goals[g] as! EqualityConstraint
-
+  private mutating func solve(equality k: EqualityConstraint) -> GoalOutcome {
     if let s = program.types.unifiable(k.lhs, k.rhs) {
       for (t, u) in s.assignments { assume(t, equals: u) }
       return .success
@@ -167,9 +165,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is a coercion constraint.
-  private mutating func solve(coercion g: GoalIdentity) -> GoalOutcome {
-    let k = goals[g] as! CoercionConstraint
-
+  private mutating func solve(coercion k: CoercionConstraint, goal g: GoalIdentity) -> GoalOutcome {
     if k.isTrivial {
       return .success
     } else if k.lhs.isVariable {
@@ -202,7 +198,7 @@ internal struct Solver {
   /// Returns the simplification of `k` as an equality between its operands.
   private mutating func simplify(_ k: CoercionConstraint) -> GoalOutcome {
     let e = EqualityConstraint(lhs: k.lhs, rhs: k.rhs, site: k.site)
-    let s = schedule(e)
+    let s = schedule(.equality(e))
     return .forward([s], diagnoseInvalidCoercion(k))
   }
 
@@ -246,9 +242,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is a widening constraint.
-  private mutating func solve(widening g: GoalIdentity) -> GoalOutcome {
-    let k = goals[g] as! WideningConstraint
-
+  private mutating func solve(widening k: WideningConstraint, goal g: GoalIdentity) -> GoalOutcome {
     // Check that the left-hand side can be widened to the right-hand side.
     switch program.types.tag(of: k.rhs) {
     case TypeVariable.self:
@@ -260,9 +254,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is a constructor conversion constraint.
-  private mutating func solve(constructorConversion g: GoalIdentity) -> GoalOutcome {
-    let k = goals[g] as! ConstructorConversionConstraint
-
+  private mutating func solve(constructorConversion k: ConstructorConversionConstraint, goal g: GoalIdentity) -> GoalOutcome {
     // Can't do anything before we've inferred the type of the source.
     if k.lhs.isVariable {
       return postpone(g)
@@ -270,7 +262,7 @@ internal struct Solver {
 
     // Is the source an initializer?
     else if let t = program.types.asConstructor(k.lhs) {
-      let subgoal = schedule(EqualityConstraint(lhs: k.rhs, rhs: t, site: k.site))
+      let subgoal = schedule(.equality(.init(lhs: k.rhs, rhs: t, site: k.site)))
       return delegate([subgoal])
     }
 
@@ -287,7 +279,7 @@ internal struct Solver {
   /// Returns the simplification of `k` as an equality between its operands.
   private mutating func simplify(_ k: WideningConstraint) -> GoalOutcome {
     let e = EqualityConstraint(lhs: k.lhs, rhs: k.rhs, site: k.site)
-    let s = schedule(e)
+    let s = schedule(.equality(e))
     return .forward([s]) { (ss, _, tp, ds) in
       let t = tp.program.types.reify(e.lhs, applying: ss)
       let u = tp.program.types.reify(e.rhs, applying: ss)
@@ -296,9 +288,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is a call constraint.
-  private mutating func solve(call g: GoalIdentity) -> GoalOutcome {
-    let k = goals[g] as! CallConstraint
-
+  private mutating func solve(call k: CallConstraint, goal g: GoalIdentity) -> GoalOutcome {
     // Can't do anything before we've inferred the type of the callee.
     let (context, head) = program.types.contextAndHead(k.callee)
     if head.isVariable {
@@ -321,8 +311,8 @@ internal struct Solver {
     } else {
       let f = program[k.origin].callee
       (_, callee) = program.types.open(k.callee)
-      coercion = schedule(
-        CoercionConstraint(on: f, from: k.callee, to: callee, at: program[f].site))
+      coercion = schedule(.coercion(
+        CoercionConstraint(on: f, from: k.callee, to: callee, at: program[f].site)))
       subgoals.append(coercion)
     }
 
@@ -338,7 +328,7 @@ internal struct Solver {
     // Infer the output type.
     let m = inplace || program.isMarkedForMutation(program[k.origin].callee)
     if let o = program.types.resultOfApplying(callee, mutably: m) {
-      subgoals.append(schedule(EqualityConstraint(lhs: o, rhs: k.output, site: k.site)))
+      subgoals.append(schedule(.equality(.init(lhs: o, rhs: k.output, site: k.site))))
     } else {
       assert(program.types.tag(of: callee) == Bundle.self)
       return .failure { (ss, _, tp, ds) in
@@ -353,7 +343,7 @@ internal struct Solver {
     }
 
     for s in ss {
-      subgoals.append(schedule(s))
+      subgoals.append(schedule(.coercion(s)))
     }
 
     return .forward(subgoals) { (substitutions, outcomes, typer, ds) in
@@ -422,8 +412,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is a static call constraint.
-  private mutating func solve(staticCall g: GoalIdentity) -> GoalOutcome {
-    let k = goals[g] as! StaticCallConstraint
+  private mutating func solve(staticCall k: StaticCallConstraint, goal g: GoalIdentity) -> GoalOutcome {
     assert(k.arguments.count == program[k.origin].arguments.count)
 
     // Can't do anything before we've inferred the type of the callee.
@@ -439,7 +428,7 @@ internal struct Solver {
 
       let ss = TypeArguments(mapping: u.parameters, to: k.arguments)
       let t = program.types.substitute(ss, in: u.head)
-      let subgoal = schedule(EqualityConstraint(lhs: k.output, rhs: t, site: k.site))
+      let subgoal = schedule(.equality(.init(lhs: k.output, rhs: t, site: k.site)))
       return delegate([subgoal])
     }
 
@@ -452,7 +441,7 @@ internal struct Solver {
 
       let ss = TypeArguments(mapping: parameters, to: k.arguments)
       let t = program.types.demand(TypeApplication(abstraction: u.erased, arguments: ss)).erased
-      let subgoal = schedule(EqualityConstraint(lhs: k.output, rhs: t, site: k.site))
+      let subgoal = schedule(.equality(.init(lhs: k.output, rhs: t, site: k.site)))
       return delegate([subgoal])
     }
 
@@ -483,9 +472,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is a member constraint.
-  private mutating func solve(member g: GoalIdentity) -> GoalOutcome {
-    let k = goals[g] as! MemberConstraint
-
+  private mutating func solve(member k: MemberConstraint, goal g: GoalIdentity) -> GoalOutcome {
     // Can't do anything before we've inferred the type of the qualification.
     if k.qualification.isVariable || program.types.isMetatype(k.qualification, of: \.isVariable) {
       return postpone(g)
@@ -506,7 +493,7 @@ internal struct Solver {
     switch typer.assume(k.member, boundTo: candidates, for: k.role, at: k.site, in: &o) {
     case .left(let t):
       bindings.merge(o.bindings, uniquingKeysWith: { (_, _) in unreachable() })
-      var subgoals = [schedule(EqualityConstraint(lhs: t, rhs: k.type, site: k.site))]
+      var subgoals = [schedule(.equality(.init(lhs: t, rhs: k.type, site: k.site)))]
       subgoals.append(contentsOf: o.constraints.map({ (c) in schedule(c) }))
       return delegate(subgoals)
 
@@ -516,9 +503,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is a member constraint.
-  private mutating func solve(tupleMember g: GoalIdentity) -> GoalOutcome {
-    let k = goals[g] as! TupleMemberConstraint
-
+  private mutating func solve(tupleMember k: TupleMemberConstraint, goal g: GoalIdentity) -> GoalOutcome {
     // Can't do anything before we've inferred the type of the container.
     if k.parent.isVariable || program.types.isMetatype(k.parent, of: \.isVariable) {
       return postpone(g)
@@ -528,7 +513,7 @@ internal struct Solver {
     else if let p = program.types.cast(k.parent, to: Tuple.self) {
       if let t = program.types.member(k.member.value, of: p) {
         let e = EqualityConstraint(lhs: t, rhs: k.type, site: k.site)
-        let s = schedule(e)
+        let s = schedule(.equality(e))
         return delegate([s])
       }
     }
@@ -547,9 +532,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is an overload constraint.
-  private mutating func solve(overload g: GoalIdentity) -> Solution {
-    let k = goals[g] as! OverloadConstraint
-
+  private mutating func solve(overload k: OverloadConstraint, goal g: GoalIdentity) -> Solution {
     var viable: [(choice: NameResolutionCandidate, solution: Solution)] = []
     for choice in k.candidates {
       let equality = EqualityConstraint(lhs: k.type, rhs: choice.type, site: k.site)
@@ -557,7 +540,7 @@ internal struct Solver {
 
       let s = indenting { (me) in
         var fork = Self(forking: me)
-        let subgoal = fork.insert(fresh: equality)
+        let subgoal = fork.insert(fresh: .equality(equality))
         fork.outcomes[g] = fork.delegate([subgoal])
         fork.bindings[k.name] = choice.reference
         return fork.solution(betterThanOrEqualTo: me.best, using: &me.typer)
@@ -657,9 +640,9 @@ internal struct Solver {
     var end = stale.count
     for i in (0 ..< stale.count).reversed() {
       switch goals[stale[i]] {
-      case let k as CoercionConstraint:
+      case .coercion(let k):
         outcomes[stale[i]] = simplify(k)
-      case let k as WideningConstraint:
+      case .widening(let k):
         outcomes[stale[i]] = simplify(k)
       default:
         continue
@@ -673,12 +656,12 @@ internal struct Solver {
 
   /// Inserts `gs` into the fresh set and return their identities.
   @discardableResult
-  private mutating func insert<T: Collection<any Constraint>>(fresh gs: T) -> [GoalIdentity] {
+  private mutating func insert<T: Collection<ConstraintEnum>>(fresh gs: T) -> [GoalIdentity] {
     gs.reversed().map({ (g) in insert(fresh: g) })
   }
 
   /// Inserts `k` into the fresh set and returns its identity.
-  private mutating func insert(fresh k: any Constraint) -> GoalIdentity {
+  private mutating func insert(fresh k: ConstraintEnum) -> GoalIdentity {
     let g = goals.count
     goals.append(k)
     if k.isTrivial && false {
@@ -691,7 +674,7 @@ internal struct Solver {
   }
 
   /// Schedules `k` to be solved in the future and returns its identity.
-  private mutating func schedule(_ k: Constraint) -> GoalIdentity {
+  private mutating func schedule(_ k: ConstraintEnum) -> GoalIdentity {
     log("- schedule: \(program.show(k))")
     return insert(fresh: k)
   }
