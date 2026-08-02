@@ -104,46 +104,34 @@ struct TypeLayoutCache {
     taggedEnum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let basis = storage(nominal: t.underlying, in: &p)
-      .map { layout(MonomorphicTypeIdentity($0), in: &p) }
+    let cases = storage(nominal: t.underlying, in: &p).map { c in
+      layout(.init(c), in: &p)
+    }
 
-    if basis.count == 0 {
-      return TypeLayout(
+    if cases.count == 0 {
+      return .init(
         bytes: .init(alignment: 1, size: 0), type: t,
         parts: [.init(name: "discriminator", type: .init(.void), offset: 0)],
         isEnumLayout: true)
     }
 
-    let discriminator = abi.enumDiscriminator(count: basis.count, in: &p)
-    let discriminatorLayout = layout(discriminator, in: &p)
+    let d = layout(abi.enumDiscriminator(count: cases.count, in: &p), in: &p)
 
-    let payloadBytes = TypeLayout.Bytes(
-      alignment: basis.lazy.map(\.alignment).max()!,
-      size: basis.lazy.map(\.size).max()!)
+    let payload = TypeLayout.Bytes(
+      alignment: cases.map(\.alignment).max()!,
+      size: cases.map(\.size).max()!)
 
-    let payloadFirst = payloadBytes.appending(discriminatorLayout.bytes)
-    let discriminatorFirst = discriminatorLayout.bytes.appending(payloadBytes)
-
-    let payloadOffset: Int
-    let discriminatorOffset: Int
-    let l: TypeLayout.Bytes
-
-    if payloadFirst.size < discriminatorFirst.size {
-      l = payloadFirst
-      payloadOffset = 0
-      discriminatorOffset = l.size - discriminatorLayout.size
-    } else {
-      l = discriminatorFirst
-      payloadOffset = l.size - payloadBytes.size
-      discriminatorOffset = 0
-    }
+    let l = storageLayoutOfRecord(havingMembers: [
+        payload, .init(alignment: d.alignment, size: d.size),
+    ])
 
     let ns = names(enum: t.underlying, in: &p)
     let parts =
-      zip(basis, ns).map { TypeLayout.Part(name: $0.1, type: $0.0.type, offset: payloadOffset) }
-      + [.init(name: "discriminator", type: discriminator, offset: discriminatorOffset)]
+      zip(cases, ns).map { TypeLayout.Part(name: $0.1, type: $0.0.type, offset: l.partOffsets[0]) }
+      + [.init(name: "discriminator", type: d.type, offset: l.partOffsets[1])]
 
-    return .init(bytes: l, type: t, parts: parts, isEnumLayout: true)
+
+    return .init(bytes: l.bytes, type: t, parts: parts, isEnumLayout: true)
   }
 
   /// Returns the layout for a raw enum `t` in `p`.
