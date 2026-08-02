@@ -1,3 +1,7 @@
+given Pointer<UInt8> is Deinitializable {}
+given Pointer<TypeWitnessHeader> is Deinitializable {}
+given Pointer<Pointer<TypeWitnessHeader>> is Deinitializable {}
+
 extension TypeWitnessHeader {
 
   init(size: Int, alignment: Int) {
