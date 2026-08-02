@@ -2,38 +2,49 @@ import Utilities
 
 extension IRFunction {
 
-  /// Adds missing closing instructions after the last uses of region opening definitions.
+  /// Adds missing closing instructions after the last uses of region opening definitions in `xs`.
   ///
   /// Some instructions (e.g., `access`) define a value and open non-lexical region in which that
   /// value is considered alive. In the final IR, each opened region must be closed by an `end`
   /// instruction after the last use of the corresponding definition, on all execution paths. This
   /// IR pass guarantees that invariant.
   ///
-  /// This pass expects to run after dead access elimination.
-  internal mutating func closeOpenEndedRegions() {
+  /// This pass is expected to run after dead access elimination.
+  internal mutating func closeOpenEndedRegions(in xs: [AnyInstructionIdentity]) {
     let g = controlFlow()
-    for i in instructions() {
+    var m: [IRValue: Lifetime] = [:]
+    for i in xs {
       switch tag(of: i) {
       case IRAccess.self:
-        close(IRAccess.self, i, computingLivenessWith: g)
+        close(IRAccess.self, i, computingLivenessWith: g, memoizingLifetimesInto: &m)
       case IRCase.self:
-        close(IRCase.self, i, computingLivenessWith: g)
+        close(IRCase.self, i, computingLivenessWith: g, memoizingLifetimesInto: &m)
       case IRPlaceCast.self:
-        close(IRPlaceCast.self, i, computingLivenessWith: g)
+        close(IRPlaceCast.self, i, computingLivenessWith: g, memoizingLifetimesInto: &m)
       case IRProject.self:
-        close(IRProject.self, i, computingLivenessWith: g)
+        close(IRProject.self, i, computingLivenessWith: g, memoizingLifetimesInto: &m)
       default:
-        continue
+        break
       }
     }
   }
 
+  /// Adds missing closing instructions after the last uses of region opening definitions.
+  ///
+  /// Calling this method has the same effect as calling `closeOpenEndedRegions(in:)` with an array
+  /// containing all the instructions in the function.
+  internal mutating func closeOpenEndedRegions() {
+    closeOpenEndedRegions(in: Array(instructions()))
+  }
+
   /// Closes the region opened by `i`, which is an instance of `T`, iff `i` it is open-ended,
   /// using `g` to compute live ranges.
-  private mutating func close<T: IRRegionEntry>(
-    _ : T.Type, _ i: AnyInstructionIdentity, computingLivenessWith g: ControlFlowGraph
+  internal mutating func close<T: IRRegionEntry>(
+    _ : T.Type, _ i: AnyInstructionIdentity,
+    computingLivenessWith g: ControlFlowGraph,
+    memoizingLifetimesInto m: inout [IRValue: Lifetime]
   ) {
-    let r = extendedLiveRange(of: .register(i), controlFlow: g)
+    let r = extendedLiveRange(of: .register(i), in: g, cache: &m)
     for boundary in r.upperBoundaries {
       switch boundary {
       case .after(let u):
@@ -62,19 +73,25 @@ extension IRFunction {
   /// `d` is its live-range merged with the extended live-ranges of the definitions extending `d`.
   ///
   /// - Note: The definition of an operand `o` isn't part of `o`'s lifetime.
-  private func extendedLiveRange(of v: IRValue, controlFlow g: ControlFlowGraph) -> Lifetime {
+  private func extendedLiveRange(
+    of v: IRValue, in g: ControlFlowGraph, cache m: inout [IRValue: Lifetime]
+  ) -> Lifetime {
     // Nothing to do if the operand has no use.
     guard let uses = self.uses[v] else { return Lifetime(operand: v) }
 
     // Nothing to do if the operand isn't a definition.
     guard let b = block(defining: v) else { return Lifetime(operand: v) }
 
+    // Did we compute the result already?
+    if let r = m[v] { return r }
+
     // Compute the live-range of the definition and extend it with that of its extending uses.
     var r = liveRange(of: v, definedIn: b, controlFlow: g)
     for use in uses where at(use.user).isExtendingOperandLifetimes {
-      r = extended(r, toCover: extendedLiveRange(of: .register(use.user), controlFlow: g))
+      r = extended(r, toCover: extendedLiveRange(of: .register(use.user), in: g, cache: &m))
     }
 
+    m[v] = r
     return r
   }
 
