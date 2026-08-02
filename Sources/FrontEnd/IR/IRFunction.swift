@@ -280,12 +280,66 @@ public struct IRFunction: Sendable {
 
   /// Returns the last use of `v` in `b`, if any.
   public func lastUse(of v: IRValue, in b: IRBlock.ID) -> Use? {
-    for i in instructions(in: b).reversed() {
-      if let n = at(i).operands.lastIndex(of: v) {
-        return Use(user: i, index: n)
+    // Nothing to do if there is no use.
+    guard let usesInBlock = uses[v] else { return nil }
+
+    // Uses are recorded in no particular order, so we have to determine which of those occurring
+    // in `b` is sequenced last. We do so by associating each use with a position, initially that
+    // of the definition the using instruction, and advance this position iteratively. The result
+    // is the use whose corresponding position was never advanced until it reached the definition
+    // of another user.
+
+    // Keys are user definitions, values are indices in `useInBlock`.
+    var definitions = SortedDictionary<AnyInstructionIdentity, Int>()
+    // Keys are indices in `useInBlock`, values are positions in `b`.
+    var candidates: [(Int, AnyInstructionIdentity)] = .init(minimumCapacity: usesInBlock.count)
+
+    // Identify the uses that occur in `b`.
+    for i in usesInBlock.indices where block(defining: usesInBlock[i].user) == b {
+      let u = usesInBlock[i]
+      modify(&definitions[u.user]) { (candidate) in
+        // Is there already a candidate for the user of `u`?
+        if let c = candidate {
+          // Is that candidate before `u`?
+          if u.index > usesInBlock[candidates[c].0].index { candidates[c].0 = i }
+        } else {
+          candidate = candidates.count
+          candidates.append((i, u.user))
+        }
       }
     }
-    return nil
+
+    // Eliminate candidates until at most one remains. `e` is the position of the last candidate
+    // not yet eliminated. Each iteration either decreases `e`, advances all positions, or returns
+    // because one position couldn't be advanced.
+    var e = candidates.count - 1
+    while e >= 1 {
+      var c = 0
+      while c <= e {
+        // If there is an next instruction, keep the candidate only if that instruction is not the
+        // definition of another candidate.
+        if let x = instruction(after: candidates[c].1) {
+          if definitions.keys.contains(x) {
+            candidates.swapAt(c, e)
+            e -= 1
+          } else {
+            candidates[c].1 = x
+            c += 1
+          }
+        }
+
+        // The current candidate is at the end of the block, so it's the last use.
+        else {
+          return usesInBlock[candidates[c].0]
+        }
+      }
+    }
+
+    if e == 0 {
+      return usesInBlock[candidates[0].0]
+    } else {
+      return nil
+    }
   }
 
   /// Returns the type of `self`, computing it using `p`.
