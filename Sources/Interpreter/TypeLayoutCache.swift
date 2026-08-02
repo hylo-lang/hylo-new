@@ -92,18 +92,9 @@ struct TypeLayoutCache {
     enum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    if isTaggedEnum(t.underlying, in: p) {
-      computeLayout(taggedEnum: t, in: &p)
-    } else {
-      computeLayout(rawEnum: t, in: &p)
+    if isRawValueEnum(t.underlying, in: p) {
+      return computeLayout(rawValueEnum: t, in: &p)
     }
-  }
-
-  /// Returns the layout for a tagged enum `t` in `p`.
-  private mutating func computeLayout(
-    taggedEnum t: MonomorphicTypeIdentity,
-    in p: inout Program
-  ) -> TypeLayout {
     let cases = storage(nominal: t.underlying, in: &p).map { c in
       layout(.init(c), in: &p)
     }
@@ -134,9 +125,9 @@ struct TypeLayoutCache {
     return .init(bytes: l.bytes, type: t, parts: parts, isEnumLayout: true)
   }
 
-  /// Returns the layout for a raw enum `t` in `p`.
+  /// Returns the layout for a raw value enum `t` in `p`.
   private mutating func computeLayout(
-    rawEnum t: MonomorphicTypeIdentity,
+    rawValueEnum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
     let discriminator = MonomorphicTypeIdentity(
@@ -180,17 +171,17 @@ struct TypeLayoutCache {
     }
   }
 
-  /// Returns true iff enum `t` in `p` has a representation.
-  private func isTaggedEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
+  /// Returns true iff enum `t` in `p` is a raw value enum.
+  private func isRawValueEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
     precondition(!t[.hasAliases])
     let u = tag(t, in: p)
     if u == Enum.self {
       let d = type(t, as: Enum.self, in: p).declaration
-      return p[d].representation == nil
+      return p[d].representation != nil
     } else {
       let a = type(t, as: TypeApplication.self, in: p)
       let d = type(a.abstraction, as: Enum.self, in: p).declaration
-      return p[d].representation == nil
+      return p[d].representation != nil
     }
   }
 
