@@ -99,18 +99,11 @@ struct TypeLayoutCache {
       layout(.init(c), in: &p)
     }
 
-    if cases.count == 0 {
-      return .init(
-        bytes: .init(alignment: 1, size: 0), type: t,
-        parts: [.init(name: "discriminator", type: .init(.void), offset: 0)],
-        isEnumLayout: true)
-    }
-
     let d = layout(abi.enumDiscriminator(count: cases.count, in: &p), in: &p)
 
     let payload = TypeLayout.Bytes(
-      alignment: cases.map(\.alignment).max()!,
-      size: cases.map(\.size).max()!)
+      alignment: cases.map(\.alignment).max() ?? 1,
+      size: cases.map(\.size).max() ?? 0)
 
     let l = storageLayoutOfRecord(havingMembers: [
         payload, .init(alignment: d.alignment, size: d.size),
