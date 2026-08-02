@@ -100,7 +100,9 @@ extension TypeLayout {
 
 extension BinaryInteger {
 
-  /// Returns `self` rounded up to the nearest multiple of `n`, which is a power of two.
+  /// Returns `self` rounded up to the nearest multiple of `n`.
+  ///
+  /// - Precondition: `n > 0`.
   fileprivate func rounded(upToNearestMultipleOf n: Self) -> Self {
     let r = self % n
     return (r == 0) ? self : self + (n - r)
