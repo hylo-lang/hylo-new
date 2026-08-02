@@ -109,7 +109,7 @@ public struct Typer {
     fileprivate var standardLibraryEntityToType: [Program.StandardLibraryEntity: AnyTypeIdentity]
 
     /// The cache of `Typer.canDeriveCoercion(_:applying:)`.
-    fileprivate var canDeriveCoercion: [Given: [TypePair: UInt8]]
+    fileprivate var canDeriveCoercion: [Given: [TypePair: CoercionCapability]]
 
     /// Creates an instance for typing `m`, which is a module in `p`.
     fileprivate init(typing m: Module.ID, in p: Program) {
@@ -279,6 +279,24 @@ public struct Typer {
       }
     }
     return u
+  }
+
+  /// The ways in which a given may contribute to the derivation of a coercion between a pair of
+  /// types `(a, b)`.
+  fileprivate struct CoercionCapability: OptionSet {
+
+    /// The raw representation.
+    var rawValue: UInt8 = 0
+
+    /// `a` unifies with at least one side of the given's head.
+    static let first = CoercionCapability(rawValue: 0b10)
+
+    /// `b` unifies with at least one side of the given's head.
+    static let second = CoercionCapability(rawValue: 0b01)
+
+    /// The given may witness coercions on both members of the pair.
+    static let both = CoercionCapability(rawValue: 0b11)
+
   }
 
   /// The occurrences of a particular capture in a local definition.
@@ -3935,13 +3953,14 @@ public struct Typer {
     return takeSummonResults(from: threads, in: scopeOfUse)
   }
 
-  /// Returns `true` iff a coercion (i.e., a witness of a type equality) from `a` to `b` might be
-  /// derived using the givens visible from `scopeOfUse` and those assumed in `environment`.
+  /// Returns `true` iff a coercion (i.e., a witness of a type equality) between `a` and `b` might
+  /// be derived using the givens visible from `scopeOfUse` and those assumed in `environment`.
   ///
-  /// This method enumerates givens having heads of the form `T ~ U`, excluding the built-in ones,
-  /// and checks whether `T` and `U` are unifiable with the given arguments. If either `a` or `b`
-  /// can't be unified in any of these givens, then we can conclude that implicit resolution will
-  /// necessarily fail to prove a coercion from `a` to `b`.
+  /// This method enumerates givens having heads of the form `T ~ U` and heads that can match any
+  /// type (e.g., `<T> T`), excluding the built-in ones, and checks whether `a` and `b` are each
+  /// unifiable with one side of some (possibly different) given. If either `a` or `b` can't be
+  /// unified in any of these givens, then we can conclude that implicit resolution will
+  /// necessarily fail to prove a coercion between `a` and `b`.
   private mutating func canDeriveCoercions(
     _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, in scopeOfUse: ScopeIdentity,
     where environment: ResolutionThread.Environment
@@ -3953,40 +3972,56 @@ public struct Typer {
 
     // Make sure the cache key does not depend on the order in which `a` and `b` have been passed.
     let p = (b.bits < a.bits) ? Pair(b, a) : Pair(a, b)
-    if let memoized = cache.scopeToPotentialCoercions[scopeOfUse]?[p] { return memoized }
+
+    // The memo isn't keyed by the assumed givens of `environment`, so it can only serve queries
+    // answered against an empty environment. Variable-bearing keys are not memoized, as they are
+    // meaningless outside of the constraint system currently being solved.
+    let memoizable =
+      environment.givens.isEmpty && !p.first[.hasVariable] && !p.second[.hasVariable]
+    if memoizable, let memoized = cache.scopeToPotentialCoercions[scopeOfUse]?[p] {
+      return memoized
+    }
 
     // Check if there are givens in scope that could be used to derive a coercion.
-    var result: UInt8 = 0
+    var result: CoercionCapability = .init()
     for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined())  {
-      result |= canDeriveCoercion(p, applying: g)
-      if result == 0b11 {
-        cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = true
+      result.formUnion(canDeriveCoercion(p, applying: g))
+      if result == .both {
+        if memoizable && !hasImplicitOnStack() {
+          cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = true
+        }
         return true
       }
     }
 
-    assert((result & 0b11) != 0b11)
-    cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = false
+    assert(result != .both)
+    if memoizable && !hasImplicitOnStack() {
+      cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = false
+    }
     return false
   }
 
-  /// Returns two bits indicating whether `g` may be used to prove a coercion from `p.first` to `x`
-  /// and from `x` to `p.second`, respectively.
-  ///
-  /// The two least significant bits of the result encode a pair of Boolean values, satisfying the
-  /// two following statements:
-  /// - `r & 0b10 != 0` iff `g` may witness a coercion from `p.first` to `x`; and
-  /// - `r & 0b01 != 0` iff `g` may witness a coercion from `p.second` to `x`.
-  private mutating func canDeriveCoercion(_ p: Memos.TypePair, applying g: Given) -> UInt8 {
+  /// Returns whether `g` may occur in a derivation of `p.first ~ p.second`, as a set containing
+  /// `.first` (or `.second`) iff `p.first` (or `p.second`) unifies with one side of `g`'s head.
+  private mutating func canDeriveCoercion(
+    _ p: Memos.TypePair, applying g: Given
+  ) -> CoercionCapability {
     if let memoized = cache.canDeriveCoercion[g]?[p] { return memoized }
+
+    // Do not memoize variable-bearing keys or results computed while givens are on stack.
+    // Such queries may yield different results in the future.
+    let memoizable =
+      !p.first[.hasVariable] && !p.second[.hasVariable] && !hasImplicitOnStack()
 
     let t = declaredType(of: g)
     let u = program.types.contextAndHead(t)
 
     // Can the given match any type (e.g., `<T> T`)?
     if u.context.parameters.contains(where: { (p) in p == u.head }) {
-      cache.canDeriveCoercion[g, default: [:]][p] = 0b11
-      return 0b11
+      if memoizable {
+        cache.canDeriveCoercion[g, default: [:]][p] = .both
+      }
+      return .both
     }
 
     // Is the given of the form `T ~ U`?
@@ -3994,16 +4029,20 @@ public struct Typer {
       let l = program.types.open(u.context.parameters, in: program.types[e].lhs)
       let r = program.types.open(u.context.parameters, in: program.types[e].rhs)
 
-      var result: UInt8 = 0
-      if unifiable(p.first, l) || unifiable(p.first, r) { result |= 0b10 }
-      if unifiable(p.second, l) || unifiable(p.second, r) { result |= 0b01 }
-      cache.canDeriveCoercion[g, default: [:]][p] = result
+      var result = CoercionCapability()
+      if unifiable(p.first, l) || unifiable(p.first, r) { result.formUnion(.first) }
+      if unifiable(p.second, l) || unifiable(p.second, r) { result.formUnion(.second) }
+      if memoizable {
+        cache.canDeriveCoercion[g, default: [:]][p] = result
+      }
       return result
     }
 
     // The given can't be used to form a coercion.
-    cache.canDeriveCoercion[g, default: [:]][p] = 0b00
-    return 0b00
+    if memoizable {
+      cache.canDeriveCoercion[g, default: [:]][p] = CoercionCapability()
+    }
+    return CoercionCapability()
   }
 
   // MARK: Name resolution
