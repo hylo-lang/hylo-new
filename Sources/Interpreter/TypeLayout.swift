@@ -18,6 +18,15 @@ struct TypeLayout: Regular {
     }
   }
 
+  /// A (potential, in the case of enum types) named or unnambed member of a type.
+  public struct Member: Regular {
+    /// The name if any (i.e. tuple label or stored property name).
+    public let name: String?
+
+    /// The type of the member.
+    public let type: MonomorphicTypeIdentity
+  }
+
   /// A (potential, in the case of enum types) part of `type` and
   /// where it is stored in a `type` instance.
   public struct Part: Regular {

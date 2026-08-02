@@ -61,14 +61,14 @@ struct TypeLayoutCache {
       ?? .init(repeating: nil, count: ms.count)
     return computeLayout(
       record: t,
-      havingMembers: zip(ms, ns).map { (type: .init($0.0), label: $0.1) },
+      havingMembers: zip(ms, ns).map { .init(name: $0.1, type: .init($0.0)) },
       in: &p)
   }
 
   /// Returns the layout for a record `t` in `p` having members `ms`.
   private mutating func computeLayout(
     record t: MonomorphicTypeIdentity,
-    havingMembers ms: [(type: MonomorphicTypeIdentity, label: String?)],
+    havingMembers ms: [TypeLayout.Member],
     in p: inout Program
   ) -> TypeLayout {
     var b = TypeLayout.Bytes(alignment: 1, size: 0)
@@ -77,7 +77,7 @@ struct TypeLayoutCache {
       let c = layout(m.type, in: &p).bytes
       b = b.appending(c)
       parts.append(
-        .init(name: m.label ?? String(i), type: m.type, offset: b.size - c.size))
+        .init(name: m.name ?? String(i), type: m.type, offset: b.size - c.size))
     }
     return TypeLayout(bytes: b, type: t, parts: parts, isEnumLayout: false)
   }
