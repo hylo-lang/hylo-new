@@ -539,7 +539,7 @@ public struct IRFunction: Sendable {
 
   /// Returns the instructions in `b`.
   public func instructions(in b: IRBlock.ID) -> IRBlock.Iterator {
-    .init(slots: slots, last: blocks[b].last, current: blocks[b].first)
+    .init(slots: slots, last: blocks[b].last, next: blocks[b].first)
   }
 
   /// Returns the contents of `b` iff it contains exactly one instruction.
@@ -557,7 +557,7 @@ public struct IRFunction: Sendable {
     return .init(
       slots: slots,
       last: blocks[b].last,
-      current: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
+      next: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
   }
 
   /// Returns `true` iff `b` contains an instruction of type `T`.
@@ -905,26 +905,56 @@ extension IRBlock {
     private let last: List<IRFunction.Slot>.Address?
 
     /// The identity of the next element in `self`, if any.
-    private var current: List<IRFunction.Slot>.Address?
+    private var _next: List<IRFunction.Slot>.Address?
+
+    /// `true` iff the iterator generates instructions in order (from first to last), `false` iff
+    /// it generates them in reverse order.
+    ///
+    /// If `last` is not `nil` then it occurs after `_next` iff `forward` is `true`.
+    private let forward: Bool
+
+    private init(
+      slots: List<IRFunction.Slot>,
+      last: List<IRFunction.Slot>.Address?,
+      next: List<IRFunction.Slot>.Address?,
+      forward: Bool
+    ) {
+      self.slots = slots
+      self.last = last
+      self._next = next
+      self.forward = forward
+    }
 
     /// Creates an instance enumerating the identities of the instructions in `slots` between
-    /// `current` and `last`, included.
+    /// `next` and `last`, included.
+    ///
+    /// If `last` is `nil` then `next` is `nil` too and the sequence is empty. Otherwise, `next`
+    /// and occurs before `last` in the same basic block.
     fileprivate init(
-      slots: List<IRFunction.Slot>, last: AnyInstructionIdentity?, current: AnyInstructionIdentity?
+      slots: List<IRFunction.Slot>, last: AnyInstructionIdentity?, next: AnyInstructionIdentity?
     ) {
-      assert((current != nil) || (last == nil))
+      assert((next != nil) || (last == nil))
       self.slots = slots
-      self.current = current?.address
+      self._next = next?.address
       self.last = last?.address
+      self.forward = true
     }
 
     public mutating func next() -> AnyInstructionIdentity? {
-      if let n = current {
-        current = (n != last) ? slots.address(after: n) : nil
+      if let n = _next {
+        if n == last {
+          _next = nil
+        } else {
+          _next = forward ? slots.address(after: n) : slots.address(before: n)
+        }
         return .init(address: n)
       } else {
         return nil
       }
+    }
+
+    public func reversed() -> Self {
+      .init(slots: slots, last: _next, next: last, forward: !forward)
     }
 
   }
