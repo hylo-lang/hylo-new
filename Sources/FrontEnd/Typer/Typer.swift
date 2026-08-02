@@ -60,6 +60,9 @@ public struct Typer {
     /// A pair of types.
     fileprivate typealias TypePair = Pair<AnyTypeIdentity, AnyTypeIdentity>
 
+    /// A pair composed of an extension and a type.
+    fileprivate typealias ExtensionAndType = Pair<ExtensionDeclaration.ID, AnyTypeIdentity>
+
     /// The cache of `Typer.lookup(_:atTopLevelOf:)`.
     fileprivate var moduleToIdentifierToDeclaration: [LookupTable?]
 
@@ -111,22 +114,8 @@ public struct Typer {
     /// The cache of `Typer.canDeriveCoercion(_:applying:)`.
     fileprivate var canDeriveCoercion: [Given: [TypePair: UInt8]]
 
-    /// A key identifying an extension-applicability query.
-    fileprivate struct AppliesKey: Hashable {
-
-      /// The scope in which the extension is being applied.
-      let s: ScopeIdentity
-
-      /// The extension being tested.
-      let d: ExtensionDeclaration.ID
-
-      /// The subject type.
-      let t: AnyTypeIdentity
-
-    }
-
     /// The cache of `Typer.applies(_:to:in:)`.
-    fileprivate var applies: [AppliesKey: SummonResult?]
+    fileprivate var scopeToExtensionApplies: [ScopeIdentity: [ExtensionAndType: SummonResult]]
 
     /// Creates an instance for typing `m`, which is a module in `p`.
     fileprivate init(typing m: Module.ID, in p: Program) {
@@ -147,7 +136,7 @@ public struct Typer {
       self.predefinedGivens = [:]
       self.standardLibraryEntityToType = [:]
       self.canDeriveCoercion = [:]
-      self.applies = [:]
+      self.scopeToExtensionApplies = [:]
     }
 
   }
@@ -4610,12 +4599,17 @@ public struct Typer {
     }
   }
 
-  /// Returns how to match a value of type `t` to apply the members of `d` in `s`.
+  /// Returns how to match a value of type `t` to apply the members of `d` in `scopeOfUse`.
   ///
   /// - Requires: The context clause of `t`, if present, has no usings.
   private mutating func applies(
-    _ d: ExtensionDeclaration.ID, to t: AnyTypeIdentity, in s: ScopeIdentity
+    _ d: ExtensionDeclaration.ID, to t: AnyTypeIdentity, in scopeOfUse: ScopeIdentity
   ) -> SummonResult? {
+    // If there aren't any givens in `scopeOfUse`, forward the query to the parent scope.
+    if givens(lexicallyIn: scopeOfUse).isEmpty, let p = program.parent(containing: scopeOfUse) {
+      return applies(d, to: t, in: p)
+    }
+
     let u = extendeeType(d)
     let w = WitnessExpression(value: .reference(.init(d)), type: u)
 
@@ -4623,20 +4617,18 @@ public struct Typer {
     if t == u { return .init(witness: w, substitutions: .init(), penalties: 0) }
 
     // Consult the cache.
-    let key = Memos.AppliesKey(s: s, d: d, t: t)
-    if !t[.hasVariable], let m = cache.applies[key] {
-      return m
-    }
+    let key = Memos.ExtensionAndType(d, t)
+    if let memoized = cache.scopeToExtensionApplies[scopeOfUse]?[key] { return memoized }
 
     // Slow path: use the match judgement of implicit resolution to create a witness describing
     // "how" the type matches the extension.
     let (context, head) = program.types.contextAndHead(t)
     assert(context.usings.isEmpty)
     let thread = formThread(matching: w, to: head, in: .empty)
-    let result = takeSummonResults(from: [thread], in: s).uniqueElement
+    let result = takeSummonResults(from: [thread], in: scopeOfUse).uniqueElement
 
     if !t[.hasVariable] && !hasImplicitOnStack() {
-      cache.applies[key] = result
+      cache.scopeToExtensionApplies[scopeOfUse, default: [:]][key] = result
     }
     return result
   }
