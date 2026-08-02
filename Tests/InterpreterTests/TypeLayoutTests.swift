@@ -337,8 +337,9 @@ final class TypeLayoutTests: XCTestCase {
       XCTAssertGreaterThanOrEqual(
         m0.alignment, m1.alignment,
         """
-        Member \(i0) with alignment \(m0.alignment) ordered before member \(i1) with alignment \(m1.alignment) !
-        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        Member \(i0) with alignment \(m0.alignment) ordered before member \(i1)
+        with alignment \(m1.alignment)!
+        \(zip(sa, offsets).map { "\n\($0), offset: \($1)" }.joined())
         """
       )
       if m0.alignment == m1.alignment {
