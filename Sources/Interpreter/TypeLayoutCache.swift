@@ -71,15 +71,19 @@ struct TypeLayoutCache {
     havingMembers ms: [TypeLayout.Member],
     in p: inout Program
   ) -> TypeLayout {
-    var b = TypeLayout.Bytes(alignment: 1, size: 0)
-    var parts: [TypeLayout.Part] = []
-    for (i, m) in ms.enumerated() {
-      let c = layout(m.type, in: &p).bytes
-      b = b.appending(c)
-      parts.append(
-        .init(name: m.name ?? String(i), type: m.type, offset: b.size - c.size))
+    let l = storageLayoutOfRecord(
+      havingMembers: ms.map { layout($0.type, in: &p).bytes })
+
+    let parts = zip(ms, l.partOffsets).enumerated().map { i, x in
+      let (m, o) = x
+      return TypeLayout.Part(
+        name: m.name ?? String(i),
+        type: m.type,
+        offset: o
+      )
     }
-    return TypeLayout(bytes: b, type: t, parts: parts, isEnumLayout: false)
+
+    return .init(bytes: l.bytes, type: t, parts: parts, isEnumLayout: false)
   }
 
   /// Returns the layout for an enum `t` in `p`.
@@ -253,4 +257,25 @@ struct TypeLayoutCache {
   private func tag(_ t: AnyTypeIdentity, in p: Program) -> any TypeTree.Type {
     p.types.tag(of: t).value
   }
+}
+
+/// Returns the storage layout and part offsets of a record having member layouts `ms`.
+func storageLayoutOfRecord(
+  havingMembers ms: [TypeLayout.Bytes]
+) -> (bytes: TypeLayout.Bytes, partOffsets: [Int]) {
+  let storageOrder = ms.enumerated().sorted {
+    if $0.element.alignment == $1.element.alignment {
+      return $0.offset < $1.offset
+    } else {
+      return $0.element.alignment > $1.element.alignment
+    }
+  }
+
+  var b = TypeLayout.Bytes(alignment: 1, size: 0)
+  var offsets = [Int](repeating: 0, count: ms.count)
+  for (i, m) in storageOrder {
+    b = b.appending(m)
+    offsets[i] = b.size - m.size
+  }
+  return (b, offsets)
 }

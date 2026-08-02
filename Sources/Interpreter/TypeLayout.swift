@@ -98,6 +98,16 @@ extension TypeLayout {
   }
 }
 
+extension BinaryInteger {
+
+  /// Returns `self` rounded up to the nearest multiple of `n`, which is a power of two.
+  fileprivate func rounded(upToNearestMultipleOf n: Self) -> Self {
+    let r = self % n
+    return (r == 0) ? self : self + (n - r)
+  }
+
+}
+
 extension TypeLayout.Bytes {
 
   /// Returns the layout of the tuple `(S, T)`, where `S` and `T` are types whose layout is

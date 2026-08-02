@@ -40,15 +40,15 @@ final class TypeLayoutTests: XCTestCase {
     let i8 = id(MachineType.i(8))
     let i64 = id(MachineType.i(64))
     let i8i64 = layout(p.types.tuple(of: [i8, i64]))
-    XCTAssertEqual(i8i64.bytes, .init(alignment: 8, size: 16))
+    XCTAssertEqual(i8i64.bytes, .init(alignment: 8, size: 9))
     let i64i8 = layout(p.types.tuple(of: [i64, i8]))
     XCTAssertEqual(i64i8.bytes, .init(alignment: 8, size: 9))
 
     XCTAssertEqual(
       i8i64.parts,
       [
-        .init(name: "0", type: .init(i8), offset: 0),
-        .init(name: "1", type: .init(i64), offset: 8),
+        .init(name: "0", type: .init(i8), offset: 8),
+        .init(name: "1", type: .init(i64), offset: 0),
       ])
 
     XCTAssertEqual(
@@ -65,14 +65,14 @@ final class TypeLayoutTests: XCTestCase {
     let i32 = id(MachineType.i(32))
 
     let i8i16i32 = layout(p.types.tuple(of: [i8, i16, i32]))
-    XCTAssertEqual(i8i16i32.bytes, .init(alignment: 4, size: 8))
+    XCTAssertEqual(i8i16i32.bytes, .init(alignment: 4, size: 7))
 
     XCTAssertEqual(
       i8i16i32.parts,
       [
-        .init(name: "0", type: .init(i8), offset: 0),
-        .init(name: "1", type: .init(i16), offset: 2),
-        .init(name: "2", type: .init(i32), offset: 4),
+        .init(name: "0", type: .init(i8), offset: 6),
+        .init(name: "1", type: .init(i16), offset: 4),
+        .init(name: "2", type: .init(i32), offset: 0),
       ])
   }
 
@@ -103,13 +103,13 @@ final class TypeLayoutTests: XCTestCase {
           }
           """))
 
-    XCTAssertEqual(i816.size, 4)
+    XCTAssertEqual(i816.size, 3)
     XCTAssertEqual(i816.alignment, 2)
     XCTAssertEqual(
       i816.parts,
       [
-        .init(name: "x", type: .init(i8), offset: 0),
-        .init(name: "y", type: .init(i16), offset: 2),
+        .init(name: "x", type: .init(i8), offset: 2),
+        .init(name: "y", type: .init(i16), offset: 0),
       ])
   }
 
@@ -182,13 +182,13 @@ final class TypeLayoutTests: XCTestCase {
           }
           """))
 
-    XCTAssertEqual(i816.size, 4)
+    XCTAssertEqual(i816.size, 3)
     XCTAssertEqual(i816.alignment, 2)
     XCTAssertEqual(
       i816.parts,
       [
-        .init(name: "x", type: .init(i8), offset: 0),
-        .init(name: "y", type: .init(i16), offset: 2),
+        .init(name: "x", type: .init(i8), offset: 2),
+        .init(name: "y", type: .init(i16), offset: 0),
       ])
   }
 
@@ -204,13 +204,13 @@ final class TypeLayoutTests: XCTestCase {
           type PairTuple<T, U> = {T, U}
           """))
 
-    XCTAssertEqual(i816.size, 4)
+    XCTAssertEqual(i816.size, 3)
     XCTAssertEqual(i816.alignment, 2)
     XCTAssertEqual(
       i816.parts,
       [
-        .init(name: "0", type: .init(i8), offset: 0),
-        .init(name: "1", type: .init(i16), offset: 2),
+        .init(name: "0", type: .init(i8), offset: 2),
+        .init(name: "1", type: .init(i16), offset: 0),
       ])
   }
 
@@ -320,4 +320,100 @@ final class TypeLayoutTests: XCTestCase {
     l.layout(.init(t), in: &p)
   }
 
+  private func check_offsets(members sa: [TypeLayout.Bytes]) {
+    if sa.count == 0 { return }
+    let offsets = storageLayoutOfRecord(havingMembers: sa).partOffsets
+
+    let member_order = sa.indices.sorted { (i, j) in
+      offsets[i] < offsets[j]
+        || offsets[i] == offsets[j] && sa[i].alignment > sa[j].alignment
+    }
+
+    // First member always sits at offset 0
+    XCTAssertEqual(offsets[member_order.first!], 0)
+    for (i0, i1) in zip(member_order, member_order.dropFirst()) {
+      let (m0, o0) = (sa[i0], offsets[i0])
+      let (m1, o1) = (sa[i1], offsets[i1])
+      XCTAssertGreaterThanOrEqual(
+        m0.alignment, m1.alignment,
+        """
+        Member \(i0) with alignment \(m0.alignment) ordered before member \(i1) with alignment \(m1.alignment) !
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        """
+      )
+      if m0.alignment == m1.alignment {
+        XCTAssertLessThan(
+          i0, i1,
+          """
+          Members \(i0) and \(i1) with the same alignment are out of order!
+          \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
+          """
+        )
+
+      }
+      XCTAssertGreaterThanOrEqual(
+        m0.alignment, m1.alignment,
+        """
+        Increasing alignment between consecutive members \(i0) and \(i1)!
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        """
+      )
+
+      XCTAssert(
+        o1 % m1.alignment == 0,
+        """
+          member \(i1) at offset \(o1) not aligned to \(m1.alignment)!
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        """
+      )
+
+      let end0 = o0 + m0.size
+      XCTAssertLessThanOrEqual(
+        end0, o1,
+        """
+        member \(i1) at offset \(o1) overlaps preceding member \(i0) at \(o0)!
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        """
+      )
+      let padding = o1 &- end0
+
+      XCTAssertLessThanOrEqual(
+        padding, m1.alignment,
+        """
+        Needless padding \(padding) before member at offset \(o1)
+        \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
+        """)
+    }
+  }
+
+  func testOffsetOfMember() {
+
+    check_offsets(members: [
+      .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 9, size: 5),
+    ])
+    check_offsets(members: [
+      .init(alignment: 4, size: 7), .init(alignment: 8, size: 5), .init(alignment: 3, size: 0),
+      .init(alignment: 4, size: 9), .init(alignment: 7, size: 1),
+    ])
+
+    for _ in 0..<3 {
+      let a = (0..<1).map { _ in
+        TypeLayout.Bytes(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+      }
+      check_offsets(members: a)
+    }
+    for _ in 0..<100 {
+      let a = (0..<2).map { _ in
+        TypeLayout.Bytes(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+      }
+      check_offsets(members: a)
+    }
+
+    for _ in 0..<2000 {
+      let a = (0..<10).map { _ in
+        TypeLayout.Bytes(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+      }
+      check_offsets(members: a)
+    }
+  }
 }
