@@ -65,7 +65,8 @@ struct TypeLayoutCache {
       in: &p)
   }
 
-  /// Returns the layout for a record `t` in `p` having members `ms`.
+  /// Returns the layout for a record `t` in `p` whose members are `ms` in
+  /// declaration order.
   private mutating func computeLayout(
     record t: MonomorphicTypeIdentity,
     havingMembers ms: [TypeLayout.Member],
@@ -259,7 +260,8 @@ struct TypeLayoutCache {
   }
 }
 
-/// Returns the storage layout and part offsets of a record having member layouts `ms`.
+/// Returns the storage layout and part offsets of a record having members
+/// with layouts `ms` in declaration order.
 func storageLayoutOfRecord(
   havingMembers ms: [TypeLayout.Bytes]
 ) -> (bytes: TypeLayout.Bytes, partOffsets: [Int]) {
