@@ -94,27 +94,6 @@ extension RecordMemberType {
 
 }
 
-// Because the integer types are incomplete
-extension UInt {
-
-  /// Creates an instance with the value of `x`.
-  @inline(always)
-  public init(x: UInt32) {
-    &self.value = Builtin.zext_i32_word(x.value)
-  }
-
-}
-
-extension Int {
-
-  /// Creates an instance with the value of `x`.
-  @inline(always)
-  public init(x: UInt32) {
-    &self.value = Builtin.zext_i32_word(x.value)
-  }
-
-}
-
 //public given Pointer<RecordMemberType> is Copyable {}
 extension Pointer<RecordMemberType> {
 

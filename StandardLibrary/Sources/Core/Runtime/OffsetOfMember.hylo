@@ -91,3 +91,45 @@ extension Pointer<TypeWitnessHeader> {
   }
 
 }
+
+/// Notionally, the type of a member of a record type
+type RecordMemberType = Pointer<TypeWitnessHeader>
+
+extension RecordMemberType {
+
+  fun assign(x: sink Self) inout {
+    &self.value = x.value
+  }
+
+  /// Returns the size of an instance
+  fun size() -> Size {
+    (self.value as* let Self.Pointee).size.copy()
+  }
+
+  /// Returns the alignment of an instance
+  fun alignment() -> Alignment {
+    (self.value as* let Self.Pointee).alignment.copy()
+  }
+
+}
+
+// Because the integer types are incomplete
+extension UInt {
+
+  /// Creates an instance with the value of `x`.
+  @inline(always)
+  public init(x: UInt32) {
+    &self.value = Builtin.zext_i32_word(x.value)
+  }
+
+}
+
+extension Int {
+
+  /// Creates an instance with the value of `x`.
+  @inline(always)
+  public init(x: UInt32) {
+    &self.value = Builtin.zext_i32_word(x.value)
+  }
+
+}
