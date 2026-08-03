@@ -96,8 +96,6 @@ extension RecordMemberType {
 
 extension Pointer<RecordMemberType> {
 
-  type Pointee = Pointer<TypeWitnessHeader>
-
   /// Returns the size of an instance
   fun size() -> Size {
     self.pointee().size()
@@ -108,7 +106,7 @@ extension Pointer<RecordMemberType> {
     self.pointee().alignment()
   }
 
-  fun pointee() -> Pointee {
+  fun pointee() -> Self.Pointee {
     (self.value as* let Self.Pointee).copy()
   }
 

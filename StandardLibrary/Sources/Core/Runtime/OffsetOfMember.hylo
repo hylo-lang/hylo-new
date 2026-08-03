@@ -136,6 +136,28 @@ extension Int {
 
 extension Pointer<RecordMemberType> {
 
+  public type Pointee = Pointer<TypeWitnessHeader>
+
+  /// Returns the size of an instance
+  fun size() -> Size {
+    self.pointee().size()
+  }
+
+  /// Returns the alignment of an instance
+  fun alignment() -> Alignment {
+    self.pointee().alignment()
+  }
+
+  fun pointee() -> Pointee {
+    (self.value as* let Self.Pointee).copy()
+  }
+
+  /// Replaces the pointee with `x`
+  fun set_pointee(x: sink Self.Pointee) {
+    // Hack: can't seem to move x, even when take_value implemented manually.
+    &(self.value as* inout Self.Pointee).value = x.value
+  }
+
   @inline(always)
   public fun copy() -> Self {
     .new(value: self.value)
