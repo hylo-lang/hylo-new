@@ -50,57 +50,6 @@ extension RecordMemberType {
 
 }
 
-extension Metatype<Pointer<UInt8>> {
-
-  type Subject = Pointer<UInt8>
-
-  /// Returns `self`, granting access to details.
-  static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  @inline(always)
-  public static fun alignment() -> Alignment {
-    Self.type_info().alignment()
-  }
-
-}
-
-extension Metatype<UInt32> {
-
-  type Subject = UInt32
-
-  /// Returns `self`, granting access to details.
-  static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  @inline(always)
-  public static fun alignment() -> Alignment {
-    Self.type_info().alignment()
-  }
-
-}
-
-extension Metatype<UInt16> {
-
-  type Subject = UInt16
-
-  /// Returns `self`, granting access to details.
-  static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  @inline(always)
-  public static fun alignment() -> Alignment {
-    Self.type_info().alignment()
-  }
-
-}
-
 /// Removes the contiguous elements at the tail of `start..<end` whose
 /// alignment is less than `a`.
 fun drop_last(
