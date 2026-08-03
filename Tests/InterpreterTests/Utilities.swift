@@ -28,6 +28,10 @@ extension Program {
     }
   }
 
+  /// Returns the type erased identity of `t`.
+  mutating func id<T: TypeTree>(_ t: T) -> AnyTypeIdentity {
+    types.demand(t).erased
+  }
 }
 
 /// Executes `action` and reports test failure if it does not throw `error`.

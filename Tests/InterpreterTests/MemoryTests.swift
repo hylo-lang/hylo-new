@@ -31,7 +31,7 @@ final class InterpreterMemoryTests: XCTestCase {
 
   /// Returns the type erased identity of `t`.
   private func id<T: TypeTree>(_ t: T) -> AnyTypeIdentity {
-    m.program.types.demand(t).erased
+    m.program.id(t)
   }
 
   /// Returns the layout of `t`.
