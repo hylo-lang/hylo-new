@@ -1,32 +1,4 @@
 type Size = UInt32
-
-// Because the integer types are incomplete
-extension UInt32 {
-
-  /// Creates an instance with the value of `x`.
-  @inline(always)
-  public init(x: UInt16) {
-    &self.value = Builtin.zext_i16_i32(x.value)
-  }
-
-  @inline(always)
-  public fun infix% (other: Self) -> Self {
-    .new(value: Builtin.urem_i32(self.value, other.value))
-  }
-
-  @inline(always)
-  public static fun zero() -> Self {
-    .new(value: Builtin.zeroinitializer_i32())
-  }
-
-  /// Creates an instance having the low 32 bits of `x`.
-  @inline(always)
-  public init(truncating x: Int) {
-    &self.value = Builtin.trunc_word_i32(x.value)
-  }
-
-}
-
 type Alignment = UInt16
 
 extension Alignment {
