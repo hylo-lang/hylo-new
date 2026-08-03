@@ -32,6 +32,7 @@ extension UInt32 {
 extension UInt16 {
 
   /// Returns the first n >= i that is a multiple of self
+  @inline(always)
   fun first_aligned_offset(starting_from i: Size) -> Size {
     let a = Size(self)
     // The distance from i to the nearest aligned offset <= i.
@@ -100,11 +101,13 @@ extension Pointer<TypeWitnessHeader> {
   }
 
   /// Returns the size of an instance
+  @inline(always)
   fun size() -> Size {
     (self.value as* let Self.Pointee).size.copy()
   }
 
   /// Returns the alignment of an instance
+  @inline(always)
   fun alignment() -> Alignment {
     (self.value as* let Self.Pointee).alignment.copy()
   }
@@ -137,15 +140,18 @@ extension Pointer<Pointer<TypeWitnessHeader>> {
   public type Pointee = Pointer<TypeWitnessHeader>
 
   /// Returns the size of an instance
+  @inline(always)
   fun size() -> Size {
     self.pointee().size()
   }
 
   /// Returns the alignment of an instance
+  @inline(always)
   fun alignment() -> Alignment {
     self.pointee().alignment()
   }
 
+  @inline(always)
   fun pointee() -> Pointee {
     (self.value as* let Self.Pointee).copy()
   }
@@ -168,6 +174,7 @@ extension Metatype<TypeWitnessHeader> {
   type Subject = TypeWitnessHeader
 
   /// Returns `self`, granting access to details.
+  @inline(always)
   static fun type_info() -> Pointer<TypeWitnessHeader> {
     return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
   }
