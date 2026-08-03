@@ -303,8 +303,8 @@ public struct Driver {
     try a.write(into: f)
   }
 
-  /// Attempts to load `m` from the module cache if its fingerprint matches `s`,
-  /// returning whether `m` was loaded.
+  /// Loads `m` from the module cache and returns `true`
+  /// if `m`'s fingerprint matches `s`; returns `false` otherwise.
   private mutating func loadCached(
     _ m: Module.Name,
     matching s: [SourceFile]
@@ -332,7 +332,7 @@ public struct Driver {
     }
   }
 
-  /// Compile module named `n` from `sources` and returns its identifier.
+  /// Compiles the module named `n` from `sources`, returning its identifier.
   private mutating func compile(
     _ n: Module.Name,
     from sources: [SourceFile]
