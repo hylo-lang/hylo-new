@@ -5,7 +5,7 @@ extension IRFunction {
   /// Removes the code after calls returning `Never`.
   internal mutating func removeCodeAfterNeverReturningCalls() {
     for b in blocks.addresses {
-      if let i = instructions(in: b).first(where: { (i) in neverReturns(i) }) {
+      if let i = instructions(in: b).first(where: neverReturns(_:)) {
         removeAll(after: i)
 
         let a = at(i).anchor
