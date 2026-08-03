@@ -80,6 +80,17 @@ final class CompilerTests: XCTestCase {
       try contents.write(to: destination, atomically: true, encoding: .utf8)
     }
 
+    /// The working directory to use when executing a compiled program.
+    ///
+    /// Returns the parent folder for single-file tests or the package root for package-based tests.
+    var workingDirectory: URL {
+      if isPackage {
+        return root
+      } else {
+        return root.deletingLastPathComponent()
+      }
+    }
+
   }
 
   /// The type of a compilation artifact.
@@ -238,7 +249,7 @@ final class CompilerTests: XCTestCase {
       // Should an executable be tested?
       if input.manifest.stage == .execution {
         let e = try XCTUnwrap(r.artifacts.executable)
-        let x = try Process.execute(e)
+        let x = try Process.execute(e, workingDirectory: input.workingDirectory)
         if input.manifest.shouldTrap {
           XCTAssert(x.terminationReason == .uncaughtSignal, "program did not trap")
         } else {

@@ -1,0 +1,7 @@
+@extern_c_indirect("hylo_read_int_from_file_indirect")
+fun read_int_from_file() -> Int
+
+public fun main() {
+  let x = read_int_from_file()
+  precondition(x == 1234)
+}
