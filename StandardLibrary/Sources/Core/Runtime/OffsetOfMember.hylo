@@ -165,3 +165,31 @@ extension Pointer<RecordMemberType> {
 
 }
 
+extension Metatype<TypeWitnessHeader> {
+
+  type Subject = TypeWitnessHeader
+
+  /// Returns `self`, granting access to details.
+  static fun type_info() -> Pointer<TypeWitnessHeader> {
+    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
+  }
+
+  /// Returns the size in bytes of the `Subject`.
+  @inline(always)
+  public static fun size() -> Size {
+    Self.type_info().size()
+  }
+
+  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
+  @inline(always)
+  public static fun alignment() -> Alignment {
+    Self.type_info().alignment()
+  }
+
+  /// Returns the number of bytes between elements in a buffer of `Subject`.
+  @inline(always)
+  public static fun stride() -> Size {
+    Self.alignment().first_aligned_offset(starting_from: Self.size())
+  }
+
+}
