@@ -86,3 +86,20 @@ public given TypeWitnessHeader is Deinitializable {
   public fun deinit() {}
 
 }
+
+public given Pointer<TypeWitnessHeader> is Deinitializable {
+
+  public fun deinit() {}
+
+}
+
+extension Pointer<TypeWitnessHeader> {
+
+  public type Pointee = TypeWitnessHeader
+
+  @inline(always)
+  public fun copy() -> Self {
+    .new(value: self.value)
+  }
+
+}
