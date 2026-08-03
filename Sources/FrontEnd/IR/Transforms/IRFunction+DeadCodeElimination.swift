@@ -3,10 +3,14 @@ import Utilities
 extension IRFunction {
 
   /// Removes the code after calls returning `Never`.
+  ///
+  /// This method only removes instructions that are in the same basic block as a never-returning
+  /// call, or that are users of a removed instruction. Some basic blocks in `self` may become
+  /// unreachable as a result of the transformation, but no basic block is removed.
   internal mutating func removeCodeAfterNeverReturningCalls() {
     for b in blocks.addresses {
       if let i = instructions(in: b).first(where: neverReturns(_:)) {
-        removeAll(after: i)
+        removeWithUsers(instructions(after: i))
 
         let a = at(i).anchor
         let s = IRUnreachable(anchor: a.emptyAtEnd)
@@ -18,12 +22,7 @@ extension IRFunction {
   /// Removes the basic blocks that have no predecessor.
   internal mutating func removeUnreachableBlocks() {
     // Nothing to do if the function has no definition.
-    guard let e = entry else { return }
-
-    /// Returns `true` iff `b` is unreachable from the function's entry.
-    func isUnreachable(_ b: IRBlock.ID, in cfg: ControlFlowGraph) -> Bool {
-      (b != e) && cfg.predecessors(of: b).isEmpty
-    }
+    if !isDefined { return }
 
     var cfg = controlFlow()
     var work = blocks.addresses.filter({ (b) in isUnreachable(b, in: cfg) })
@@ -65,6 +64,11 @@ extension IRFunction {
         remove(i)
       }
     }
+  }
+
+  /// Returns `true` iff `b` is unreachable from the function's entry.
+  private func isUnreachable(_ b: IRBlock.ID, in cfg: ControlFlowGraph) -> Bool {
+    (b != entry) && cfg.predecessors(of: b).isEmpty
   }
 
   /// Returns `true` iff `i` can be removed if it has no use.

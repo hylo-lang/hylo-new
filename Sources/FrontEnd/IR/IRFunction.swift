@@ -761,22 +761,30 @@ public struct IRFunction: Sendable {
     return instruction(after: i)
   }
 
-  /// Removes all instructions that follow `i` from the block containing `i`.
-  ///
-  /// - Requires: No removed instruction is used outside the block containing `i`.
-  public mutating func removeAll(after i: AnyInstructionIdentity) {
-    let p = block(defining: i)
-    var j = blocks[p].last
-    while let k = j, k != i {
-      j = slots.address(before: k.address).map(AnyInstructionIdentity.init(address:))
-      remove(k)
+  /// Removes all instructions in `xs`, including their users.
+  public mutating func removeWithUsers<S: Sequence<AnyInstructionIdentity>>(_ xs: S) {
+    var work = Array(xs)
+    var done = Set<AnyInstructionIdentity>()
+    while let w = work.popLast() {
+      if done.contains(w) {
+        continue
+      } else if let u = uses[.register(w)] {
+        work.append(w)
+        work.append(contentsOf: u.map(\.user))
+      } else {
+        remove(w)
+        done.insert(w)
+      }
     }
   }
 
   /// Removes `i` from the use chains of its operands.
   private mutating func removeUses(by i: AnyInstructionIdentity) {
     for o in at(i).operands {
-      uses[o]?.removeAll(where: { $0.user == i })
+      modify(&uses[o]) { (us) in
+        us?.removeAll(where: { $0.user == i })
+        if let x = us, x.isEmpty { us = nil }
+      }
     }
   }
 
