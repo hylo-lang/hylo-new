@@ -191,3 +191,18 @@ extension Metatype<TypeWitnessHeader> {
   }
 
 }
+
+extension Pointer<TypeWitnessHeader> {
+
+  @inline(always)
+  public fun infix+ (offset: Int) -> Self {
+    let byte_offset = Int(Metatype<TypeWitnessHeader>.stride()) * offset
+    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
+  }
+
+  @inline(always)
+  public fun infix+= (offset: Int) inout {
+    &self.value = (self + offset).value
+  }
+
+}
