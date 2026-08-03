@@ -1,80 +1,6 @@
 type Size = UInt32
 
-// Because the integer types are incomplete
-extension UInt32 {
-
-  /// Creates an instance with the value of `x`.
-  @inline(always)
-  public init(x: UInt16) {
-    &self.value = Builtin.zext_i16_i32(x.value)
-  }
-
-  @inline(always)
-  public fun infix% (other: Self) -> Self {
-    .new(value: Builtin.urem_i32(self.value, other.value))
-  }
-
-  @inline(always)
-  public static fun zero() -> Self {
-    .new(value: Builtin.zeroinitializer_i32())
-  }
-
-  /// Creates an instance having the low 32 bits of `x`.
-  @inline(always)
-  public init(truncating x: Int) {
-    &self.value = Builtin.trunc_word_i32(x.value)
-  }
-
-}
-
 type Alignment = UInt16
-
-extension Alignment {
-
-  /// Returns the first n >= i that is a multiple of self
-  fun first_aligned_offset(starting_from i: Size) -> Size {
-    let a = Size(self)
-    // The distance from i to the nearest aligned offset <= i.
-    let excess = i % a
-    return if excess == (0 as Size) { i.copy() } else { i - excess + a }
-  }
-
-  /// Creates an instance having the low 16 bits of `x`.
-  @inline(always)
-  public init(truncating x: Int) {
-    &self.value = Builtin.trunc_word_i16(x.value)
-  }
-}
-
-public given Pointer<UInt8> is Deinitializable {}
-
-extension Pointer<UInt8> {
-
-  // Workaround for https://github.com/hylo-lang/hylo-new/issues/357
-  // and https://github.com/hylo-lang/hylo-new/issues/365
-  /// Initializes s to the null pointer.
-  static fun null_(s: set Self) {
-    &s.value = Builtin.zeroinitializer_ptr()
-  }
-
-}
-
-/// The header of the structure representing information stored in all type witnesses.
-///
-/// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
-public struct TypeWitnessHeader {
-  @inline(always)
-  public memberwise init
-
-  // TODO: verify that the type of `description` is correct.
-  // see https://github.com/hylo-lang/hylo-new/issues/306
-  let description: Pointer<UInt8>
-  let size: Size
-  let alignment: Alignment
-  let type_argument_or_parameter_count: UInt16
-}
-
-given TypeWitnessHeader is Deinitializable {}
 
 extension Metatype<TypeWitnessHeader> {
 
@@ -546,7 +472,7 @@ fun __hylo_offset_of_member(
 extension TypeWitnessHeader {
 
   init(size: Int, alignment: Int) {
-    Pointer<UInt8>.null_(&self.description)
+    &self.description = .new()
     &self.size = .new(truncating: size)
     &self.alignment = .new(truncating: alignment)
     &self.type_argument_or_parameter_count = .zero()
