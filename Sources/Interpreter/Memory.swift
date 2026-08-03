@@ -113,7 +113,7 @@ struct Memory {
     ///
     /// - Precondition: the storage exists and is properly aligned.
     internal mutating func withUnsafeMutablePointer<T, R>(
-      to _: T.Type, at a: Offset, _ body: (UnsafeMutablePointer<T>)->R
+      to _: T.Type, at a: Offset, _ body: (UnsafeMutablePointer<T>) -> R
     ) -> R {
       precondition(a + MemoryLayout<T>.size <= size)
       precondition(offset(a, hasAlignment: MemoryLayout<T>.alignment))
@@ -126,7 +126,7 @@ struct Memory {
     ///
     /// - Precondition: the storage exists and is properly aligned.
     internal func withUnsafePointer<T, R>(
-      to _: T.Type, at a: Offset, _ body: (UnsafePointer<T>)->R
+      to _: T.Type, at a: Offset, _ body: (UnsafePointer<T>) -> R
     ) -> R {
       precondition(a + MemoryLayout<T>.size <= size)
       return storage.withUnsafeBytes { p in
@@ -134,7 +134,7 @@ struct Memory {
       }
     }
 
-    /// Returns the unsigned interpretation of the builtin integer value at `a`;
+    /// Returns the unsigned interpretation of `t` at `a`.
     internal func unsignedIntValue(at a: Offset, ofType t: MachineType) -> UInt {
       if case .i(let n) = t {
         return switch n {
@@ -145,7 +145,7 @@ struct Memory {
         default: fatalError("Unknown builtin integer size \(n)")
         }
       } else {
-        fatalError("Unrecognized builtin integer type \(t)")
+        preconditionFailure("Unrecognized builtin integer type \(t)")
       }
     }
 
@@ -246,25 +246,25 @@ struct Memory {
 extension Memory.Address {
 
   /// Returns `l` offset by `r` bytes.
-  static func +(l: Self, r: Int) -> Self {
+  static func + (l: Self, r: Int) -> Self {
     .init(allocation: l.allocation, offset: l.offset + r)
   }
 
   /// Returns `l` offset by `-r` bytes.
-  static func -(l: Self, r: Int) -> Self {
+  static func - (l: Self, r: Int) -> Self {
     .init(allocation: l.allocation, offset: l.offset - r)
   }
 
   /// Returns `r` offset by `l` bytes.
-  static func +(l: Int, r: Self) -> Self {
+  static func + (l: Int, r: Self) -> Self {
     .init(allocation: r.allocation, offset: l + r.offset)
   }
 
   ///  Offsets `l` by `r` bytes.
-  static func +=(l: inout Self, r: Int) { l = l + r }
+  static func += (l: inout Self, r: Int) { l = l + r }
 
   ///  Offsets `l` by `-r` bytes.
-  static func -=(l: inout Self, r: Int)  { l = l - r }
+  static func -= (l: inout Self, r: Int) { l = l - r }
 
 }
 
