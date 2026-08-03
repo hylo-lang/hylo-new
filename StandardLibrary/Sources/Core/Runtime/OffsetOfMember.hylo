@@ -81,8 +81,3 @@ public struct TypeWitnessHeader {
   let type_argument_or_parameter_count: UInt16
 }
 
-public given TypeWitnessHeader is Deinitializable {
-
-  public fun deinit() {}
-
-}
