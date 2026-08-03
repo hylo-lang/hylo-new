@@ -579,8 +579,8 @@ public struct IRFunction: Sendable {
     var g = ControlFlowGraph()
     guard let e = entry else { return g }
 
-    var done = IRBlockSet()
     var work = [e]
+    var done = IRBlockSet()
 
     while let a = work.popLast() {
       for b in successors(of: a) {
