@@ -577,11 +577,18 @@ public struct IRFunction: Sendable {
   /// Returns the control flow graph of this function.
   public func controlFlow() -> ControlFlowGraph {
     var g = ControlFlowGraph()
-    for a in blocks.addresses {
+    guard let e = entry else { return g }
+
+    var done = IRBlockSet()
+    var work = [e]
+
+    while let a = work.popLast() {
       for b in successors(of: a) {
         g.define(a, predecessorOf: b)
+        if done.insert(b).inserted { work.append(b) }
       }
     }
+
     return g
   }
 
