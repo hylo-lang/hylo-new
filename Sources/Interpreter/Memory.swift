@@ -173,12 +173,6 @@ struct Memory {
     }
 
     public var description: String { "@\(allocation):0x\(String(offset, radix: 16))" }
-
-    /// Returns a `TypedAddress` referring to the same `allocation` and `offset` as `self`,
-    /// viewed as having type `t`.
-    public func asTypedAddress(of t: MonomorphicTypeIdentity) -> TypedAddress {
-      TypedAddress(allocation: allocation, offset: offset, type: t)
-    }
   }
 
   /// A typed location in memory.
@@ -208,22 +202,22 @@ struct Memory {
     public var description: String { "@\(allocation):0x\(String(offset, radix: 16))[\(type)]" }
   }
 
-  /// Allocates `n` instances of `t` and returns `TypedAddress` of first instance.
-  public mutating func allocate(_ t: MonomorphicTypeIdentity, count n: Int = 1) -> TypedAddress {
+  /// Allocates `n` instances of `t` and returns `Address` of first instance.
+  public mutating func allocate(_ t: MonomorphicTypeIdentity, count n: Int = 1) -> Address {
     let a = nextAllocation
     nextAllocation += 1
     allocation[a] = Allocation(typeLayouts.layout(t, in: &program), count: n, id: a)
-    return .init(allocation: a, offset: 0, type: t)
+    return .init(allocation: a, offset: 0)
   }
 
   /// Deallocates the allocated memory starting at `a`.
-  public mutating func deallocate(_ a: TypedAddress) throws {
+  public mutating func deallocate(_ a: Address) throws {
     if a.offset != 0 {
-      throw Error.deallocationNotAtStartOfAllocation(a.address)
+      throw Error.deallocationNotAtStartOfAllocation(a)
     }
     let v = allocation.removeValue(forKey: a.allocation)
     if v == nil {
-      throw Error.noLongerAllocated(a.address)
+      throw Error.noLongerAllocated(a)
     }
   }
 
