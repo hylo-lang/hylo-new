@@ -59,7 +59,7 @@ struct Memory {
 
     /// A region within an `Allocation`, identified by a starting offset
     /// and the type layout associated with that location.
-    public struct TypedRegion: Regular, Comparable {
+    public struct TypedRegion: Regular {
 
       /// Where the region begins relative to an `Allocation`'s `baseOffset`.
       let offset: Offset
@@ -67,13 +67,9 @@ struct Memory {
       /// The type in the region.
       let type: MonomorphicTypeIdentity
 
-      public static func < (lhs: Self, rhs: Self) -> Bool {
-        lhs.offset < rhs.offset
-      }
-
     }
 
-    /// Creates an instance hviang `n` bytes with alignment `m` and the given `id`.
+    /// Creates an instance having `n` bytes with alignment `m` and the given `id`.
     private init(_ n: Int, bytesWithAlignment m: Int, id: ID) {
       precondition(n >= 0)
       precondition(m > 0)
@@ -166,12 +162,6 @@ struct Memory {
     /// The offset from the beginning of that `allocation`.
     public let offset: Storage.Index
 
-    /// An instance in the given `allocation` at `offset`.
-    public init(allocation: Allocation.ID, offset: Storage.Index) {
-      self.allocation = allocation
-      self.offset = offset
-    }
-
     public var description: String { "@\(allocation):0x\(String(offset, radix: 16))" }
   }
 
@@ -190,13 +180,6 @@ struct Memory {
     /// Address having same `allocation` and `offset` as of `self`.
     public var address: Address {
       .init(allocation: allocation, offset: offset)
-    }
-
-    /// An instance in the given `allocation` at `offset` to be accessed as `type`.
-    public init(allocation: Allocation.ID, offset: Storage.Index, type: MonomorphicTypeIdentity) {
-      self.allocation = allocation
-      self.offset = offset
-      self.type = type
     }
 
     public var description: String { "@\(allocation):0x\(String(offset, radix: 16))[\(type)]" }
