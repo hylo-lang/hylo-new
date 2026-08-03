@@ -13,8 +13,6 @@ extension Alignment {
 
 }
 
-public given Pointer<UInt8> is Deinitializable {}
-
 extension Pointer<UInt8> {
 
   // Workaround for https://github.com/hylo-lang/hylo-new/issues/357
@@ -26,7 +24,6 @@ extension Pointer<UInt8> {
 
 }
 
-given TypeWitnessHeader is Deinitializable {}
 
 extension Metatype<TypeWitnessHeader> {
 
@@ -57,19 +54,7 @@ extension Metatype<TypeWitnessHeader> {
 
 }
 
-public given Pointer<TypeWitnessHeader> is Deinitializable {}
-
-// Causes an assertion in the compiler (LLVM).
-//public given Pointer<TypeWitnessHeader> is Copyable {}
-
 extension Pointer<TypeWitnessHeader> {
-
-  public type Pointee = TypeWitnessHeader
-
-  @inline(always)
-  public fun copy() -> Self {
-    .new(value: self.value)
-  }
 
   @inline(always)
   public fun infix+ (offset: Int) -> Self {

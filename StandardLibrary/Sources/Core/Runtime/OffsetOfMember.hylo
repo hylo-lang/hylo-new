@@ -81,3 +81,13 @@ public struct TypeWitnessHeader {
   let type_argument_or_parameter_count: UInt16
 }
 
+extension Pointer<TypeWitnessHeader> {
+
+  public type Pointee = TypeWitnessHeader
+
+  @inline(always)
+  public fun copy() -> Self {
+    .new(value: self.value)
+  }
+
+}
