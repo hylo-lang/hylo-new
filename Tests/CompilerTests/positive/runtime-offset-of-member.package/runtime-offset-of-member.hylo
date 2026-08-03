@@ -94,18 +94,6 @@ extension RecordMemberType {
 
 }
 
-//public given Pointer<RecordMemberType> is Copyable {}
-extension Pointer<RecordMemberType> {
-
-  @inline(always)
-  public fun copy() -> Self {
-    .new(value: self.value)
-  }
-
-}
-
-public given Pointer<RecordMemberType> is Deinitializable {}
-
 extension Pointer<RecordMemberType> {
 
   type Pointee = Pointer<TypeWitnessHeader>
@@ -215,10 +203,6 @@ extension Metatype<RecordMemberType> {
     Self.alignment().first_aligned_offset(starting_from: Self.size())
   }
 }
-
-type MemberIndex = UInt32
-type WitnessIndex = UInt32
-type MemberCount = UInt32
 
 extension Metatype<Pointer<UInt8>> {
 

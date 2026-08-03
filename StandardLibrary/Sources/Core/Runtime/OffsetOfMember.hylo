@@ -133,3 +133,13 @@ extension Int {
   }
 
 }
+
+extension Pointer<RecordMemberType> {
+
+  @inline(always)
+  public fun copy() -> Self {
+    .new(value: self.value)
+  }
+
+}
+
