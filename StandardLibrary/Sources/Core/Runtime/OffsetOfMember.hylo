@@ -360,3 +360,189 @@ extension Metatype<UInt16> {
   }
 
 }
+
+/// Removes the contiguous elements at the tail of `start..<end` whose
+/// alignment is less than `a`.
+fun drop_last(
+  from start: Pointer<RecordMemberType>,
+  to end: inout Pointer<RecordMemberType>,
+  while_alignment_less_than a: Alignment
+) {
+  while end != start {
+    if (end - 1).pointee().alignment() >= a { return }
+    end -= 1
+  }
+}
+
+/// Removes the contiguous elements at the head of `start..<end` whose
+/// pointees have alignment less than or equal to `a`.
+fun drop_first(
+  from start: inout Pointer<RecordMemberType>,
+  to end: Pointer<RecordMemberType>,
+  while_alignment_no_greater_than a: Alignment
+) {
+  while start != end {
+    if start.pointee().alignment() > a {
+      return
+    }
+    start += 1
+  }
+}
+
+/// Shifts the contents of `start..<end` one position later in memory.
+fun shift_backward1(
+  from start: Pointer<RecordMemberType>,
+  until end: Pointer<RecordMemberType>
+) {
+  var e = end.copy()
+  while e != start {
+    let e0 = e - 1
+    e.set_pointee(e0.pointee().copy())
+    &e.value = e0.value
+  }
+}
+
+/// Inserts `source.pointee()` at the latest position *q* in
+/// `destinationStart...destinationEnd` such that all its
+/// predecessors' `pointee`s have `alignment` ≥
+/// *q*`.pointee().alignment()`.
+///
+/// - Precondition: the pointees of
+///   `destinationStart..<destinationEnd` are sorted by decreasing
+///   alignment.
+/// - Precondition: `source >= destinationEnd`.
+fun insert_backward_stably_sorted_by_decreasing_alignment(
+  into destinationStart: Pointer<RecordMemberType>,
+  until destinationEnd: inout Pointer<RecordMemberType>,
+  from source: Pointer<RecordMemberType>
+) {
+  let r = source.pointee()
+  let r_alignment = r.alignment()
+
+  var i = destinationEnd.copy()
+  drop_last(
+    from: destinationStart, to: &i, while_alignment_less_than: r_alignment)
+
+  // Workaround #370
+  insert_backward_stably_sorted_by_decreasing_alignment1(source, i, destinationEnd, r)
+  destinationEnd += 1
+}
+
+fun insert_backward_stably_sorted_by_decreasing_alignment1(
+  source: Pointer<RecordMemberType>, i: Pointer<RecordMemberType>,
+  destinationEnd: Pointer<RecordMemberType>, r: RecordMemberType)
+{
+  if source != i {
+    shift_backward1(from: i, until: destinationEnd)
+    i.set_pointee(r.copy())
+  }
+}
+
+/// Inserts each pointee in `sourceStart_..<sourceEnd` whose
+/// `alignment()` is greater than `a` into
+/// `destinationStart...destinationEnd` such that all their
+/// predecessors' `pointee`s have `alignment` ≥
+/// *q*`.pointee().alignment()`.
+///
+/// - Precondition: the pointees of
+///   `destinationStart..<destinationEnd` are sorted by decreasing
+///   alignment.
+/// - Precondition: `sourceStart_ >= destinationEnd`.
+fun insert_backward_stably_sorted_by_decreasing_alignment(
+  into destinationStart: Pointer<RecordMemberType>,
+  until destinationEnd: inout Pointer<RecordMemberType>,
+  from sourceStart: sink Pointer<RecordMemberType>,
+  until sourceEnd: Pointer<RecordMemberType>,
+  where_alignment_exceeds a: Alignment
+) {
+  while sourceStart != sourceEnd {
+    if sourceStart.pointee().alignment() > a {
+      insert_backward_stably_sorted_by_decreasing_alignment(
+        into: destinationStart, until: &destinationEnd, from: sourceStart)
+    }
+    sourceStart += 1
+  }
+}
+
+/// Removes from start..<end the elements with alignments less than
+/// that of n, or with the same alignment as n but occurring at a
+/// position > n, and stably sorts them by decreasing alignment.
+fun filter_and_stable_sort_elements_by_decreasing_alignment(
+  from start: inout Pointer<RecordMemberType>,
+  to end: inout Pointer<RecordMemberType>,
+  that_lay_out_before n: Pointer<RecordMemberType>,
+  having_alignment n_alignment: Alignment
+) {
+  // Drop initial unretained elements before n
+  drop_first(from: &start, to: n, while_alignment_no_greater_than: n_alignment - (1 as Alignment))
+
+  var new_end: Pointer<RecordMemberType>
+  sink let tail_start: Pointer<RecordMemberType>
+
+  if start != n {
+    // insert elements up to n
+    &new_end = start + 1
+
+    insert_backward_stably_sorted_by_decreasing_alignment(
+      into: start, until: &new_end, from: start + 1, until: n,
+      where_alignment_exceeds: n_alignment - (1 as Alignment))
+
+    &tail_start.value = (n + 1).value
+  }
+  else {
+    // Drop unretained elments after n
+    &start = n + 1
+    drop_first(from: &start, to: end, while_alignment_no_greater_than: n_alignment)
+
+    if start == end {
+      return
+    }
+
+    &new_end.value = (start + 1).value
+    &tail_start.value = new_end.value
+  }
+
+  // insert elements after n
+  insert_backward_stably_sorted_by_decreasing_alignment(
+    into: start, until: &new_end, from: tail_start, until: end,
+    where_alignment_exceeds: n_alignment)
+  &end.value = new_end.value
+}
+
+/// Returns the size a record type would have were its members given
+/// in storage order by `start..<end`.
+fun size_of_record_having_ordered_members(
+  from start_: Pointer<RecordMemberType>,
+  to end: Pointer<RecordMemberType>
+) -> Size {
+  var r: Size = 0
+  var start = start_.copy()
+  while start < end {
+    let w = start.pointee()
+    let position = w.alignment().first_aligned_offset(starting_from: r)
+    &r = position + w.size()
+    &start += 1
+  }
+  return r
+}
+
+/// Returns the offset of the `n`th member in declaration order of a
+/// record type having members given by the array of length `l` at
+/// `memberArray`.
+///
+/// Mutates the elements in the array in arbitrary ways.
+fun __hylo_offset_of_member(
+  n: UInt32,
+  in memberArray: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
+{
+  sink let p = memberArray + Int(n)
+  sink let nth_alignment = p.pointee().alignment()
+  var start = memberArray.copy()
+  var end = memberArray + Int(l)
+
+  filter_and_stable_sort_elements_by_decreasing_alignment(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
+  if start == end { return 0 }
+  let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
+  sink let r = nth_alignment.first_aligned_offset(starting_from: preceding_size)
+  return r
+}
