@@ -185,8 +185,11 @@ extension WideningConstraint: Showable {
 
 }
 
-/// a constraint stating that `T` is the type of an initializer that is convertible to a
+/// A constraint stating that `T` is the type of an initializer that is convertible to a
 /// constructor of type `U`.
+///
+/// Establishes the relationship between the declared initializer that takes `self` as a 
+/// `set` parameter, and the constructor (`.new(...)`) that returns a new instance.
 internal struct ConstructorConversionConstraint: Constraint {
 
   /// The type of the initializer.

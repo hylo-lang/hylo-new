@@ -7,7 +7,7 @@ public func unreachable(
   fatalError(message(), file: file, line: line)
 }
 
-/// Reports that a feature is not yet implemented at halts the program's execution.
+/// Reports that a feature is not yet implemented and halts the program's execution.
 public func unimplemented(
   _ feature: @autoclosure () -> String? = nil,
   file: StaticString = #file,
@@ -16,4 +16,19 @@ public func unimplemented(
   fatalError(
     "unimplemented feature" + (feature().map({ (s) in ": \(s)" }) ?? ""),
     file: file, line: line)
+}
+
+/// Iff `c` is `true`, reports that a feature is not yet implemented and halts the program's 
+/// execution.
+public func unimplemented(
+  if c: Bool,
+  _ feature: @autoclosure () -> String? = nil,
+  file: StaticString = #file,
+  line: UInt = #line
+) {
+  if c {
+    fatalError(
+      "unimplemented feature" + (feature().map({ (s) in ": \(s)" }) ?? ""),
+      file: file, line: line)
+  }
 }
