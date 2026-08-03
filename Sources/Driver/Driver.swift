@@ -292,10 +292,15 @@ public struct Driver {
     }
     let m = try await compile(module, from: sources)
     if cachingIsEnabled {
-      let a = try program.archive(module: m)
-      let f = moduleCachePath!.appending(component: module + ".hylomodule")
-      try a.write(into: f)
+      try cache(m, named: module)
     }
+  }
+
+  /// Caches `m` in the module cache with name `n`.
+  private func cache(_ m: Module.ID, named n: Module.Name) throws {
+    let a = try program.archive(module: m)
+    let f = moduleCachePath!.appending(component: n + ".hylomodule")
+    try a.write(into: f)
   }
 
   /// Attempts to load `m` from the module cache if its fingerprint matches `s`,
