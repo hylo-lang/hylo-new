@@ -64,7 +64,7 @@ extension TypeWitnessHeader {
 
   /// Fatal error unless TypeWitnessHeader lays out in declaration
   /// order in Hylo.
-  static fun checkLayoutAssumptions() {
+  static fun check_layout_assumptions() {
     precondition(
       Metatype<Pointer<UInt8>>.alignment() >= Metatype<Size>.alignment())
     precondition(
@@ -192,7 +192,7 @@ extension Pointer<Int> {
 
 fun main() -> Int32 {
   var x = 0
-  TypeWitnessHeader.checkLayoutAssumptions()
+  TypeWitnessHeader.check_layout_assumptions()
   let f = open_test_cases_file_for_reading()
   while true {
     var sizes: Int[10] = (0,0,0,0,0,0,0,0,0,0)
