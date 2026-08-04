@@ -479,7 +479,9 @@ public struct Program: Sendable {
     if !self[d].is(.public) { return false }
     var p = parent(containing: d)
     while let a = p.node {
-      guard let b = self[a] as? (any ModifiableDeclaration), b.is(.public) else { return false }
+      if let b = self[a] as? (any ModifiableDeclaration) {
+        if !b.is(.public) { return false }
+      }
       p = parent(containing: a)
     }
     return p.isFile
