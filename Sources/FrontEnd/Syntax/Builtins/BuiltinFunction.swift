@@ -815,7 +815,7 @@ extension BuiltinFunction: Showable {
     case .trunc(let s, let d):
       return printer.format("trunc_%T_%T", [s.erased, d.erased])
     case .zext(let s, let d):
-      return printer.format("trunc_%T_%T", [s.erased, d.erased])
+      return printer.format("zext_%T_%T", [s.erased, d.erased])
     //    case .sext(let l, let r):
     //      return "sext_\(l)_\(r)"
     //    case .uitofp(let l, let r):
