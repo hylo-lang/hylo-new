@@ -14,28 +14,6 @@ extension Pointer<UInt8> {
 
 }
 
-// --------------- TESTING -------------
-
-extension TypeWitnessHeader {
-
-  init(size: Int, alignment: Int) {
-    Pointer<UInt8>.null_(&self.description)
-    &self.size = .new(truncating: size)
-    &self.alignment = .new(truncating: alignment)
-    &self.type_argument_or_parameter_count = .zero()
-  }
-
-  /// Fatal error unless TypeWitnessHeader lays out in declaration
-  /// order in Hylo.
-  static fun check_layout_assumptions() {
-    precondition(
-      Metatype<Pointer<UInt8>>.alignment() >= Metatype<Size>.alignment())
-    precondition(
-      Metatype<Size>.alignment() >= Metatype<Alignment>.alignment())
-  }
-
-}
-
 extension Metatype<Int> {
 
   type Subject = Int
@@ -59,13 +37,55 @@ extension Metatype<Int> {
   public static fun stride() -> Size {
     Self.alignment().first_aligned_offset(starting_from: Self.size())
   }
+
+}
+
+extension Pointer<Int> {
+
+  public type Pointee = Int
+
+  public fun infix+ (offset: Int) -> Self {
+    let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
+    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
+  }
+
+  public fun infix+= (offset: Int) inout {
+    &self.value = (self + offset).value
+  }
+
+  fun pointee() -> Pointee {
+    .new(value: (self.value as* let Self.Pointee).value)
+  }
+
+  fun at(n: Int) -> Pointee {
+    (self + n).pointee()
+  }
+
+}
+
+// --------------- TESTING -------------
+
+extension TypeWitnessHeader {
+
+  init(size: Int, alignment: Int) {
+    Pointer<UInt8>.null_(&self.description)
+    &self.size = .new(truncating: size)
+    &self.alignment = .new(truncating: alignment)
+    &self.type_argument_or_parameter_count = .zero()
+  }
+
+  /// Fatal error unless TypeWitnessHeader lays out in declaration
+  /// order in Hylo.
+  static fun check_layout_assumptions() {
+    precondition(
+      Metatype<Pointer<UInt8>>.alignment() >= Metatype<Size>.alignment())
+    precondition(
+      Metatype<Size>.alignment() >= Metatype<Alignment>.alignment())
+  }
+
 }
 
 type H = TypeWitnessHeader
-
-subscript pointer(to x: TypeWitnessHeader) -> Pointer<TypeWitnessHeader> {
-  yield .new(value: Builtin.address(of: x))
-}
 
 fun verify_offset(
   i: Int,
@@ -115,43 +135,12 @@ fun verify_offsets(
 @extern_c_indirect("hylo_open_test_cases_file_for_reading_indirect")
 fun open_test_cases_file_for_reading() -> Pointer<Never>
 
-/*
-@extern_c_indirect("hylo_print_Int_indirect")
-fun print(x: Int)
- */
-
 @extern_c_indirect("hylo_read_test_case_indirect")
 fun read_test_case(
   file: Pointer<Never>,
   sizes: inout Int[10],
   alignments: inout Int[10],
   offsets: inout Int[10]) -> Int
-
-extension Pointer<Int> {
-
-  public type Pointee = Int
-
-  public fun copy() -> Self {
-    .new(value: self.value)
-  }
-
-  public fun infix+ (offset: Int) -> Self {
-    let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
-    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
-  }
-
-  public fun infix+= (offset: Int) inout {
-    &self.value = (self + offset).value
-  }
-
-  fun pointee() -> Pointee {
-    .new(value: (self.value as* let Self.Pointee).value)
-  }
-
-  fun at(n: Int) -> Pointee {
-    (self + n).pointee()
-  }
-}
 
 fun main() -> Int32 {
   var x = 0
