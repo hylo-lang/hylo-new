@@ -260,7 +260,8 @@ private func __hylo_offset_of_member(
   var start = memberArray
   var end = memberArray + Int(l)
 
-  filter_and_stable_sort_elements_by_decreasing_alignment(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
+  filter_and_stable_sort_elements_by_decreasing_alignment(
+    from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
   if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
   return nth_alignment.first_aligned_offset(starting_from: preceding_size)
@@ -383,7 +384,8 @@ final class LayoutTests: XCTestCase {
       XCTAssertGreaterThanOrEqual(
         m0.alignment, m1.alignment,
         """
-        Member \(i0) with alignment \(m0.alignment) ordered before member \(i1) with alignment \(m1.alignment) !
+        Member \(i0) with alignment \(m0.alignment) ordered before member \(i1) 
+          with alignment \(m1.alignment) !
         \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
         """
       )
@@ -434,8 +436,19 @@ final class LayoutTests: XCTestCase {
 
   func testOffsetOfMember() throws {
 
-    checkOffsets(members: [(size: 5, alignment: 1), (size: 3, alignment: 2), (size: 5, alignment: 9)])
-    checkOffsets(members: [(size: 7, alignment: 4), (size: 5, alignment: 8), (size: 0, alignment: 3), (size: 9, alignment: 4), (size: 1, alignment: 7)])
+    checkOffsets(
+      members: [
+        (size: 5, alignment: 1),
+        (size: 3, alignment: 2),
+        (size: 5, alignment: 9)])
+
+    checkOffsets(
+      members: [
+        (size: 7, alignment: 4),
+        (size: 5, alignment: 8),
+        (size: 0, alignment: 3),
+        (size: 9, alignment: 4),
+        (size: 1, alignment: 7)])
 
     // Random tests cases generated via:
     /*
