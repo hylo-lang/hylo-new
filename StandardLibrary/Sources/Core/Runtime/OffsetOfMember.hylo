@@ -33,7 +33,7 @@ extension UInt16 {
 
   /// Returns the first n >= i that is a multiple of self
   @inline(always)
-  fun first_aligned_offset(starting_from i: Size) -> Size {
+  public fun first_aligned_offset(starting_from i: Size) -> Size {
     let a = Size(self)
     // The distance from i to the nearest aligned offset <= i.
     let excess = i % a
@@ -47,14 +47,6 @@ extension UInt16 {
   }
 
 }
-
-public given Pointer<UInt8> is Deinitializable {
-
-  public fun deinit() {}
-
-}
-
-public given Pointer<UInt8> is Movable {}
 
 extension Pointer<UInt8> {
 
@@ -91,7 +83,8 @@ extension Pointer<TypeWitnessHeader> {
     .new(value: self.value)
   }
 
-  fun assign(x: sink Self) inout {
+  @inline(always)
+  public fun assign(x: sink Self) inout {
     &self.value = x.value
   }
 
@@ -101,13 +94,13 @@ extension RecordMemberType {
 
   /// Returns the size of an instance
   @inline(always)
-  fun size() -> Size {
+  public fun size() -> Size {
     (self.value as* let Self.Pointee).size.copy()
   }
 
   /// Returns the alignment of an instance
   @inline(always)
-  fun alignment() -> Alignment {
+  public fun alignment() -> Alignment {
     (self.value as* let Self.Pointee).alignment.copy()
   }
 
@@ -133,7 +126,8 @@ extension Int {
   }
 
   /// Replaces `sef` with `other`.
-  fun assign(other: Self) inout {
+  @inline(always)
+  public fun assign(other: Self) inout {
     &self.value = other.value
   }
 
@@ -148,24 +142,24 @@ extension Pointer<RecordMemberType> {
 
   /// Returns the size of an instance
   @inline(always)
-  fun size() -> Size {
+  public fun size() -> Size {
     self.pointee().size()
   }
 
   /// Returns the alignment of an instance
   @inline(always)
-  fun alignment() -> Alignment {
+  public fun alignment() -> Alignment {
     self.pointee().alignment()
   }
 
   @inline(always)
-  fun pointee() -> Pointee {
+  public fun pointee() -> Pointee {
     (self.value as* let Self.Pointee).copy()
   }
 
   /// Replaces the pointee with `x`
   @inline(always)
-  fun set_pointee(x: sink Self.Pointee) {
+  public fun set_pointee(x: sink Self.Pointee) {
     // Hack: can't seem to move x, even when take_value implemented manually.
     &(self.value as* inout Self.Pointee).value = x.value
   }
@@ -183,7 +177,7 @@ extension Metatype<TypeWitnessHeader> {
 
   /// Returns `self`, granting access to details.
   @inline(always)
-  static fun type_info() -> RecordMemberType {
+  public static fun type_info() -> RecordMemberType {
     return Pointer<RecordMemberType>(value: Builtin.address(of: Subject)).pointee()
   }
 
@@ -228,7 +222,7 @@ extension Metatype<RecordMemberType> {
 
   /// Returns `self`, granting access to details.
   @inline(always)
-  static fun type_info() -> RecordMemberType {
+  public static fun type_info() -> RecordMemberType {
     return Pointer<RecordMemberType>(value: Builtin.address(of: Subject)).pointee()
   }
 
@@ -306,7 +300,8 @@ extension Pointer<RecordMemberType> {
   }
 
   /// Replaces `sef` with `other`.
-  fun assign(other: Self) inout {
+  @inline(always)
+  public fun assign(other: Self) inout {
     &self.value = other.value
   }
 
@@ -318,7 +313,7 @@ extension Metatype<Pointer<UInt8>> {
 
   /// Returns `self`, granting access to details.
   @inline(always)
-  static fun type_info() -> Pointer<TypeWitnessHeader> {
+  public static fun type_info() -> Pointer<TypeWitnessHeader> {
     return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
   }
 
@@ -336,7 +331,7 @@ extension Metatype<UInt32> {
 
   /// Returns `self`, granting access to details.
   @inline(always)
-  static fun type_info() -> Pointer<TypeWitnessHeader> {
+  public static fun type_info() -> Pointer<TypeWitnessHeader> {
     return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
   }
 
@@ -354,7 +349,7 @@ extension Metatype<UInt16> {
 
   /// Returns `self`, granting access to details.
   @inline(always)
-  static fun type_info() -> Pointer<TypeWitnessHeader> {
+  public static fun type_info() -> Pointer<TypeWitnessHeader> {
     return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
   }
 
@@ -368,7 +363,8 @@ extension Metatype<UInt16> {
 
 /// Removes the contiguous elements at the tail of `start..<end` whose
 /// alignment is less than `a`.
-fun drop_last(
+@inline(always)
+public fun drop_last(
   from start: Pointer<RecordMemberType>,
   to end: inout Pointer<RecordMemberType>,
   while_alignment_less_than a: Alignment
@@ -381,7 +377,8 @@ fun drop_last(
 
 /// Removes the contiguous elements at the head of `start..<end` whose
 /// pointees have alignment less than or equal to `a`.
-fun drop_first(
+@inline(always)
+public fun drop_first(
   from start: inout Pointer<RecordMemberType>,
   to end: Pointer<RecordMemberType>,
   while_alignment_no_greater_than a: Alignment
@@ -395,7 +392,8 @@ fun drop_first(
 }
 
 /// Shifts the contents of `start..<end` one position later in memory.
-fun shift_backward1(
+@inline(always)
+public fun shift_backward1(
   from start: Pointer<RecordMemberType>,
   until end: Pointer<RecordMemberType>
 ) {
@@ -416,7 +414,8 @@ fun shift_backward1(
 ///   `destinationStart..<destinationEnd` are sorted by decreasing
 ///   alignment.
 /// - Precondition: `source >= destinationEnd`.
-fun insert_backward_stably_sorted_by_decreasing_alignment(
+@inline(always)
+public fun insert_backward_stably_sorted_by_decreasing_alignment(
   into destinationStart: Pointer<RecordMemberType>,
   until destinationEnd: inout Pointer<RecordMemberType>,
   from source: Pointer<RecordMemberType>
@@ -433,7 +432,8 @@ fun insert_backward_stably_sorted_by_decreasing_alignment(
   destinationEnd += 1
 }
 
-fun insert_backward_stably_sorted_by_decreasing_alignment1(
+@inline(always)
+public fun insert_backward_stably_sorted_by_decreasing_alignment1(
   source: Pointer<RecordMemberType>, i: Pointer<RecordMemberType>,
   destinationEnd: Pointer<RecordMemberType>, r: RecordMemberType)
 {
@@ -453,7 +453,8 @@ fun insert_backward_stably_sorted_by_decreasing_alignment1(
 ///   `destinationStart..<destinationEnd` are sorted by decreasing
 ///   alignment.
 /// - Precondition: `sourceStart_ >= destinationEnd`.
-fun insert_backward_stably_sorted_by_decreasing_alignment(
+@inline(always)
+public fun insert_backward_stably_sorted_by_decreasing_alignment(
   into destinationStart: Pointer<RecordMemberType>,
   until destinationEnd: inout Pointer<RecordMemberType>,
   from sourceStart: sink Pointer<RecordMemberType>,
@@ -472,7 +473,8 @@ fun insert_backward_stably_sorted_by_decreasing_alignment(
 /// Removes from start..<end the elements with alignments less than
 /// that of n, or with the same alignment as n but occurring at a
 /// position > n, and stably sorts them by decreasing alignment.
-fun filter_and_stable_sort_elements_by_decreasing_alignment(
+@inline(always)
+public fun filter_and_stable_sort_elements_by_decreasing_alignment(
   from start: inout Pointer<RecordMemberType>,
   to end: inout Pointer<RecordMemberType>,
   that_lay_out_before n: Pointer<RecordMemberType>,
@@ -516,7 +518,8 @@ fun filter_and_stable_sort_elements_by_decreasing_alignment(
 
 /// Returns the size a record type would have were its members given
 /// in storage order by `start..<end`.
-fun size_of_record_having_ordered_members(
+@inline(always)
+public fun size_of_record_having_ordered_members(
   from start_: Pointer<RecordMemberType>,
   to end: Pointer<RecordMemberType>
 ) -> Size {
@@ -536,7 +539,8 @@ fun size_of_record_having_ordered_members(
 /// `memberArray`.
 ///
 /// Mutates the elements in the array in arbitrary ways.
-fun __hylo_offset_of_member(
+@inline(always)
+public fun __hylo_offset_of_member(
   n: UInt32,
   in memberArray: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
 {
