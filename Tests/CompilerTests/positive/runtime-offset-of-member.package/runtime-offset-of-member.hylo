@@ -1,17 +1,7 @@
 type Size = UInt32
 type Alignment = UInt16
 
-extension Alignment {
-
-  /// Returns the first n >= i that is a multiple of self
-  fun first_aligned_offset(starting_from i: Size) -> Size {
-    let a = Size(self)
-    // The distance from i to the nearest aligned offset <= i.
-    let excess = i % a
-    return if excess == (0 as Size) { i.copy() } else { i - excess + a }
-  }
-
-}
+// ------- Generic standard lib facilities that can't yet be emitted -------
 
 extension Pointer<UInt8> {
 
@@ -23,33 +13,6 @@ extension Pointer<UInt8> {
   }
 
 }
-
-
-/// Notionally, the type of a member of a record type
-type RecordMemberType = Pointer<TypeWitnessHeader>
-
-extension RecordMemberType {
-
-  fun assign(x: sink Self) inout {
-    &self.value = x.value
-  }
-
-}
-
-extension RecordMemberType {
-
-  /// Returns the size of an instance
-  fun size() -> Size {
-    (self.value as* let Self.Pointee).size.copy()
-  }
-
-  /// Returns the alignment of an instance
-  fun alignment() -> Alignment {
-    (self.value as* let Self.Pointee).alignment.copy()
-  }
-
-}
-
 
 // --------------- TESTING -------------
 
