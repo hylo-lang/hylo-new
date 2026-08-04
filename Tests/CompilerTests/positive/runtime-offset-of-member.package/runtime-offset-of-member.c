@@ -4,17 +4,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Opens our test case file for reading, returning the file handle.
 void hylo_open_test_cases_file_for_reading_indirect(FILE** result) {
   *result = fopen("test-cases.txt", "r");
 }
 
-/*
-void hylo_print_Int_indirect(intptr_t *x) {
-  printf("%td\n", *x);
-  fflush(stdout);
-}
-*/
-
+/// Reads a test case from `f` into `s` representing the sizes of
+/// members, `a` representing their alignments, and `o` representing
+/// their expected offsets, returning the number of significant
+/// elements of each of those arrays.
+///
+/// If there are no more test cases (the sentinel value -1 is
+/// reached in the input), returns -1.
+///
+/// If errors occur, returns a negative value indicating how far along
+/// the call got.
 void hylo_read_test_case_indirect(
     FILE **f, intptr_t s[10],
     intptr_t a[10], intptr_t o[10], intptr_t *result) {
@@ -54,25 +58,5 @@ void hylo_read_test_case_indirect(
   *result = 0;
   for (int i = 0; i < 10 && a[i] != 0; i++) {
     ++*result;
-  }
-}
-
-void hylo_close_file_indirect(void* result, FILE** f) {
-  fclose(*f);
-}
-
-
-/// Reads an integer from a file named "input.txt" and stores it in the provided pointer.
-///
-/// Stores -1 in `result` on failure.
-void hylo_read_int_from_file_indirect(intptr_t* result)  {
-  FILE* file = fopen("input.txt", "r");
-  if (file) {
-    if (fscanf(file, "%" PRIdPTR, result) != 1) {
-      *result = -1;
-    }
-    fclose(file);
-  } else {
-    *result = -1;
   }
 }
