@@ -83,19 +83,16 @@ extension Metatype<Int> {
   }
 
   /// Returns the size in bytes of the `Subject`.
-  @inline(always)
   public static fun size() -> Size {
     Self.type_info().size()
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  @inline(always)
   public static fun alignment() -> Alignment {
     Self.type_info().alignment()
   }
 
   /// Returns the number of bytes between elements in a buffer of `Subject`.
-  @inline(always)
   public static fun stride() -> Size {
     Self.alignment().first_aligned_offset(starting_from: Self.size())
   }
@@ -171,18 +168,15 @@ extension Pointer<Int> {
 
   public type Pointee = Int
 
-  @inline(always)
   public fun copy() -> Self {
     .new(value: self.value)
   }
 
-  @inline(always)
   public fun infix+ (offset: Int) -> Self {
     let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
-  @inline(always)
   public fun infix+= (offset: Int) inout {
     &self.value = (self + offset).value
   }
