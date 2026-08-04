@@ -415,9 +415,11 @@ extension BuiltinFunction {
       return t3.erased
 
     case .assumeInitialized:
-      let t0 = s.fresh().erased
-      let t1 = s.demand(Arrow(inputs: [.init(label: nil, access: .auto, type: t0)], output: .void))
-      return t1.erased
+      let t0 = s.demand(GenericParameter.nth(0, .proper))
+      let a = Arrow(inputs: [.init(label: nil, access: .auto, type: t0.erased)], output: .void)
+      let t1 = s.demand(a).erased
+      let t2 = s.demand(UniversalType(parameters: [t0], head: t1))
+      return t2.erased
 
     case .add(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased

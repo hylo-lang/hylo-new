@@ -1,0 +1,241 @@
+type Size = UInt32
+type Alignment = UInt16
+
+extension Alignment {
+
+  /// Returns the first n >= i that is a multiple of self
+  fun first_aligned_offset(starting_from i: Size) -> Size {
+    let a = Size(self)
+    // The distance from i to the nearest aligned offset <= i.
+    let excess = i % a
+    return if excess == (0 as Size) { i.copy() } else { i - excess + a }
+  }
+
+}
+
+extension Pointer<UInt8> {
+
+  // Workaround for https://github.com/hylo-lang/hylo-new/issues/357
+  // and https://github.com/hylo-lang/hylo-new/issues/365
+  /// Initializes s to the null pointer.
+  static fun null_(s: set Self) {
+    &s.value = Builtin.zeroinitializer_ptr()
+  }
+
+}
+
+
+/// Notionally, the type of a member of a record type
+type RecordMemberType = Pointer<TypeWitnessHeader>
+
+extension RecordMemberType {
+
+  fun assign(x: sink Self) inout {
+    &self.value = x.value
+  }
+
+}
+
+extension RecordMemberType {
+
+  /// Returns the size of an instance
+  fun size() -> Size {
+    (self.value as* let Self.Pointee).size.copy()
+  }
+
+  /// Returns the alignment of an instance
+  fun alignment() -> Alignment {
+    (self.value as* let Self.Pointee).alignment.copy()
+  }
+
+}
+
+
+// --------------- TESTING -------------
+
+extension TypeWitnessHeader {
+
+  init(size: Int, alignment: Int) {
+    Pointer<UInt8>.null_(&self.description)
+    &self.size = .new(truncating: size)
+    &self.alignment = .new(truncating: alignment)
+    &self.type_argument_or_parameter_count = .zero()
+  }
+
+  /// Fatal error unless TypeWitnessHeader lays out in declaration
+  /// order in Hylo.
+  static fun checkLayoutAssumptions() {
+    precondition(
+      Metatype<Pointer<UInt8>>.alignment() >= Metatype<Size>.alignment())
+    precondition(
+      Metatype<Size>.alignment() >= Metatype<Alignment>.alignment())
+  }
+
+}
+
+extension Metatype<Int> {
+
+  type Subject = Int
+
+  /// Returns `self`, granting access to details.
+  static fun type_info() -> Pointer<TypeWitnessHeader> {
+    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
+  }
+
+  /// Returns the size in bytes of the `Subject`.
+  @inline(always)
+  public static fun size() -> Size {
+    Self.type_info().size()
+  }
+
+  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
+  @inline(always)
+  public static fun alignment() -> Alignment {
+    Self.type_info().alignment()
+  }
+
+  /// Returns the number of bytes between elements in a buffer of `Subject`.
+  @inline(always)
+  public static fun stride() -> Size {
+    Self.alignment().first_aligned_offset(starting_from: Self.size())
+  }
+}
+
+type H = TypeWitnessHeader
+
+subscript pointer(to x: TypeWitnessHeader) -> Pointer<TypeWitnessHeader> {
+  yield .new(value: Builtin.address(of: x))
+}
+
+fun verify_offset(
+  i: Int,
+  in headers: H[10],
+  of_length l: Int,
+  to_be x: Int
+) {
+  let p = Pointer<H>(value: Builtin.address(of: headers))
+  var witnesses: Pointer<TypeWitnessHeader>[10] = (
+    p + 0, p + 1, p + 2, p + 3, p + 4, p + 5, p + 6, p + 7, p + 8, p + 9)
+
+  let o = __hylo_offset_of_member(
+    .new(truncating: i),
+    in: .new(value: Builtin.address(of: witnesses)),
+    of_length: .new(truncating: l))
+
+  precondition(o == UInt32(truncating: x))
+}
+
+fun verify_offsets(
+    forFirst n: Int,
+    in recordDeclaration: H[10],
+    to_be o0: Int, o1: Int, o2: Int, o3: Int, o4: Int, o5: Int, o6: Int, o7: Int, o8: Int, o9: Int
+) {
+  if n > 0 { return }
+  verify_offset(0, in: recordDeclaration, of_length: n, to_be: o0)
+  if n > 1 { return }
+  verify_offset(1, in: recordDeclaration, of_length: n, to_be: o1)
+  if n > 2 { return }
+  verify_offset(2, in: recordDeclaration, of_length: n, to_be: o2)
+  if n > 3 { return }
+  verify_offset(3, in: recordDeclaration, of_length: n, to_be: o3)
+  if n > 4 { return }
+  verify_offset(4, in: recordDeclaration, of_length: n, to_be: o4)
+  if n > 5 { return }
+  verify_offset(5, in: recordDeclaration, of_length: n, to_be: o5)
+  if n > 6 { return }
+  verify_offset(6, in: recordDeclaration, of_length: n, to_be: o6)
+  if n > 7 { return }
+  verify_offset(7, in: recordDeclaration, of_length: n, to_be: o7)
+  if n > 8 { return }
+  verify_offset(8, in: recordDeclaration, of_length: n, to_be: o8)
+  if n > 9 { return }
+  verify_offset(9, in: recordDeclaration, of_length: n, to_be: o9)
+}
+
+@extern_c_indirect("hylo_open_test_cases_file_for_reading_indirect")
+fun open_test_cases_file_for_reading() -> Pointer<Never>
+
+/*
+@extern_c_indirect("hylo_print_Int_indirect")
+fun print(x: Int)
+ */
+
+@extern_c_indirect("hylo_read_test_case_indirect")
+fun read_test_case(
+  file: Pointer<Never>,
+  sizes: inout Int[10],
+  alignments: inout Int[10],
+  offsets: inout Int[10]) -> Int
+
+extension Pointer<Int> {
+
+  public type Pointee = Int
+
+  @inline(always)
+  public fun copy() -> Self {
+    .new(value: self.value)
+  }
+
+  @inline(always)
+  public fun infix+ (offset: Int) -> Self {
+    let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
+    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
+  }
+
+  @inline(always)
+  public fun infix+= (offset: Int) inout {
+    &self.value = (self + offset).value
+  }
+
+  fun pointee() -> Pointee {
+    .new(value: (self.value as* let Self.Pointee).value)
+  }
+
+  fun at(n: Int) -> Pointee {
+    (self + n).pointee()
+  }
+}
+
+fun main() -> Int32 {
+  var x = 0
+  TypeWitnessHeader.checkLayoutAssumptions()
+  let f = open_test_cases_file_for_reading()
+  while true {
+    var sizes: Int[10] = (0,0,0,0,0,0,0,0,0,0)
+    var alignments: Int[10] = (0,0,0,0,0,0,0,0,0,0)
+    var offsets: Int[10] = (0,0,0,0,0,0,0,0,0,0)
+
+    let l = read_test_case(f, &sizes, &alignments, &offsets)
+
+    if l <= 0 {
+      if l == -1 {return 0}
+      if l == -2 {return -2}
+      if l == -3 {return -3}
+      if l == -4 {return -4}
+      if l == -5 {return -5}
+      if l == 0 {return -6}
+      return -7
+    }
+    if l > 10 { return -8 }
+
+    let s = Pointer<Int>(value: Builtin.address(of: sizes))
+    let a = Pointer<Int>(value: Builtin.address(of: alignments))
+    let o = Pointer<Int>(value: Builtin.address(of: offsets))
+    verify_offsets(
+      forFirst: l,
+      in: (
+        H(s.at(0), a.at(0)),
+        H(s.at(1), a.at(1)),
+        H(s.at(2), a.at(2)),
+        H(s.at(3), a.at(3)),
+        H(s.at(4), a.at(4)),
+        H(s.at(5), a.at(5)),
+        H(s.at(6), a.at(6)),
+        H(s.at(7), a.at(7)),
+        H(s.at(8), a.at(8)),
+        H(s.at(9), a.at(9))),
+      to_be: o.at(0), o.at(1), o.at(2), o.at(3), o.at(4), o.at(5), o.at(6), o.at(7), o.at(8), o.at(9))
+    x += 1
+  }
+  return 0
+}

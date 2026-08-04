@@ -1,0 +1,19 @@
+public struct BoxAddress is Deinitializable {
+
+  public var value: Builtin.ptr
+
+  public memberwise init
+
+  public subscript unsafe() let -> UInt32 {
+    let v = self.value as* let UInt32
+    yield v
+    precondition(v == (42 as UInt32))
+  }
+
+}
+
+public fun main() {
+  let x = 42 as UInt32
+  let b = BoxAddress(value: Builtin.address(of: x))
+  precondition(b.unsafe[] == (42 as UInt32))
+}

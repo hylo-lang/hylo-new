@@ -334,56 +334,39 @@ final class LayoutTests: XCTestCase {
     }
   }
 
-  /// Fragments of Hylo test code for these cases.
-  var hyloChecks: [String] = []
+  /// Fragments of the Hylo test input file.
+  var hyloTestCases: [String] = []
 
-  /// Returns the Hylo code for a particular test case.
-  private func hylo_check_code(
+  /// Returns a the test case formatted for the Hylo test
+  /// input file.
+  private func hyloTestCase(
     members sas: [(size: Size, alignment: Alignment)],
     offsets os: [UInt32]
   ) -> String {
+    func field<T>(_ x: T, width: Int) -> String {
+      let s = "\(x)"
+      return s + repeatElement(" ", count: max(0, width - s.count))
+    }
+
     let sas1 = sas + repeatElement((size: 0, alignment: 0), count: 10 - sas.count)
     let os1 = os + repeatElement(0, count: 10 - os.count)
 
     return """
-        verify_offsets(
-          forFirst: \(os.count),
-          in: (\(sas1.map { sa in "H(\(sa.size), \(sa.alignment))" }.joined(separator: ", "))),
-          to_be: \(os1.map { "\($0)" }.joined(separator: ", ")))
+      \(sas1.map { sa in "\(sa.size) \(sa.alignment)  " }.joined())
+      \(os1.map { field($0, width: 4) }.joined(separator: " "))
       """
   }
 
-  /// Returns the accumulated code of the Hylo tests.
-  private func hyloCode() -> String {
-    var r = ""
-    let batchSize = 10
-    var functionCount = 0
-    var nextChecks: [String] = []
-    while hyloChecks.count > 1 {
-      var remaining = hyloChecks[...]
-      while !remaining.isEmpty {
-        r +=
-        """
-          
-        fun test\(functionCount)() {
-        \(remaining.prefix(batchSize).joined(separator: "\n"))
-        }
-
-        """
-        remaining = remaining.dropFirst(batchSize)
-        nextChecks.append("  test\(functionCount)()")
-        functionCount += 1
-      }
-      hyloChecks = nextChecks
-      nextChecks = []
-    }
-    return r
+  /// Returns the contents of the Hylo test file.
+  private func writeHyloTestFile() throws {
+    try (hyloTestCases.joined(separator: "\n") + "\n-1\n")
+      .write(toFile: "test-cases.txt", atomically: true, encoding: .utf8)
   }
 
   private func check_offsets(members sa: [(size: Size, alignment: Alignment)]) {
     if sa.count == 0 { return }
     let offsets = offsets(members: sa)
-    // hyloChecks.append(hylo_check_code(members: sa, offsets: offsets))
+    // hyloTestCases.append(hyloTestCase(members: sa, offsets: offsets))
 
     let member_order = sa.indices.sorted { (i, j) in
       offsets[i] < offsets[j]
@@ -447,7 +430,7 @@ final class LayoutTests: XCTestCase {
     }
   }
 
-  func testOffsetOfMember() {
+  func testOffsetOfMember() throws {
 
     check_offsets(members: [(size: 5, alignment: 1), (size: 3, alignment: 2), (size: 5, alignment: 9)])
     check_offsets(members: [(size: 7, alignment: 4), (size: 5, alignment: 8), (size: 0, alignment: 3), (size: 9, alignment: 4), (size: 1, alignment: 7)])
@@ -2582,7 +2565,7 @@ final class LayoutTests: XCTestCase {
     check_offsets(members: [(size: 5, alignment: 9), (size: 8, alignment: 1), (size: 3, alignment: 9), (size: 5, alignment: 4), (size: 3, alignment: 9), (size: 3, alignment: 7), (size: 2, alignment: 6), (size: 9, alignment: 4), (size: 2, alignment: 9), (size: 8, alignment: 3)])
     check_offsets(members: [(size: 0, alignment: 1), (size: 6, alignment: 8), (size: 7, alignment: 1), (size: 3, alignment: 5), (size: 8, alignment: 8), (size: 1, alignment: 8), (size: 0, alignment: 9), (size: 6, alignment: 4), (size: 1, alignment: 2), (size: 8, alignment: 7)])
 
-    // print(hyloCode())
+    // try writeHyloTestFile()
   }
 
 }
