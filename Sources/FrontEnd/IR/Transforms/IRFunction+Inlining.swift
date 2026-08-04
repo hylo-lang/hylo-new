@@ -1,4 +1,19 @@
+import Utilities
+
 extension IRFunction {
+
+  /// The state of inlining.
+  internal struct InliningContext {
+
+    /// The functions whose contents are being inlined.
+    fileprivate var stack: [IRFunction.Name]
+
+    /// Creates an empty instance.
+    internal init() {
+      self.stack = []
+    }
+
+  }
 
   /// If `self` is exposed and must be inlined, verifies that it only uses exposed symbols.
   internal func upholdInliningRequirements(in m: Module.ID, using typer: inout Typer) -> Bool {
@@ -22,10 +37,15 @@ extension IRFunction {
   }
 
   /// Inlines the contents of the callees in `self` that were resolved statically to a declaration
-  /// annotated with `@inline(always)`, and whose definition is visible from `m`.
-  internal mutating func inlineSimpleCallees(emittingInto m: Module.ID, using typer: inout Typer) {
-    var work = Array(blocks)
-    while let b = work.popLast() {
+  /// that should be inlined given `context`.
+  internal mutating func inlineSimpleCallees(
+    emittingInto m: Module.ID, using typer: inout Typer,
+    in context: inout InliningContext
+  ) {
+    // Nothing to do if the function already went through mandatory inlining.
+    if passedMandatoryInlining { return }
+
+    for b in blocks {
       // Nothing to do if the block's empty.
       guard var j = b.last else { continue }
 
@@ -37,38 +57,79 @@ extension IRFunction {
         defer { swap(&i, &j) }
 
         // TODO: Subscripts
-        if let s = at(j) as? IRApply, case .function(let f, _) = s.callee {
-          // Should the callee be inlined?
-          let callee = typer.program[m].ir.functions[f]!.name
-          if !typer.program.shouldInline(callee) { continue }
-
-          // Can we access the callee's definition.
-          guard let (n, source) = typer.program.definition(of: callee, visibleFrom: m) else {
-            continue
-          }
-
-          for k in source.instructions() {
-            for case .function(let f, _) in source.at(k).operands {
-              typer.program[m].ir.declare(typer.program[n].ir.functions[f]!)
-            }
-          }
-
-          // Construct a table mapping each parameter to its argument.
-          var table = IRSubstitutionTable()
-          table[source.returnRegister!] = s.result
-          for (p, a) in s.arguments.enumerated() {
-            table[.parameter(p)] = a
-          }
-
-          // Replace the call with the contents of the callee.
-          typer.program.withEmitter(insertingIn: m) { (emitter) in
-            emitter.insert(
-              contentsOf: source, before: j, in: &self, substitutingOperandsWith: table)
-          }
-          remove(j)
+        if let k = cast(j, to: IRApply.self) {
+          inlineApply(k, emittingInto: m, using: &typer, in: &context)
         }
       }
     }
+
+    // Inlining may have inserted calls to never-returning functions, introducing unreachable basic
+    // blocks that have to be eliminated.
+    removeCodeAfterNeverReturningCalls()
+    removeUnreachableBlocks()
+  }
+
+  /// Inlines `i` iff its callee has been resolved statically to a declaration that should be
+  /// inlined given `context`.
+  private mutating func inlineApply(
+    _ i: IRApply.ID, emittingInto m: Module.ID, using typer: inout Typer,
+    in context: inout InliningContext
+  ) {
+    let s = at(i)
+    guard case .function(let callee, _) = s.callee else { return }
+
+    // Should the callee be inlined?
+    if !typer.program.shouldInline(callee) {
+      return
+    }
+
+    // Are we in a cycle?
+    if (name == callee) || context.stack.contains(callee) {
+      let a = typer.program.span(s.anchor)
+      let d = Diagnostic(.error, "cannot inline recursive function", at: a)
+      typer.program[m].addDiagnostic(d)
+      return
+    }
+
+    context.stack.append(callee)
+    defer { context.stack.removeLast() }
+
+    // Locate the definition of `f`.
+    guard let (n, f) = typer.program.definition(of: callee, visibleFrom: m) else {
+      // No available definition. An error should have been reported elsewhere.
+      return
+    }
+
+    // Should the callee go through mandatory inlining first?
+    if !typer.program[n].ir[f].passedMandatoryInlining {
+      var g = typer.program[n].ir[f].move()
+      g.inlineSimpleCallees(emittingInto: n, using: &typer, in: &context)
+      typer.program[n].ir[f].take(definition: g)
+    }
+
+    // Make sure the functions used in the callee are declared in `m`. These functions should be
+    // either defined in `m` or exposed from another module.
+    let source = typer.program[n].ir[f]
+    for k in source.instructions() {
+      for case .function(let f, _) in source.at(k).operands {
+        typer.program[m].ir.declare(typer.program[n].ir.functions[f]!)
+      }
+    }
+
+    // Construct a table mapping each parameter to its argument.
+    var table = IRSubstitutionTable()
+    table[source.returnRegister!] = s.result
+    for (p, a) in s.arguments.enumerated() {
+      table[.parameter(p)] = a
+    }
+
+    // Replace the call with the contents of the callee.
+    typer.program.withEmitter(insertingIn: m) { (emitter) in
+      emitter.insert(
+        contentsOf: source, before: i.erased, in: &self,
+        substitutingOperandsWith: table)
+    }
+    remove(i.erased)
   }
 
 }

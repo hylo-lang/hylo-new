@@ -183,10 +183,8 @@ public struct Program: Sendable {
         if !typer.program[m].ir[i].isDefined { continue }
 
         var f = typer.program[m].ir[i].move()
-        // Hack for more aggressive inlining.
-        // See https://github.com/hylo-lang/hylo-new/issues/329 for the proper solution.
-        f.inlineSimpleCallees(emittingInto: m, using: &typer)
-        f.inlineSimpleCallees(emittingInto: m, using: &typer)
+        var c = IRFunction.InliningContext()
+        f.inlineSimpleCallees(emittingInto: m, using: &typer, in: &c)
         typer.program[m].ir[i].take(definition: f)
       }
     }
@@ -1567,28 +1565,26 @@ public struct Program: Sendable {
 
   /// Returns the definition of `f` iff such definition is visible from `m`.
   ///
-  /// The result is the first definition of `f` found by inspecting `m` and then its dependencies,
-  /// in an arbitrary order. The method assumes all possible definitions of `f` to be equivalent,
-  /// which corresponds to LLVM's `linkonce` linkage type.
+  /// The result is the identity of the first definition of `f` found by inspecting `m` and then
+  /// its dependencies, in an arbitrary order. The method assumes all possible definitions of `f`
+  /// to be equivalent, which corresponds to LLVM's `linkonce` linkage type.
   ///
   /// - Requires: `f` is declared (possibly without a definition) in `m`.
   public func definition(
     of f: IRFunction.Name, visibleFrom m: Module.ID
-  ) -> (Module.ID, IRFunction)? {
-    guard let i = self[m].ir.identity(function: f) else {
-      preconditionFailure("'\(show(f))' not declared in module '\(self[m].name)'")
-    }
+  ) -> (Module.ID, IRFunction.ID)? {
+    guard let i = self[m].ir.identity(function: f) else { return nil }
 
     // Is `f` defined in `m`?
     if self[m].ir[i].isDefined {
-      return (m, self[m].ir[i])
+      return (m, i)
     }
 
     // Is `f` defined in a dependency?
     for d in self[m].dependencies {
       guard let n = self.identity(module: d) else { continue }
       if let j = self[n].ir.identity(function: f), self[n].ir[j].isDefined {
-        return (n, self[n].ir[j])
+        return (n, j)
       }
     }
 

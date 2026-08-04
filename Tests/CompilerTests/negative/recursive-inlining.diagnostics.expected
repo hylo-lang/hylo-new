@@ -1,0 +1,6 @@
+negative/recursive-inlining.hylo:2.11-14: error: cannot inline recursive function
+fun f() { f() }
+          ~~~
+negative/recursive-inlining.hylo:8.11-14: error: cannot inline recursive function
+fun h() { g() }
+          ~~~
