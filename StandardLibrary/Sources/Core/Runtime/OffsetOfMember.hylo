@@ -497,7 +497,7 @@ public fun filter_and_stable_sort_elements_by_decreasing_alignment(
     &tail_start.value = (n + 1).value
   }
   else {
-    // Drop unretained elments after n
+    // Drop unretained elements after n
     &start = n + 1
     drop_first(from: &start, to: end, while_alignment_no_greater_than: n_alignment)
 

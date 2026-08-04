@@ -97,7 +97,7 @@ private func first_position(
 }
 
 /// Removes the contiguous elements at the tail of `start..<end` whose
-/// pointees satisify `p`.
+/// pointees satisfy `p`.
 private func drop_last(
   from start: UnsafeMutablePointer<RecordMemberType>,
   to end: inout UnsafeMutablePointer<RecordMemberType>,
@@ -109,7 +109,7 @@ private func drop_last(
 }
 
 /// Removes the contiguous elements at the head of `start..<end` whose
-/// pointees satisify `p`.
+/// pointees satisfy `p`.
 private func drop(
   from start: inout UnsafeMutablePointer<RecordMemberType>,
   to end: UnsafeMutablePointer<RecordMemberType>,
@@ -211,7 +211,7 @@ private func filter_and_stable_sort_elements_by_decreasing_alignment(
     tail_start = n + 1
   }
   else {
-    // Drop unretained elments after n
+    // Drop unretained elements after n
     start = n + 1
     drop(
       from: &start, to: end,
