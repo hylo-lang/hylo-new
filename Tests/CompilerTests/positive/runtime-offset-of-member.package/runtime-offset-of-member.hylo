@@ -180,7 +180,8 @@ fun main() -> Int32 {
         H(s.at(7), a.at(7)),
         H(s.at(8), a.at(8)),
         H(s.at(9), a.at(9))),
-      to_be: o.at(0), o.at(1), o.at(2), o.at(3), o.at(4), o.at(5), o.at(6), o.at(7), o.at(8), o.at(9))
+      to_be: o.at(0), o.at(1), o.at(2), o.at(3), o.at(4), o.at(5),
+             o.at(6), o.at(7), o.at(8), o.at(9))
     x += 1
   }
   return 0
