@@ -1,0 +1,16 @@
+//! stage:lowering
+
+// Declarations in extensions should be exposed if the extendee is exposed. `g` is exposed and
+// must be inlined into other modules, so its callees must be exposed too.
+
+extension Int {
+
+  @inline(always)
+  public fun f() {}
+
+}
+
+@inline(always)
+public fun g() {
+  Int().f()
+}

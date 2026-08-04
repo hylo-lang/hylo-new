@@ -470,19 +470,81 @@ public struct Program: Sendable {
   /// Returns `true` if the contents of `d` is visible in all modules.
   ///
   /// The result is `true` if `d` is annotated with `@exposed` and/or `d` and all the scopes
-  /// enclosing it are public.
+  /// enclosing it are public. An extension has no modifiers; its scope is public iff the
+  /// declaration of its extendee, if any, is exposed.
   public func isExposed<T: ModifiableDeclaration>(_ d: T.ID) -> Bool {
+    isExposed(DeclarationIdentity(d))
+  }
+
+  private func parentModifiableDeclaration<T: SyntaxIdentity>(of n: T) -> AnySyntaxIdentity? {
+    guard let s = parent(containing: n).node else { return nil }
+
+    if self[s] is (any ModifiableDeclaration) { 
+      return s.erased
+    }
+    if let e = cast(s, to: ExtensionDeclaration.self),
+      let x = nominalExtendee(of: e)
+    {
+      return self[x] is (any ModifiableDeclaration) ? x.erased : nil
+    }
+    return nil
+  }
+
+  /// Returns `true` if the contents of `d` is visible in all modules.
+  ///
+  /// - Requires: The module containing `d` is typed.
+  public func isExposed(_ d: DeclarationIdentity) -> Bool {
     // Is `d` explicitly exposed?
     if (annotation("exposed", appliedTo: d) != nil) { return true }
 
     // Otherwise, `d` and its enclosing scopes must be public.
-    if !self[d].is(.public) { return false }
-    var p = parent(containing: d)
-    while let a = p.node {
-      guard let b = self[a] as? (any ModifiableDeclaration), b.is(.public) else { return false }
-      p = parent(containing: a)
+    if let m = self[d] as? (any ModifiableDeclaration), !m.is(.public) { return false }
+
+    var p: AnySyntaxIdentity = d.erased
+    while let m = parentModifiableDeclaration(of: p) {
+      let b = self[m] as! (any ModifiableDeclaration)
+      
+      if !b.is(.public) { return false }
+      p = m
     }
-    return p.isFile
+    return parent(containing: p).isFile
+  }
+
+  /// Returns `true` iff the extendee of `e` is exposed or is not introduced by a modifiable
+  /// declaration (e.g., a generic parameter or a structural type).
+  ///
+  /// - Requires: The module containing `e` is typed.
+  private func extendsExposedEntity(_ e: ExtensionDeclaration.ID) -> Bool {
+    guard
+      let d = nominalExtendee(of: e),
+      self[d] is any ModifiableDeclaration
+    else { return true }
+    return isExposed(d)
+  }
+
+  /// Returns the declaration introducing the entity extended by `e`, if any.
+  ///
+  /// - Requires: The module containing `e` is typed.
+  private func nominalExtendee(of e: ExtensionDeclaration.ID) -> DeclarationIdentity? {
+    type(maybeAssignedTo: e).flatMap({ (t) in declaration(introducing: types.head(t)) })
+  }
+
+  /// Returns the declaration introducing `t`, if any.
+  private func declaration(introducing t: AnyTypeIdentity) -> DeclarationIdentity? {
+    switch types[t] {
+    case let u as Struct:
+      return .init(u.declaration)
+    case let u as Enum:
+      return .init(u.declaration)
+    case let u as Trait:
+      return .init(u.declaration)
+    case let u as TypeAlias:
+      return .init(u.declaration)
+    case let u as TypeApplication:
+      return declaration(introducing: u.abstraction)
+    default:
+      return nil
+    }
   }
 
   /// Returns `true` iff `d` declares symbols that will not appear in the ABI of `m`.
