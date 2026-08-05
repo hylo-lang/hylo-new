@@ -469,8 +469,8 @@ public struct Program: Sendable {
 
   /// Returns `true` if the contents of `d` is visible in all modules.
   ///
-  /// The result is `true` if `d` is annotated with `@exposed` and/or `d` and all the scopes
-  /// enclosing it are public.
+  /// The result is `true` if `d` is annotated with `@exposed` or `d` and all the scopes enclosing
+  /// it are public. Note that the scope of an extension is always public.
   public func isExposed<T: ModifiableDeclaration>(_ d: T.ID) -> Bool {
     // Is `d` explicitly exposed?
     if (annotation("exposed", appliedTo: d) != nil) { return true }
@@ -479,8 +479,13 @@ public struct Program: Sendable {
     if !self[d].is(.public) { return false }
     var p = parent(containing: d)
     while let a = p.node {
-      guard let b = self[a] as? (any ModifiableDeclaration), b.is(.public) else { return false }
-      p = parent(containing: a)
+      if tag(of: a) == ExtensionDeclaration.self {
+        p = parent(containing: a)
+      } else if let b = self[a] as? (any ModifiableDeclaration), b.is(.public) {
+        p = parent(containing: a)
+      } else {
+        return false
+      }
     }
     return p.isFile
   }
