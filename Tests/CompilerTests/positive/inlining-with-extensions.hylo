@@ -1,0 +1,17 @@
+//! exit-status:1
+
+extension Int32 {
+
+  @inline(always)
+  public fun incremented() -> Int32 { self + (1 as Int32) }
+
+}
+
+@inline(always)
+public fun one() -> Int32 {
+  Int32().incremented()
+}
+
+public fun main() -> Int32 {
+  return one()
+}
