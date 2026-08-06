@@ -1,0 +1,7 @@
+public fun main() {
+  precondition((3 as UInt8) * (2 as UInt8) == (6 as UInt8))
+  precondition((256 as UInt16) * (4 as UInt16) == (1024 as UInt16))
+  precondition((7 as UInt32) * (3 as UInt32) == (21 as UInt32))
+  precondition((7 as UInt64) * (0 as UInt64) == (0 as UInt64))
+  precondition((17 as UInt) * (1 as UInt) == (17 as UInt))
+}
