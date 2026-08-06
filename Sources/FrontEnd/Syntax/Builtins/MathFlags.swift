@@ -2,7 +2,8 @@ import Archivist
 
 /// A set of customizations to the behavior of floating point operations.
 ///
-/// The meaning of each customization is given by the LLVM option of the same name.
+/// The meaning of each customization is given by the LLVM option of the same name. The raw value
+/// of each flag matches its position in `LLVMFastMathFlags` (see llvm-c/Core.h).
 public struct MathFlags: OptionSet, Hashable, Sendable {
 
   public typealias RawValue = UInt8
@@ -13,21 +14,22 @@ public struct MathFlags: OptionSet, Hashable, Sendable {
     self.rawValue = rawValue
   }
 
-  public static let afn = MathFlags(rawValue: 1 << 0)
+  public static let reassoc = MathFlags(rawValue: 1 << 0)
 
-  public static let arcp = MathFlags(rawValue: 1 << 1)
+  public static let nnan = MathFlags(rawValue: 1 << 1)
 
-  public static let contract = MathFlags(rawValue: 1 << 2)
+  public static let ninf = MathFlags(rawValue: 1 << 2)
 
-  public static let fast = MathFlags(rawValue: 1 << 3)
+  public static let nsz = MathFlags(rawValue: 1 << 3)
 
-  public static let ninf = MathFlags(rawValue: 1 << 4)
+  public static let arcp = MathFlags(rawValue: 1 << 4)
 
-  public static let nnan = MathFlags(rawValue: 1 << 5)
+  public static let contract = MathFlags(rawValue: 1 << 5)
 
-  public static let nsz = MathFlags(rawValue: 1 << 6)
+  public static let afn = MathFlags(rawValue: 1 << 6)
 
-  public static let reassoc = MathFlags(rawValue: 1 << 7)
+  /// All flags; implies every other customization, as in LLVM.
+  public static let fast: MathFlags = [.reassoc, .nnan, .ninf, .nsz, .arcp, .contract, .afn]
 
 }
 
@@ -76,11 +78,11 @@ extension MathFlags: LosslessStringConvertible {
 
   /// The contribution this set of flags makes to name of a function in the `Builtin` module.
   public var description: String {
+    if self.contains(.fast) { return "fast" }
     var result: [String] = []
     if self.contains(.afn) { result.append("afn") }
     if self.contains(.arcp) { result.append("arcp") }
     if self.contains(.contract) { result.append("contract") }
-    if self.contains(.fast) { result.append("fast") }
     if self.contains(.ninf) { result.append("ninf") }
     if self.contains(.nnan) { result.append("nnan") }
     if self.contains(.nsz) { result.append("nsz") }

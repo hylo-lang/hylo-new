@@ -1,0 +1,29 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+public fun main() {
+  // `sdiv` rounds towards zero.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64((7 as Int64).value, (2 as Int64).value),
+    (3 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64((-7 as Int64).value, (2 as Int64).value),
+    (-3 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64((7 as Int64).value, (-2 as Int64).value),
+    (-3 as Int64).value))
+
+  // Defined at the limits, except for `min / -1`.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64(Int64.min().value, (1 as Int64).value),
+    Int64.min().value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64(Int64.max().value, (-1 as Int64).value),
+    (-9223372036854775807 as Int64).value))
+
+  // The `exact` variant is defined when there is no remainder.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_exact_i64((-8 as Int64).value, (2 as Int64).value),
+    (-4 as Int64).value))
+}

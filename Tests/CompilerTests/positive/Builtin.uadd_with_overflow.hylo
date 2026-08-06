@@ -1,0 +1,18 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+fun expect_not(c: Builtin.i1) {
+  precondition(!Bool(value: c))
+}
+
+public fun main() {
+  let (r0, o0) = Builtin.uadd_with_overflow_i64((5 as UInt64).value, (7 as UInt64).value)
+  expect(Builtin.icmp_eq_i64(r0, (12 as UInt64).value))
+  expect_not(o0)
+
+  // Overflow wraps and is reported.
+  let (r1, o1) = Builtin.uadd_with_overflow_i64(UInt64.max().value, (1 as UInt64).value)
+  expect(Builtin.icmp_eq_i64(r1, (0 as UInt64).value))
+  expect(o1)
+}

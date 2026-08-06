@@ -1,0 +1,19 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+public fun main() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fadd_float64((1.5 as Float64).value, (2.25 as Float64).value),
+    (3.75 as Float64).value))
+
+  // Overflow produces infinity, which exceeds every finite value.
+  expect(Builtin.fcmp_ogt_float64(
+    Builtin.fadd_float64((1.0e308 as Float64).value, (1.0e308 as Float64).value),
+    (1.7976931348623157e308 as Float64).value))
+
+  // Fast-math flags do not change exact computations.
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fadd_fast_float64((1.5 as Float64).value, (2.25 as Float64).value),
+    (3.75 as Float64).value))
+}

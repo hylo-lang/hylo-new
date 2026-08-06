@@ -1,0 +1,18 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+public fun main() {
+  // `fptosi` truncates towards zero.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptosi_float64_i64((4.99 as Float64).value),
+    (4 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptosi_float64_i64((-4.5 as Float64).value),
+    (-4 as Int64).value))
+
+  // The 64-bit minimum is exactly convertible.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptosi_float64_i64((-9223372036854775808.0 as Float64).value),
+    Int64.min().value))
+}
