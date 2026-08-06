@@ -1,0 +1,31 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+fun expect_not(c: Builtin.i1) {
+  precondition(!Bool(value: c))
+}
+
+public fun main() {
+  let one = (1.0 as Float64).value
+  let two = (2.0 as Float64).value
+  let nan = Builtin.fdiv_float64((0.0 as Float64).value, (0.0 as Float64).value)
+
+  expect(Builtin.fcmp_oeq_float64(one, one))
+  expect(Builtin.fcmp_one_float64(one, two))
+  expect(Builtin.fcmp_olt_float64(one, two))
+  expect(Builtin.fcmp_ole_float64(one, one))
+  expect(Builtin.fcmp_ogt_float64(two, one))
+  expect(Builtin.fcmp_oge_float64(two, two))
+
+  // `ord` holds without NaN; `uno` holds with it.
+  expect(Builtin.fcmp_ord_float64(one, two))
+  expect_not(Builtin.fcmp_ord_float64(nan, one))
+  expect(Builtin.fcmp_uno_float64(nan, one))
+  expect_not(Builtin.fcmp_uno_float64(one, two))
+
+  // NaN is not ordered-equal to anything, including itself.
+  expect_not(Builtin.fcmp_oeq_float64(nan, nan))
+  expect(Builtin.fcmp_ueq_float64(nan, one)) // unordered or equal
+  expect(Builtin.fcmp_une_float64(nan, nan)) // unordered or not equal
+}

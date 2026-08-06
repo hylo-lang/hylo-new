@@ -1,0 +1,12 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+public fun main() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fpext_float32_float64((1.5 as Float32).value),
+    (1.5 as Float64).value))
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fpext_float32_float64((-0.5 as Float32).value),
+    (-0.5 as Float64).value))
+}

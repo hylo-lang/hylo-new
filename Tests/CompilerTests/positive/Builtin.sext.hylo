@@ -1,0 +1,17 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+public fun main() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sext_i8_i64((127 as Int8).value),
+    (127 as Int64).value))
+
+  // `sext` extends with the sign bit, preserving signed values.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sext_i8_i64((-1 as Int8).value),
+    (-1 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sext_i8_i64(Int8.min().value),
+    (-128 as Int64).value))
+}

@@ -1,0 +1,18 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+fun expect_not(c: Builtin.i1) {
+  precondition(!Bool(value: c))
+}
+
+public fun main() {
+  // `zeroinitializer` produces the all-zeroes value of each machine type.
+  expect_not(Builtin.zeroinitializer_i1())
+  expect(Builtin.icmp_eq_i8(Builtin.zeroinitializer_i8(), (0 as Int8).value))
+  expect(Builtin.icmp_eq_i64(Builtin.zeroinitializer_i64(), (0 as Int64).value))
+  expect(Builtin.icmp_eq_word(Builtin.zeroinitializer_word(), (0 as Int).value))
+  expect(Builtin.fcmp_oeq_float32(Builtin.zeroinitializer_float32(), (0.0 as Float32).value))
+  expect(Builtin.fcmp_oeq_float64(Builtin.zeroinitializer_float64(), (0.0 as Float64).value))
+  expect(Builtin.icmp_eq_ptr(Builtin.zeroinitializer_ptr(), Builtin.zeroinitializer_ptr()))
+}

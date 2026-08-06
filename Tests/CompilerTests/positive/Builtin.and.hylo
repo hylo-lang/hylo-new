@@ -1,0 +1,17 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+public fun main() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.and_i64((12 as Int64).value, (10 as Int64).value),
+    (8 as Int64).value))
+
+  // All-ones is the identity of `and`; zero absorbs.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.and_i64((42 as Int64).value, (-1 as Int64).value),
+    (42 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.and_i64((42 as Int64).value, (0 as Int64).value),
+    (0 as Int64).value))
+}

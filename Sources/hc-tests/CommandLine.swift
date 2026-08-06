@@ -54,7 +54,9 @@ import Foundation
   }
 
   private func testCaseIdentifier(_ testCase: URL) -> String {
-    testCase.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "-", with: "_")
+    testCase.deletingPathExtension().lastPathComponent
+      .replacingOccurrences(of: "-", with: "_")
+      .replacingOccurrences(of: ".", with: "_")
   }
 
   /// Creates a new instance with default options.

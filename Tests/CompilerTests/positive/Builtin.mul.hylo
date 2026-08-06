@@ -1,0 +1,25 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+public fun main() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.mul_i64((6 as Int64).value, (7 as Int64).value),
+    (42 as Int64).value))
+
+  // `mul` wraps around on overflow.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.mul_i64(Int64.max().value, (2 as Int64).value),
+    (-2 as Int64).value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.mul_i8((64 as Int8).value, (2 as Int8).value),
+    Int8.min().value))
+
+  // `nuw`/`nsw` variants work right at the limits.
+  expect(Builtin.icmp_eq_i8(
+    Builtin.mul_nuw_i8((85 as UInt8).value, (3 as UInt8).value),
+    UInt8.max().value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.mul_nsw_i8((-64 as Int8).value, (2 as Int8).value),
+    Int8.min().value))
+}

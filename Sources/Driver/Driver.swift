@@ -380,6 +380,10 @@ public struct Driver {
       .trimmingCharacters(in: .whitespacesAndNewlines)
     arguments += ["-isysroot", sdk, "-lSystem"]
     #endif
+    #if os(Linux)
+    // Instruction selection may lower some instructions (e.g., `frem`) to libm calls.
+    arguments += ["-lm"]
+    #endif
 
     let clang = try Host.findBinaryExecutable(invokedAs: "clang")
     _ = try Process.executionOutput(clang, arguments: arguments)
