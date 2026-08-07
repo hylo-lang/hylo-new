@@ -27,18 +27,18 @@ extension UInt32 {
     &self.value = Builtin.trunc_word_i32(x.value)
   }
 
+  /// Returns the least n >= `self` that is a multiple of `a`.
+  @inline(always)
+  public fun rounded_up(to_nearest_multiple_of a: Alignment) -> Self {
+    let a_ = Size(a)
+    // The distance from i to the nearest aligned offset <= i.
+    let excess = self % a_
+    return if excess == (0 as Self) { self.copy() } else { self - excess + a_ }
+  }
+
 }
 
 extension UInt16 {
-
-  /// Returns the first n >= i that is a multiple of self
-  @inline(always)
-  public fun first_aligned_offset(starting_from i: Size) -> Size {
-    let a = Size(self)
-    // The distance from i to the nearest aligned offset <= i.
-    let excess = i % a
-    return if excess == (0 as Size) { i.copy() } else { i - excess + a }
-  }
 
   /// Creates an instance having the low 16 bits of `x`.
   @inline(always)
@@ -203,7 +203,7 @@ extension Metatype<TypeWitnessHeader> {
   /// Returns the number of bytes between elements in a buffer of `Subject`.
   @inline(always)
   public static fun stride() -> Size {
-    Self.alignment().first_aligned_offset(starting_from: Self.size())
+    Self.size().rounded_up(to_nearest_multiple_of: Self.alignment())
   }
 
 }
@@ -233,7 +233,7 @@ extension Metatype<RecordMemberType> {
   /// Returns the number of bytes between elements in a buffer of `Subject`.
   @inline(always)
   public static fun stride() -> Size {
-    Self.alignment().first_aligned_offset(starting_from: Self.size())
+    Self.size().rounded_up(to_nearest_multiple_of: Self.alignment())
   }
 
 }
@@ -519,7 +519,7 @@ public fun size_of_record_having_ordered_members(
   var start = start_.copy()
   while start < end {
     let w = start.pointee()
-    let position = w.alignment().first_aligned_offset(starting_from: r)
+    let position = r.rounded_up(to_nearest_multiple_of: w.alignment())
     &r = position + w.size()
     &start += 1
   }
@@ -544,6 +544,6 @@ public fun __hylo_offset_of_member(
   filter_and_stable_sort_elements_by_decreasing_alignment(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
   if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
-  sink let r = nth_alignment.first_aligned_offset(starting_from: preceding_size)
+  sink let r = preceding_size.rounded_up(to_nearest_multiple_of: nth_alignment)
   return r
 }
