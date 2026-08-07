@@ -1,0 +1,14 @@
+//! stage:lowering
+
+subscript f(x: auto Void) auto -> Int {
+  let { yield 0 }
+  inout { yield &0 }
+}
+
+fun modify(x: inout Int) {}
+
+public fun main() {
+  var s = ()
+  inout t = f[&s]
+  modify(&t)
+}
