@@ -422,18 +422,23 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment(
     from: destinationStart, to: &i, while_alignment_less_than: r_alignment)
 
   // Workaround #370
-  insert_backward_stably_sorted_by_decreasing_alignment1(source, i, destinationEnd, r)
+  insert(source, backward_at_head_of_range_from: i, to: destinationEnd)
   destinationEnd += 1
 }
 
+/// Inserts `source.pointee()` at the head of the `pointee`s of `start..<end`.
+///
+/// - Precondition: `source >= end`.
+/// - Note: Mutates the `pointee`s of `start...source`.
 @inline(always)
-public fun insert_backward_stably_sorted_by_decreasing_alignment1(
-  source: Pointer<RecordMemberType>, i: Pointer<RecordMemberType>,
-  destinationEnd: Pointer<RecordMemberType>, r: RecordMemberType)
+public fun insert(
+  source: Pointer<RecordMemberType>,
+  backward_at_head_of_range_from start: Pointer<RecordMemberType>,
+  to end: Pointer<RecordMemberType>)
 {
-  if source != i {
-    shift_backward1(from: i, until: destinationEnd)
-    i.set_pointee(r.copy())
+  if source != start {
+    shift_backward1(from: start, until: end)
+    start.set_pointee(source.pointee())
   }
 }
 
