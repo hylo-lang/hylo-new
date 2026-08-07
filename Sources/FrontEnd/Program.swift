@@ -478,16 +478,21 @@ public struct Program: Sendable {
     // Otherwise, `d` and its enclosing scopes must be public.
     if !self[d].is(.public) { return false }
     var p = parent(containing: d)
-    while let a = p.node {
-      if tag(of: a) == ExtensionDeclaration.self {
-        p = parent(containing: a)
-      } else if let b = self[a] as? (any ModifiableDeclaration), b.is(.public) {
-        p = parent(containing: a)
-      } else {
-        return false
-      }
+    while let a = p.node, isPublicScope(a) {
+      p = parent(containing: a)
     }
     return p.isFile
+  }
+
+  /// Returns `true` iff `n` delineates a public scope.
+  public func isPublicScope<T: SyntaxIdentity>(_ n: T) -> Bool {
+    if tag(of: n) == ExtensionDeclaration.self {
+      return true
+    } else if let d = self[n] as? (any ModifiableDeclaration), d.is(.public) {
+      return true
+    } else {
+      return false
+    }
   }
 
   /// Returns `true` iff `d` declares symbols that will not appear in the ABI of `m`.
