@@ -2477,16 +2477,21 @@ internal struct IREmitter {
     _return()
   }
 
-  /// Generates the IR for storing the type witness expressed by `e` into a temporary alloca and
-  /// returns that alloca.
+  /// Generates IR for storing the type witness expressed by `e` into a fresh alloca and returns
+  /// that alloca.
   ///
   /// - Requires: The evaluation of `e` has no side effects.
   private mutating func _emitTypeWitness(expressedBy e: ExpressionIdentity) -> IRValue {
     let t = program.type(assignedTo: e, assuming: Metatype.self)
-    let u = program.types.dealiased(program.types[t].inhabitant)
-    let v = program.types.demand(TypeWitness())
-    let x = _alloca(v.erased)
-    _emitInitialize(x, with: .type(u, v))
+    return _emitTypeWitness(of: program.types[t].inhabitant)
+  }
+
+  /// Generates IR for storing a type witness of `t` into a fresh alloca and returns that alloca.
+  private mutating func _emitTypeWitness(of t: AnyTypeIdentity) -> IRValue {
+    let u = program.types.dealiased(t)
+    let w = program.types.demand(TypeWitness())
+    let x = _alloca(w.erased)
+    _emitInitialize(x, with: .type(u, w))
     return x
   }
 
