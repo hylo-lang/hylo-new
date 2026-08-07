@@ -3718,7 +3718,7 @@ public struct Typer {
     let e = thread.environment.assuming(givens: gs)
     let t = demand(EqualityWitness(lhs: a, rhs: b)).erased
     let w = WitnessExpression(
-      value: .termApplication(.init(builtin: .coercion, type: t), thread.witness),
+      value: .termApplication(.init(value: .builtin(.coercion), type: t), thread.witness),
       type: b)
     return .next([thread.copy(matching: w, to: b, in: e)])
   }
