@@ -397,15 +397,17 @@ public fun shift_backward1(
   }
 }
 
-/// Inserts `source.pointee()` at the latest position *q* in
-/// `destinationStart...destinationEnd` such that all its
-/// predecessors' `pointee`s have `alignment` ≥
-/// *q*`.pointee().alignment()`.
+/// Inserts `source.pointee()` at the latest position in
+/// `destinationStart...destinationEnd` such that any immediate
+/// predecessor has a greater or equal alignment.
 ///
-/// - Precondition: the pointees of
-///   `destinationStart..<destinationEnd` are sorted by decreasing
-///   alignment.
 /// - Precondition: `source >= destinationEnd`.
+///
+/// - Note: replaces `destinationEnd` with a value in
+///   `destinationEnd...(source+1)` *and* mutates the `pointee`s
+///   of `destinationStart..<(source+1)` in place, with unspecified
+///   effects on `pointee`s that fall out the final value of
+///   `destinationStart..<destinationEnd`.
 @inline(always)
 public fun insert_backward_stably_sorted_by_decreasing_alignment(
   into destinationStart: Pointer<RecordMemberType>,
@@ -436,15 +438,17 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment1(
 }
 
 /// Inserts each pointee in `sourceStart_..<sourceEnd` whose
-/// `alignment()` is greater than `a` into
-/// `destinationStart...destinationEnd` such that all their
-/// predecessors' `pointee`s have `alignment` ≥
-/// *q*`.pointee().alignment()`.
+/// `alignment()` is greater than `a` at the latest position in
+/// `destinationStart...destinationEnd` such that any immediate
+/// predecessor has a greater or equal alignment.
 ///
-/// - Precondition: the pointees of
-///   `destinationStart..<destinationEnd` are sorted by decreasing
-///   alignment.
 /// - Precondition: `sourceStart_ >= destinationEnd`.
+///
+/// - Note: replaces `destinationEnd` with a value in
+///   `destinationEnd..<sourceEnd` *and* mutates the `pointee`s
+///   of `destinationStart..<sourceEnd` in place, with unspecified
+///   effects on `pointee`s that fall out the final value of
+///   `destinationStart..<destinationEnd`.
 @inline(always)
 public fun insert_backward_stably_sorted_by_decreasing_alignment(
   into destinationStart: Pointer<RecordMemberType>,
@@ -462,15 +466,20 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment(
   }
 }
 
-/// Removes from start..<end the elements with alignments less than
-/// that of n, or with the same alignment as n but occurring at a
-/// position > n, and stably sorts them by decreasing alignment.
+/// Replaces `start..<end` with its elements having `alignment() <
+/// n_alignment`, or having `alignment() == n_alignment` but occurring
+/// at a position < `n`, stably-sorted by decreasing alignment.
+///
+/// - Note: replaces `start` and `end` with values in `start...end`
+///   *and* mutates the `pointee`s of `start..<end` in place, with
+///   unspecified effects on `pointee`s that fall out the final value
+///   of `start..<end`.
 @inline(always)
-public fun filter_and_stable_sort_elements_by_decreasing_alignment(
-  from start: inout Pointer<RecordMemberType>,
+public fun make_elements_stably_sorted_by_decreasing_alignment(
+  in start: inout Pointer<RecordMemberType>,
   to end: inout Pointer<RecordMemberType>,
-  that_lay_out_before n: Pointer<RecordMemberType>,
-  having_alignment n_alignment: Alignment
+  with_alignment_greater_than n_alignment: Alignment,
+  or_with_same_alignment_but_preceding n: Pointer<RecordMemberType>
 ) {
   // Drop initial unretained elements before n
   drop_first(from: &start, to: n, while_alignment_no_greater_than: n_alignment - (1 as Alignment))
@@ -509,7 +518,7 @@ public fun filter_and_stable_sort_elements_by_decreasing_alignment(
 }
 
 /// Returns the size a record type would have were its members given
-/// in storage order by `start..<end`.
+/// in storage order by the `pointee`s of `start..<end`.
 @inline(always)
 public fun size_of_record_having_ordered_members(
   from start_: Pointer<RecordMemberType>,
@@ -541,7 +550,11 @@ public fun __hylo_offset_of_member(
   var start = memberArray.copy()
   var end = memberArray + Int(l)
 
-  filter_and_stable_sort_elements_by_decreasing_alignment(from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
+  make_elements_stably_sorted_by_decreasing_alignment(
+    in: &start, to: &end,
+    with_alignment_greater_than: nth_alignment,
+    or_with_same_alignment_but_preceding: p)
+
   if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
   sink let r = preceding_size.rounded_up(to_nearest_multiple_of: nth_alignment)
