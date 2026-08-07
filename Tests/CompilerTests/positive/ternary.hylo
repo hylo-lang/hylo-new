@@ -1,0 +1,12 @@
+//! stage:typing
+
+public fun main() {
+  // Simple case.
+  _ = if true { Int() } else { Int() }
+
+  // Expected type flows top-down.
+  _ = if true { Builtin.trap() } else { .zero() } as Int
+
+  // Type of failure branch flows to success branch.
+  _ = if true { Builtin.trap() } else { Int.zero() }
+}
