@@ -2270,23 +2270,10 @@ public struct Typer {
 
     // Are both branches single-bodied?
     else if let (e0, e1) = program.branches(of: e) {
-      let t0 = inferredType(of: program[e].success, occurringAsStatement: false, in: &context)
-      context.obligations.assume(program[e].success, hasType: t0, at: program[e0].site)
-      let t1 = inferredType(of: program[e].failure, occurringAsStatement: false, in: &context)
-      context.obligations.assume(program[e].failure, hasType: t1, at: program[e1].site)
+      let t0 = inferredType(of: e0, in: &context)
+      let t1 = inferredType(of: e1, in: &context)
 
-      // Did we inferred the same type for both branches?
-      if t0 == t1 {
-        return context.obligations.assume(e, hasType: t0, at: site)
-      }
-
-      // Is the expected type `Void`?
-      else if context.expectedType == .void {
-        return context.obligations.assume(e, hasType: .void, at: site)
-      }
-
-      // Slow path: we may need coercions.
-      let t = fresh().erased
+      let t = context.expectedType ?? fresh().erased
       context.obligations.assume(CoercionConstraint(on: e0, from: t0, to: t, at: program[e0].site))
       context.obligations.assume(CoercionConstraint(on: e1, from: t1, to: t, at: program[e1].site))
       return context.obligations.assume(e, hasType: t, at: site)
@@ -2840,12 +2827,12 @@ public struct Typer {
     of b: Block.ID, occurringAsStatement isStatement: Bool,
     in context: inout InferenceContext
   ) -> AnyTypeIdentity {
+    context.obligations.assume(b, hasType: .void, at: program[b].site)
     if !isStatement, let e = program.singleExpression(of: b) {
-      let t = inferredType(of: e, in: &context)
-      return context.obligations.assume(b, hasType: t, at: program[b].site)
+      return inferredType(of: e, in: &context)
     } else {
       for s in program[b].statements { check(s) }
-      return context.obligations.assume(b, hasType: .void, at: program[b].site)
+      return .void
     }
   }
 
