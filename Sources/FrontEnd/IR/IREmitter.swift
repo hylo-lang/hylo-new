@@ -1391,6 +1391,9 @@ internal struct IREmitter {
         return lowering(e, { $0._property(d, of: q, withType: t) })
       }
 
+    case .builtin(.selfAlias):
+      return lowering(e, { $0._emitTypeWitness(of: t) })
+
     default:
       fatalError()
     }
