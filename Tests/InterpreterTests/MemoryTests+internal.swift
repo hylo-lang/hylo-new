@@ -18,4 +18,12 @@ final class InterpreterMemoryInternalTests: XCTestCase {
 
   }
 
+  func testFormingPointerToOneByteLaterThanLastByteOfAllocation() throws {
+    var m = Memory(forRunning: .init(forTesting: true), on: UnrealABI())
+    let a = m.allocate(.init(m.program.id(MachineType.i(8))))
+
+    m[a.allocation].withUnsafeMutablePointer(to: Void.self, at: 1) { _ = $0 }
+    m[a.allocation].withUnsafePointer(to: Void.self, at: 1) { _ = $0 }
+  }
+
 }
