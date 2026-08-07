@@ -410,9 +410,9 @@ public fun shift_backward1(
 ///   `destinationStart..<destinationEnd`.
 @inline(always)
 public fun insert_backward_stably_sorted_by_decreasing_alignment(
-  into destinationStart: Pointer<RecordMemberType>,
-  until destinationEnd: inout Pointer<RecordMemberType>,
-  from source: Pointer<RecordMemberType>
+  source: Pointer<RecordMemberType>,
+  into_range_from destinationStart: Pointer<RecordMemberType>,
+  to destinationEnd: inout Pointer<RecordMemberType>,
 ) {
   let r = source.pointee()
   let r_alignment = r.alignment()
@@ -460,7 +460,7 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment(
   while sourceStart != sourceEnd {
     if sourceStart.pointee().alignment() > a {
       insert_backward_stably_sorted_by_decreasing_alignment(
-        into: destinationStart, until: &destinationEnd, from: sourceStart)
+        sourceStart, into_range_from: destinationStart, to: &destinationEnd)
     }
     sourceStart += 1
   }
