@@ -41,4 +41,28 @@ final class InterpreterMemoryInternalTests: XCTestCase {
     }
   }
 
+  func testUnsignnedIntValue() throws {
+    var m = Memory(forRunning: .init(forTesting: true), on: UnrealABI())
+    let a = m.allocate(.init(m.program.id(MachineType.i(8))), count: 64)
+    m[a.allocation].withUnsafeMutablePointer(to: UInt8.self, at: 0) { p in
+      p.pointee = 8
+    }
+    XCTAssertEqual(m[a.allocation].unsignedIntValue(at: 0, ofType: .i(8)), 8)
+
+    m[a.allocation].withUnsafeMutablePointer(to: UInt16.self, at: 0) { p in
+      p.pointee = 16
+    }
+    XCTAssertEqual(m[a.allocation].unsignedIntValue(at: 0, ofType: .i(16)), 16)
+
+    m[a.allocation].withUnsafeMutablePointer(to: UInt32.self, at: 0) { p in
+      p.pointee = 32
+    }
+    XCTAssertEqual(m[a.allocation].unsignedIntValue(at: 0, ofType: .i(32)), 32)
+
+    m[a.allocation].withUnsafeMutablePointer(to: UInt64.self, at: 0) { p in
+      p.pointee = 64
+    }
+    XCTAssertEqual(m[a.allocation].unsignedIntValue(at: 0, ofType: .i(64)), 64)
+  }
+
 }
