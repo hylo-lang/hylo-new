@@ -67,6 +67,9 @@ extension IRFunction {
     // blocks that have to be eliminated.
     removeCodeAfterNeverReturningCalls()
     removeUnreachableBlocks()
+
+    // Mandatory inlining is done.
+    setMandatoryInliningPassed()
   }
 
   /// Inlines `i` iff its callee has been resolved statically to a declaration that should be

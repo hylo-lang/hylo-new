@@ -893,6 +893,12 @@ public struct IRFunction: Sendable {
     swap(&self.passedMandatoryInlining, &other.passedMandatoryInlining)
   }
 
+  /// Sets the flag indicating that the function passed mandatory inlining.
+  internal mutating func setMandatoryInliningPassed() {
+    self.passedMandatoryInlining = true
+  }
+
+
 }
 
 extension IRFunction: Showable {
