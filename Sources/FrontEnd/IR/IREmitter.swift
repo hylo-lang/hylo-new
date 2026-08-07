@@ -999,7 +999,7 @@ internal struct IREmitter {
       at: program.anchorForDiagnostics(about: e))
   }
 
-  /// Generates the IR using `d` as a callee, possibly qualified by `qualification`, and occuring
+  /// Generates the IR using `d` as a callee, possibly qualified by `qualification`, and occurring
   /// as the function applied by `c` or a synthesized call.
   ///
   /// This method implements the logic of `loweredCallee(_:appliedBy:writingResultTo:)` handling
@@ -1079,7 +1079,7 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR using `d` as a callee, possibly bound to `receiver`, and occuring as the
+  /// Generates the IR using `d` as a callee, possibly bound to `receiver`, and occurring as the
   /// function applied by `c` or a synthesized call.
   ///
   /// This method implements the logic of `loweredCallee(_:appliedBy:writingResultTo:)` handling
