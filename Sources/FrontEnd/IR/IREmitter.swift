@@ -1375,7 +1375,7 @@ internal struct IREmitter {
     switch program.declaration(referredToBy: e) {
     case .direct(let d):
       if program.isTypeDeclaration(d) {
-        return lowering(e, { $0._emitTypeWitnesse(expressedBy: .init(e)) })
+        return lowering(e, { $0._emitTypeWitness(expressedBy: .init(e)) })
       } else {
         return lowering(e, { $0._emit(useOf: d, typed: t) })
       }
@@ -1399,7 +1399,7 @@ internal struct IREmitter {
   /// Implements `lower(lvalue:)` for static calls.
   private mutating func lowered(lvalue e: StaticCall.ID) -> IRValue {
     if program.isReferringToTypeDeclaration(program[e].callee) {
-      return lowering(e, { $0._emitTypeWitnesse(expressedBy: .init(e)) })
+      return lowering(e, { $0._emitTypeWitness(expressedBy: .init(e)) })
     } else {
       unimplemented("static call")
     }
@@ -2478,7 +2478,7 @@ internal struct IREmitter {
   /// returns that alloca.
   ///
   /// - Requires: The evaluation of `e` has no side effects.
-  private mutating func _emitTypeWitnesse(expressedBy e: ExpressionIdentity) -> IRValue {
+  private mutating func _emitTypeWitness(expressedBy e: ExpressionIdentity) -> IRValue {
     let t = program.type(assignedTo: e, assuming: Metatype.self)
     let u = program.types.dealiased(program.types[t].inhabitant)
     let v = program.types.demand(TypeWitness())
