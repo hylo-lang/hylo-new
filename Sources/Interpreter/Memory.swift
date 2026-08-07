@@ -8,17 +8,15 @@ struct Memory {
   public var program: Program
 
   /// The type layouts computed so far.
-  ///
-  /// Invariant: All allocations in `self` obeys type layout from `typeLayouts`.
   private var typeLayouts: TypeLayoutCache
 
-  /// The ID of the next allocated block.
+  /// The ID of the next block to be allocated.
   private var nextAllocation = 0
 
   /// The live allocations, by ID
   private var allocation: [Allocation.ID: Allocation] = [:]
 
-  /// Creates an empty instance to run `p` on `platform`.
+  /// Creates an instance to run `p` on `platform`.
   public init(forRunning p: Program, on platform: any TargetABI) {
     program = p
     typeLayouts = .init(for: platform)
@@ -185,7 +183,7 @@ struct Memory {
     public var description: String { "@\(allocation):0x\(String(offset, radix: 16))[\(type)]" }
   }
 
-  /// Allocates `n` instances of `t` and returns `Address` of first instance.
+  /// Allocates `n` contiguous instances of `t` and returns the`Address` of the first instance.
   public mutating func allocate(_ t: MonomorphicTypeIdentity, count n: Int = 1) -> Address {
     let a = nextAllocation
     nextAllocation += 1
@@ -193,7 +191,7 @@ struct Memory {
     return .init(allocation: a, offset: 0)
   }
 
-  /// Deallocates the allocated memory starting at `a`.
+  /// Deallocates the allocation starting at `a`.
   public mutating func deallocate(_ a: Address) throws {
     if a.offset != 0 {
       throw Error.deallocationNotAtStartOfAllocation(a)
@@ -261,7 +259,7 @@ extension UnsafeRawBufferPointer {
   /// Returns the number of bytes from the notional base address to
   /// the nearest address aligned to `a`.
   ///
-  /// If `self.baseAddress == 0`, returns `0`.
+  /// If `self.baseAddress == nil`, returns `0`.
   fileprivate func firstOffsetAligned(to a: Int) -> Int {
     return baseAddress?.offsetToAlignment(a) ?? 0
   }

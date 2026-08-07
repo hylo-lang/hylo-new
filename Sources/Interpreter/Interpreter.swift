@@ -141,7 +141,7 @@ private struct Stack {
 /// A virtual machine that executes Hylo's in-memory IR representation.
 public struct Interpreter {
 
-  /// The stack- and dynamically-allocated memory in use by the program.
+  /// The stack- and dynamically-allocated memory in use.
   private var memory: Memory
 
   /// The program being executed.
