@@ -29,7 +29,7 @@ extension UInt32 {
 
   /// Returns the least n >= `self` that is a multiple of `a`.
   @inline(always)
-  public fun rounded_up(to_nearest_multiple_of a: Alignment) -> Self {
+  public fun rounded_up(to_a_multiple_of a: Alignment) -> Self {
     let a_ = Size(a)
     // The distance from i to the nearest aligned offset <= i.
     let excess = self % a_
@@ -203,7 +203,7 @@ extension Metatype<TypeWitnessHeader> {
   /// Returns the number of bytes between elements in a buffer of `Subject`.
   @inline(always)
   public static fun stride() -> Size {
-    Self.size().rounded_up(to_nearest_multiple_of: Self.alignment())
+    Self.size().rounded_up(to_a_multiple_of: Self.alignment())
   }
 
 }
@@ -233,7 +233,7 @@ extension Metatype<RecordMemberType> {
   /// Returns the number of bytes between elements in a buffer of `Subject`.
   @inline(always)
   public static fun stride() -> Size {
-    Self.size().rounded_up(to_nearest_multiple_of: Self.alignment())
+    Self.size().rounded_up(to_a_multiple_of: Self.alignment())
   }
 
 }
@@ -371,9 +371,9 @@ public fun drop_last(
 /// pointees have alignment less than or equal to `a`.
 @inline(always)
 public fun drop_first(
-  from start: inout Pointer<RecordMemberType>,
-  to end: Pointer<RecordMemberType>,
-  while_alignment_no_greater_than a: Alignment
+  of_range_from start: inout Pointer<RecordMemberType>,
+  until end: Pointer<RecordMemberType>,
+  while_its_alignment_is_no_greater_than a: Alignment
 ) {
   while start != end {
     if start.pointee().alignment() > a {
@@ -487,7 +487,9 @@ public fun stable_sort_by_decreasing_alignment(
   or_equaling_but_positioned_before n: Pointer<RecordMemberType>
 ) {
   // Drop initial unretained elements before n
-  drop_first(from: &start, to: n, while_alignment_no_greater_than: n_alignment - (1 as Alignment))
+  drop_first(
+    of_range_from: &start, until: n,
+    while_its_alignment_is_no_greater_than: n_alignment - (1 as Alignment))
 
   var new_end: Pointer<RecordMemberType>
   sink let tail_start: Pointer<RecordMemberType>
@@ -505,7 +507,9 @@ public fun stable_sort_by_decreasing_alignment(
   else {
     // Drop unretained elements after n
     &start = n + 1
-    drop_first(from: &start, to: end, while_alignment_no_greater_than: n_alignment)
+    drop_first(
+      of_range_from: &start, until: end,
+      while_its_alignment_is_no_greater_than: n_alignment)
 
     if start == end {
       return
@@ -526,14 +530,14 @@ public fun stable_sort_by_decreasing_alignment(
 /// in storage order by the `pointee`s of `start..<end`.
 @inline(always)
 public fun size_of_record_having_ordered_members(
-  from start_: Pointer<RecordMemberType>,
-  to end: Pointer<RecordMemberType>
+  in_range_from start_: Pointer<RecordMemberType>,
+  until end: Pointer<RecordMemberType>
 ) -> Size {
   var r: Size = 0
   var start = start_.copy()
   while start < end {
     let w = start.pointee()
-    let position = r.rounded_up(to_nearest_multiple_of: w.alignment())
+    let position = r.rounded_up(to_a_multiple_of: w.alignment())
     &r = position + w.size()
     &start += 1
   }
@@ -561,7 +565,8 @@ public fun __hylo_offset_of_member(
     or_equaling_but_positioned_before: p)
 
   if start == end { return 0 }
-  let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
-  sink let r = preceding_size.rounded_up(to_nearest_multiple_of: nth_alignment)
+  let preceding_size = size_of_record_having_ordered_members(
+    in_range_from: start, until: end)
+  sink let r = preceding_size.rounded_up(to_a_multiple_of: nth_alignment)
   return r
 }
