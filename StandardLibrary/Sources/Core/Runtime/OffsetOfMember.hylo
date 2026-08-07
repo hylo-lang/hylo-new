@@ -357,9 +357,9 @@ extension Metatype<UInt16> {
 /// alignment is less than `a`.
 @inline(always)
 public fun drop_last(
-  from start: Pointer<RecordMemberType>,
-  to end: inout Pointer<RecordMemberType>,
-  while_alignment_less_than a: Alignment
+  of_range_from start: Pointer<RecordMemberType>,
+  until end: inout Pointer<RecordMemberType>,
+  while_its_alignment_is_less_than a: Alignment
 ) {
   while end != start {
     if (end - 1).pointee().alignment() >= a { return }
@@ -419,10 +419,11 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment(
 
   var i = destinationEnd.copy()
   drop_last(
-    from: destinationStart, to: &i, while_alignment_less_than: r_alignment)
+    of_range_from: destinationStart, until: &i,
+    while_its_alignment_is_less_than: r_alignment)
 
   // Workaround #370
-  insert(source, backward_at_head_of_range_from: i, to: destinationEnd)
+  insert_backward(source, at_head_of_range_from: i, to: destinationEnd)
   destinationEnd += 1
 }
 
@@ -431,9 +432,9 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment(
 /// - Precondition: `source >= end`.
 /// - Note: Mutates the `pointee`s of `start...source`.
 @inline(always)
-public fun insert(
+public fun insert_backward(
   source: Pointer<RecordMemberType>,
-  backward_at_head_of_range_from start: Pointer<RecordMemberType>,
+  at_head_of_range_from start: Pointer<RecordMemberType>,
   to end: Pointer<RecordMemberType>)
 {
   if source != start {
@@ -475,16 +476,16 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment(
 /// n_alignment`, or having `alignment() == n_alignment` but occurring
 /// at a position < `n`, stably-sorted by decreasing alignment.
 ///
-/// - Note: replaces `start` and `end` with values in `start...end`
+/// - Note: reduces `start..<end` to a subrange of its initial value
 ///   *and* mutates the `pointee`s of `start..<end` in place, with
 ///   unspecified effects on `pointee`s that fall out the final value
 ///   of `start..<end`.
 @inline(always)
-public fun make_elements_stably_sorted_by_decreasing_alignment(
-  in start: inout Pointer<RecordMemberType>,
-  to end: inout Pointer<RecordMemberType>,
+public fun make_elements(
   with_alignment_greater_than n_alignment: Alignment,
-  or_with_same_alignment_but_preceding n: Pointer<RecordMemberType>
+  or_with_same_alignment_but_preceding n: Pointer<RecordMemberType>,
+  stably_sorted_by_decreasing_alignment_in_range_from start: inout Pointer<RecordMemberType>,
+  until end: inout Pointer<RecordMemberType>
 ) {
   // Drop initial unretained elements before n
   drop_first(
@@ -526,11 +527,11 @@ public fun make_elements_stably_sorted_by_decreasing_alignment(
   &end.value = new_end.value
 }
 
-/// Returns the size a record type would have were its members given
+/// Returns the size of a record type would have were its members given
 /// in storage order by the `pointee`s of `start..<end`.
 @inline(always)
 public fun size_of_record_having_ordered_members(
-  in_range_from start_: Pointer<RecordMemberType>,
+  in_the_range_from start_: Pointer<RecordMemberType>,
   until end: Pointer<RecordMemberType>
 ) -> Size {
   var r: Size = 0
@@ -559,14 +560,15 @@ public fun __hylo_offset_of_member(
   var start = memberArray.copy()
   var end = memberArray + Int(l)
 
-  make_elements_stably_sorted_by_decreasing_alignment(
-    in: &start, to: &end,
+  make_elements(
     with_alignment_greater_than: nth_alignment,
-    or_with_same_alignment_but_preceding: p)
+    or_with_same_alignment_but_preceding: p,
+    stably_sorted_by_decreasing_alignment_in_range_from: &start, until: &end
+  )
 
   if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(
-    in_range_from: start, until: end)
+    in_the_range_from: start, until: end)
   sink let r = preceding_size.rounded_up(to_a_multiple_of: nth_alignment)
   return r
 }
