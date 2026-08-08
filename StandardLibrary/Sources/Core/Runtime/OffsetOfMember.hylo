@@ -397,6 +397,21 @@ public fun shift_backward1(
   }
 }
 
+/// Inserts `source.pointee()` at the head of the `pointee`s of `start..<end`.
+///
+/// - Note: Mutates the `pointee`s of `start...source`.
+@inline(always)
+public fun insert_backward(
+  source: Pointer<RecordMemberType>,
+  at_head_of_range_from start: Pointer<RecordMemberType>,
+  to end: Pointer<RecordMemberType>)
+{
+  if source != start {
+    shift_backward1(from: start, until: end)
+    start.set_pointee(source.pointee())
+  }
+}
+
 /// Inserts `source.pointee()` at the latest position in
 /// `destination_start...destination_end` such that any immediate
 /// predecessor has a greater or equal alignment.
@@ -425,22 +440,6 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment(
   // Workaround #370
   insert_backward(source, at_head_of_range_from: i, to: destination_end)
   destination_end += 1
-}
-
-/// Inserts `source.pointee()` at the head of the `pointee`s of `start..<end`.
-///
-/// - Precondition: `source >= end`.
-/// - Note: Mutates the `pointee`s of `start...source`.
-@inline(always)
-public fun insert_backward(
-  source: Pointer<RecordMemberType>,
-  at_head_of_range_from start: Pointer<RecordMemberType>,
-  to end: Pointer<RecordMemberType>)
-{
-  if source != start {
-    shift_backward1(from: start, until: end)
-    start.set_pointee(source.pointee())
-  }
 }
 
 /// Inserts each pointee in `source_start_..<source_end` whose
