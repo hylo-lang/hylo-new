@@ -1,0 +1,13 @@
+//! stage:typing no-std
+
+type A = {Void,Void}
+type B = A
+type C = B
+
+fun f(x: sink B) -> A {
+  x
+}
+
+public fun g() -> C {
+  return f(((), ()))
+}

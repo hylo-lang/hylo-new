@@ -65,7 +65,7 @@ jobs:
           #       That no longer works, so we had to upgrade to 10.0.26100.0.
           #       See also: https://github.com/swiftlang/swift/issues/88237
 
-      - name: Verify swift version
+      - name: Verify Swift version
         run: swift --version && swift --version | grep -q ${{ matrix.swift }}
         shell: bash
 
@@ -79,11 +79,11 @@ jobs:
           addToPkgConfigPath: true
           addToPath: true
 
-      # We disabled the separate build step, as it consumes extra CI time - building for testing apparently doesn't
-      # reuse the build cache from here, doubling the CI time.
+      - name: Build Swift project
+        run: swift build --build-tests -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
-      - name: Build and test for ${{ matrix.swift }} on ${{ matrix.os }} in ${{ matrix.config }} mode
-        run: swift test -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+      - name: Run tests
+        run: swift test --skip-build -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}

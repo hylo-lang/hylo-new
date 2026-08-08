@@ -61,11 +61,11 @@ public enum BuiltinFunction: Hashable, Sendable {
   case mul(OverflowBehavior, MachineType.ID)
 
   //  case shl(OverflowBehavior, MachineType.ID)
-  //
-  //  case udiv(exact: Bool, MachineType.ID)
-  //
-  //  case sdiv(exact: Bool, MachineType.ID)
-  //
+
+  case udiv(exact: Bool, MachineType.ID)
+
+  case sdiv(exact: Bool, MachineType.ID)
+
   //  case lshr(exact: Bool, MachineType.ID)
   //
   //  case ashr(exact: Bool, MachineType.ID)
@@ -397,35 +397,44 @@ public enum BuiltinFunction: Hashable, Sendable {
 
 extension BuiltinFunction {
 
-  /// Returns the type of the function, calling `freshVariable` to create fresh type variables.
-  public func type(uniquingTypesWith s: inout TypeStore) -> Arrow.ID {
+  /// Returns the type of the function, using `s` to create unique type identities.
+  public func type(uniquingTypesWith s: inout TypeStore) -> AnyTypeIdentity {
     let i1 = s.demand(MachineType.i(1))
 
     switch self {
     case .trap:
-      return s.demand(Arrow(inputs: [], output: .never))
+      return s.demand(Arrow(inputs: [], output: .never)).erased
 
     case .addressOf:
-      let t0 = s.fresh().erased
+      let t0 = s.demand(GenericParameter.nth(0, .proper))
       let t1 = s.demand(MachineType.ptr).erased
-      return s.demand(Arrow(inputs: [.init(label: "of", access: .let, type: t0)], output: t1))
+      let a = Arrow(inputs: [.init(label: "of", access: .let, type: t0.erased)], output: t1)
+
+      let t2 = s.demand(a).erased
+      let t3 = s.demand(UniversalType(parameters: [t0], head: t2))
+      return t3.erased
 
     case .assumeInitialized:
-      let t0 = s.fresh().erased
-      return s.demand(Arrow(inputs: [.init(label: nil, access: .auto, type: t0)], output: .void))
+      let t0 = s.demand(GenericParameter.nth(0, .proper))
+      let a = Arrow(inputs: [.init(label: nil, access: .auto, type: t0.erased)], output: .void)
+      let t1 = s.demand(a).erased
+      let t2 = s.demand(UniversalType(parameters: [t0], head: t1))
+      return t2.erased
 
     case .add(_, let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .sub(_, let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .mul(_, let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     //    case .shl(_, let t):
     //      return .init(^t, ^t, to: ^t)
     //    case .udiv(_, let t):
     //      return .init(^t, ^t, to: ^t)
-    //    case .sdiv(_, let t):
-    //      return .init(^t, ^t, to: ^t)
+    case .udiv(_, let t):
+      return s.demand(Arrow(t, t, to: t)).erased
+    case .sdiv(_, let t):
+      return s.demand(Arrow(t, t, to: t)).erased
     //    case .lshr(_, let t):
     //      return .init(^t, ^t, to: ^t)
     //    case .ashr(_, let t):
@@ -435,31 +444,31 @@ extension BuiltinFunction {
     //    case .srem(let t):
     //      return .init(^t, ^t, to: ^t)
     case .and(let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .or(let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .xor(let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .signedAdditionWithOverflow(let t):
       let u = s.tuple(of: [t.erased, i1.erased])
-      return s.demand(Arrow(t, t, to: u))
+      return s.demand(Arrow(t, t, to: u)).erased
     case .unsignedAdditionWithOverflow(let t):
       let u = s.tuple(of: [t.erased, i1.erased])
-      return s.demand(Arrow(t, t, to: u))
+      return s.demand(Arrow(t, t, to: u)).erased
     case .signedSubtractionWithOverflow(let t):
       let u = s.tuple(of: [t.erased, i1.erased])
-      return s.demand(Arrow(t, t, to: u))
+      return s.demand(Arrow(t, t, to: u)).erased
     case .unsignedSubtractionWithOverflow(let t):
       let u = s.tuple(of: [t.erased, i1.erased])
-      return s.demand(Arrow(t, t, to: u))
+      return s.demand(Arrow(t, t, to: u)).erased
     case .signedMultiplicationWithOverflow(let t):
       let u = s.tuple(of: [t.erased, i1.erased])
-      return s.demand(Arrow(t, t, to: u))
+      return s.demand(Arrow(t, t, to: u)).erased
     case .unsignedMultiplicationWithOverflow(let t):
       let u = s.tuple(of: [t.erased, i1.erased])
-      return s.demand(Arrow(t, t, to: u))
+      return s.demand(Arrow(t, t, to: u)).erased
     case .icmp(_, let t):
-      return s.demand(Arrow(t, t, to: i1))
+      return s.demand(Arrow(t, t, to: i1)).erased
     //    case .trunc(let s, let d):
     //      return .init(^s, to: ^d)
     //    case .zext(let s, let d):
@@ -475,25 +484,25 @@ extension BuiltinFunction {
     //    case .ptrtoint(let t):
     //      return .init(.builtin(.ptr), to: ^t)
     case .fadd(_, let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .fsub(_, let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .fmul(_, let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .fdiv(_, let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .frem(_, let t):
-      return s.demand(Arrow(t, t, to: t))
+      return s.demand(Arrow(t, t, to: t)).erased
     case .fcmp(_, _, let t):
-      return s.demand(Arrow(t, t, to: i1))
+      return s.demand(Arrow(t, t, to: i1)).erased
     case .fptrunc(let f, let d):
-      return s.demand(Arrow(f, to: d))
+      return s.demand(Arrow(f, to: d)).erased
     case .fpext(let f, let d):
-      return s.demand(Arrow(f, to: d))
+      return s.demand(Arrow(f, to: d)).erased
     case .fptoui(let f, let d):
-      return s.demand(Arrow(f, to: d))
+      return s.demand(Arrow(f, to: d)).erased
     case .fptosi(let f, let d):
-      return s.demand(Arrow(f, to: d))
+      return s.demand(Arrow(f, to: d)).erased
     //    case .ctpop(let t):
     //      return .init(^t, to: ^t)
     //    case .ctlz(let t):
@@ -501,7 +510,7 @@ extension BuiltinFunction {
     //    case .cttz(let t):
     //      return .init(^t, to: ^t)
     case .zeroinitializer(let t):
-      return s.demand(Arrow(inputs: [], output: t.erased))
+      return s.demand(Arrow(inputs: [], output: t.erased)).erased
     //    case .advancedByBytes(let byteOffset):
     //      return .init(.builtin(.ptr), ^byteOffset, to: .builtin(.ptr))
     //    case .atomic_store_relaxed(let t):
@@ -766,10 +775,10 @@ extension BuiltinFunction: Showable {
       return printer.format((p != .ignore) ? "mul_%S_%T" : "mul_%T", [p, t.erased])
     //    case .shl(let p, let t):
     //      return (p != .ignore) ? "shl_\(p)_\(t)" : "shl_\(t)"
-    //    case .udiv(let e, let t):
-    //      return e ? "udiv_exact_\(t)" : "udiv_\(t)"
-    //    case .sdiv(let e, let t):
-    //      return e ? "sdiv_exact_\(t)" : "sdiv_\(t)"
+    case .udiv(let e, let t):
+      return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
+    case .sdiv(let e, let t):
+      return printer.format(e ? "sdiv_exact_%T" : "sdiv_%T", [t.erased])
     //    case .lshr(let e, let t):
     //      return e ? "lshr_exact_\(t)" : "lshr_\(t)"
     //    case .ashr(let e, let t):
@@ -1119,15 +1128,14 @@ extension BuiltinFunction {
     //    case "shl":
     //      guard let (p, t) = integerArithmeticTail(&tokens) else { return nil }
     //      self = .shl(p, t)
-    //
-    //    case "udiv":
-    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
-    //      self = .udiv(exact: p != nil, t)
-    //
-    //    case "sdiv":
-    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
-    //      self = .sdiv(exact: p != nil, t)
-    //
+
+    case "udiv":
+      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
+      self = .udiv(exact: p != nil, s.demand(t))
+    case "sdiv":
+      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
+      self = .sdiv(exact: p != nil, s.demand(t))
+
     //    case "lshr":
     //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .lshr(exact: p != nil, t)
