@@ -152,9 +152,9 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case zeroinitializer(MachineType.ID)
 
-  // Corresponding LLVM instruction: get_elementptr_inbounds.
+  /// In LLVM: `getelementptr inbounds` on a base of type `i8`.
   case advancedByBytes(byteOffset: MachineType.ID)
-  //
+
   //  case atomic_store_relaxed(MachineType.ID)
   //
   //  case atomic_store_release(MachineType.ID)
@@ -509,9 +509,9 @@ extension BuiltinFunction {
     //      return .init(^t, to: ^t)
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
-    case .advancedByBytes(let t):
+    case .advancedByBytes(let byteOffset):
       let p = s.demand(MachineType.ptr)
-      return s.demand(Arrow(p, t, to: p)).erased
+      return s.demand(Arrow(p, byteOffset, to: p)).erased
     //    case .atomic_store_relaxed(let t):
     //      return .init(.builtin(.ptr), ^t, to: .void)
     //    case .atomic_store_release(let t):
@@ -855,7 +855,7 @@ extension BuiltinFunction: Showable {
     case .zeroinitializer(let t):
       return printer.format("zeroinitializer_%T", [t.erased])
     case .advancedByBytes(let t):
-      return "advanced_by_bytes_\(t)"
+      return printer.format("advanced_by_bytes_%T", [t.erased])
     //    case .atomic_store_relaxed(let t):
     //      return "atomic_store_relaxed_\(t)"
     //    case .atomic_store_release(let t):
@@ -1631,6 +1631,7 @@ private func integerArithmeticWithOverflowTail(
   return p(&stream).map(\.1)
 }
 
+/// Parses the parameters and type of `advanced_by_bytes`.
 private let advancedByBytesTail =
   exactly("by") + exactly("bytes") + machineType
 
