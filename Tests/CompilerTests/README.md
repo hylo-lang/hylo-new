@@ -6,6 +6,8 @@ A use case is either a single Hylo source file or a directory representing a pac
 
 A single-file test is compiled to a binary executable, just as if it was passed as an argument to `hc`.
 A package test is built according to the configuration specified by its manifest.
+The generated binary is invoked with working directory set to the package test's root directory or
+the parent of a single-file test case. 
 
 ## Test attributes
 

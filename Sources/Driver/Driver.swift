@@ -283,7 +283,7 @@ public struct Driver {
   public mutating func load(
     _ module: Module.Name, withSourcesAt root: URL, additionalSources: [SourceFile] = []
   ) async throws {
-    let sources = try sources(at: root) + additionalSources
+    let sources = additionalSources + (try sources(at: root))
 
     // Attempt to load the module from disk.
     do {

@@ -68,9 +68,10 @@ extension Process {
     return output
   }
 
-  /// Runs `executable` with `arguments` and returns its execution report.
+  /// Runs `executable` with `arguments`, setting the working directory if provided, and returns its
+  /// execution report.
   public static func execute(
-    _ executable: URL, arguments: [String] = []
+    _ executable: URL, arguments: [String] = [], workingDirectory: URL? = nil
   ) throws -> ExecutionReport {
     let process = Process()
     let standardOutput = Pipe()
@@ -79,6 +80,9 @@ extension Process {
     process.executableURL = executable
     process.standardOutput = standardOutput
     process.standardError = standardError
+    if let d = workingDirectory {
+      process.currentDirectoryURL = d
+    }
     try process.run()
     process.waitUntilExit()
 

@@ -1,3 +1,0 @@
-negative/unused-value.hylo:4.3-8: error: unused value of type '{Void}'
-  ((),)
-  ~~~~~

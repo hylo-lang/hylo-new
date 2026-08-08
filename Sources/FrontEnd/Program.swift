@@ -183,10 +183,8 @@ public struct Program: Sendable {
         if !typer.program[m].ir[i].isDefined { continue }
 
         var f = typer.program[m].ir[i].move()
-        // Hack for more aggressive inlining.
-        // See https://github.com/hylo-lang/hylo-new/issues/329 for the proper solution.
-        f.inlineSimpleCallees(emittingInto: m, using: &typer)
-        f.inlineSimpleCallees(emittingInto: m, using: &typer)
+        var c = IRFunction.InliningContext()
+        f.inlineSimpleCallees(emittingInto: m, using: &typer, in: &c)
         typer.program[m].ir[i].take(definition: f)
       }
     }
@@ -469,8 +467,8 @@ public struct Program: Sendable {
 
   /// Returns `true` if the contents of `d` is visible in all modules.
   ///
-  /// The result is `true` if `d` is annotated with `@exposed` and/or `d` and all the scopes
-  /// enclosing it are public.
+  /// The result is `true` if `d` is annotated with `@exposed` or `d` and all the scopes enclosing
+  /// it are public. Note that the scope of an extension is always public.
   public func isExposed<T: ModifiableDeclaration>(_ d: T.ID) -> Bool {
     // Is `d` explicitly exposed?
     if (annotation("exposed", appliedTo: d) != nil) { return true }
@@ -478,11 +476,21 @@ public struct Program: Sendable {
     // Otherwise, `d` and its enclosing scopes must be public.
     if !self[d].is(.public) { return false }
     var p = parent(containing: d)
-    while let a = p.node {
-      guard let b = self[a] as? (any ModifiableDeclaration), b.is(.public) else { return false }
+    while let a = p.node, isPublicScope(a) {
       p = parent(containing: a)
     }
     return p.isFile
+  }
+
+  /// Returns `true` iff `n` delineates a public scope.
+  public func isPublicScope<T: SyntaxIdentity>(_ n: T) -> Bool {
+    if tag(of: n) == ExtensionDeclaration.self {
+      return true
+    } else if let d = self[n] as? (any ModifiableDeclaration), d.is(.public) {
+      return true
+    } else {
+      return false
+    }
   }
 
   /// Returns `true` iff `d` declares symbols that will not appear in the ABI of `m`.
@@ -1557,28 +1565,26 @@ public struct Program: Sendable {
 
   /// Returns the definition of `f` iff such definition is visible from `m`.
   ///
-  /// The result is the first definition of `f` found by inspecting `m` and then its dependencies,
-  /// in an arbitrary order. The method assumes all possible definitions of `f` to be equivalent,
-  /// which corresponds to LLVM's `linkonce` linkage type.
+  /// The result is the identity of the first definition of `f` found by inspecting `m` and then
+  /// its dependencies, in an arbitrary order. The method assumes all possible definitions of `f`
+  /// to be equivalent, which corresponds to LLVM's `linkonce` linkage type.
   ///
   /// - Requires: `f` is declared (possibly without a definition) in `m`.
   public func definition(
     of f: IRFunction.Name, visibleFrom m: Module.ID
-  ) -> (Module.ID, IRFunction)? {
-    guard let i = self[m].ir.identity(function: f) else {
-      preconditionFailure("'\(show(f))' not declared in module '\(self[m].name)'")
-    }
+  ) -> (Module.ID, IRFunction.ID)? {
+    guard let i = self[m].ir.identity(function: f) else { return nil }
 
     // Is `f` defined in `m`?
     if self[m].ir[i].isDefined {
-      return (m, self[m].ir[i])
+      return (m, i)
     }
 
     // Is `f` defined in a dependency?
     for d in self[m].dependencies {
       guard let n = self.identity(module: d) else { continue }
       if let j = self[n].ir.identity(function: f), self[n].ir[j].isDefined {
-        return (n, self[n].ir[j])
+        return (n, j)
       }
     }
 

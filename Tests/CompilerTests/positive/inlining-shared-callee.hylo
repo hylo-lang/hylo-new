@@ -1,0 +1,13 @@
+//! no-std stage:lowering
+
+// A callee reachable from two inlined callers is inlined in both.
+@inline(always)
+fun leaf() {}
+
+@inline(always)
+fun a() { leaf() }
+
+@inline(always)
+fun b() { leaf() }
+
+public fun main() { a(); b() }

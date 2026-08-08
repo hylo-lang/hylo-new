@@ -528,7 +528,9 @@ extension ProcessInfo {
 extension ContinuousClock.Instant.Duration {
 
   /// The value of `self` in nanoseconds.
-  fileprivate var ns: Int64 { components.attoseconds / 1_000_000_000 }
+  fileprivate var ns: Int64 {
+    components.seconds * 1_000_000_000 + components.attoseconds / 1_000_000_000
+  }
 
   /// The value of `self` in microseconds.
   fileprivate var μs: Int64 { ns / 1_000 }

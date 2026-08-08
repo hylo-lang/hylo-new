@@ -685,10 +685,6 @@ internal struct IREmitter {
       lower(store: program.castUnchecked(e, to: If.self), to: target)
     case InoutExpression.self:
       lower(store: program.castUnchecked(e, to: InoutExpression.self), to: target)
-    case IntegerLiteral.self:
-      lower(store: program.castUnchecked(e, to: IntegerLiteral.self), to: target)
-    case FloatingPointLiteral.self:
-      lower(store: program.castUnchecked(e, to: FloatingPointLiteral.self), to: target)
     case NameExpression.self:
       lower(store: program.castUnchecked(e, to: NameExpression.self), to: target)
     case StaticCall.self:
@@ -855,16 +851,6 @@ internal struct IREmitter {
   private mutating func lower(store e: InoutExpression.ID, to target: IRValue) {
     let m = "'&' may only be used to assign a variable, form a binding, or pass an argument"
     report(.init(.error, m, at: program[e].marker.site))
-  }
-
-  /// Implements `lower(store:to:)` for integer literals.
-  private mutating func lower(store e: IntegerLiteral.ID, to target: IRValue) {
-    unreachable()
-  }
-
-  /// Implements `lower(store:to:)` for integer literals.
-  private mutating func lower(store e: FloatingPointLiteral.ID, to target: IRValue) {
-    unreachable()
   }
 
   /// Implements `lower(store:to:)` for name expressions.
@@ -1286,7 +1272,8 @@ internal struct IREmitter {
       // accesses have to cover all uses of the projected value, which are not known yet. We'll
       // delay the work until lifetime analysis instead.
       if me.program[e].style == .parenthesized {
-        return me._apply(f.value, arguments, into: f.result, afterFormingAccesses: true)
+        me._apply(f.value, arguments, into: f.result, argumentAccesses: .form)
+        return f.result
       } else {
         assert(f.result.isPoison)
         return me._project(f.value, arguments, afterFormingAccesses: true)
@@ -1494,11 +1481,7 @@ internal struct IREmitter {
       return i
     }
 
-    let scopeOfDeclaration = program.castToScope(d)!
-    let types = program.withTyper(typing: d.module) { (tp) in
-      tp.accumulatedGenericParameters(visibleFrom: scopeOfDeclaration)
-    }
-
+    let types = accumulatedGenericParameters(visibleFrom: program.castToScope(d)!)
     let anchor = program.anchorForDiagnostics(about: d)
     let (terms, output) = prototype(functionOrConformance: d)
     return program[module].ir.addFunction(
@@ -1539,11 +1522,8 @@ internal struct IREmitter {
       return i
     }
 
-    let ts = program.withTyper(typing: d.module) { (tp) in
-      tp.accumulatedGenericParameters(visibleFrom: .init(node: d))
-    }
-
     // The constructor takes each associated value as a sink parameter.
+    let ts = accumulatedGenericParameters(visibleFrom: .init(node: d))
     var ps: [IRParameter] = .init(minimumCapacity: program[d].parameters.count + 1)
     for p in program[d].parameters {
       let t = program.type(assignedTo: p, assuming: RemoteType.self)
@@ -1974,7 +1954,27 @@ internal struct IREmitter {
     report(.init(l, m, at: program.spanForDiagnostic(about: n)))
   }
 
+  /// Reports a diagnostic with the given level and message at the current insertion anchor.
+  private mutating func _report(_ l: Diagnostic.Level, _ m: String) {
+    report(.init(l, m, at: program.span(currentAnchor)))
+  }
+
   // MARK: Instruction builders
+
+  /// The way in which accesses to the arguments of an `apply` or `project` instruction should be
+  /// handled by the instruction builder.
+  internal enum ArgumentAccessHandling {
+
+    /// Nothing to do; argument values are already accesses.
+    case identity
+
+    /// Accesses should be formed but not closed.
+    case form
+
+    /// Accesses should be formed and closed.
+    case formAndClose
+
+  }
 
   /// Inserts `instruction` into `self.module` at `self.insertionContext.point` and returns its
   /// result the register assigned by `instruction`, if any.
@@ -2042,33 +2042,30 @@ internal struct IREmitter {
     return insert(s)!
   }
 
-  /// Inserts a `apply` instruction.
-  ///
-  /// If `formAccesses` is `true`, an access is created on each argument before the projection,
-  /// with the access effects defined by the type of `callee`'s parameters. Otherwise, each given
-  /// argument is an access requesting the effect of the corresponding parameter.
-  ///
-  /// The result of the function is the value passed to the return register of the callee, which
-  /// is *not* the register assigned by the `apply` instruction.
+  /// Inserts a `apply` instruction, handling the accesses to `callee`'s arguments according to the
+  /// policy specified by `argumentAccesses`.
   internal mutating func _apply(
-    _ callee: IRValue, _ arguments: consuming [IRValue], into result: IRValue,
-    afterFormingAccesses formAccesses: Bool
-  ) -> IRValue {
+    _ callee: IRValue, _ arguments: [IRValue], into result: IRValue,
+    argumentAccesses: ArgumentAccessHandling
+  ) {
     let t = currentFunction.resultAsTermAbstraction(of: callee, in: program) ?? badOperand()
     assert(program.types[t].inputs.count == arguments.count)
 
+    var xs = arguments
     var last = result
-    if formAccesses {
-      _emitArgumentAccesses(&arguments, toApplyOrProject: callee, typed: t)
+
+    if argumentAccesses != .identity {
+      _emitArgumentAccesses(&xs, toApplyOrProject: callee, typed: t)
       last = _access([.set], from: result)
     }
 
-    let s = IRApply(
-      callee: callee, arguments: arguments, result: last,
-      anchor: currentAnchor)
+    let s = IRApply(callee: callee, arguments: xs, result: last, anchor: currentAnchor)
     insert(s)
 
-    return result
+    if argumentAccesses == .formAndClose {
+      _end(IRAccess.self, openedBy: last)
+      for x in xs.reversed() { _end(IRAccess.self, openedBy: x) }
+    }
   }
 
   /// Calls `f(arguments...)`, where `f` has type `t`.
@@ -2288,6 +2285,39 @@ internal struct IREmitter {
     insert(IRYield(projectee: projectee, anchor: currentAnchor))
   }
 
+  /// Returns the result of `action` applied with a projection of `self`, along with the identities
+  /// of the instructions inserted by `action`.
+  private mutating func _recordingInsertions<T>(
+    _ action: (inout Self) -> T
+  ) -> (T, [AnyInstructionIdentity]) {
+    /// Returns the results of `action` along with the result of `enumerateInsertions`, which
+    /// accepts the current insertion function and returns the identities of the instructions
+    /// inserted by `action`.
+    func doit(
+      _ enumerateInsertions: (IRFunction) -> [AnyInstructionIdentity]
+    ) -> (T, [AnyInstructionIdentity]) {
+      let r = action(&self)
+      return (r, enumerateInsertions(currentFunction))
+    }
+
+    switch insertionContext.point! {
+    case .before(let j):
+      if let i = currentFunction.instruction(before: j) {
+        return doit({ (f) in f.instructions(after: i).prefix(while: { (k) in k != j }) })
+      } else {
+        let b = currentFunction.block(defining: j)
+        return doit({ (f) in f.instructions(in: b).prefix(while: { (k) in k != j }) })
+      }
+
+    case .end(let b):
+      if let i = currentFunction.blocks[b].last {
+        return doit({ (f) in Array(f.instructions(after: i)) })
+      } else {
+        return doit({ (f) in Array(f.instructions(in: b)) })
+      }
+    }
+  }
+
   /// Inserts the contents of `source` before `boundary`, which is in `target`, substituting the
   /// properties of copied instructions using `properties`.
   ///
@@ -2387,8 +2417,7 @@ internal struct IREmitter {
       // Is `d` referring to a local variable that is not yet in scope?
       if let v = program.cast(d, to: VariableDeclaration.self) {
         // The only way to get here is if `v` has not been defined yet.
-        let s = program.span(insertionContext.anchor!)
-        report(.init(.error, "use of '\(program[v].identifier)' before its declaration", at: s))
+        _report(.error, "use of '\(program[v].identifier)' before its declaration")
         return .poison(program.types.ir(place: t))
       }
 
@@ -2468,7 +2497,7 @@ internal struct IREmitter {
       _yield(x0)
     } else {
       let x0 = operands.removeLast()
-      _ = _apply(f.value, operands, into: x0, afterFormingAccesses: true)
+      _apply(f.value, operands, into: x0, argumentAccesses: .form)
     }
 
     _return()
@@ -2562,55 +2591,6 @@ internal struct IREmitter {
 
       default:
         return (expression, types, terms.reversed())
-      }
-    }
-  }
-
-  /// Generates the IR for computing the arguments of the term application represented by `f(a)`.
-  ///
-  /// Term applications are represented in curried form. A call to a function `f` accepting two
-  /// parameters is encoded as `(f(a0))(a1)`. This method "unrolls" such an encoding and returns
-  /// the underlying abstraction `f` together with the values of each argument.
-  private mutating func _emit(
-    curriedApplicationOf f: WitnessExpression, to a: WitnessExpression
-  ) -> (WitnessExpression, [IRValue]) {
-    var stack = [_emit(witness: a)]
-    var abstraction = f
-    while true {
-      if case .termApplication(let g, let b) = abstraction.value {
-        stack.append(_emit(witness: b))
-        abstraction = g
-      } else {
-        return (abstraction, stack.reversed())
-      }
-    }
-  }
-
-  /// Returns the type and term arguments of `w`, which is a reference to an extension.
-  ///
-  /// Declaration references to declarations declared in type extensions are expressed using a
-  /// witness representing the type and term arguments passed to parameters declared on the
-  /// extension itself. This method computes the values of these arguments.
-  private mutating func _emitArguments(
-    of w: WitnessExpression
-  ) -> (types: TypeArguments, terms: [IRValue]) {
-    var value = w.value
-    var types: TypeArguments.Contents = [:]
-    var terms: [IRValue] = []
-
-    while true {
-      switch value {
-      case .termApplication(let f, let a):
-        let (x, xs) = _emit(curriedApplicationOf: f, to: a)
-        value = x.value
-        terms.append(contentsOf: xs)
-
-      case .typeApplication(let f, let a):
-        value = f.value
-        types.merge(a.elements, uniquingKeysWith: { (_, _) in fatalError() })
-
-      default:
-        return (TypeArguments(types), terms)
       }
     }
   }
@@ -2775,7 +2755,7 @@ internal struct IREmitter {
               implicit deinitialization of instances of '\(program.show(t))' causes infinite \
               recursion in this context
               """
-            report(.init(.error, m, at: program.span(currentAnchor)))
+            _report(.error, m)
             _emitTrap()
             return false
           }
@@ -2789,7 +2769,7 @@ internal struct IREmitter {
             implementation, qualifiedBy: nil, markedForMutationBy: nil,
             output: o, at: currentAnchor)
           let xs = Array(s, prependedTo: f.arguments)
-          _ = _apply(f.value, xs, into: f.result, afterFormingAccesses: true)
+          _apply(f.value, xs, into: f.result, argumentAccesses: .formAndClose)
           return true
         }
       }
@@ -2806,21 +2786,14 @@ internal struct IREmitter {
     _ s: IRValue, instanceOf t: AnyTypeIdentity, usingNonTrivialConformance w: WitnessExpression
   ) {
     let requirement = program.standardLibraryDeclaration(.deinitializableDeinit)
-    let table = _emit(witness: w)
-    let t0 = program.types.demand(
-      Arrow(inputs: [.init(access: .sink, type: t)], output: .void))
-
-    let x0 = _alloca(.void)
-    let x1 = _access([.sink], from: s)
-    let x2 = _access([.set], from: x0)
-    let x3 = _property(requirement, of: table, withType: t0.erased)
-    let x4 = _access([.let], from: x3)
-
-    _ = _apply(x4, [x1], into: x2, afterFormingAccesses: false)
-
-    _end(IRAccess.self, openedBy: x4)
-    _end(IRAccess.self, openedBy: x2)
+    let (table, xs) = _recordingInsertions({ $0._emit(witness: w) })
+    let t0 = program.types.demand(Arrow(inputs: [.init(access: .sink, type: t)], output: .void))
+    let x0 = _property(requirement, of: table, withType: t0.erased)
+    let x1 = _access([.let], from: x0)
+    let x2 = _alloca(.void)
+    _apply(x1, [s], into: x2, argumentAccesses: .formAndClose)
     _end(IRAccess.self, openedBy: x1)
+    insertionContext.function!.closeOpenEndedRegions(in: xs)
   }
 
   /// Generates the IR deinitializing `s`, which is an instance of `t`, generating and applying a
@@ -2842,18 +2815,11 @@ internal struct IREmitter {
       implementationOf: requirement, synthesized: true, for: conformance, a)
     implementSynthesizedDeinitializer(f, for: a)
 
-    let x0 = functionReference(to: f)
-    let x1 = _emit(witness: w)
-    let x2 = _alloca(.void)
-    let x3 = _access([.let], from: x1)
-    let x4 = _access([.sink], from: s)
-    let x5 = _access([.set], from: x2)
-
-    _ = _apply(x0, [x3, x4], into: x5, afterFormingAccesses: false)
-
-    _end(IRAccess.self, openedBy: x5)
-    _end(IRAccess.self, openedBy: x4)
-    _end(IRAccess.self, openedBy: x3)
+    let (table, xs) = _recordingInsertions({ $0._emit(witness: w) })
+    let x0 = _alloca(.void)
+    let x1 = functionReference(to: f)
+    _apply(x1, [table, s], into: x0, argumentAccesses: .formAndClose)
+    insertionContext.function!.closeOpenEndedRegions(in: xs)
   }
 
   /// Generates the IR deinitializing `s`, which is an instance of `t`, and returns `true` iff each
@@ -3019,9 +2985,7 @@ internal struct IREmitter {
     let x2 = _access([k], from: target)
     let x3 = _access([.set], from: x0)
     let x4 = _property(.init(member), of: movable, withType: t0.erased)
-
-    _ = _apply(x4, [x2, x1], into: x3, afterFormingAccesses: false)
-
+    _apply(x4, [x2, x1], into: x3, argumentAccesses: .identity)
     _end(IRAccess.self, openedBy: x3)
     _end(IRAccess.self, openedBy: x2)
     _end(IRAccess.self, openedBy: x1)

@@ -1,0 +1,35 @@
+//! stage:typing no-std
+
+// Checks that `Typer.canDeriveCoercions` doesn't reuse a memoized result across resolution
+// environments with different assumed givens.
+
+trait P {}
+
+struct Box<X> {}
+struct Pair<X, Y> {}
+struct Other {}
+
+fun need<W is P>() {}
+
+fun f<T, U, V where T == U, Box<U> == V>() {
+  given Pair<Box<T>, Box<T>> is P {}
+  given <where Box<T> == V> => Pair<Box<T>, Box<T>> is P {}
+
+  // Summoning P<Pair<V, V>
+  // - Candidate 1: P<Pair<V, V>> vs P<Pair<Box<T>, Other>>.
+  //   - P matches P
+  //   - Pair matches Pair
+  //   - then componentwise:
+  //     - V vs Box<T>: should match but fails due to https://github.com/hylo-lang/hylo-new/issues/393
+  //                    -> (V, Box<T>) -> false is saved
+  //     - V vs Other: mismatch
+  // - Candidate 2: P<Pair<V, V>> vs P<Pair<Box<T>, Box<T>>>
+  //   - P matches P
+  //   - Pair matches Pair
+  //   - then componentwise:
+  //     - V vs Box<T>: used to get answered from cache. In this thread, we have already helped the
+  //                    type system to prove `V ~ Box<T>` by the `where` clause, so it's wrong to
+  //                    reuse the memo.
+  //
+  need<Pair<V, V>>()
+}

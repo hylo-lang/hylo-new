@@ -24,7 +24,7 @@ extension IREmitter {
     }
 
     // Close the `let` accesses that may have been opened to pass type witnesses.
-    f.closeOpenEndedRegions()
+    f.closeOpenEndedRegions(in: witnesses.values.compactMap(\.register))
   }
   
   /// Replaces uses of `i` with their existentialized forms.
@@ -124,8 +124,6 @@ extension IREmitter {
     f.replace(
       user,
       with: IRApply(callee: referenceToMono, arguments: xs, result: result, anchor: old.anchor))
-
-    f.closeOpenEndedRegions()
   }
 
   /// Replaces `user`, which is the application of a polymorphic abstraction, with an application
@@ -161,9 +159,13 @@ extension IREmitter {
       f.replace(
         user,
         with: IRPlaceCast(source: x, access: old.access, target: t, anchor: old.anchor))
-    }
 
-    f.closeOpenEndedRegions()
+      var m: [IRValue: Lifetime] = [:]
+      f.close(
+        IRProject.self, x.register!,
+        computingLivenessWith: f.controlFlow(),
+        memoizingLifetimesInto: &m)
+    }
   }
 
   /// Returns the identity of the existentialized form of the polymorphic function `f`.
