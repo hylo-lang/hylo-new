@@ -15,7 +15,7 @@ struct TypeLayoutCache {
     self.abi = abi
   }
 
-  /// The layout for `t` in `p`.
+  /// Returns the layout for `t`, defined in `p`.
   public mutating func layout(
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
@@ -26,7 +26,7 @@ struct TypeLayoutCache {
     return r
   }
 
-  /// Returns the layout for `t` in `p`.
+  /// Returns the layout for `t`, defined in `p`.
   private mutating func computeLayout(
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
@@ -37,7 +37,7 @@ struct TypeLayoutCache {
       let v = type(u, as: MachineType.self, in: p)
       return TypeLayout(whole: abi.layout(v), type: t, parts: [], isEnumLayout: false)
     } else if s == Struct.self || s == Tuple.self {
-      return computeLayout(record: t, in: &p)
+      return computeLayout(recordType: t, in: &p)
     } else if s == Enum.self {
       return computeLayout(enum: t, in: &p)
     } else {
@@ -45,25 +45,25 @@ struct TypeLayoutCache {
     }
   }
 
-  /// Returns the layout for record `t` in `p`.
+  /// Returns the layout for the record type `t`, defined in `p`.
   private mutating func computeLayout(
-    record t: MonomorphicTypeIdentity,
+    recordType t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let ms = storage(record: t.underlying, in: &p)
+    let ms = storage(recordType: t.underlying, in: &p)
     let ns =
-      names(record: t.underlying, in: &p)
+      names(recordType: t.underlying, in: &p)
       ?? .init(repeating: nil, count: ms.count)
     return computeLayout(
-      record: t,
+      recordType: t,
       havingMembers: zip(ms, ns).map { .init(name: $0.1, type: .init($0.0)) },
       in: &p)
   }
 
-  /// Returns the layout for a record `t` in `p` whose members are `ms` in
-  /// declaration order.
+  /// Returns the layout for the record type `t`, defined in `p`, whose members
+  /// are `ms` in declaration order.
   private mutating func computeLayout(
-    record t: MonomorphicTypeIdentity,
+    recordType t: MonomorphicTypeIdentity,
     havingMembers ms: [TypeLayout.Member],
     in p: inout Program
   ) -> TypeLayout {
@@ -82,7 +82,7 @@ struct TypeLayoutCache {
     return .init(whole: l.bytes, type: t, parts: parts, isEnumLayout: false)
   }
 
-  /// Returns the layout for an enum `t` in `p`.
+  /// Returns the layout for an enum `t`, defined in `p`.
   private mutating func computeLayout(
     enum t: MonomorphicTypeIdentity,
     in p: inout Program
@@ -112,7 +112,7 @@ struct TypeLayoutCache {
     return .init(whole: l.bytes, type: t, parts: parts, isEnumLayout: true)
   }
 
-  /// Returns the layout for a raw value enum `t` in `p`.
+  /// Returns the layout for a raw value enum `t`, defined in `p`.
   private mutating func computeLayout(
     rawValueEnum t: MonomorphicTypeIdentity,
     in p: inout Program
@@ -128,7 +128,7 @@ struct TypeLayoutCache {
     )
   }
 
-  /// Returns true iff enum `t` in `p` is a raw value enum.
+  /// Returns true iff enum `t`, defined in `p`, is a raw value enum.
   ///
   /// - Precondition: `t` is an enum.
   private func isRawValueEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
@@ -137,8 +137,8 @@ struct TypeLayoutCache {
     return p[d].representation != nil
   }
 
-  /// Returns the types of stored parts of record `t` in `p`.
-  private func storage(record t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
+  /// Returns the types of stored parts of the record type `t`, defined in `p`.
+  private func storage(recordType t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
     let u = underlyingType(t, in: p)
     if tag(u, in: p) == Tuple.self {
       let v = ConcreteTypeIdentity<Tuple>(uncheckedFrom: u)
@@ -150,22 +150,22 @@ struct TypeLayoutCache {
     }
   }
 
-  /// Returns the types of stored parts of nominal `t` in `p`.
+  /// Returns the types of stored parts of nominal `t`, defined in `p`.
   private func storage(nominal t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
     let d = p.declaration(of: t)!
     let m = p.parent(containing: d).module
     return p.storage(of: t, visibleFrom: m)!
   }
 
-  /// Returns the declared names (if any) of stored parts of record `t` in `p`,
-  /// in storage order.
-  private func names(record t: AnyTypeIdentity, in p: inout Program) -> [String?]? {
+  /// Returns the declared names (if any) of stored parts of the record type `t`,
+  /// defined in `p`, in storage order.
+  private func names(recordType t: AnyTypeIdentity, in p: inout Program) -> [String?]? {
     guard let d = p.declaration(of: t) else { return nil }
     let s = p.cast(d, to: StructDeclaration.self)!
     return p.storedProperties(of: s).map { p[$0].identifier.value }
   }
 
-  /// Returns the declared names of stored parts of enum `t` in `p`,
+  /// Returns the declared names of stored parts of enum `t` in `p`, defined in `p`,
   /// in storage order.
   private func names(enum t: AnyTypeIdentity, in p: inout Program) -> [String] {
     let d = p.declaration(of: t)!
@@ -175,7 +175,7 @@ struct TypeLayoutCache {
       .map { p[$0].identifier.value }
   }
 
-  /// Returns the type identified by `t` in `p`, cast to `U`.
+  /// Returns the type identified by `t`, defined in `p`, cast to `U`.
   private func type<U: TypeTree>(
     _ t: AnyTypeIdentity, as u: U.Type,
     in p: Program
@@ -183,12 +183,13 @@ struct TypeLayoutCache {
     p.types[p.types.cast(t, to: u)!]
   }
 
-  /// Returns the tag of `t` in `p`.
+  /// Returns the tag of `t`, defined in `p`.
   private func tag(_ t: AnyTypeIdentity, in p: Program) -> any TypeTree.Type {
     p.types.tag(of: t).value
   }
 
-  /// Returns the underlying type of `t`, after unwrapping type applications and aliases.
+  /// Returns the underlying type of `t`, defined in `p`, after unwrapping
+  /// type applications and aliases.
   private func underlyingType(_ t: AnyTypeIdentity, in p: Program) -> AnyTypeIdentity {
     let u = tag(t, in: p)
     if u == TypeApplication.self {
