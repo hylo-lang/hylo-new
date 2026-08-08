@@ -373,7 +373,7 @@ public fun drop_last(
 public fun drop_first(
   of_range_from start: inout Pointer<RecordMemberType>,
   until end: Pointer<RecordMemberType>,
-  while_its_alignment_is_no_greater_than a: Alignment
+  while_its_alignment_doesnt_exceed a: Alignment
 ) {
   while start != end {
     if start.pointee().alignment() > a {
@@ -490,7 +490,7 @@ public fun stable_sort_by_decreasing_alignment(
   // Drop initial unretained elements before n
   drop_first(
     of_range_from: &start, until: n,
-    while_its_alignment_is_no_greater_than: n_alignment - (1 as Alignment))
+    while_its_alignment_doesnt_exceed: n_alignment - (1 as Alignment))
 
   var new_end: Pointer<RecordMemberType>
   sink let tail_start: Pointer<RecordMemberType>
@@ -510,7 +510,7 @@ public fun stable_sort_by_decreasing_alignment(
     &start = n + 1
     drop_first(
       of_range_from: &start, until: end,
-      while_its_alignment_is_no_greater_than: n_alignment)
+      while_its_alignment_doesnt_exceed: n_alignment)
 
     if start == end {
       return
