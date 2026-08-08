@@ -10,7 +10,7 @@ struct MonomorphicTypeIdentity: Regular {
 
   /// Creates an instance wrapping `t` as `MonomorphicTypeIdentity`.
   ///
-  /// - Precondition: `t` is monomorphic.
+  /// - Precondition: `t` is monomorphic and not a type variable.
   public init(_ t: AnyTypeIdentity) {
     precondition(!t[.hasGenericParameter] && !t[.hasVariable])
     underlying = t
