@@ -1954,6 +1954,11 @@ internal struct IREmitter {
     report(.init(l, m, at: program.spanForDiagnostic(about: n)))
   }
 
+  /// Reports a diagnostic with the given level and message at the current insertion anchor.
+  private mutating func _report(_ l: Diagnostic.Level, _ m: String) {
+    report(.init(l, m, at: program.span(currentAnchor)))
+  }
+
   // MARK: Instruction builders
 
   /// The way in which accesses to the arguments of an `apply` or `project` instruction should be
@@ -2412,8 +2417,7 @@ internal struct IREmitter {
       // Is `d` referring to a local variable that is not yet in scope?
       if let v = program.cast(d, to: VariableDeclaration.self) {
         // The only way to get here is if `v` has not been defined yet.
-        let s = program.span(insertionContext.anchor!)
-        report(.init(.error, "use of '\(program[v].identifier)' before its declaration", at: s))
+        _report(.error, "use of '\(program[v].identifier)' before its declaration")
         return .poison(program.types.ir(place: t))
       }
 
@@ -2751,7 +2755,7 @@ internal struct IREmitter {
               implicit deinitialization of instances of '\(program.show(t))' causes infinite \
               recursion in this context
               """
-            report(.init(.error, m, at: program.span(currentAnchor)))
+            _report(.error, m)
             _emitTrap()
             return false
           }
