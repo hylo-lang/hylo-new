@@ -86,20 +86,21 @@ extension IRFunction {
       return
     }
 
-    // Are we in a cycle?
-    if (name == callee) || context.stack.contains(callee) {
-      let a = typer.program.span(s.anchor)
-      let d = Diagnostic(.error, "cannot inline recursive function", at: a)
-      typer.program[m].addDiagnostic(d)
-      return
-    }
-
+    // Update the inlining context.
     context.stack.append(callee)
     defer { context.stack.removeLast() }
 
     // Locate the definition of `f`.
     guard let (n, f) = typer.program.definition(of: callee, visibleFrom: m) else {
-      // No available definition. An error should have been reported elsewhere.
+      // Either the callee is not defined, in which case an error has been reported elsewhere, or
+      // it is being inlined, in which case we must complain about recursive inlining.
+      if context.stack.contains(callee) {
+        let a = typer.program.span(s.anchor)
+        let d = Diagnostic(.error, "cannot inline recursive function", at: a)
+        typer.program[m].addDiagnostic(d)
+      }
+
+      // In any case, there's nothing more we can do.
       return
     }
 
