@@ -29,6 +29,20 @@ final class InterpreterMemoryTests: XCTestCase {
     }
   }
 
+  func testMemoryAddressArithmetic() throws {
+    let a = m.allocate(.init(id(MachineType.i(8))), count: 128)
+
+    XCTAssertEqual(a + 1, .init(allocation: a.allocation, offset: a.offset + 1))
+    XCTAssertEqual(1 + a, .init(allocation: a.allocation, offset: a.offset + 1))
+    XCTAssertEqual(a + 1 - 1, a)
+
+    var b = a
+    b += 1
+    XCTAssertEqual(b, .init(allocation: a.allocation, offset: a.offset + 1))
+    b -= 1
+    XCTAssertEqual(b, a)
+  }
+
   /// Returns the type erased identity of `t`.
   private func id<T: TypeTree>(_ t: T) -> AnyTypeIdentity {
     m.program.id(t)
