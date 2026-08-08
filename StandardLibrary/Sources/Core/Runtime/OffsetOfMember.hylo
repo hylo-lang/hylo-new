@@ -397,50 +397,35 @@ public fun shift_backward1(
   }
 }
 
-/// Inserts `source.pointee()` at the head of the `pointee`s of `start..<end`.
-///
-/// - Note: Mutates the `pointee`s of `start...source`.
+/// Inserts `x` at the head of the `start..<end`.
 @inline(always)
-public fun insert_backward(
-  source: Pointer<RecordMemberType>,
+public fun insert(
+  x: RecordMemberType,
   at_head_of_range_from start: Pointer<RecordMemberType>,
-  to end: Pointer<RecordMemberType>)
+  until end: Pointer<RecordMemberType>)
 {
-  if source != start {
-    shift_backward1(from: start, until: end)
-    start.set_pointee(source.pointee())
-  }
+  shift_backward1(from: start, until: end)
+  start.set_pointee(x.copy())
 }
 
-/// Inserts `source.pointee()` at the latest position in
-/// `destination_start...destination_end` such that any immediate
-/// predecessor has a greater or equal alignment.
-///
-/// - Precondition: `source >= destination_end`.
-///
-/// - Note: replaces `destination_end` with a value in
-///   `destination_end...(source+1)` *and* mutates the `pointee`s
-///   of `destination_start..<(source+1)` in place, with unspecified
-///   effects on `pointee`s that fall out the final value of
-///   `destination_start..<destination_end`.
+/// Inserts `x` at the latest position in `start..<end` such that any
+/// immediate successor has a lesser alignment.
 @inline(always)
-public fun insert_backward_stably_sorted_by_decreasing_alignment(
-  source: Pointer<RecordMemberType>,
-  into_range_from destination_start: Pointer<RecordMemberType>,
-  to destination_end: inout Pointer<RecordMemberType>,
-) {
-  let r = source.pointee()
-  let r_alignment = r.alignment()
-
-  var i = destination_end.copy()
+public fun insert(
+  x: RecordMemberType,
+  into_range_from start: Pointer<RecordMemberType>,
+  until end: inout Pointer<RecordMemberType>,
+  before_max_suffix_aligned_less_than a: Alignment)
+{
+  var i = end.copy()
   drop_last(
-    of_range_from: destination_start, until: &i,
-    while_its_alignment_is_less_than: r_alignment)
+    of_range_from: start, until: &i,
+    while_its_alignment_is_less_than: a)
 
-  // Workaround #370
-  insert_backward(source, at_head_of_range_from: i, to: destination_end)
-  destination_end += 1
+  insert(x, at_head_of_range_from: i, until: &end)
+  end += 1
 }
+
 
 /// Inserts each pointee in `source_start_..<source_end` whose
 /// `alignment()` is greater than `a` at the latest position in
@@ -463,9 +448,13 @@ public fun insert_backward_stably_sorted_by_decreasing_alignment(
   where_alignment_exceeds a: Alignment
 ) {
   while source_start != source_end {
+    // Workaround for https://github.com/hylo-lang/hylo-new/issues/370
+    // Cannot hoist source_start.pointee() and its .alignment() computation.
     if source_start.pointee().alignment() > a {
-      insert_backward_stably_sorted_by_decreasing_alignment(
-        source_start, into_range_from: destination_start, to: &destination_end)
+      insert(
+        source_start.pointee(),
+        into_range_from: destination_start, until: &destination_end,
+        before_max_suffix_aligned_less_than: source_start.pointee().alignment())
     }
     source_start += 1
   }
