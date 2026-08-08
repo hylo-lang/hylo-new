@@ -1,0 +1,16 @@
+//! no-std stage:lowering
+
+// A chain of inlined callees is collapsed whatever the order in which functions are lowered.
+public fun main() { a() }
+
+@inline(always)
+fun a() { b() }
+
+@inline(always)
+fun b() { c() }
+
+@inline(always)
+fun c() { d() }
+
+@inline(always)
+fun d() {}
