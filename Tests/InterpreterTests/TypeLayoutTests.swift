@@ -153,7 +153,7 @@ final class TypeLayoutTests: XCTestCase {
       ])
   }
 
-  func testTypeAlias() async throws {
+  func testMachineTypeAlias() async throws {
     let int8 = layout(
       await type(
         named: "Int8",
@@ -165,6 +165,45 @@ final class TypeLayoutTests: XCTestCase {
     XCTAssertEqual(int8.size, 1)
     XCTAssertEqual(int8.alignment, 1)
     XCTAssert(int8.parts.isEmpty)
+  }
+
+  func testTupleTypeAlias() async throws {
+    let i8Tuple = layout(
+      await type(
+        named: "I8Tuple",
+        in: """
+          public type I8Tuple = {Builtin.i8}
+          """))
+
+    let i8 = id(MachineType.i(8))
+    XCTAssertEqual(i8Tuple.size, 1)
+    XCTAssertEqual(i8Tuple.alignment, 1)
+    XCTAssertEqual(
+      i8Tuple.parts,
+      [
+        .init(name: "0", type: .init(i8), offset: 0)
+      ])
+  }
+
+  func testStructTypeAlias() async throws {
+    let i8StructAlias = layout(
+      await type(
+        named: "I8StructAlias",
+        in: """
+          public struct I8Struct {
+            let x: Builtin.i8
+          }
+          public type I8StructAlias = I8Struct
+          """))
+
+    let i8 = id(MachineType.i(8))
+    XCTAssertEqual(i8StructAlias.size, 1)
+    XCTAssertEqual(i8StructAlias.alignment, 1)
+    XCTAssertEqual(
+      i8StructAlias.parts,
+      [
+        .init(name: "x", type: .init(i8), offset: 0)
+      ])
   }
 
   func testStructWithTypeApplication() async throws {
