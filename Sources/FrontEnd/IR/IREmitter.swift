@@ -685,10 +685,6 @@ internal struct IREmitter {
       lower(store: program.castUnchecked(e, to: If.self), to: target)
     case InoutExpression.self:
       lower(store: program.castUnchecked(e, to: InoutExpression.self), to: target)
-    case IntegerLiteral.self:
-      lower(store: program.castUnchecked(e, to: IntegerLiteral.self), to: target)
-    case FloatingPointLiteral.self:
-      lower(store: program.castUnchecked(e, to: FloatingPointLiteral.self), to: target)
     case NameExpression.self:
       lower(store: program.castUnchecked(e, to: NameExpression.self), to: target)
     case StaticCall.self:
@@ -855,16 +851,6 @@ internal struct IREmitter {
   private mutating func lower(store e: InoutExpression.ID, to target: IRValue) {
     let m = "'&' may only be used to assign a variable, form a binding, or pass an argument"
     report(.init(.error, m, at: program[e].marker.site))
-  }
-
-  /// Implements `lower(store:to:)` for integer literals.
-  private mutating func lower(store e: IntegerLiteral.ID, to target: IRValue) {
-    unreachable()
-  }
-
-  /// Implements `lower(store:to:)` for integer literals.
-  private mutating func lower(store e: FloatingPointLiteral.ID, to target: IRValue) {
-    unreachable()
   }
 
   /// Implements `lower(store:to:)` for name expressions.
@@ -1495,11 +1481,7 @@ internal struct IREmitter {
       return i
     }
 
-    let scopeOfDeclaration = program.castToScope(d)!
-    let types = program.withTyper(typing: d.module) { (tp) in
-      tp.accumulatedGenericParameters(visibleFrom: scopeOfDeclaration)
-    }
-
+    let types = accumulatedGenericParameters(visibleFrom: program.castToScope(d)!)
     let anchor = program.anchorForDiagnostics(about: d)
     let (terms, output) = prototype(functionOrConformance: d)
     return program[module].ir.addFunction(
@@ -1540,11 +1522,8 @@ internal struct IREmitter {
       return i
     }
 
-    let ts = program.withTyper(typing: d.module) { (tp) in
-      tp.accumulatedGenericParameters(visibleFrom: .init(node: d))
-    }
-
     // The constructor takes each associated value as a sink parameter.
+    let ts = accumulatedGenericParameters(visibleFrom: .init(node: d))
     var ps: [IRParameter] = .init(minimumCapacity: program[d].parameters.count + 1)
     for p in program[d].parameters {
       let t = program.type(assignedTo: p, assuming: RemoteType.self)
@@ -1973,6 +1952,11 @@ internal struct IREmitter {
   /// Reports a diagnostic related to `n` with the given level and message.
   private mutating func report<T: SyntaxIdentity>(_ l: Diagnostic.Level, _ m: String, about n: T) {
     report(.init(l, m, at: program.spanForDiagnostic(about: n)))
+  }
+
+  /// Reports a diagnostic with the given level and message at the current insertion anchor.
+  private mutating func _report(_ l: Diagnostic.Level, _ m: String) {
+    report(.init(l, m, at: program.span(currentAnchor)))
   }
 
   // MARK: Instruction builders
@@ -2433,8 +2417,7 @@ internal struct IREmitter {
       // Is `d` referring to a local variable that is not yet in scope?
       if let v = program.cast(d, to: VariableDeclaration.self) {
         // The only way to get here is if `v` has not been defined yet.
-        let s = program.span(insertionContext.anchor!)
-        report(.init(.error, "use of '\(program[v].identifier)' before its declaration", at: s))
+        _report(.error, "use of '\(program[v].identifier)' before its declaration")
         return .poison(program.types.ir(place: t))
       }
 
@@ -2612,55 +2595,6 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the IR for computing the arguments of the term application represented by `f(a)`.
-  ///
-  /// Term applications are represented in curried form. A call to a function `f` accepting two
-  /// parameters is encoded as `(f(a0))(a1)`. This method "unrolls" such an encoding and returns
-  /// the underlying abstraction `f` together with the values of each argument.
-  private mutating func _emit(
-    curriedApplicationOf f: WitnessExpression, to a: WitnessExpression
-  ) -> (WitnessExpression, [IRValue]) {
-    var stack = [_emit(witness: a)]
-    var abstraction = f
-    while true {
-      if case .termApplication(let g, let b) = abstraction.value {
-        stack.append(_emit(witness: b))
-        abstraction = g
-      } else {
-        return (abstraction, stack.reversed())
-      }
-    }
-  }
-
-  /// Returns the type and term arguments of `w`, which is a reference to an extension.
-  ///
-  /// Declaration references to declarations declared in type extensions are expressed using a
-  /// witness representing the type and term arguments passed to parameters declared on the
-  /// extension itself. This method computes the values of these arguments.
-  private mutating func _emitArguments(
-    of w: WitnessExpression
-  ) -> (types: TypeArguments, terms: [IRValue]) {
-    var value = w.value
-    var types: TypeArguments.Contents = [:]
-    var terms: [IRValue] = []
-
-    while true {
-      switch value {
-      case .termApplication(let f, let a):
-        let (x, xs) = _emit(curriedApplicationOf: f, to: a)
-        value = x.value
-        terms.append(contentsOf: xs)
-
-      case .typeApplication(let f, let a):
-        value = f.value
-        types.merge(a.elements, uniquingKeysWith: { (_, _) in fatalError() })
-
-      default:
-        return (TypeArguments(types), terms)
-      }
-    }
-  }
-
   /// Forms an access on each of the lvalues in `arguments`, which are the arguments passed to the
   /// function `f` that has type `t`.
   ///
@@ -2821,7 +2755,7 @@ internal struct IREmitter {
               implicit deinitialization of instances of '\(program.show(t))' causes infinite \
               recursion in this context
               """
-            report(.init(.error, m, at: program.span(currentAnchor)))
+            _report(.error, m)
             _emitTrap()
             return false
           }
