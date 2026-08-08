@@ -31,17 +31,14 @@ struct TypeLayoutCache {
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    if t.underlying[.hasAliases] {
-      let l = layout(.init(p.types.dealiased(t.underlying)), in: &p)
-      return .init(whole: l.whole, type: t, parts: l.parts, isEnumLayout: l.isEnumLayout)
-    }
-    let u = tag(t.underlying, in: p)
-    if u == MachineType.self {
-      let u = type(t.underlying, as: MachineType.self, in: p)
-      return TypeLayout(whole: abi.layout(u), type: t, parts: [], isEnumLayout: false)
-    } else if hasRecordLayout(t.underlying, in: p) {
+    let u = underlyingType(t.underlying, in: p)
+    let s = tag(u, in: p)
+    if s == MachineType.self {
+      let v = type(u, as: MachineType.self, in: p)
+      return TypeLayout(whole: abi.layout(v), type: t, parts: [], isEnumLayout: false)
+    } else if s == Struct.self || s == Tuple.self {
       return computeLayout(record: t, in: &p)
-    } else if hasEnumLayout(t.underlying, in: p) {
+    } else if s == Enum.self {
       return computeLayout(enum: t, in: &p)
     } else {
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
@@ -104,14 +101,13 @@ struct TypeLayoutCache {
       size: cases.map(\.size).max() ?? 0)
 
     let l = storageLayoutOfRecord(havingMembers: [
-        payload, .init(alignment: d.alignment, size: d.size),
+      payload, .init(alignment: d.alignment, size: d.size),
     ])
 
     let ns = names(enum: t.underlying, in: &p)
     let parts =
       zip(cases, ns).map { TypeLayout.Part(name: $0.1, type: $0.0.type, offset: l.partOffsets[0]) }
       + [.init(name: "discriminator", type: d.type, offset: l.partOffsets[1])]
-
 
     return .init(whole: l.bytes, type: t, parts: parts, isEnumLayout: true)
   }
@@ -132,48 +128,13 @@ struct TypeLayoutCache {
     )
   }
 
-  /// Returns true iff `t` in `p` has a record layout.
-  private func hasRecordLayout(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    precondition(!t[.hasAliases])
-    let u = tag(t, in: p)
-    if u == Struct.self || u == Tuple.self {
-      return true
-    } else if u == TypeApplication.self {
-      let a = type(t, as: TypeApplication.self, in: p)
-      let v = tag(a.abstraction, in: p)
-      return v == Struct.self || v == Tuple.self
-    } else {
-      return false
-    }
-  }
-
-  /// Returns true iff `t` in `p` has an enum layout.
-  private func hasEnumLayout(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    precondition(!t[.hasAliases])
-    let u = tag(t, in: p)
-    if u == Enum.self {
-      return true
-    } else if u == TypeApplication.self {
-      let a = type(t, as: TypeApplication.self, in: p)
-      let v = tag(a.abstraction, in: p)
-      return v == Enum.self
-    } else {
-      return false
-    }
-  }
-
   /// Returns true iff enum `t` in `p` is a raw value enum.
+  ///
+  /// - Precondition: `t` is an enum.
   private func isRawValueEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    precondition(!t[.hasAliases])
-    let u = tag(t, in: p)
-    if u == Enum.self {
-      let d = type(t, as: Enum.self, in: p).declaration
-      return p[d].representation != nil
-    } else {
-      let a = type(t, as: TypeApplication.self, in: p)
-      let d = type(a.abstraction, as: Enum.self, in: p).declaration
-      return p[d].representation != nil
-    }
+    let u = underlyingType(t, in: p)
+    let d = type(u, as: Enum.self, in: p).declaration
+    return p[d].representation != nil
   }
 
   /// Returns the types of stored parts of record `t` in `p`.
@@ -199,7 +160,6 @@ struct TypeLayoutCache {
   /// Returns the declared names (if any) of stored parts of record `t` in `p`,
   /// in storage order.
   private func names(record t: AnyTypeIdentity, in p: inout Program) -> [String?]? {
-    precondition(!t[.hasAliases])
     guard let d = p.declaration(of: t) else { return nil }
     let s = p.cast(d, to: StructDeclaration.self)!
     return p.storedProperties(of: s).map { p[$0].identifier.value }
@@ -208,7 +168,6 @@ struct TypeLayoutCache {
   /// Returns the declared names of stored parts of enum `t` in `p`,
   /// in storage order.
   private func names(enum t: AnyTypeIdentity, in p: inout Program) -> [String] {
-    precondition(!t[.hasAliases])
     let d = p.declaration(of: t)!
     let e = p.cast(d, to: EnumDeclaration.self)!
     return p[e].members
@@ -227,6 +186,20 @@ struct TypeLayoutCache {
   /// Returns the tag of `t` in `p`.
   private func tag(_ t: AnyTypeIdentity, in p: Program) -> any TypeTree.Type {
     p.types.tag(of: t).value
+  }
+
+  /// Returns the underlying type of `t`, after unwrapping type applications and aliases.
+  private func underlyingType(_ t: AnyTypeIdentity, in p: Program) -> AnyTypeIdentity {
+    let u = tag(t, in: p)
+    if u == TypeApplication.self {
+      let a = type(t, as: TypeApplication.self, in: p)
+      return underlyingType(a.abstraction, in: p)
+    } else if u == TypeAlias.self {
+      let a = type(t, as: TypeAlias.self, in: p)
+      return underlyingType(a.aliasee, in: p)
+    } else {
+      return t
+    }
   }
 }
 
