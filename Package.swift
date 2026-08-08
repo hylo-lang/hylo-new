@@ -185,7 +185,7 @@ let package = Package(
     .testTarget(
       name: "InterpreterTests",
       dependencies: [
-        "Interpreter", "FrontEnd",
+        "Interpreter", "FrontEnd", "Driver"
       ],
       resources: [
         .copy("InterpreterTestPrograms")
