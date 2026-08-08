@@ -139,9 +139,9 @@ struct TypeLayoutCache {
 
   /// Returns the types of stored parts of record `t` in `p`.
   private func storage(record t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
-    let u = tag(t, in: p)
-    if u == Tuple.self {
-      let v = ConcreteTypeIdentity<Tuple>(uncheckedFrom: t)
+    let u = underlyingType(t, in: p)
+    if tag(u, in: p) == Tuple.self {
+      let v = ConcreteTypeIdentity<Tuple>(uncheckedFrom: u)
       let (ms, o) = p.types.members(of: v)
       assert(o == false)
       return ms

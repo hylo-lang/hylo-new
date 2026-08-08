@@ -186,21 +186,22 @@ final class TypeLayoutTests: XCTestCase {
   }
 
   func testStructTypeAlias() async throws {
-    let i8StructAlias = layout(
+    let i8Struct = layout(
       await type(
-        named: "I8StructAlias",
+        named: "I8Struct",
         in: """
-          public struct I8Struct {
+          public struct I8Struct__ {
             let x: Builtin.i8
           }
-          public type I8StructAlias = I8Struct
+          public type I8Struct_ = I8Struct__
+          public type I8Struct = I8Struct_
           """))
 
     let i8 = id(MachineType.i(8))
-    XCTAssertEqual(i8StructAlias.size, 1)
-    XCTAssertEqual(i8StructAlias.alignment, 1)
+    XCTAssertEqual(i8Struct.size, 1)
+    XCTAssertEqual(i8Struct.alignment, 1)
     XCTAssertEqual(
-      i8StructAlias.parts,
+      i8Struct.parts,
       [
         .init(name: "x", type: .init(i8), offset: 0)
       ])
