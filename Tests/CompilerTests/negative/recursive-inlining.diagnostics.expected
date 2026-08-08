@@ -1,6 +1,12 @@
-negative/recursive-inlining.hylo:2.11-14: error: cannot inline recursive function
+negative/recursive-inlining.hylo:2.5-6: error: recursive function is not inlinable
+fun f() { f() }
+    ^
+negative/recursive-inlining.hylo:2.11-14: note: recursion starts here
 fun f() { f() }
           ~~~
-negative/recursive-inlining.hylo:8.11-14: error: cannot inline recursive function
+negative/recursive-inlining.hylo:8.5-6: error: recursive function is not inlinable
+fun h() { g() }
+    ^
+negative/recursive-inlining.hylo:8.11-14: note: recursion starts here
 fun h() { g() }
           ~~~

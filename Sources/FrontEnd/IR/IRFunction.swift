@@ -131,7 +131,7 @@ public struct IRFunction: Sendable {
   /// The name of the function.
   public let name: Name
 
-  /// The region of the code to which this function is associated.
+  /// The region of the code where general debugging information about this function is reported.
   public let anchor: Anchor
 
   /// The way in which the function returns its result.

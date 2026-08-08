@@ -15,6 +15,20 @@ extension IRFunction {
 
   }
 
+  /// The outcome of an attempt to inline the application of a subscript or function.
+  private enum InlningResult {
+
+    /// Inlining succeeded
+    case success
+
+    /// Inlining did not occur because the definition of the callee could not be resolved.
+    case skipped
+
+    /// Inlining did not occur because of recursion.
+    case recursion
+
+  }
+
   /// If `self` is exposed and must be inlined, verifies that it only uses exposed symbols.
   internal func upholdInliningRequirements(in m: Module.ID, using typer: inout Typer) -> Bool {
     // Nothing to do unless inlining is mandated and the function is exposed.
@@ -45,6 +59,9 @@ extension IRFunction {
     // Nothing to do if the function already went through mandatory inlining.
     if passedMandatoryInlining { return }
 
+    context.stack.append(name)
+    defer { context.stack.removeLast() }
+
     for b in blocks {
       // Nothing to do if the block's empty.
       guard var j = b.last else { continue }
@@ -58,7 +75,15 @@ extension IRFunction {
 
         // TODO: Subscripts
         if let k = cast(j, to: IRApply.self) {
-          inlineApply(k, emittingInto: m, using: &typer, in: &context)
+          switch inlineApply(k, emittingInto: m, using: &typer, in: &context) {
+          case .recursion:
+            let d = typer.program.notInlinable(dueToRecursiveCall: j, in: self)
+            typer.program[m].addDiagnostic(d)
+            return
+
+          default:
+            break
+          }
         }
       }
     }
@@ -72,36 +97,27 @@ extension IRFunction {
     setMandatoryInliningPassed()
   }
 
-  /// Inlines `i` iff its callee has been resolved statically to a declaration that should be
-  /// inlined given `context`.
+  /// Substitutes `i` with the contents of its callee if the latter has been statically resolved to
+  /// a declaration that should be inlined given `context`.
   private mutating func inlineApply(
     _ i: IRApply.ID, emittingInto m: Module.ID, using typer: inout Typer,
     in context: inout InliningContext
-  ) {
+  ) -> InlningResult {
     let s = at(i)
-    guard case .function(let callee, _) = s.callee else { return }
+    guard case .function(let callee, _) = s.callee else { return .skipped }
 
     // Should the callee be inlined?
-    if !typer.program.shouldInline(callee) {
-      return
-    }
-
-    // Update the inlining context.
-    context.stack.append(callee)
-    defer { context.stack.removeLast() }
+    if !typer.program.shouldInline(callee) { return .skipped }
 
     // Locate the definition of `f`.
     guard let (n, f) = typer.program.definition(of: callee, visibleFrom: m) else {
       // Either the callee is not defined, in which case an error has been reported elsewhere, or
       // it is being inlined, in which case we must complain about recursive inlining.
       if context.stack.contains(callee) {
-        let a = typer.program.span(s.anchor)
-        let d = Diagnostic(.error, "cannot inline recursive function", at: a)
-        typer.program[m].addDiagnostic(d)
+        return .recursion
+      } else {
+        return .skipped
       }
-
-      // In any case, there's nothing more we can do.
-      return
     }
 
     // Should the callee go through mandatory inlining first?
@@ -134,6 +150,8 @@ extension IRFunction {
         substitutingOperandsWith: table)
     }
     remove(i.erased)
+
+    return .success
   }
 
 }
