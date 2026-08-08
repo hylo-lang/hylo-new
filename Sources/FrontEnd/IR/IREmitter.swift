@@ -1362,7 +1362,7 @@ internal struct IREmitter {
     switch program.declaration(referredToBy: e) {
     case .direct(let d):
       if program.isTypeDeclaration(d) {
-        return lowering(e, { $0._emitTypeWitnesse(expressedBy: .init(e)) })
+        return lowering(e, { $0._emitTypeWitness(expressedBy: .init(e)) })
       } else {
         return lowering(e, { $0._emit(useOf: d, typed: t) })
       }
@@ -1378,6 +1378,9 @@ internal struct IREmitter {
         return lowering(e, { $0._property(d, of: q, withType: t) })
       }
 
+    case .builtin(.selfAlias):
+      return lowering(e, { $0._emitTypeWitness(of: t) })
+
     default:
       fatalError()
     }
@@ -1386,7 +1389,7 @@ internal struct IREmitter {
   /// Implements `lower(lvalue:)` for static calls.
   private mutating func lowered(lvalue e: StaticCall.ID) -> IRValue {
     if program.isReferringToTypeDeclaration(program[e].callee) {
-      return lowering(e, { $0._emitTypeWitnesse(expressedBy: .init(e)) })
+      return lowering(e, { $0._emitTypeWitness(expressedBy: .init(e)) })
     } else {
       unimplemented("static call")
     }
@@ -2503,16 +2506,21 @@ internal struct IREmitter {
     _return()
   }
 
-  /// Generates the IR for storing the type witness expressed by `e` into a temporary alloca and
-  /// returns that alloca.
+  /// Generates IR for storing the type witness expressed by `e` into a fresh alloca and returns
+  /// that alloca.
   ///
   /// - Requires: The evaluation of `e` has no side effects.
-  private mutating func _emitTypeWitnesse(expressedBy e: ExpressionIdentity) -> IRValue {
+  private mutating func _emitTypeWitness(expressedBy e: ExpressionIdentity) -> IRValue {
     let t = program.type(assignedTo: e, assuming: Metatype.self)
-    let u = program.types.dealiased(program.types[t].inhabitant)
-    let v = program.types.demand(TypeWitness())
-    let x = _alloca(v.erased)
-    _emitInitialize(x, with: .type(u, v))
+    return _emitTypeWitness(of: program.types[t].inhabitant)
+  }
+
+  /// Generates IR for storing a type witness of `t` into a fresh alloca and returns that alloca.
+  private mutating func _emitTypeWitness(of t: AnyTypeIdentity) -> IRValue {
+    let u = program.types.dealiased(t)
+    let w = program.types.demand(TypeWitness())
+    let x = _alloca(w.erased)
+    _emitInitialize(x, with: .type(u, w))
     return x
   }
 
