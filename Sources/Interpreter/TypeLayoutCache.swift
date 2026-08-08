@@ -210,11 +210,7 @@ func storageLayoutOfRecord(
   havingMembers ms: [TypeLayout.Bytes]
 ) -> (bytes: TypeLayout.Bytes, partOffsets: [Int]) {
   let storageOrder = ms.enumerated().sorted {
-    if $0.element.alignment == $1.element.alignment {
-      return $0.offset < $1.offset
-    } else {
-      return $0.element.alignment > $1.element.alignment
-    }
+    return $0.element.alignment > $1.element.alignment
   }
 
   var b = TypeLayout.Bytes(alignment: 1, size: 0)
