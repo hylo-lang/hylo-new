@@ -1,0 +1,8 @@
+@inline(always)
+fun f() { f() }
+
+@inline(always)
+fun g() { h() }
+
+@inline(always)
+fun h() { g() }

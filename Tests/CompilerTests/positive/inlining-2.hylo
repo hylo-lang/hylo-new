@@ -1,0 +1,13 @@
+//! stage:lowering
+
+@inline
+fun one() -> Int32 { 1 }
+
+@inline
+fun two(c: Bool) -> Int32 {
+  if c { 2 } else { one() }
+}
+
+public fun main() -> Int32 {
+  two(true)
+}

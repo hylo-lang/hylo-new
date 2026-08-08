@@ -131,7 +131,7 @@ public struct IRFunction: Sendable {
   /// The name of the function.
   public let name: Name
 
-  /// The region of the code to which this function is associated.
+  /// The region of the code where general debugging information about this function is reported.
   public let anchor: Anchor
 
   /// The way in which the function returns its result.
@@ -155,6 +155,9 @@ public struct IRFunction: Sendable {
   /// The use chains of the values in this function.
   public private(set) var uses: [IRValue: [Use]]
 
+  /// `true` iff `self` passed through mandatory inlining.
+  public private(set) var passedMandatoryInlining: Bool
+
   /// Creates an instance with the given properties.
   public init(
     name: Name, anchor: Anchor,
@@ -169,6 +172,7 @@ public struct IRFunction: Sendable {
     self.blocks = []
     self.uses = [:]
     self.bindings = [:]
+    self.passedMandatoryInlining = false
   }
 
   /// `true` iff the function has an entry.
@@ -871,6 +875,7 @@ public struct IRFunction: Sendable {
     swap(&self.slots, &other.slots)
     swap(&self.blocks, &other.blocks)
     swap(&self.uses, &other.uses)
+    swap(&self.passedMandatoryInlining, &other.passedMandatoryInlining)
     return other
   }
 
@@ -885,7 +890,14 @@ public struct IRFunction: Sendable {
     swap(&self.slots, &other.slots)
     swap(&self.blocks, &other.blocks)
     swap(&self.uses, &other.uses)
+    swap(&self.passedMandatoryInlining, &other.passedMandatoryInlining)
   }
+
+  /// Sets the flag indicating that the function passed mandatory inlining.
+  internal mutating func setMandatoryInliningPassed() {
+    self.passedMandatoryInlining = true
+  }
+
 
 }
 
@@ -1036,6 +1048,7 @@ extension IRFunction: Archivable {
     self.output = try archive.read(Output.self, in: &context)
     self.typeParameters = try archive.read([GenericParameter.ID].self, in: &context)
     self.termParameters = try archive.read([IRParameter].self, in: &context)
+    self.passedMandatoryInlining = try archive.read(Bool.self)
     self.slots = []
     self.blocks = []
     self.uses = [:]
@@ -1074,6 +1087,7 @@ extension IRFunction: Archivable {
     try archive.write(output, in: &context)
     try archive.write(typeParameters, in: &context)
     try archive.write(termParameters, in: &context)
+    try archive.write(passedMandatoryInlining, in: &context)
 
     // Write the number of basic blocks in the function. Note that the function cannot contain any
     // unreachable block at this point.

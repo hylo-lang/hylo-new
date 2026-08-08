@@ -254,6 +254,15 @@ extension Program {
     .init(.error, "not enough context to infer a type", at: spanForDiagnostic(about: n))
   }
 
+  /// Returns a error diagnosing that `f` is not inlinable due to recursion starting at `i`.
+  internal func notInlinable(
+    dueToRecursiveCall i: AnyInstructionIdentity, in f: IRFunction
+  ) -> Diagnostic {
+    .init(
+      .error, "recursive function is not inlinable", at: span(f.anchor),
+      notes: [.init(.note, "recursion starts here", at: span(f.at(i).anchor))])
+  }
+
   /// Returns an error diagnosing a failure of implicit search.
   internal func noUniqueGivenInstance(
     of t: AnyTypeIdentity, found: [Typer.SummonResult], at site: SourceSpan
