@@ -398,33 +398,33 @@ public fun shift_backward1(
 }
 
 /// Inserts `source.pointee()` at the latest position in
-/// `destinationStart...destinationEnd` such that any immediate
+/// `destination_start...destination_end` such that any immediate
 /// predecessor has a greater or equal alignment.
 ///
-/// - Precondition: `source >= destinationEnd`.
+/// - Precondition: `source >= destination_end`.
 ///
-/// - Note: replaces `destinationEnd` with a value in
-///   `destinationEnd...(source+1)` *and* mutates the `pointee`s
-///   of `destinationStart..<(source+1)` in place, with unspecified
+/// - Note: replaces `destination_end` with a value in
+///   `destination_end...(source+1)` *and* mutates the `pointee`s
+///   of `destination_start..<(source+1)` in place, with unspecified
 ///   effects on `pointee`s that fall out the final value of
-///   `destinationStart..<destinationEnd`.
+///   `destination_start..<destination_end`.
 @inline(always)
 public fun insert_backward_stably_sorted_by_decreasing_alignment(
   source: Pointer<RecordMemberType>,
-  into_range_from destinationStart: Pointer<RecordMemberType>,
-  to destinationEnd: inout Pointer<RecordMemberType>,
+  into_range_from destination_start: Pointer<RecordMemberType>,
+  to destination_end: inout Pointer<RecordMemberType>,
 ) {
   let r = source.pointee()
   let r_alignment = r.alignment()
 
-  var i = destinationEnd.copy()
+  var i = destination_end.copy()
   drop_last(
-    of_range_from: destinationStart, until: &i,
+    of_range_from: destination_start, until: &i,
     while_its_alignment_is_less_than: r_alignment)
 
   // Workaround #370
-  insert_backward(source, at_head_of_range_from: i, to: destinationEnd)
-  destinationEnd += 1
+  insert_backward(source, at_head_of_range_from: i, to: destination_end)
+  destination_end += 1
 }
 
 /// Inserts `source.pointee()` at the head of the `pointee`s of `start..<end`.
@@ -443,32 +443,32 @@ public fun insert_backward(
   }
 }
 
-/// Inserts each pointee in `sourceStart_..<sourceEnd` whose
+/// Inserts each pointee in `source_start_..<source_end` whose
 /// `alignment()` is greater than `a` at the latest position in
-/// `destinationStart...destinationEnd` such that any immediate
+/// `destination_start...destination_end` such that any immediate
 /// predecessor has a greater or equal alignment.
 ///
-/// - Precondition: `sourceStart_ >= destinationEnd`.
+/// - Precondition: `source_start_ >= destination_end`.
 ///
-/// - Note: replaces `destinationEnd` with a value in
-///   `destinationEnd..<sourceEnd` *and* mutates the `pointee`s
-///   of `destinationStart..<sourceEnd` in place, with unspecified
+/// - Note: replaces `destination_end` with a value in
+///   `destination_end..<source_end` *and* mutates the `pointee`s
+///   of `destination_start..<source_end` in place, with unspecified
 ///   effects on `pointee`s that fall out the final value of
-///   `destinationStart..<destinationEnd`.
+///   `destination_start..<destination_end`.
 @inline(always)
 public fun insert_backward_stably_sorted_by_decreasing_alignment(
-  into destinationStart: Pointer<RecordMemberType>,
-  until destinationEnd: inout Pointer<RecordMemberType>,
-  from sourceStart: sink Pointer<RecordMemberType>,
-  until sourceEnd: Pointer<RecordMemberType>,
+  into destination_start: Pointer<RecordMemberType>,
+  until destination_end: inout Pointer<RecordMemberType>,
+  from source_start: sink Pointer<RecordMemberType>,
+  until source_end: Pointer<RecordMemberType>,
   where_alignment_exceeds a: Alignment
 ) {
-  while sourceStart != sourceEnd {
-    if sourceStart.pointee().alignment() > a {
+  while source_start != source_end {
+    if source_start.pointee().alignment() > a {
       insert_backward_stably_sorted_by_decreasing_alignment(
-        sourceStart, into_range_from: destinationStart, to: &destinationEnd)
+        source_start, into_range_from: destination_start, to: &destination_end)
     }
-    sourceStart += 1
+    source_start += 1
   }
 }
 
@@ -547,18 +547,18 @@ public fun size_of_record_having_ordered_members(
 
 /// Returns the offset of the `n`th member in declaration order of a
 /// record type having members given by the array of length `l` at
-/// `memberArray`.
+/// `member_array`.
 ///
 /// Mutates the elements in the array in arbitrary ways.
 @inline(always)
 public fun __hylo_offset_of_member(
   n: UInt32,
-  in memberArray: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
+  in member_array: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
 {
-  sink let p = memberArray + Int(n)
+  sink let p = member_array + Int(n)
   sink let nth_alignment = p.pointee().alignment()
-  var start = memberArray.copy()
-  var end = memberArray + Int(l)
+  var start = member_array.copy()
+  var end = member_array + Int(l)
 
   stable_sort_by_decreasing_alignment(
     from: &start, until: &end,
