@@ -77,13 +77,17 @@ private enum InstructionEpilogue {
 /// The ephemeral (or non-`Memory`) execution state of a function call.
 private struct StackFrame {
 
-  // TODO: add local variables and parameters, which require `Memory`.
+  /// The allocations in this stack frame.
+  var allocations: [Memory.Address] = []
 
   /// The results of instructions.
   public var registers: [AnyInstructionIdentity: Value] = [:]
 
   /// The next instruction to execute.
   public var currentStep: InstructionPointer
+
+  /// Location of values passed to the function.
+  var parameters: [Memory.TypedAddress]
 
 }
 
@@ -93,11 +97,14 @@ private struct Stack {
   /// Local variables, parameters, and return addresses.
   private var frames: [StackFrame] = []
 
-  /// Adds a frame for a call to `f`, a nullary function defined in `p`.
-  public mutating func enter(_ f: GlobalFunctionIdentity, definedIn p: Program) {
-    // TODO: support parameters.
+  /// Adds a frame for a call to `f`, defined in `p`, with parameters `ps`.
+  public mutating func enter(
+    _ f: GlobalFunctionIdentity,
+    definedIn p: Program,
+    withParameters ps: [Memory.TypedAddress]
+  ) {
     let s = InstructionPointer(interpreting: f, definedIn: p)
-    let f = StackFrame(currentStep: s)
+    let f = StackFrame(currentStep: s, parameters: ps)
     frames.append(f)
   }
 
@@ -134,8 +141,11 @@ private struct Stack {
 /// A virtual machine that executes Hylo's in-memory IR representation.
 public struct Interpreter {
 
+  /// The stack- and dynamically-allocated memory in use.
+  private var memory: Memory
+
   /// The program being executed.
-  private let program: Program
+  private var program: Program { memory.program }
 
   /// The next instruction to execute.
   private var programCounter: InstructionPointer {
@@ -172,8 +182,8 @@ public struct Interpreter {
   ///
   /// - Precondition: `p.entry != nil`
   public init(_ p: Program) {
-    program = p
-    callStack.enter(p.entry, definedIn: p)
+    memory = Memory(forRunning: p, on: UnrealABI())
+    callStack.enter(p.entry, definedIn: p, withParameters: [])
   }
 
   /// Executes a single instruction.
