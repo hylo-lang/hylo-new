@@ -172,7 +172,8 @@ final class TypeLayoutTests: XCTestCase {
       await type(
         named: "I8Tuple",
         in: """
-          public type I8Tuple = {Builtin.i8}
+          public type I8Tuple_ = {Builtin.i8}
+          public type I8Tuple = I8Tuple_
           """))
 
     let i8 = id(MachineType.i(8))
