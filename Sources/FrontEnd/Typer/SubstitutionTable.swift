@@ -45,7 +45,10 @@ public struct SubstitutionTable: Hashable, Sendable {
   internal mutating func assign(_ substitution: AnyTypeIdentity, to variable: TypeVariable.ID) {
     var walked = variable
     while let a = types[walked] {
-      assert(a.isVariable || a == substitution, "variable is already bound")
+      if !a.isVariable {
+        assert(a == substitution, "variable is already bound to something else")
+        return
+      }
       walked = .init(uncheckedFrom: a)
     }
     types[walked] = substitution

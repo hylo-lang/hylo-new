@@ -172,7 +172,7 @@ internal struct Solver {
 
     if k.isTrivial {
       return .success
-    } else if k.lhs.isVariable {
+    } else if k.lhs.isVariable || (k.rhs.isVariable && program.types.hasContext(k.lhs)) {
       return postpone(g)
     }
 
@@ -201,9 +201,13 @@ internal struct Solver {
 
   /// Returns the simplification of `k` as an equality between its operands.
   private mutating func simplify(_ k: CoercionConstraint) -> GoalOutcome {
-    let e = EqualityConstraint(lhs: k.lhs, rhs: k.rhs, site: k.site)
-    let s = schedule(e)
-    return .forward([s], diagnoseInvalidCoercion(k))
+    if k.rhs.isVariable && program.types.hasContext(k.lhs) {
+      return .failure(diagnoseInvalidCoercion(k))
+    } else {
+      let e = EqualityConstraint(lhs: k.lhs, rhs: k.rhs, site: k.site)
+      let s = schedule(e)
+      return .forward([s], diagnoseInvalidCoercion(k))
+    }
   }
 
   /// Returns a function diagnosing a failure to solve a `k` due to an invalid coercion.

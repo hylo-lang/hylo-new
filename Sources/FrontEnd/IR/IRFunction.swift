@@ -280,12 +280,66 @@ public struct IRFunction: Sendable {
 
   /// Returns the last use of `v` in `b`, if any.
   public func lastUse(of v: IRValue, in b: IRBlock.ID) -> Use? {
-    for i in instructions(in: b).reversed() {
-      if let n = at(i).operands.lastIndex(of: v) {
-        return Use(user: i, index: n)
+    // Nothing to do if there is no use.
+    guard let usesInBlock = uses[v] else { return nil }
+
+    // Uses are recorded in no particular order, so we have to determine which of those occurring
+    // in `b` is sequenced last. We do so by associating each use with a position, initially that
+    // of the definition the using instruction, and advance this position iteratively. The result
+    // is the use whose corresponding position was never advanced until it reached the definition
+    // of another user.
+
+    // Keys are user definitions, values are indices in `useInBlock`.
+    var definitions = SortedDictionary<AnyInstructionIdentity, Int>()
+    // Keys are indices in `useInBlock`, values are positions in `b`.
+    var candidates: [(Int, AnyInstructionIdentity)] = .init(minimumCapacity: usesInBlock.count)
+
+    // Identify the uses that occur in `b`.
+    for i in usesInBlock.indices where block(defining: usesInBlock[i].user) == b {
+      let u = usesInBlock[i]
+      modify(&definitions[u.user]) { (candidate) in
+        // Is there already a candidate for the user of `u`?
+        if let c = candidate {
+          // Is that candidate before `u`?
+          if u.index > usesInBlock[candidates[c].0].index { candidates[c].0 = i }
+        } else {
+          candidate = candidates.count
+          candidates.append((i, u.user))
+        }
       }
     }
-    return nil
+
+    // Eliminate candidates until at most one remains. `e` is the position of the last candidate
+    // not yet eliminated. Each iteration either decreases `e`, advances all positions, or returns
+    // because one position couldn't be advanced.
+    var e = candidates.count - 1
+    while e >= 1 {
+      var c = 0
+      while c <= e {
+        // If there is an next instruction, keep the candidate only if that instruction is not the
+        // definition of another candidate.
+        if let x = instruction(after: candidates[c].1) {
+          if definitions.keys.contains(x) {
+            candidates.swapAt(c, e)
+            e -= 1
+          } else {
+            candidates[c].1 = x
+            c += 1
+          }
+        }
+
+        // The current candidate is at the end of the block, so it's the last use.
+        else {
+          return usesInBlock[candidates[c].0]
+        }
+      }
+    }
+
+    if e == 0 {
+      return usesInBlock[candidates[0].0]
+    } else {
+      return nil
+    }
   }
 
   /// Returns the type of `self`, computing it using `p`.
@@ -539,7 +593,7 @@ public struct IRFunction: Sendable {
 
   /// Returns the instructions in `b`.
   public func instructions(in b: IRBlock.ID) -> IRBlock.Iterator {
-    .init(slots: slots, last: blocks[b].last, current: blocks[b].first)
+    .init(slots: slots, last: blocks[b].last, next: blocks[b].first)
   }
 
   /// Returns the contents of `b` iff it contains exactly one instruction.
@@ -557,7 +611,7 @@ public struct IRFunction: Sendable {
     return .init(
       slots: slots,
       last: blocks[b].last,
-      current: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
+      next: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
   }
 
   /// Returns `true` iff `b` contains an instruction of type `T`.
@@ -577,11 +631,18 @@ public struct IRFunction: Sendable {
   /// Returns the control flow graph of this function.
   public func controlFlow() -> ControlFlowGraph {
     var g = ControlFlowGraph()
-    for a in blocks.addresses {
+    guard let e = entry else { return g }
+
+    var work = [e]
+    var done = IRBlockSet()
+
+    while let a = work.popLast() {
       for b in successors(of: a) {
         g.define(a, predecessorOf: b)
+        if done.insert(b).inserted { work.append(b) }
       }
     }
+
     return g
   }
 
@@ -754,22 +815,30 @@ public struct IRFunction: Sendable {
     return instruction(after: i)
   }
 
-  /// Removes all instructions that follow `i` from the block containing `i`.
-  ///
-  /// - Requires: No removed instruction is used outside the block containing `i`.
-  public mutating func removeAll(after i: AnyInstructionIdentity) {
-    let p = block(defining: i)
-    var j = blocks[p].last
-    while let k = j, k != i {
-      j = slots.address(before: k.address).map(AnyInstructionIdentity.init(address:))
-      remove(k)
+  /// Removes all instructions in `xs`, including their users.
+  public mutating func removeWithUsers<S: Sequence<AnyInstructionIdentity>>(_ xs: S) {
+    var work = Array(xs)
+    var done = Set<AnyInstructionIdentity>()
+    while let w = work.popLast() {
+      if done.contains(w) {
+        continue
+      } else if let u = uses[.register(w)] {
+        work.append(w)
+        work.append(contentsOf: u.map(\.user))
+      } else {
+        remove(w)
+        done.insert(w)
+      }
     }
   }
 
   /// Removes `i` from the use chains of its operands.
   private mutating func removeUses(by i: AnyInstructionIdentity) {
     for o in at(i).operands {
-      uses[o]?.removeAll(where: { $0.user == i })
+      modify(&uses[o]) { (us) in
+        us?.removeAll(where: { $0.user == i })
+        if let x = us, x.isEmpty { us = nil }
+      }
     }
   }
 
@@ -898,33 +967,61 @@ extension IRBlock {
 
     public typealias Element = AnyInstructionIdentity
 
+    private typealias Position = List<IRFunction.Slot>.Address
+
     /// The instructions containing the subsequence that `self` represents.
     private let slots: List<IRFunction.Slot>
 
     /// The identity of the last element in `self`.
-    private let last: List<IRFunction.Slot>.Address?
+    private let last: Position?
 
     /// The identity of the next element in `self`, if any.
-    private var current: List<IRFunction.Slot>.Address?
+    private var _next: Position?
+
+    /// `true` iff the iterator generates instructions in order (from first to last), `false` iff
+    /// it generates them in reverse order.
+    ///
+    /// If `last` is not `nil` then it occurs after `_next` iff `forward` is `true`.
+    private let forward: Bool
+
+    /// Creates an instance with the given properties.
+    private init(slots: List<IRFunction.Slot>, last: Position?, next: Position?, forward: Bool) {
+      self.slots = slots
+      self.last = last
+      self._next = next
+      self.forward = forward
+    }
 
     /// Creates an instance enumerating the identities of the instructions in `slots` between
-    /// `current` and `last`, included.
+    /// `next` and `last`, included.
+    ///
+    /// If `last` is `nil` then `next` is `nil` too and the sequence is empty. Otherwise, `next`
+    /// and occurs before `last` in the same basic block.
     fileprivate init(
-      slots: List<IRFunction.Slot>, last: AnyInstructionIdentity?, current: AnyInstructionIdentity?
+      slots: List<IRFunction.Slot>, last: AnyInstructionIdentity?, next: AnyInstructionIdentity?
     ) {
-      assert((current != nil) || (last == nil))
+      assert((next != nil) || (last == nil))
       self.slots = slots
-      self.current = current?.address
+      self._next = next?.address
       self.last = last?.address
+      self.forward = true
     }
 
     public mutating func next() -> AnyInstructionIdentity? {
-      if let n = current {
-        current = (n != last) ? slots.address(after: n) : nil
+      if let n = _next {
+        if n == last {
+          _next = nil
+        } else {
+          _next = forward ? slots.address(after: n) : slots.address(before: n)
+        }
         return .init(address: n)
       } else {
         return nil
       }
+    }
+
+    public func reversed() -> Self {
+      .init(slots: slots, last: _next, next: last, forward: !forward)
     }
 
   }

@@ -469,8 +469,8 @@ public struct Program: Sendable {
 
   /// Returns `true` if the contents of `d` is visible in all modules.
   ///
-  /// The result is `true` if `d` is annotated with `@exposed` and/or `d` and all the scopes
-  /// enclosing it are public.
+  /// The result is `true` if `d` is annotated with `@exposed` or `d` and all the scopes enclosing
+  /// it are public. Note that the scope of an extension is always public.
   public func isExposed<T: ModifiableDeclaration>(_ d: T.ID) -> Bool {
     // Is `d` explicitly exposed?
     if (annotation("exposed", appliedTo: d) != nil) { return true }
@@ -478,11 +478,21 @@ public struct Program: Sendable {
     // Otherwise, `d` and its enclosing scopes must be public.
     if !self[d].is(.public) { return false }
     var p = parent(containing: d)
-    while let a = p.node {
-      guard let b = self[a] as? (any ModifiableDeclaration), b.is(.public) else { return false }
+    while let a = p.node, isPublicScope(a) {
       p = parent(containing: a)
     }
     return p.isFile
+  }
+
+  /// Returns `true` iff `n` delineates a public scope.
+  public func isPublicScope<T: SyntaxIdentity>(_ n: T) -> Bool {
+    if tag(of: n) == ExtensionDeclaration.self {
+      return true
+    } else if let d = self[n] as? (any ModifiableDeclaration), d.is(.public) {
+      return true
+    } else {
+      return false
+    }
   }
 
   /// Returns `true` iff `d` declares symbols that will not appear in the ABI of `m`.

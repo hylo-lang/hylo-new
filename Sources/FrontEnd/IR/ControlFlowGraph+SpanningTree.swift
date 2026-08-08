@@ -22,7 +22,7 @@ extension ControlFlowGraph {
     /// - Requires: `v` is in the tree.
     /// - Complexity: O(1).
     internal func parent(_ v: IRBlock.ID) -> IRBlock.ID? {
-      parents[v]!
+      parents[v].flatMap({ $0 })
     }
 
     /// Sets `newParent` as `v`'s parent.

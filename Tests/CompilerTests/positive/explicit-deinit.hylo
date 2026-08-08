@@ -1,0 +1,15 @@
+//! stage:lowering
+
+struct S is Deinitializable { fun deinit() sink {} }
+
+fun eat(x: sink S) {
+  // Deinitialization is trivial.
+  _ = ()
+  // Deinitialization is dispatched statically.
+  _ = x
+}
+
+fun eat<T is Deinitializable>(x: sink T) {
+  // Deinitialization uses the witness of `T`'s conformance.
+  _ = x
+}
