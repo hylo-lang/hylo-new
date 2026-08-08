@@ -43,7 +43,7 @@ struct TypeLayout: Regular {
   /// Aggregate properties of this layout.
   public let whole: Bytes
 
-  /// The minimum alignment of an instance.  Always a power of 2.
+  /// The minimum alignment of an instance.
   public var alignment: Int { whole.alignment }
 
   /// The number of bytes occupied by an instance.
