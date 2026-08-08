@@ -137,7 +137,7 @@ struct TypeLayoutCache {
     return p[d].representation != nil
   }
 
-  /// Returns the types of stored parts of the record type `t`, defined in `p`.
+  /// Returns the types of `t`'s stored parts, where `t` is defined in `p`.
   private func storage(recordType t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
     let u = underlyingType(t, in: p)
     if tag(u, in: p) == Tuple.self {
@@ -150,23 +150,23 @@ struct TypeLayoutCache {
     }
   }
 
-  /// Returns the types of stored parts of nominal `t`, defined in `p`.
+  /// Returns the types of a nominal `t`'s stored parts, where `t` is defined in `p`.
   private func storage(nominal t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
     let d = p.declaration(of: t)!
     let m = p.parent(containing: d).module
     return p.storage(of: t, visibleFrom: m)!
   }
 
-  /// Returns the declared names (if any) of stored parts of the record type `t`,
-  /// defined in `p`, in storage order.
+  /// Returns the declared names (if any) of stored parts of the record type `t`
+  /// in storage order, where `t` is defined in `p`.
   private func names(recordType t: AnyTypeIdentity, in p: inout Program) -> [String?]? {
     guard let d = p.declaration(of: t) else { return nil }
     let s = p.cast(d, to: StructDeclaration.self)!
     return p.storedProperties(of: s).map { p[$0].identifier.value }
   }
 
-  /// Returns the declared names of stored parts of enum `t` in `p`, defined in `p`,
-  /// in storage order.
+  /// Returns the declared names of stored parts of enum `t` in storage order,
+  /// where `t` is defined in `p`.
   private func names(enum t: AnyTypeIdentity, in p: inout Program) -> [String] {
     let d = p.declaration(of: t)!
     let e = p.cast(d, to: EnumDeclaration.self)!
