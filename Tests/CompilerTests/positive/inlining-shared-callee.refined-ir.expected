@@ -1,0 +1,37 @@
+fun main(set %p0: Void) {
+%b0:
+  %r0 = alloca Void, #preferred
+  %r1 = access [set] %r0
+  %r8 = access [set] %r1
+  %r25 = access [set] %r8
+  %r26 = assume_state %r25 initialized
+  %r27 = end %r25
+  %r28 = br %b4
+%b1:
+  %r17 = end %r7
+  %r9 = access [sink] %r6
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = access [set] %p0
+  %r13 = assume_state %r12 initialized
+  %r14 = end %r12
+  %r15 = return
+%b2:
+  %r23 = end %r18
+  %r24 = br %b1
+%b3:
+  %r16 = end %r1
+  %r3 = access [sink] %r0
+  %r4 = assume_state %r3 uninitialized
+  %r5 = end %r3
+  %r6 = alloca Void, #preferred
+  %r7 = access [set] %r6
+  %r18 = access [set] %r7
+  %r19 = access [set] %r18
+  %r20 = assume_state %r19 initialized
+  %r21 = end %r19
+  %r22 = br %b2
+%b4:
+  %r29 = end %r8
+  %r30 = br %b3
+}

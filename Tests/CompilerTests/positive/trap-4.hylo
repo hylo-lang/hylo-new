@@ -1,0 +1,10 @@
+//! trap
+
+@inline(always)
+public fun abort() { Builtin.trap() }
+
+public fun main() {
+  var x = true
+  abort()
+  &x = false
+}

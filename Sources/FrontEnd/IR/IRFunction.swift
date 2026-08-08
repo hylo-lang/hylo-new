@@ -131,7 +131,7 @@ public struct IRFunction: Sendable {
   /// The name of the function.
   public let name: Name
 
-  /// The region of the code to which this function is associated.
+  /// The region of the code where general debugging information about this function is reported.
   public let anchor: Anchor
 
   /// The way in which the function returns its result.
@@ -155,6 +155,9 @@ public struct IRFunction: Sendable {
   /// The use chains of the values in this function.
   public private(set) var uses: [IRValue: [Use]]
 
+  /// `true` iff `self` passed through mandatory inlining.
+  public private(set) var passedMandatoryInlining: Bool
+
   /// Creates an instance with the given properties.
   public init(
     name: Name, anchor: Anchor,
@@ -169,6 +172,7 @@ public struct IRFunction: Sendable {
     self.blocks = []
     self.uses = [:]
     self.bindings = [:]
+    self.passedMandatoryInlining = false
   }
 
   /// `true` iff the function has an entry.
@@ -280,12 +284,66 @@ public struct IRFunction: Sendable {
 
   /// Returns the last use of `v` in `b`, if any.
   public func lastUse(of v: IRValue, in b: IRBlock.ID) -> Use? {
-    for i in instructions(in: b).reversed() {
-      if let n = at(i).operands.lastIndex(of: v) {
-        return Use(user: i, index: n)
+    // Nothing to do if there is no use.
+    guard let usesInBlock = uses[v] else { return nil }
+
+    // Uses are recorded in no particular order, so we have to determine which of those occurring
+    // in `b` is sequenced last. We do so by associating each use with a position, initially that
+    // of the definition the using instruction, and advance this position iteratively. The result
+    // is the use whose corresponding position was never advanced until it reached the definition
+    // of another user.
+
+    // Keys are user definitions, values are indices in `useInBlock`.
+    var definitions = SortedDictionary<AnyInstructionIdentity, Int>()
+    // Keys are indices in `useInBlock`, values are positions in `b`.
+    var candidates: [(Int, AnyInstructionIdentity)] = .init(minimumCapacity: usesInBlock.count)
+
+    // Identify the uses that occur in `b`.
+    for i in usesInBlock.indices where block(defining: usesInBlock[i].user) == b {
+      let u = usesInBlock[i]
+      modify(&definitions[u.user]) { (candidate) in
+        // Is there already a candidate for the user of `u`?
+        if let c = candidate {
+          // Is that candidate before `u`?
+          if u.index > usesInBlock[candidates[c].0].index { candidates[c].0 = i }
+        } else {
+          candidate = candidates.count
+          candidates.append((i, u.user))
+        }
       }
     }
-    return nil
+
+    // Eliminate candidates until at most one remains. `e` is the position of the last candidate
+    // not yet eliminated. Each iteration either decreases `e`, advances all positions, or returns
+    // because one position couldn't be advanced.
+    var e = candidates.count - 1
+    while e >= 1 {
+      var c = 0
+      while c <= e {
+        // If there is an next instruction, keep the candidate only if that instruction is not the
+        // definition of another candidate.
+        if let x = instruction(after: candidates[c].1) {
+          if definitions.keys.contains(x) {
+            candidates.swapAt(c, e)
+            e -= 1
+          } else {
+            candidates[c].1 = x
+            c += 1
+          }
+        }
+
+        // The current candidate is at the end of the block, so it's the last use.
+        else {
+          return usesInBlock[candidates[c].0]
+        }
+      }
+    }
+
+    if e == 0 {
+      return usesInBlock[candidates[0].0]
+    } else {
+      return nil
+    }
   }
 
   /// Returns the type of `self`, computing it using `p`.
@@ -539,7 +597,7 @@ public struct IRFunction: Sendable {
 
   /// Returns the instructions in `b`.
   public func instructions(in b: IRBlock.ID) -> IRBlock.Iterator {
-    .init(slots: slots, last: blocks[b].last, current: blocks[b].first)
+    .init(slots: slots, last: blocks[b].last, next: blocks[b].first)
   }
 
   /// Returns the contents of `b` iff it contains exactly one instruction.
@@ -557,7 +615,7 @@ public struct IRFunction: Sendable {
     return .init(
       slots: slots,
       last: blocks[b].last,
-      current: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
+      next: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
   }
 
   /// Returns `true` iff `b` contains an instruction of type `T`.
@@ -817,6 +875,7 @@ public struct IRFunction: Sendable {
     swap(&self.slots, &other.slots)
     swap(&self.blocks, &other.blocks)
     swap(&self.uses, &other.uses)
+    swap(&self.passedMandatoryInlining, &other.passedMandatoryInlining)
     return other
   }
 
@@ -831,7 +890,14 @@ public struct IRFunction: Sendable {
     swap(&self.slots, &other.slots)
     swap(&self.blocks, &other.blocks)
     swap(&self.uses, &other.uses)
+    swap(&self.passedMandatoryInlining, &other.passedMandatoryInlining)
   }
+
+  /// Sets the flag indicating that the function passed mandatory inlining.
+  internal mutating func setMandatoryInliningPassed() {
+    self.passedMandatoryInlining = true
+  }
+
 
 }
 
@@ -913,33 +979,61 @@ extension IRBlock {
 
     public typealias Element = AnyInstructionIdentity
 
+    private typealias Position = List<IRFunction.Slot>.Address
+
     /// The instructions containing the subsequence that `self` represents.
     private let slots: List<IRFunction.Slot>
 
     /// The identity of the last element in `self`.
-    private let last: List<IRFunction.Slot>.Address?
+    private let last: Position?
 
     /// The identity of the next element in `self`, if any.
-    private var current: List<IRFunction.Slot>.Address?
+    private var _next: Position?
+
+    /// `true` iff the iterator generates instructions in order (from first to last), `false` iff
+    /// it generates them in reverse order.
+    ///
+    /// If `last` is not `nil` then it occurs after `_next` iff `forward` is `true`.
+    private let forward: Bool
+
+    /// Creates an instance with the given properties.
+    private init(slots: List<IRFunction.Slot>, last: Position?, next: Position?, forward: Bool) {
+      self.slots = slots
+      self.last = last
+      self._next = next
+      self.forward = forward
+    }
 
     /// Creates an instance enumerating the identities of the instructions in `slots` between
-    /// `current` and `last`, included.
+    /// `next` and `last`, included.
+    ///
+    /// If `last` is `nil` then `next` is `nil` too and the sequence is empty. Otherwise, `next`
+    /// and occurs before `last` in the same basic block.
     fileprivate init(
-      slots: List<IRFunction.Slot>, last: AnyInstructionIdentity?, current: AnyInstructionIdentity?
+      slots: List<IRFunction.Slot>, last: AnyInstructionIdentity?, next: AnyInstructionIdentity?
     ) {
-      assert((current != nil) || (last == nil))
+      assert((next != nil) || (last == nil))
       self.slots = slots
-      self.current = current?.address
+      self._next = next?.address
       self.last = last?.address
+      self.forward = true
     }
 
     public mutating func next() -> AnyInstructionIdentity? {
-      if let n = current {
-        current = (n != last) ? slots.address(after: n) : nil
+      if let n = _next {
+        if n == last {
+          _next = nil
+        } else {
+          _next = forward ? slots.address(after: n) : slots.address(before: n)
+        }
         return .init(address: n)
       } else {
         return nil
       }
+    }
+
+    public func reversed() -> Self {
+      .init(slots: slots, last: _next, next: last, forward: !forward)
     }
 
   }
@@ -954,6 +1048,7 @@ extension IRFunction: Archivable {
     self.output = try archive.read(Output.self, in: &context)
     self.typeParameters = try archive.read([GenericParameter.ID].self, in: &context)
     self.termParameters = try archive.read([IRParameter].self, in: &context)
+    self.passedMandatoryInlining = try archive.read(Bool.self)
     self.slots = []
     self.blocks = []
     self.uses = [:]
@@ -992,6 +1087,7 @@ extension IRFunction: Archivable {
     try archive.write(output, in: &context)
     try archive.write(typeParameters, in: &context)
     try archive.write(termParameters, in: &context)
+    try archive.write(passedMandatoryInlining, in: &context)
 
     // Write the number of basic blocks in the function. Note that the function cannot contain any
     // unreachable block at this point.

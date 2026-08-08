@@ -132,26 +132,26 @@ fun Deinitializable.deinit$synthesized<Self: S3>(let %p0: Deinitializable<S3>, s
   %r8 = access [sink] %r6
   %r9 = access [set] %r7
   %r10 = apply S0.deinit(%r8) => %r9
-  %r22 = end %r9
-  %r21 = end %r8
-  %r11 = subfield %r5 at 1 as S1
-  %r12 = alloca Void, #preferred
-  %r13 = access [sink] %r11
-  %r14 = access [set] %r12
-  %r15 = apply S1.deinit(%r13) => %r14
-  %r24 = end %r14
-  %r23 = end %r13
-  %r20 = end %r0
-  %r16 = access [set] %p2
-  %r17 = assume_state %r16 initialized
+  %r11 = end %r9
+  %r12 = end %r8
+  %r13 = subfield %r5 at 1 as S1
+  %r14 = alloca Void, #preferred
+  %r15 = access [sink] %r13
+  %r16 = access [set] %r14
+  %r17 = apply S1.deinit(%r15) => %r16
   %r18 = end %r16
+  %r19 = end %r15
+  %r24 = end %r0
+  %r20 = access [set] %p2
+  %r21 = assume_state %r20 initialized
+  %r22 = end %r20
   %r25 = access [sink] %r7
   %r26 = assume_state %r25 uninitialized
   %r27 = end %r25
-  %r28 = access [sink] %r12
+  %r28 = access [sink] %r14
   %r29 = assume_state %r28 uninitialized
   %r30 = end %r28
-  %r19 = return
+  %r23 = return
 }
 
 fun E0.$<ConformanceDeclaration at synthesized-deinit:26.12>() let <: Deinitializable<E0> {
@@ -253,27 +253,27 @@ fun Deinitializable.deinit$synthesized<Self: E3>(let %p0: Deinitializable<E3>, s
   %r6 = access [sink] %r4
   %r7 = access [set] %r5
   %r8 = apply S0.deinit(%r6) => %r7
-  %r25 = end %r7
-  %r24 = end %r6
-  %r23 = end %r3
-  %r22 = end %r2
-  %r9 = br %b3
+  %r9 = end %r7
+  %r10 = end %r6
+  %r27 = end %r3
+  %r26 = end %r2
+  %r11 = br %b3
 %b2:
-  %r10 = case "b" of %p1
-  %r11 = place_cast %r10 as sink {S1}
-  %r12 = subfield %r11 at 0 as S1
-  %r13 = alloca Void, #preferred
-  %r14 = access [sink] %r12
-  %r15 = access [set] %r13
-  %r16 = apply S1.deinit(%r14) => %r15
-  %r29 = end %r15
-  %r28 = end %r14
-  %r27 = end %r11
-  %r26 = end %r10
-  %r17 = br %b3
+  %r12 = case "b" of %p1
+  %r13 = place_cast %r12 as sink {S1}
+  %r14 = subfield %r13 at 0 as S1
+  %r15 = alloca Void, #preferred
+  %r16 = access [sink] %r14
+  %r17 = access [set] %r15
+  %r18 = apply S1.deinit(%r16) => %r17
+  %r19 = end %r17
+  %r20 = end %r16
+  %r29 = end %r13
+  %r28 = end %r12
+  %r21 = br %b3
 %b3:
-  %r18 = access [set] %p2
-  %r19 = assume_state %r18 initialized
-  %r20 = end %r18
-  %r21 = return
+  %r22 = access [set] %p2
+  %r23 = assume_state %r22 initialized
+  %r24 = end %r22
+  %r25 = return
 }

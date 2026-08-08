@@ -2270,23 +2270,10 @@ public struct Typer {
 
     // Are both branches single-bodied?
     else if let (e0, e1) = program.branches(of: e) {
-      let t0 = inferredType(of: program[e].success, occurringAsStatement: false, in: &context)
-      context.obligations.assume(program[e].success, hasType: t0, at: program[e0].site)
-      let t1 = inferredType(of: program[e].failure, occurringAsStatement: false, in: &context)
-      context.obligations.assume(program[e].failure, hasType: t1, at: program[e1].site)
+      let t0 = inferredType(of: e0, in: &context)
+      let t1 = inferredType(of: e1, in: &context)
 
-      // Did we inferred the same type for both branches?
-      if t0 == t1 {
-        return context.obligations.assume(e, hasType: t0, at: site)
-      }
-
-      // Is the expected type `Void`?
-      else if context.expectedType == .void {
-        return context.obligations.assume(e, hasType: .void, at: site)
-      }
-
-      // Slow path: we may need coercions.
-      let t = fresh().erased
+      let t = context.expectedType ?? fresh().erased
       context.obligations.assume(CoercionConstraint(on: e0, from: t0, to: t, at: program[e0].site))
       context.obligations.assume(CoercionConstraint(on: e1, from: t1, to: t, at: program[e1].site))
       return context.obligations.assume(e, hasType: t, at: site)
@@ -2840,12 +2827,12 @@ public struct Typer {
     of b: Block.ID, occurringAsStatement isStatement: Bool,
     in context: inout InferenceContext
   ) -> AnyTypeIdentity {
+    context.obligations.assume(b, hasType: .void, at: program[b].site)
     if !isStatement, let e = program.singleExpression(of: b) {
-      let t = inferredType(of: e, in: &context)
-      return context.obligations.assume(b, hasType: t, at: program[b].site)
+      return inferredType(of: e, in: &context)
     } else {
       for s in program[b].statements { check(s) }
-      return context.obligations.assume(b, hasType: .void, at: program[b].site)
+      return .void
     }
   }
 
@@ -3939,13 +3926,14 @@ public struct Typer {
     return takeSummonResults(from: threads, in: scopeOfUse)
   }
 
-  /// Returns `true` iff a coercion (i.e., a witness of a type equality) from `a` to `b` might be
-  /// derived using the givens visible from `scopeOfUse` and those assumed in `environment`.
+  /// Returns `true` iff a coercion (i.e., a witness of a type equality) between `a` and `b` might
+  /// be derived using the givens visible from `scopeOfUse` and those assumed in `environment`.
   ///
-  /// This method enumerates givens having heads of the form `T ~ U`, excluding the built-in ones,
-  /// and checks whether `T` and `U` are unifiable with the given arguments. If either `a` or `b`
-  /// can't be unified in any of these givens, then we can conclude that implicit resolution will
-  /// necessarily fail to prove a coercion from `a` to `b`.
+  /// This method enumerates givens having heads of the form `T ~ U` and heads that can match any
+  /// type (e.g., `<T> T`), excluding the built-in ones, and checks whether `a` and `b` are each
+  /// unifiable with one side of some (possibly different) given. If either `a` or `b` can't be
+  /// unified in any of these givens, then we can conclude that implicit resolution will
+  /// necessarily fail to prove a coercion between `a` and `b`.
   private mutating func canDeriveCoercions(
     _ a: AnyTypeIdentity, _ b: AnyTypeIdentity, in scopeOfUse: ScopeIdentity,
     where environment: ResolutionThread.Environment
@@ -3957,39 +3945,58 @@ public struct Typer {
 
     // Make sure the cache key does not depend on the order in which `a` and `b` have been passed.
     let p = (b.bits < a.bits) ? Pair(b, a) : Pair(a, b)
-    if let memoized = cache.scopeToPotentialCoercions[scopeOfUse]?[p] { return memoized }
+
+    // The memo isn't keyed by the assumed givens of `environment`, so it can only serve queries
+    // answered against an empty environment. Variable-bearing keys are not memoized, as they are
+    // meaningless outside of the constraint system currently being solved.
+    let memoizable = environment.givens.isEmpty && p.isClosed
+    if memoizable, let memoized = cache.scopeToPotentialCoercions[scopeOfUse]?[p] {
+      return memoized
+    }
 
     // Check if there are givens in scope that could be used to derive a coercion.
     var result: UInt8 = 0
     for g in chain(environment.givens, givens(visibleFrom: scopeOfUse).joined())  {
       result |= canDeriveCoercion(p, applying: g)
       if result == 0b11 {
-        cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = true
+        if memoizable && !hasImplicitOnStack() {
+          cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = true
+        }
         return true
       }
     }
 
     assert((result & 0b11) != 0b11)
-    cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = false
+    if memoizable && !hasImplicitOnStack() {
+      cache.scopeToPotentialCoercions[scopeOfUse, default: [:]][p] = false
+    }
     return false
   }
 
-  /// Returns two bits indicating whether `g` may be used to prove a coercion from `p.first` to `x`
-  /// and from `x` to `p.second`, respectively.
+  /// Returns two bits indicating whether `g` may be used to prove a coercion between `p.first` and
+  /// some type `x`, and between `x` and `p.second`, respectively.
   ///
   /// The two least significant bits of the result encode a pair of Boolean values, satisfying the
   /// two following statements:
-  /// - `r & 0b10 != 0` iff `g` may witness a coercion from `p.first` to `x`; and
-  /// - `r & 0b01 != 0` iff `g` may witness a coercion from `p.second` to `x`.
-  private mutating func canDeriveCoercion(_ p: Memos.TypePair, applying g: Given) -> UInt8 {
+  /// - `r & 0b10 != 0` iff `g` may witness a coercion between `p.first` and `x`; and
+  /// - `r & 0b01 != 0` iff `g` may witness a coercion between `p.second` and `x`.
+  private mutating func canDeriveCoercion(
+    _ p: Memos.TypePair, applying g: Given
+  ) -> UInt8 {
     if let memoized = cache.canDeriveCoercion[g]?[p] { return memoized }
+
+    // Do not memoize variable-bearing keys or results computed while givens are on stack.
+    // Such queries may yield different results in the future.
+    let memoizable = p.isClosed && !hasImplicitOnStack()
 
     let t = declaredType(of: g)
     let u = program.types.contextAndHead(t)
 
     // Can the given match any type (e.g., `<T> T`)?
     if u.context.parameters.contains(where: { (p) in p == u.head }) {
-      cache.canDeriveCoercion[g, default: [:]][p] = 0b11
+      if memoizable {
+        cache.canDeriveCoercion[g, default: [:]][p] = 0b11
+      }
       return 0b11
     }
 
@@ -4001,12 +4008,16 @@ public struct Typer {
       var result: UInt8 = 0
       if unifiable(p.first, l) || unifiable(p.first, r) { result |= 0b10 }
       if unifiable(p.second, l) || unifiable(p.second, r) { result |= 0b01 }
-      cache.canDeriveCoercion[g, default: [:]][p] = result
+      if memoizable {
+        cache.canDeriveCoercion[g, default: [:]][p] = result
+      }
       return result
     }
 
     // The given can't be used to form a coercion.
-    cache.canDeriveCoercion[g, default: [:]][p] = 0b00
+    if memoizable {
+      cache.canDeriveCoercion[g, default: [:]][p] = 0b00
+    }
     return 0b00
   }
 
@@ -4942,5 +4953,12 @@ public struct Typer {
   private func hasImplicitOnStack() -> Bool {
     declarationsOnStack.contains(where: program.isImplicit)
   }
+
+}
+
+extension Typer.Memos.TypePair {
+
+  /// `true` iff neither member has a type variable.
+  fileprivate var isClosed: Bool { !first[.hasVariable] && !second[.hasVariable] }
 
 }

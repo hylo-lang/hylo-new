@@ -1,0 +1,9 @@
+//! no-std stage:lowering
+
+// A call cycle that leaves the set of inlined functions is not a recursive inlining.
+@inline(always)
+fun f() { g() }
+
+fun g() { f() }
+
+public fun main() { f() }

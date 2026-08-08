@@ -1,4 +1,5 @@
 import XCTest
+import FrontEnd
 
 final class InterpreterRunTests: XCTestCase {
 
@@ -9,11 +10,8 @@ final class InterpreterRunTests: XCTestCase {
       includingPropertiesForKeys: nil
     )
     for f in fs {
-      do {
-        try await f.interpret()
-      } catch {
-        XCTFail(error.localizedDescription)
-      }
+      let p = try await Program.loadForInterpretation(sourceRoot: f)
+      try p.interpret()
     }
   }
 
