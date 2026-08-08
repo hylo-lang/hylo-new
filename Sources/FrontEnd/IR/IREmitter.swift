@@ -2302,32 +2302,34 @@ internal struct IREmitter {
   }
 
   /// Returns the result of `action` applied with a projection of `self`, along with the identities
-  /// of all the instructions that have been inserted by `action`.
+  /// of the instructions inserted by `action`.
   private mutating func _recordingInsertions<T>(
     _ action: (inout Self) -> T
   ) -> (T, [AnyInstructionIdentity]) {
+    /// Returns the results of `action` along with the result of `enumerateInsertions`, which
+    /// accepts the current insertion function and returns the identities of the instructions
+    /// inserted by `action`.
+    func doit(
+      _ enumerateInsertions: (IRFunction) -> [AnyInstructionIdentity]
+    ) -> (T, [AnyInstructionIdentity]) {
+      let r = action(&self)
+      return (r, enumerateInsertions(currentFunction))
+    }
+
     switch insertionContext.point! {
     case .before(let j):
       if let i = currentFunction.instruction(before: j) {
-        let r = action(&self)
-        let n = currentFunction.instructions(after: i).prefix(while: { (k) in k != j })
-        return (r, n)
+        return doit({ (f) in f.instructions(after: i).prefix(while: { (k) in k != j }) })
       } else {
-        let r = action(&self)
         let b = currentFunction.block(defining: j)
-        let n = currentFunction.instructions(in: b).prefix(while: { (k) in k != j })
-        return (r, n)
+        return doit({ (f) in f.instructions(in: b).prefix(while: { (k) in k != j }) })
       }
 
     case .end(let b):
       if let i = currentFunction.blocks[b].last {
-        let r = action(&self)
-        let n = Array(currentFunction.instructions(after: i))
-        return (r, n)
+        return doit({ (f) in Array(f.instructions(after: i)) })
       } else {
-        let r = action(&self)
-        let n = Array(currentFunction.instructions(in: b))
-        return (r, n)
+        return doit({ (f) in Array(f.instructions(in: b)) })
       }
     }
   }
