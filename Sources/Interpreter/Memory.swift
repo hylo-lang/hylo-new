@@ -152,7 +152,7 @@ struct Memory {
   }
 
   /// A memory location.
-  public struct Address: Regular, CustomStringConvertible {
+  public struct Address: Regular {
 
     /// The containing allocation.
     public let allocation: Allocation.ID
@@ -160,11 +160,10 @@ struct Memory {
     /// The offset from the beginning of that `allocation`.
     public let offset: Storage.Index
 
-    public var description: String { "@\(allocation):0x\(String(offset, radix: 16))" }
   }
 
   /// A typed location in memory.
-  public struct TypedAddress: Regular, CustomStringConvertible {
+  public struct TypedAddress: Regular {
 
     /// The containing allocation.
     public let allocation: Allocation.ID
@@ -175,12 +174,6 @@ struct Memory {
     /// The type to be accessed at `offset` in `allocation`.
     public let type: MonomorphicTypeIdentity
 
-    /// Address having same `allocation` and `offset` as of `self`.
-    public var address: Address {
-      .init(allocation: allocation, offset: offset)
-    }
-
-    public var description: String { "@\(allocation):0x\(String(offset, radix: 16))[\(type)]" }
   }
 
   /// Allocates `n` contiguous instances of `t` and returns the`Address` of the first instance.
