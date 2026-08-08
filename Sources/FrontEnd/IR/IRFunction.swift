@@ -952,14 +952,16 @@ extension IRBlock {
 
     public typealias Element = AnyInstructionIdentity
 
+    private typealias Position = List<IRFunction.Slot>.Address
+
     /// The instructions containing the subsequence that `self` represents.
     private let slots: List<IRFunction.Slot>
 
     /// The identity of the last element in `self`.
-    private let last: List<IRFunction.Slot>.Address?
+    private let last: Position?
 
     /// The identity of the next element in `self`, if any.
-    private var _next: List<IRFunction.Slot>.Address?
+    private var _next: Position?
 
     /// `true` iff the iterator generates instructions in order (from first to last), `false` iff
     /// it generates them in reverse order.
@@ -967,12 +969,8 @@ extension IRBlock {
     /// If `last` is not `nil` then it occurs after `_next` iff `forward` is `true`.
     private let forward: Bool
 
-    private init(
-      slots: List<IRFunction.Slot>,
-      last: List<IRFunction.Slot>.Address?,
-      next: List<IRFunction.Slot>.Address?,
-      forward: Bool
-    ) {
+    /// Creates an instance with the given properties.
+    private init(slots: List<IRFunction.Slot>, last: Position?, next: Position?, forward: Bool) {
       self.slots = slots
       self.last = last
       self._next = next
