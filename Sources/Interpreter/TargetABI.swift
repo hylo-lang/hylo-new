@@ -17,10 +17,10 @@ struct UnrealABI: TargetABI {
   /// The size of a word in `bits`
   private let bitsInAWord = 64
 
-  /// The maximal alignment of a builtin type in bytes.
+  /// The maximal alignment of a machine type in bytes.
   private let maxAlignment = 128 / 8
 
-  /// Returns the layout for a `bitWidth`-bit type.
+  /// Returns the layout for a `bitWidth`-bit machine type.
   ///
   /// - Precondition: `bitWidth` is a power of 2.
   private func layout(bitWidth: Int) -> TypeLayout.Bytes {

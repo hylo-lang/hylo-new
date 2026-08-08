@@ -27,20 +27,18 @@ struct TypeLayoutCache {
   }
 
   /// Returns the layout for `t` in `p`.
-  ///
-  /// - Precondition: `t` is not an alias.
   private mutating func computeLayout(
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
     if t.underlying[.hasAliases] {
       let l = layout(.init(p.types.dealiased(t.underlying)), in: &p)
-      return .init(bytes: l.bytes, type: t, parts: l.parts, isEnumLayout: l.isEnumLayout)
+      return .init(whole: l.whole, type: t, parts: l.parts, isEnumLayout: l.isEnumLayout)
     }
     let u = tag(t.underlying, in: p)
     if u == MachineType.self {
       let u = type(t.underlying, as: MachineType.self, in: p)
-      return TypeLayout(bytes: abi.layout(u), type: t, parts: [], isEnumLayout: false)
+      return TypeLayout(whole: abi.layout(u), type: t, parts: [], isEnumLayout: false)
     } else if hasRecordLayout(t.underlying, in: p) {
       return computeLayout(record: t, in: &p)
     } else if hasEnumLayout(t.underlying, in: p) {
@@ -73,7 +71,7 @@ struct TypeLayoutCache {
     in p: inout Program
   ) -> TypeLayout {
     let l = storageLayoutOfRecord(
-      havingMembers: ms.map { layout($0.type, in: &p).bytes })
+      havingMembers: ms.map { layout($0.type, in: &p).whole })
 
     let parts = zip(ms, l.partOffsets).enumerated().map { i, x in
       let (m, o) = x
@@ -84,7 +82,7 @@ struct TypeLayoutCache {
       )
     }
 
-    return .init(bytes: l.bytes, type: t, parts: parts, isEnumLayout: false)
+    return .init(whole: l.bytes, type: t, parts: parts, isEnumLayout: false)
   }
 
   /// Returns the layout for an enum `t` in `p`.
@@ -102,7 +100,7 @@ struct TypeLayoutCache {
     let d = layout(abi.enumDiscriminator(count: cases.count, in: &p), in: &p)
 
     let payload = TypeLayout.Bytes(
-      alignment: cases.map(\.alignment).max() ?? 1,
+      alignment: Int(cases.map(\.alignment).lcm() ?? 1),
       size: cases.map(\.size).max() ?? 0)
 
     let l = storageLayoutOfRecord(havingMembers: [
@@ -115,7 +113,7 @@ struct TypeLayoutCache {
       + [.init(name: "discriminator", type: d.type, offset: l.partOffsets[1])]
 
 
-    return .init(bytes: l.bytes, type: t, parts: parts, isEnumLayout: true)
+    return .init(whole: l.bytes, type: t, parts: parts, isEnumLayout: true)
   }
 
   /// Returns the layout for a raw value enum `t` in `p`.
@@ -127,7 +125,7 @@ struct TypeLayoutCache {
       storage(nominal: t.underlying, in: &p).first!)
     let discriminatorLayout = layout(discriminator, in: &p)
     return TypeLayout(
-      bytes: discriminatorLayout.bytes,
+      whole: discriminatorLayout.whole,
       type: t,
       parts: [.init(name: "discriminator", type: discriminator, offset: 0)],
       isEnumLayout: true

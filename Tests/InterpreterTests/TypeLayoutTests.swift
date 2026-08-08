@@ -40,9 +40,9 @@ final class TypeLayoutTests: XCTestCase {
     let i8 = id(MachineType.i(8))
     let i64 = id(MachineType.i(64))
     let i8i64 = layout(p.types.tuple(of: [i8, i64]))
-    XCTAssertEqual(i8i64.bytes, .init(alignment: 8, size: 9))
+    XCTAssertEqual(i8i64.whole, .init(alignment: 8, size: 9))
     let i64i8 = layout(p.types.tuple(of: [i64, i8]))
-    XCTAssertEqual(i64i8.bytes, .init(alignment: 8, size: 9))
+    XCTAssertEqual(i64i8.whole, .init(alignment: 8, size: 9))
 
     XCTAssertEqual(
       i8i64.parts,
@@ -65,7 +65,7 @@ final class TypeLayoutTests: XCTestCase {
     let i32 = id(MachineType.i(32))
 
     let i8i16i32 = layout(p.types.tuple(of: [i8, i16, i32]))
-    XCTAssertEqual(i8i16i32.bytes, .init(alignment: 4, size: 7))
+    XCTAssertEqual(i8i16i32.whole, .init(alignment: 4, size: 7))
 
     XCTAssertEqual(
       i8i16i32.parts,

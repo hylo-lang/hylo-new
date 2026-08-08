@@ -6,7 +6,7 @@ struct TypeLayout: Regular {
 
   /// Memory layout of a type, without any detail about parts.
   public struct Bytes: Regular {
-    /// The minimum alignment of an instance.  Always a power of 2.
+    /// The minimum alignment of an instance.
     let alignment: Int
 
     /// The number of bytes occupied by an instance.
@@ -40,17 +40,17 @@ struct TypeLayout: Regular {
     public let offset: Int
   }
 
-  /// Aggregate layout values of this layout.
-  public let bytes: Bytes
+  /// Aggregate properties of this layout.
+  public let whole: Bytes
 
   /// The minimum alignment of an instance.  Always a power of 2.
-  public var alignment: Int { bytes.alignment }
+  public var alignment: Int { whole.alignment }
 
   /// The number of bytes occupied by an instance.
-  public var size: Int { bytes.size }
+  public var size: Int { whole.size }
 
   /// The number of bytes between the beginnings of consecutive array elements.
-  public var stride: Int { bytes.stride }
+  public var stride: Int { whole.stride }
 
   /// The type whose layout is described by `self`.
   public let type: MonomorphicTypeIdentity
@@ -80,7 +80,7 @@ struct TypeLayout: Regular {
 
 extension TypeLayout {
 
-  /// The discriminator of an enum layout.,
+  /// The discriminator of an enum layout.
   public var discriminator: Part {
     precondition(isEnumLayout)
     return parts.last!
@@ -103,7 +103,7 @@ extension BinaryInteger {
   /// Returns `self` rounded up to the nearest multiple of `n`.
   ///
   /// - Precondition: `n > 0`.
-  fileprivate func rounded(upToNearestMultipleOf n: Self) -> Self {
+  fileprivate func roundedUp(toNearestMultipleOf n: Self) -> Self {
     let r = self % n
     return (r == 0) ? self : self + (n - r)
   }
@@ -117,8 +117,8 @@ extension TypeLayout.Bytes {
   ///
   /// - Note: the `T` instance is stored `t.size` bytes before the end of the tuple.
   func appending(_ t: Self) -> Self {
-    let r = self.size.rounded(upToNearestMultipleOf: t.alignment)
-    return .init(alignment: max(self.alignment, t.alignment), size: r + t.size)
+    let r = self.size.roundedUp(toNearestMultipleOf: t.alignment)
+    return .init(alignment: Int(lcm(self.alignment, t.alignment)), size: r + t.size)
   }
 
 }
