@@ -457,4 +457,14 @@ final class TypeLayoutTests: XCTestCase {
       check_offsets(members: a)
     }
   }
+
+  func testBytesOfStorageLayoutOfRecord() {
+    XCTAssertEqual(
+      storageLayoutOfRecord(havingMembers: [
+        .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 9, size: 5),
+      ]).bytes,
+
+      .init(alignment: 18, size: 14)
+    )
+  }
 }
