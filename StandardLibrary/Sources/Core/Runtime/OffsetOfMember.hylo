@@ -528,7 +528,7 @@ public fun stable_sort_by_decreasing_alignment(
 }
 
 /// Returns the size of a record type would have were its members given
-/// in storage order by the `pointee`s of `start..<end`.
+/// in storage order by the `pointee`s of `start_..<end`.
 @inline(always)
 public fun size_of_record_having_ordered_members(
   in_the_range_from start_: Pointer<RecordMemberType>,
