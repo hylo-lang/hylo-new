@@ -426,35 +426,35 @@ public fun insert(
   end += 1
 }
 
-
-/// Inserts each pointee in `source_start_..<source_end` whose
-/// `alignment()` is greater than `a` at the latest position in
-/// `destination_start...destination_end` such that any immediate
-/// predecessor has a greater or equal alignment.
+/// Inserts each pointee in `source_start_..<source_end` (in order)
+/// whose `alignment()` is greater than `a`, at the latest position in
+/// `destination_start...destination_end` such that all following
+/// elements are less aligned.
 ///
-/// - Precondition: `source_start_ >= destination_end`.
+/// - Precondition: The source and destination ranges are
+///   non-overlapping.
 ///
-/// - Note: replaces `destination_end` with a value in
-///   `destination_end..<source_end` *and* mutates the `pointee`s
-///   of `destination_start..<source_end` in place, with unspecified
-///   effects on `pointee`s that fall out the final value of
-///   `destination_start..<destination_end`.
+/// - Note: may increase `destination_end` *and* mutate the `pointee`s
+///   of the final destination range in place.  If the source range
+///   overlaps the final destination, it may of course have been
+///   modified.
 @inline(always)
-public fun insert_backward_stably_sorted_by_decreasing_alignment(
-  into destination_start: Pointer<RecordMemberType>,
-  until destination_end: inout Pointer<RecordMemberType>,
-  from source_start: sink Pointer<RecordMemberType>,
+public fun insert_in_order_before_max_less_aligned_suffix(
+  range_from source_start: sink Pointer<RecordMemberType>,
   until source_end: Pointer<RecordMemberType>,
-  where_alignment_exceeds a: Alignment
+  where_alignment_exceeds a: Alignment,
+  into_range_from destination_start: Pointer<RecordMemberType>,
+  until destination_end: inout Pointer<RecordMemberType>,
 ) {
   while source_start != source_end {
     // Workaround for https://github.com/hylo-lang/hylo-new/issues/370
-    // Cannot hoist source_start.pointee() and its .alignment() computation.
+    // Cannot hoist source_start.pointee() or its .alignment() computation.
     if source_start.pointee().alignment() > a {
       insert(
         source_start.pointee(),
         into_range_from: destination_start, until: &destination_end,
-        before_max_suffix_aligned_less_than: source_start.pointee().alignment())
+        before_max_suffix_aligned_less_than:
+          source_start.pointee().alignment())
     }
     source_start += 1
   }
@@ -487,9 +487,10 @@ public fun stable_sort_by_decreasing_alignment(
     // insert elements up to n
     &new_end = start + 1
 
-    insert_backward_stably_sorted_by_decreasing_alignment(
-      into: start, until: &new_end, from: start + 1, until: n,
-      where_alignment_exceeds: n_alignment - (1 as Alignment))
+    insert_in_order_before_max_less_aligned_suffix(
+      range_from: start + 1, until: n,
+      where_alignment_exceeds: n_alignment - (1 as Alignment),
+      into_range_from: start, until: &new_end)
 
     &tail_start.value = (n + 1).value
   }
@@ -509,9 +510,11 @@ public fun stable_sort_by_decreasing_alignment(
   }
 
   // insert elements after n
-  insert_backward_stably_sorted_by_decreasing_alignment(
-    into: start, until: &new_end, from: tail_start, until: end,
-    where_alignment_exceeds: n_alignment)
+  insert_in_order_before_max_less_aligned_suffix(
+    range_from: tail_start, until: end,
+    where_alignment_exceeds: n_alignment,
+    into_range_from: start, until: &new_end)
+
   &end.value = new_end.value
 }
 
