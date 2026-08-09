@@ -1,0 +1,9 @@
+//! stage:lowering
+
+fun use<T>(x: T) {}
+
+struct S {
+
+  fun f() { use(Self) }
+
+}
