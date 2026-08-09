@@ -85,12 +85,6 @@ public struct WitnessExpression: Hashable, Sendable {
     self.type = type
   }
 
-  /// Creates a reference to a built-in entity.
-  public init(builtin entity: BuiltinEntity, type: AnyTypeIdentity) {
-    self.value = .builtin(entity)
-    self.type = type
-  }
-
   /// `true` iff this expression mentions open variable.
   public var hasVariable: Bool {
     if type[.hasVariable] { return true }
