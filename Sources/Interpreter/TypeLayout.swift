@@ -61,12 +61,12 @@ struct TypeLayout: Regular {
   public let isEnumLayout: Bool
 }
 
-extension BinaryInteger {
+extension UnsignedInteger {
 
   /// Returns `self` rounded up to the nearest multiple of `n`.
   ///
   /// - Precondition: `n > 0`.
-  fileprivate func roundedUp(toNearestMultipleOf n: Self) -> Self {
+  internal func roundedUp(toNearestMultipleOf n: Self) -> Self {
     let r = self % n
     return (r == 0) ? self : self + (n - r)
   }
@@ -80,8 +80,10 @@ extension TypeLayout.Bytes {
   ///
   /// - Note: the `T` instance is stored `t.size` bytes before the end of the tuple.
   func appending(_ t: Self) -> Self {
-    let r = self.size.roundedUp(toNearestMultipleOf: t.alignment)
-    return .init(alignment: Int(lcm(self.alignment, t.alignment)), size: r + t.size)
+    let r = UInt(size).roundedUp(toNearestMultipleOf: UInt(t.alignment))
+    return .init(
+      alignment: Int(lcm(self.alignment, t.alignment)),
+      size: Int(r) + t.size)
   }
 
 }
