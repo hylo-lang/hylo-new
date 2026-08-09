@@ -246,7 +246,7 @@ extension UnsafeRawPointer {
   /// aligned to `a`.
   fileprivate func offsetToAlignment(_ a: Int) -> Int {
     let b = UInt(bitPattern: self)
-    return Int(b.rounded(upToNearestMultipleOf: UInt(a)) - b)
+    return Int(b.roundedUp(toNearestMultipleOf: UInt(a)) - b)
   }
 
 }
