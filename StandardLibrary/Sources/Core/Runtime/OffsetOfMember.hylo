@@ -29,7 +29,7 @@ extension UInt32 {
 
   /// Returns the least n >= `self` that is a multiple of `a`.
   @inline(always)
-  public fun rounded_up(to_a_multiple_of a: Alignment) -> Self {
+  public fun rounded_up(to_nearest_multiple_of a: Alignment) -> Self {
     let a_ = Size(a)
     // The distance from i to the nearest aligned offset <= i.
     let excess = self % a_
@@ -203,7 +203,7 @@ extension Metatype<TypeWitnessHeader> {
   /// Returns the number of bytes between elements in a buffer of `Subject`.
   @inline(always)
   public static fun stride() -> Size {
-    Self.size().rounded_up(to_a_multiple_of: Self.alignment())
+    Self.size().rounded_up(to_nearest_multiple_of: Self.alignment())
   }
 
 }
@@ -233,7 +233,7 @@ extension Metatype<RecordMemberType> {
   /// Returns the number of bytes between elements in a buffer of `Subject`.
   @inline(always)
   public static fun stride() -> Size {
-    Self.size().rounded_up(to_a_multiple_of: Self.alignment())
+    Self.size().rounded_up(to_nearest_multiple_of: Self.alignment())
   }
 
 }
@@ -527,7 +527,7 @@ public fun size_of_record_having_ordered_members(
   var start = start_.copy()
   while start < end {
     let w = start.pointee()
-    let position = r.rounded_up(to_a_multiple_of: w.alignment())
+    let position = r.rounded_up(to_nearest_multiple_of: w.alignment())
     &r = position + w.size()
     &start += 1
   }
@@ -557,6 +557,6 @@ public fun __hylo_offset_of_member(
   if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(
     in_the_range_from: start, until: end)
-  sink let r = preceding_size.rounded_up(to_a_multiple_of: nth_alignment)
+  sink let r = preceding_size.rounded_up(to_nearest_multiple_of: nth_alignment)
   return r
 }
