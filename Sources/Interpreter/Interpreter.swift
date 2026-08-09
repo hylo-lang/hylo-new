@@ -208,7 +208,11 @@ public struct Interpreter {
       // TODO: add a real implementation, validating if it is safe to end the access.
       return .initializeRegister(to: .init(storage: ()))
     case let x as IRAlloca:
-      _ = x
+      if x.witness != nil {
+        unimplemented("dynamically sized stack allocation is not supported yet.")
+      }
+      let p = allocateOnStack(.init(x.storage))
+      return .initializeRegister(to: .init(storage: p))
     case let x as IRApply:
       _ = x
     case let x as IRApplyBuiltin:
@@ -239,6 +243,9 @@ public struct Interpreter {
     case let x as IRProperty:
       _ = x
     case is IRReturn:
+      for a in topOfStack.allocations.reversed() {
+        try memory.deallocate(a)
+      }
       return .return
     case let x as IRStore:
       _ = x
@@ -269,6 +276,14 @@ public struct Interpreter {
         .instruction(after: programCounter.position)
     else { throw IRError() }
     programCounter.position = i
+  }
+
+  /// Allocates storage on `callStack` for a value of type `t`, ready to be initialized,
+  /// and returns its address.
+  private mutating func allocateOnStack(_ t: MonomorphicTypeIdentity) -> Memory.TypedAddress {
+    let a = memory.allocate(t)
+    topOfStack.allocations.append(a)
+    return .init(allocation: a.allocation, offset: a.offset, type: t)
   }
 }
 
