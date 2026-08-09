@@ -43,6 +43,37 @@ final class InterpreterMemoryTests: XCTestCase {
     XCTAssertEqual(b, a)
   }
 
+  func testSubPart() {
+    let i8 = id(MachineType.i(8))
+    let i32 = id(MachineType.i(32))
+    let inner = m.program.types.tuple(of: [i8, i32])
+    let t = m.program.types.tuple(of: [i32, inner])
+
+    let a = m.allocate(.init(t))
+    let p = Memory.TypedAddress(
+      allocation: a.allocation, offset: a.offset, type: .init(t))
+
+    XCTAssertEqual(
+      m.location([], in: p),
+      .init(allocation: a.allocation, offset: a.offset, type: .init(t)))
+
+    XCTAssertEqual(
+      m.location([0], in: p),
+      .init(allocation: a.allocation, offset: a.offset, type: .init(i32)))
+
+    XCTAssertEqual(
+      m.location([1], in: p),
+      .init(allocation: a.allocation, offset: a.offset + 4, type: .init(inner)))
+
+    XCTAssertEqual(
+      m.location([1, 0], in: p),
+      .init(allocation: a.allocation, offset: a.offset + 8, type: .init(i8)))
+
+    XCTAssertEqual(
+      m.location([1, 1], in: p),
+      .init(allocation: a.allocation, offset: a.offset + 4, type: .init(i32)))
+  }
+
   /// Returns the type erased identity of `t`.
   private func id<T: TypeTree>(_ t: T) -> AnyTypeIdentity {
     m.program.id(t)

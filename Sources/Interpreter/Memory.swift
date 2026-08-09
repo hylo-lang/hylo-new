@@ -262,3 +262,17 @@ extension UnsafeRawBufferPointer {
   }
 
 }
+
+extension Memory {
+  /// Returns layout of `t`.
+  public mutating func layout(_ t: MonomorphicTypeIdentity) -> TypeLayout {
+    typeLayouts.layout(t, in: &program)
+  }
+
+  /// Returns the address of `subPart` in `whole`.
+  mutating func location(_ subPart: IndexPath, in whole: TypedAddress) -> TypedAddress {
+    let (t, o) =
+      typeLayouts.typeAndOffset(subPart, within: whole.type, definedIn: &program)
+    return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
+  }
+}
