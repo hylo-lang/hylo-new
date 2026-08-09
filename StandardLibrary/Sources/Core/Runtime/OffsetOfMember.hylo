@@ -465,9 +465,7 @@ public fun insert_in_order_before_max_less_aligned_suffix(
 /// at a position < `n`, stably-sorted by decreasing alignment.
 ///
 /// - Note: reduces `start..<end` to a subrange of its initial value
-///   *and* mutates the `pointee`s of `start..<end` in place, with
-///   unspecified effects on `pointee`s that fall out the final value
-///   of `start..<end`.
+///   *and* mutates the `pointee`s of `start..<end`.
 @inline(always)
 public fun stable_sort_by_decreasing_alignment(
   from start: inout Pointer<RecordMemberType>,
