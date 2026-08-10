@@ -235,14 +235,31 @@ extension Program {
     _ i: IRAlloca.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
-    assert(s.witness == nil, "unsupported dynamically sized alloca")
-
-    let t = metadata(of: s.storage, in: &ctx.module)
-    let x = ctx.module.llvm.insertAlloca(t.llvm, atEntryOf: ctx.llvm)
-    ctx.module.llvm.setAlignment(t.layout.alignment, for: x)
-
     let v = IRValue.register(i.erased)
-    ctx.value[v] = x.v
+
+    // Is the alloca dynamically sized?
+    if let t = s.witness {
+      let x0 = ctx.module.llvm.insertLoad(
+        ctx.module.llvm.ptr, from: ctx.value[t]!, at: ctx.insertionPoint!)
+      let x1 = ctx.module.llvm.insertGetStructElementPointer(
+        of: x0, typed: ctx.module.typeWitnessHeader, index: 1, at: ctx.insertionPoint!)
+      let x2 = ctx.module.llvm.insertLoad(
+        ctx.module.llvm.i32, from: x1, at: ctx.insertionPoint!)
+
+      let x3 = ctx.module.llvm.insertAlloca(
+        arrayOf: x2, ctx.module.llvm.i8, at: ctx.insertionPoint!)
+      ctx.module.llvm.setAlignment(ctx.module.dynamicAllocationAlignment(), for: x3)
+      ctx.value[v] = x3.v
+    }
+
+    // Size and alignment are determiend at compile-time.
+    else {
+      let t = metadata(of: s.storage, in: &ctx.module)
+      let x = ctx.module.llvm.insertAlloca(t.llvm, atEntryOf: ctx.llvm)
+      ctx.module.llvm.setAlignment(t.layout.alignment, for: x)
+      ctx.value[v] = x.v
+    }
+
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -387,8 +404,11 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
     let x = demandGlobal(s.source, in: &ctx.module)
+    let y = ctx.module.llvm.insertAlloca(ctx.module.llvm.ptr, at: ctx.insertionPoint!)
+    ctx.module.llvm.insertStore(x, to: y, at: ctx.insertionPoint!)
+
     let v = IRValue.register(i.erased)
-    ctx.value[v] = x.v
+    ctx.value[v] = y.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -935,8 +955,7 @@ extension Program {
     }
 
     // Declare the symbol.
-    let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
-    let symbol = ctx.llvm.declareGlobalVariable(name, storage)
+    let symbol = ctx.llvm.declareGlobalVariable(name, ctx.typeWitnessHeader)
     ctx.llvm.setLinkage(.private, for: symbol)
 
     // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
@@ -951,10 +970,10 @@ extension Program {
       ctx.llvm.i16.unsafe[].zero.v,
     ]
 
-    let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
+    let alignment = ctx.llvm.layout.preferredAlignment(of: ctx.typeWitnessHeader)
     ctx.llvm.setAlignment(alignment, for: symbol)
 
-    let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
+    let initializer = ctx.llvm.structConstant(of: ctx.typeWitnessHeader, aggregating: fields)
     ctx.llvm.setInitializer(initializer, for: symbol)
     ctx.llvm.setGlobalConstant(true, for: symbol)
 
