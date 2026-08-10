@@ -257,7 +257,7 @@ extension UnsafeRawBufferPointer {
   /// the nearest address aligned to `a`.
   ///
   /// If `self.baseAddress == nil`, returns `0`.
-  fileprivate func firstOffsetAligned(to a: Int) -> Int {
+  internal func firstOffsetAligned(to a: Int) -> Int {
     return baseAddress?.offsetToAlignment(a) ?? 0
   }
 
