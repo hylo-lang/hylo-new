@@ -343,6 +343,19 @@ public struct Interpreter {
       preconditionFailure("\(program.show(v)) is not a Access<Memory.TypedAddress>.")
     }
   }
+
+  /// Returns the value stored at `p`, consuming the stored value if `p` does not
+  /// point to a `MachineType`.
+  private mutating func load(
+    from p: Access<Memory.TypedAddress>
+  ) throws -> RuntimeValue {
+    let t = program.underlyingType(p.location.type.underlying)
+    if program.tag(t) == MachineType.self {
+      return try memory.read(from: p)
+    } else {
+      return try memory.consume(from: p)
+    }
+  }
 }
 
 extension Program {
