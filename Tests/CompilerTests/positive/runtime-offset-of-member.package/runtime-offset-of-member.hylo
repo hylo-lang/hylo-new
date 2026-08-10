@@ -3,17 +3,6 @@ type Alignment = UInt16
 
 // ------- Generic standard lib facilities that can't yet be emitted -------
 
-extension Pointer<UInt8> {
-
-  // Workaround for https://github.com/hylo-lang/hylo-new/issues/357
-  // and https://github.com/hylo-lang/hylo-new/issues/365
-  /// Initializes s to the null pointer.
-  static fun null_(s: set Self) {
-    &s.value = Builtin.zeroinitializer_ptr()
-  }
-
-}
-
 extension Metatype<Int> {
 
   type Subject = Int
@@ -68,7 +57,7 @@ extension Pointer<Int> {
 extension TypeWitnessHeader {
 
   init(size: Int, alignment: Int) {
-    Pointer<UInt8>.null_(&self.description)
+    &self.description = .new()
     &self.size = .new(truncating: size)
     &self.alignment = .new(truncating: alignment)
     &self.type_argument_or_parameter_count = .zero()
