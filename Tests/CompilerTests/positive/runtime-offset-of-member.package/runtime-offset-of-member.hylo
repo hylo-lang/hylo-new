@@ -106,30 +106,31 @@ fun verify_offset(
 }
 
 fun verify_offsets(
-    forFirst n: Int,
-    in recordDeclaration: H[10],
-    to_be o0: Int, o1: Int, o2: Int, o3: Int, o4: Int, o5: Int, o6: Int, o7: Int, o8: Int, o9: Int
+  in record_declaration: H[10],
+  of_length n: Int,
+  to_be o0: Int, o1: Int, o2: Int, o3: Int, o4: Int, o5: Int,
+    o6: Int, o7: Int, o8: Int, o9: Int
 ) {
   if n <= 0 { return }
-  verify_offset(0, in: recordDeclaration, of_length: n, to_be: o0)
+  verify_offset(0, in: record_declaration, of_length: n, to_be: o0)
   if n <= 1 { return }
-  verify_offset(1, in: recordDeclaration, of_length: n, to_be: o1)
+  verify_offset(1, in: record_declaration, of_length: n, to_be: o1)
   if n <= 2 { return }
-  verify_offset(2, in: recordDeclaration, of_length: n, to_be: o2)
+  verify_offset(2, in: record_declaration, of_length: n, to_be: o2)
   if n <= 3 { return }
-  verify_offset(3, in: recordDeclaration, of_length: n, to_be: o3)
+  verify_offset(3, in: record_declaration, of_length: n, to_be: o3)
   if n <= 4 { return }
-  verify_offset(4, in: recordDeclaration, of_length: n, to_be: o4)
+  verify_offset(4, in: record_declaration, of_length: n, to_be: o4)
   if n <= 5 { return }
-  verify_offset(5, in: recordDeclaration, of_length: n, to_be: o5)
+  verify_offset(5, in: record_declaration, of_length: n, to_be: o5)
   if n <= 6 { return }
-  verify_offset(6, in: recordDeclaration, of_length: n, to_be: o6)
+  verify_offset(6, in: record_declaration, of_length: n, to_be: o6)
   if n <= 7 { return }
-  verify_offset(7, in: recordDeclaration, of_length: n, to_be: o7)
+  verify_offset(7, in: record_declaration, of_length: n, to_be: o7)
   if n <= 8 { return }
-  verify_offset(8, in: recordDeclaration, of_length: n, to_be: o8)
+  verify_offset(8, in: record_declaration, of_length: n, to_be: o8)
   if n <= 9 { return }
-  verify_offset(9, in: recordDeclaration, of_length: n, to_be: o9)
+  verify_offset(9, in: record_declaration, of_length: n, to_be: o9)
 }
 
 @extern_c_indirect("hylo_open_test_cases_file_for_reading_indirect")
@@ -168,7 +169,6 @@ fun main() -> Int32 {
     let a = Pointer<Int>(value: Builtin.address(of: alignments))
     let o = Pointer<Int>(value: Builtin.address(of: offsets))
     verify_offsets(
-      forFirst: l,
       in: (
         H(s.at(0), a.at(0)),
         H(s.at(1), a.at(1)),
@@ -180,6 +180,7 @@ fun main() -> Int32 {
         H(s.at(7), a.at(7)),
         H(s.at(8), a.at(8)),
         H(s.at(9), a.at(9))),
+      of_length: l,
       to_be: o.at(0), o.at(1), o.at(2), o.at(3), o.at(4), o.at(5),
              o.at(6), o.at(7), o.at(8), o.at(9))
     x += 1

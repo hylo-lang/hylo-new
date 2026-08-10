@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Opens our test case file for reading, returning the file handle.
+/// Opens the test case file for reading, returning the file handle,
+/// or 0 if opening failed.
 void hylo_open_test_cases_file_for_reading_indirect(FILE** result) {
   *result = fopen("test-cases.txt", "r");
 }
