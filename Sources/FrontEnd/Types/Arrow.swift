@@ -35,6 +35,13 @@ public struct Arrow: TypeTree {
     self.output = output
   }
 
+  /// Creates the type of a function accepting `inputs` and returning an instance of `output`.
+  public init(_ inputs: (AccessEffect, AnyTypeIdentity)..., to output: AnyTypeIdentity) {
+    self.init(
+      inputs: inputs.map({ (k, t) in .init(access: k, type: t) }),
+      output: output)
+  }
+
   /// Creates the type of a built-in function accepting `inputs`, which are the types of unlabeled
   /// `let` parameters, and returning an instance of `output`.
   public init<T: TypeIdentity>(_ inputs: MachineType.ID..., to output: T) {
