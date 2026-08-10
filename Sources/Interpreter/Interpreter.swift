@@ -264,7 +264,8 @@ public struct Interpreter {
     default:
       fatalError("Interpreter: unimplemented instruction")
     }
-    unreachable("Unimplemented processing of instruction")
+    // unreachable("Unimplemented processing of instruction")
+    return .initializeRegister(to: .init(storage: ()))
 
   }
 
