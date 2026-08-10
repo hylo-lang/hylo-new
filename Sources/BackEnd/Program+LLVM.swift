@@ -252,7 +252,7 @@ extension Program {
       ctx.value[v] = x3.v
     }
 
-    // Size and alignment are determiend at compile-time.
+    // Size and alignment are determined at compile-time.
     else {
       let t = metadata(of: s.storage, in: &ctx.module)
       let x = ctx.module.llvm.insertAlloca(t.llvm, atEntryOf: ctx.llvm)

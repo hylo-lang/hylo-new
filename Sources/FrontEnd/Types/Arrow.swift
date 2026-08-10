@@ -83,7 +83,7 @@ public struct Arrow: TypeTree {
     return i == labels.endIndex
   }
 
-  /// Returns `self` with its parameters modified by `uodate`.
+  /// Returns `self` with its parameters modified by `update`.
   public func withInputsModified(_ update: ([Parameter]) -> [Parameter]) -> Arrow {
     .init(
       style: style, effect: effect,
