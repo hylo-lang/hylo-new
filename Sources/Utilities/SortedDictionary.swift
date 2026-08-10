@@ -104,7 +104,7 @@ public struct SortedDictionary<Key: Comparable, Value> {
     _ other: Self, uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows -> Self {
     // Trivial if either side is empty.
-    if other.isEmpty { return self } else if other.isEmpty { return other }
+    if other.isEmpty { return self } else if self.isEmpty { return other }
 
     // Otherwise, merge the contents of the RHS into the LHS.
     var keys = ContiguousArray<Key>()
