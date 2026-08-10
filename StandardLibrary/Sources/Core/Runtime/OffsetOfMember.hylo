@@ -67,6 +67,8 @@ public struct TypeWitnessHeader {
   @inline(always)
   public memberwise init
 
+  // TODO: verify that the following is correct. See
+  // https://github.com/hylo-lang/hylo-new/issues/306
   /// The type name in nul-terminated utf-8.
   let description: Pointer<UInt8>
 

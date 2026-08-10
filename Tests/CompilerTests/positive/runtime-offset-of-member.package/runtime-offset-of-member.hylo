@@ -139,12 +139,12 @@ fun open_test_cases_file_for_reading() -> Pointer<Never>
 @extern_c_indirect("hylo_read_test_case_indirect")
 fun read_test_case(
   file: Pointer<Never>,
-  sizes: inout Int[10],
-  alignments: inout Int[10],
-  offsets: inout Int[10]) -> Int
+  sizes: inout Int[10], alignments: inout Int[10], offsets: inout Int[10]) -> Int
 
 fun main() -> Int32 {
   TypeWitnessHeader.check_layout_assumptions()
+  // TODO: check for null.  Currently
+  // https://github.com/hylo-new/issues/450 stands in the way.
   let f = open_test_cases_file_for_reading()
   while true {
     var sizes: Int[10] = (0,0,0,0,0,0,0,0,0,0)
