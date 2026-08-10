@@ -63,16 +63,18 @@ internal struct IREmitter {
     defining(f, at: program[module].ir[f].anchor) { (me) in
       // The first parameter of `f` is a witness of `Deinitializable` and the second parameter is
       // the instance to deinitialize.
-      let receiver = me.currentFunction.termParameters[1].type
+      let abstract = me.currentFunction.termParameters[1].type
+      let concrete = me.program.types.substitute(a, in: abstract)
 
       // Is the receiver trivial to deinitialize?
-      if case .trivial = me.witnessOfDeinitializable(for: receiver) {
+      if case .trivial = me.witnessOfDeinitializable(for: concrete) {
         me._assume_state(.parameter(1), initialized: false)
       }
 
       // Is the receiver an instance of a struct or enum?
-      else if let d = me.program.declaration(whereStructOrEnum: receiver) {
-        me._emitDeinitializeMemberwise(.parameter(1), instanceOf: d, instantiatedWith: a)
+      else if let d = me.program.declaration(whereStructOrEnum: concrete) {
+        let receiver = me._place_cast(.parameter(1), as: .sink, concrete)
+        me._emitDeinitializeMemberwise(receiver, instanceOf: d, instantiatedWith: a)
       }
 
       // Give up if it's none of the above.
@@ -80,7 +82,7 @@ internal struct IREmitter {
         unimplemented(
           """
           synthetic implementation of 'Deinitializable.deinit(:)' for \
-          '\(me.program.show(receiver))'
+          '\(me.program.show(concrete))'
           """)
       }
 
@@ -1066,14 +1068,12 @@ internal struct IREmitter {
 
       // The member is inherited by conformance.
       else {
-        let typeOfImplementation = program.withTyper(typing: module) { (tp) in
-          tp.typeOfImplementation(satisfying: m, in: w)
-        }
-
+        let interface = program.withTyper(typing: module, { (tp) in tp.typeOfInterface(for: m) })
         return lowering(at: anchor) { (me) in
           let x0 = me._emit(witness: w)
-          let x1 = me._property(m, of: x0, withType: typeOfImplementation)
-          return LoweredCallee(value: x1, arguments: Array(contentsOf: receiver), result: result)
+          let x1 = me._property(m, of: x0, withType: interface)
+          let xs = Array(x0, prependedTo: Array(contentsOf: receiver))
+          return LoweredCallee(value: x1, arguments: xs, result: result)
         }
       }
 
@@ -1505,7 +1505,7 @@ internal struct IREmitter {
       return i
     } else {
       let anchor = program.anchorForDiagnostics(about: conformance)
-      let (terms, output) = prototype(functionOrConformance: requirement, applying: arguments)
+      let (terms, output) = prototype(functionOrConformance: requirement)
       return program[module].ir.addFunction(
         IRFunction(
           name: name, anchor: anchor, output: output,
@@ -2491,6 +2491,18 @@ internal struct IREmitter {
       operands.append(.parameter(i))
     }
 
+    let t = currentFunction.resultAsTermAbstraction(of: f.value, in: program) ?? badOperand()
+    var ps = program.types[t].inputs
+    if !currentFunction.isSubscript {
+      ps.append(.init(access: .set, type: program.types[t].output))
+    }
+
+    for (i, p) in ps.enumerated() {
+      if p.type != currentFunction.result(of: operands[i])!.type {
+        operands[i] = _place_cast(operands[i], as: p.access, p.type)
+      }
+    }
+
     // Do the call.
     if currentFunction.isSubscript {
       let x0 = _project(f.value, operands, afterFormingAccesses: true)
@@ -2787,11 +2799,13 @@ internal struct IREmitter {
   ) {
     let requirement = program.standardLibraryDeclaration(.deinitializableDeinit)
     let (table, xs) = _recordingInsertions({ $0._emit(witness: w) })
-    let t0 = program.types.demand(Arrow(inputs: [.init(access: .sink, type: t)], output: .void))
-    let x0 = _property(requirement, of: table, withType: t0.erased)
+    let interface = program.types.demand(
+      Arrow((.let, w.type), (.sink, t), to: .void))
+
+    let x0 = _property(requirement, of: table, withType: interface.erased)
     let x1 = _access([.let], from: x0)
     let x2 = _alloca(.void)
-    _apply(x1, [s], into: x2, argumentAccesses: .formAndClose)
+    _apply(x1, [table, s], into: x2, argumentAccesses: .formAndClose)
     _end(IRAccess.self, openedBy: x1)
     insertionContext.function!.closeOpenEndedRegions(in: xs)
   }
@@ -2973,21 +2987,16 @@ internal struct IREmitter {
       return
     }
 
-    let movable = _emit(witness: w)
-    let member = program.variant(k, of: program.standardLibraryDeclaration(.movableTakeValue))!
-    let t0 = program.types.demand(
-      Arrow(
-        inputs: [.init(access: k, type: typeOfSource), .init(access: .sink, type: typeOfSource)],
-        output: .void))
+    let bundle = program.standardLibraryDeclaration(.movableTakeValue)
+    let requirement = program.variant(k, of: bundle)!
+    let table = _emit(witness: w)
+    let interface = program.types.demand(
+      Arrow((.let, w.type), (k, typeOfSource), (.sink, typeOfSource), to: .void))
 
-    let x0 = _alloca(.void)
-    let x1 = _access([.sink], from: source)
-    let x2 = _access([k], from: target)
-    let x3 = _access([.set], from: x0)
-    let x4 = _property(.init(member), of: movable, withType: t0.erased)
-    _apply(x4, [x2, x1], into: x3, argumentAccesses: .identity)
-    _end(IRAccess.self, openedBy: x3)
-    _end(IRAccess.self, openedBy: x2)
+    let x0 = _property(.init(requirement), of: table, withType: interface.erased)
+    let x1 = _access([.let], from: x0)
+    let x2 = _alloca(.void)
+    _apply(x1, [table, target, source], into: x2, argumentAccesses: .formAndClose)
     _end(IRAccess.self, openedBy: x1)
   }
 
