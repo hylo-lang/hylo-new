@@ -3281,6 +3281,28 @@ public struct Typer {
     }
   }
 
+  /// Returns the type of `requirement` presented through a witness table.
+  ///
+  /// In witness tables, implementations of function requirements are presented via interfaces
+  /// that accept a witness table as their first parameter (the instance of `P.Self`) and where a
+  /// skolem is substituted for each generic parameter of the requiring trait. This substitution
+  /// ensures that abstract parts are properly existentialized during lowering.
+  ///
+  /// - Requires: `requirement` is a function requirement in a trait declaration.
+  internal mutating func typeOfInterface(for requirement: DeclarationIdentity) -> AnyTypeIdentity {
+    assert(program.isFunctionRequirement(requirement))
+
+    let t = typeOfTraitSelf(in: program.traitRequiring(requirement)!)
+    let implementation = declaredType(of: requirement)
+    let (c, h) = program.types.contextAndHead(implementation)
+    let a = (program.types[h] as! Arrow).withInputsModified { (ps) in
+      .init(Parameter(access: .let, type: t), prependedTo: ps)
+    }
+
+    let sansContext = program.types.demand(a)
+    return program.types.introduce(c, into: sansContext.erased)
+  }
+
   /// Returns the context parameters of the type of an instance of `Self` in `s`.
   private mutating func contextOfSelf(in s: TraitDeclaration.ID) -> ContextClause {
     let w = typeOfTraitSelf(in: s)

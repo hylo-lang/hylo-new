@@ -351,6 +351,18 @@ public struct Program: Sendable {
     traitRequiring(n) != nil
   }
 
+  /// Returns `true` iff `n` is a function requirement in a trait.
+  ///
+  /// - Requires: The module containing `n` is scoped.
+  public func isFunctionRequirement<T: SyntaxIdentity>(_ n: T) -> Bool {
+    switch tag(of: n) {
+    case FunctionDeclaration.self, VariantDeclaration.self:
+      return isRequirement(n)
+    default:
+      return false
+    }
+  }
+
   /// Returns `true` iff `n` introduces entities in the implicit context.
   public func isImplicit<T: SyntaxIdentity>(_ n: T) -> Bool {
     switch tag(of: n) {

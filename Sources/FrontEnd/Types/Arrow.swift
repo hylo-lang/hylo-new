@@ -83,6 +83,15 @@ public struct Arrow: TypeTree {
     return i == labels.endIndex
   }
 
+  /// Returns `self` with its parameters modified by `uodate`.
+  public func withInputsModified(_ update: ([Parameter]) -> [Parameter]) -> Arrow {
+    .init(
+      style: style, effect: effect,
+      environment: environment,
+      inputs: update(inputs),
+      output: output)
+  }
+
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
   public func modified(
     in store: inout TypeStore,
