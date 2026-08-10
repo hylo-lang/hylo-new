@@ -80,10 +80,10 @@ jobs:
           addToPath: true
 
       - name: Build Swift project
-        run: swift build --build-tests -Xswiftc -enable-testing -c ${{ matrix.config }} ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+        run: swift build --build-tests --enable-xctest --disable-swift-testing -c ${{ matrix.config }} ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Run tests
-        run: swift test --skip-build -Xswiftc -enable-testing -c ${{ matrix.config }} ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+        run: swift test --skip-build --skip-update --enable-xctest --disable-swift-testing -c ${{ matrix.config }} ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}
