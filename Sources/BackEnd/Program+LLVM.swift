@@ -239,17 +239,12 @@ extension Program {
 
     // Is the alloca dynamically sized?
     if let t = s.witness {
-      let x0 = ctx.module.llvm.insertLoad(
-        ctx.module.llvm.ptr, from: ctx.value[t]!, at: ctx.insertionPoint!)
-      let x1 = ctx.module.llvm.insertGetStructElementPointer(
-        of: x0, typed: ctx.module.typeWitnessHeader, index: 1, at: ctx.insertionPoint!)
-      let x2 = ctx.module.llvm.insertLoad(
-        ctx.module.llvm.i32, from: x1, at: ctx.insertionPoint!)
-
-      let x3 = ctx.module.llvm.insertAlloca(
-        arrayOf: x2, ctx.module.llvm.i8, at: ctx.insertionPoint!)
-      ctx.module.llvm.setAlignment(ctx.module.dynamicAllocationAlignment(), for: x3)
-      ctx.value[v] = x3.v
+      // Read the size of the allocation from the type witness.
+      let n = insertLoadTypeSize(from: ctx.value[t]!, in: &ctx)
+      let x = ctx.module.llvm.insertAlloca(
+        arrayOf: n, ctx.module.llvm.i8, at: ctx.insertionPoint!)
+      ctx.module.llvm.setAlignment(ctx.module.dynamicAllocationAlignment(), for: x)
+      ctx.value[v] = x.v
     }
 
     // Size and alignment are determined at compile-time.
@@ -1035,6 +1030,20 @@ extension Program {
     return xs.map { (x) in
       ctx.module.llvm.insertLoad(m.llvm, from: ctx.value[x]!, at: ctx.insertionPoint!).v
     }
+  }
+
+  /// Returns the size of a type witnessed by `witness`, which is a pointer to the start of a type
+  /// witness stored in memory.
+  private mutating func insertLoadTypeSize(
+    from witness: LLVMValue, in ctx: inout FunctionGenerationContext
+  ) -> SwiftyLLVM.Load.UnsafeReference {
+    let x0 = ctx.module.llvm.insertLoad(
+      ctx.module.llvm.ptr, from: witness, at: ctx.insertionPoint!)
+    let x1 = ctx.module.llvm.insertGetStructElementPointer(
+      of: x0, typed: ctx.module.typeWitnessHeader, index: 1, at: ctx.insertionPoint!)
+    let x2 = ctx.module.llvm.insertLoad(
+      ctx.module.llvm.i32, from: x1, at: ctx.insertionPoint!)
+    return x2
   }
 
   /// Returns the representations of `arguments`, which are passed to `callee`, in LLVM IR.
