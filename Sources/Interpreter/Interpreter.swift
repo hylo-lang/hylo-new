@@ -218,10 +218,12 @@ public struct Interpreter {
   /// Applies the `Memory` and I/O effects of the current instruction and returns its epilogue.
   private mutating func applyCurrentInstruction() throws -> InstructionEpilogue {
     switch currentInstruction {
-    case is IRAccess:
+    case let x as IRAccess:
       // TODO: add a real implementation, validating new access in memory and
       // storing the access into register.
-      return .initializeRegister(to: .init(()))
+      let p = asTypedAddress(x.source)
+      let a = Access<Memory.TypedAddress>(to: p, effect: x.effect)
+      return .initializeRegister(to: .init(a))
     case is IRRegionEnd<IRAccess>:
       // TODO: add a real implementation, validating if it is safe to end the access.
       return .initializeRegister(to: .init(()))
@@ -334,6 +336,16 @@ extension Program {
       $0.name == IRFunction.Name.lowered(.init(entryFunctionDeclaration))
     }!
     return .init(module: entryModule, function: entryFunction)
+  }
+}
+
+extension IRAccess {
+  /// The associated permissions and obligations.
+  var effect: AccessEffect {
+    // Because IR analysis should ensure single effect.
+    // See: Sources/FrontEnd/IR/Instructions/IRAccess.swift.
+    precondition(capabilities.count == 1)
+    return capabilities[0]
   }
 }
 
