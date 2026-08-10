@@ -24,8 +24,8 @@ extension IREmitter {
     }
 
     // Close the `let` accesses that may have been opened to pass type witnesses.
-    let ws: [AnyInstructionIdentity] = witnesses.values.reduce(into: []) { (r, w) in
-      if let us = f.uses[w] { r.append(contentsOf: us.map(\.user)) }
+    let ws: SortedSet<AnyInstructionIdentity> = witnesses.values.reduce(into: []) { (r, w) in
+      if let us = f.uses[w] { r.formUnion(us.map(\.user)) }
     }
     f.closeOpenEndedRegions(in: ws)
   }

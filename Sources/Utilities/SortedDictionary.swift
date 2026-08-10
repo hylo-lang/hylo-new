@@ -75,6 +75,27 @@ public struct SortedDictionary<Key: Comparable, Value> {
     }
   }
 
+  /// Accesses the value associated to `key`, falling back to `defaultValue` if there isn't any.
+  ///
+  /// Complexity: O(n log n) where n is the number of key/value pairs in `self`.
+  public subscript(key: Key, default defaultValue: @autoclosure () -> Value) -> Value {
+    get {
+      self[key] ?? defaultValue()
+    }
+    _modify {
+      if let k = keys.firstIndex(of: key) {
+        yield &values[k]
+      } else {
+        var v = defaultValue()
+        defer {
+          let (_, k) = keys.index(insertingIfAbsent: key)
+          values.insert(v, at: k)
+        }
+        yield &v
+      }
+    }
+  }
+
 }
 
 extension SortedDictionary: ExpressibleByDictionaryLiteral {

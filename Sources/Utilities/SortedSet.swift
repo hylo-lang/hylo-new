@@ -105,6 +105,11 @@ public struct SortedSet<Element: Comparable>: Equatable {
     self.subtracting(SortedSet(other))
   }
 
+  /// Inserts the contents of `other` into `self`.
+  public mutating func formUnion<S: Sequence<Element>>(_ other: S) {
+    for o in other { self.insert(o) }
+  }
+
 }
 
 extension SortedSet: ExpressibleByArrayLiteral {
