@@ -55,7 +55,7 @@ public struct SortedSet<Element: Comparable>: Equatable {
   }
 
   /// Creates an instance with the given elements, which are sorted.
-  private init(sorted elements: ContiguousArray<Element>) {
+  internal init(sorted elements: ContiguousArray<Element>) {
     assert(elements.indices.dropLast().allSatisfy({ (i) in elements[i] < elements[i + 1] }))
     self.elements = elements
   }

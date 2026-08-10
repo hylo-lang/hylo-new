@@ -1,3 +1,5 @@
+import Utilities
+
 /// A region of the program rooted at a definition.
 ///
 /// A lifetime rooted at a definition `d` is a region starting immediately after `d` and covering
@@ -7,7 +9,7 @@
 /// - Note: The definition of an operand `o` isn't part of `o`'s lifetime.
 internal struct Lifetime: Sendable {
 
-  internal typealias Coverage = [IRBlock.ID: BlockCoverage]
+  internal typealias Coverage = SortedDictionary<IRBlock.ID, BlockCoverage>
 
   /// A position before or after an instruction.
   internal enum Boundary {
