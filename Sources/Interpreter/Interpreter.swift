@@ -61,7 +61,7 @@ private struct Value {
     storage = x
   }
 
-  /// The memory location pointed by `self`, if any.
+  /// The memory location pointed to by `self`, if any.
   public var location: Memory.TypedAddress? {
     if let a = storage as? Access<Memory.TypedAddress> {
       a.location
@@ -70,6 +70,12 @@ private struct Value {
     } else {
       nil
     }
+  }
+
+  /// The location pointed to by `self` together with its associated permissions
+  /// and obligations, if any.
+  public var accessedLocation: Access<Memory.TypedAddress>? {
+    storage as? Access<Memory.TypedAddress>
   }
 
 }
@@ -309,17 +315,32 @@ public struct Interpreter {
     return .init(allocation: a.allocation, offset: a.offset, type: t)
   }
 
-  /// Returns the `Memory.TypedAddress` of `v`.
+  /// Returns the memory location pointed to by `v`.
   ///
   /// - Precondition: `v` contains a place.
-  private mutating func asTypedAddress(_ v: IRValue) -> Memory.TypedAddress {
-    switch(v) {
-      case .parameter(let i):
-        return topOfStack.parameters[i].location
-      case .register(let r):
-        return topOfStack.registers[r]!.location!
-      default:
-        preconditionFailure("\(program.show(v)) is not a TypedAddress.")
+  private func asTypedAddress(_ v: IRValue) -> Memory.TypedAddress {
+    switch v {
+    case .parameter(let i):
+      topOfStack.parameters[i].location
+    case .register(let r):
+      topOfStack.registers[r]!.location!
+    default:
+      preconditionFailure("\(program.show(v)) is not a Memory.TypedAddress.")
+    }
+  }
+
+  /// Returns the memory location pointed to by `v`, together with its associated
+  /// permissions and obligations.
+  ///
+  /// - Precondition: `v` contains a place computed by `access` instruction.
+  private func asAccess(_ v: IRValue) -> Access<Memory.TypedAddress> {
+    switch v {
+    case .parameter(let i):
+      topOfStack.parameters[i]
+    case .register(let r):
+      topOfStack.registers[r]!.accessedLocation!
+    default:
+      preconditionFailure("\(program.show(v)) is not a Access<Memory.TypedAddress>.")
     }
   }
 }
