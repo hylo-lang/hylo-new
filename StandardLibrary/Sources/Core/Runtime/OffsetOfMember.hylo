@@ -31,7 +31,7 @@ extension UInt32 {
   @inline(always)
   public fun rounded_up(to_nearest_multiple_of a: Alignment) -> Self {
     let a_ = Size(a)
-    // The distance from i to the nearest aligned offset <= i.
+    // The distance from the nearest multiple of `a` <= `self` to `self`.
     let excess = self % a_
     return if excess == (0 as Self) { self.copy() } else { self - excess + a_ }
   }
@@ -63,15 +63,22 @@ extension Pointer<UInt8> {
 ///
 /// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
 public struct TypeWitnessHeader {
+
   @inline(always)
   public memberwise init
 
-  // TODO: verify that the type of `description` is correct.
-  // see https://github.com/hylo-lang/hylo-new/issues/306
+  /// The type name in nul-terminated utf-8.
   let description: Pointer<UInt8>
+
+  /// The size of the type in bytes.
   let size: Size
+
+  /// The alignment of the type in bytes.
   let alignment: Alignment
-  let type_argument_or_parameter_count: UInt16
+
+  /// The number of type parameters or type arguments
+  let type_argument_or_parameter_count: Int16
+
 }
 
 extension Pointer<TypeWitnessHeader> {
@@ -83,18 +90,13 @@ extension Pointer<TypeWitnessHeader> {
     .new(value: self.value)
   }
 
-  @inline(always)
-  public fun assign(x: sink Self) inout {
-    &self.value = x.value
-  }
-
-  /// Returns the size of an instance
+  /// Returns the size of an instance.
   @inline(always)
   public fun size() -> Size {
     (self.value as* let Self.Pointee).size.copy()
   }
 
-  /// Returns the alignment of an instance
+  /// Returns the alignment of an instance.
   @inline(always)
   public fun alignment() -> Alignment {
     (self.value as* let Self.Pointee).alignment.copy()
@@ -113,7 +115,6 @@ extension Pointer<TypeWitnessHeader> {
 
 }
 
-// Because the integer types are incomplete
 extension UInt {
 
   /// Creates an instance with the value of `x`.
@@ -132,28 +133,22 @@ extension Int {
     &self.value = Builtin.zext_i32_word(x.value)
   }
 
-  /// Replaces `sef` with `other`.
-  @inline(always)
-  public fun assign(other: Self) inout {
-    &self.value = other.value
-  }
-
 }
 
-/// Notionally, the type of a member of a record type
+/// Notionally, the type of a member of a record type.
 type RecordMemberType = Pointer<TypeWitnessHeader>
 
 extension Pointer<RecordMemberType> {
 
   public type Pointee = RecordMemberType
 
-  /// Returns the size of an instance
+  /// Returns the size of an instance.
   @inline(always)
   public fun size() -> Size {
     self.pointee().size()
   }
 
-  /// Returns the alignment of an instance
+  /// Returns the alignment of an instance.
   @inline(always)
   public fun alignment() -> Alignment {
     self.pointee().alignment()
@@ -164,7 +159,7 @@ extension Pointer<RecordMemberType> {
     (self.value as* let Self.Pointee).copy()
   }
 
-  /// Replaces the pointee with `x`
+  /// Replaces the pointee with `x`.
   @inline(always)
   public fun set_pointee(x: sink Self.Pointee) {
     // Hack: can't seem to move x, even when take_value implemented manually.
@@ -289,12 +284,6 @@ extension Pointer<RecordMemberType> {
   @inline(always)
   public fun infix< (other: Self) -> Bool {
     Bool(value: Builtin.icmp_ult_ptr(self.value, other.value))
-  }
-
-  /// Replaces `sef` with `other`.
-  @inline(always)
-  public fun assign(other: Self) inout {
-    &self.value = other.value
   }
 
 }
