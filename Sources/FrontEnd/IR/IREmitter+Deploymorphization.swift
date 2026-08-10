@@ -24,7 +24,10 @@ extension IREmitter {
     }
 
     // Close the `let` accesses that may have been opened to pass type witnesses.
-    f.closeOpenEndedRegions(in: witnesses.values.compactMap(\.register))
+    let ws: [AnyInstructionIdentity] = witnesses.values.reduce(into: []) { (r, w) in
+      if let us = f.uses[w] { r.append(contentsOf: us.map(\.user)) }
+    }
+    f.closeOpenEndedRegions(in: ws)
   }
   
   /// Replaces uses of `i` with their existentialized forms.
@@ -206,11 +209,11 @@ extension IREmitter {
 
   /// Emits the existentialized definition of `poly` into `m`.
   ///
-  /// `poly` is a polymorphic function whose implementation is defined in the current module. `m`
-  /// identifies the existentialized form of this function and has not been defined yet.
-  internal mutating func existentialize(_ poly: IRFunction, into m: IRFunction.ID) {
-    var mono = program[module].ir[m].move()
-    assert(poly.isDefined && !mono.isDefined, "existentialization already completed")
+  /// `poly` is a polymorphic function whose implementation is defined in the current module and
+  /// `mono` identifies the existentialized form of this function and has not been defined yet.
+  internal mutating func existentialize(_ poly: IRFunction, into mono: IRFunction.ID) {
+    var target = program[module].ir[mono].move()
+    assert(poly.isDefined && !target.isDefined, "existentialization already completed")
 
     /// The type parameters of the function being existentialized.
     let parameters = poly.typeParameters
@@ -223,7 +226,7 @@ extension IREmitter {
     /// A table for rewriting instructions.
     var properties = IRSubstitutionTable()
     for b in poly.blocks.addresses {
-      properties[b] = mono.addBlock()
+      properties[b] = target.addBlock()
     }
     for i in poly.termParameters.indices {
       properties[IRValue.parameter(i)] = .parameter(i + parameters.count)
@@ -239,7 +242,7 @@ extension IREmitter {
         switch poly.tag(of: i) {
         case IRAlloca.self:
           let s = poly.at(i) as! IRAlloca
-          lowering(p, anchoredTo: s.anchor, in: &mono) { (me) in
+          lowering(p, anchoredTo: s.anchor, in: &target) { (me) in
             // Gather the generic type parameters that occur free in type of the storage being
             // allocated. They should be defined by the function being existentialized.
             let ps = me.program.types.parameters(freeIn: s.storage)
@@ -257,7 +260,7 @@ extension IREmitter {
 
         default:
           let s = poly.at(i)
-          lowering(p, anchoredTo: s.anchor, in: &mono) { (me) in
+          lowering(p, anchoredTo: s.anchor, in: &target) { (me) in
             if let clone = me.insert(s.substituting(properties)) {
               properties[.register(i)] = clone
             }
@@ -266,8 +269,8 @@ extension IREmitter {
       }
     }
 
-    depolymorphize(&mono, passing: witnesses.filter({ (k, v) in v.parameter != nil }))
-    program[module].ir[m].take(definition: mono)
+    depolymorphize(&target, passing: witnesses)
+    program[module].ir[mono].take(definition: target)
   }
 
 }
