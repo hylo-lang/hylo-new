@@ -365,11 +365,13 @@ public fun drop_first(
   }
 }
 
-/// Shifts the contents of `start..<end` one position later in memory.
+/// Adds an unspecified value at `start`, shifting the contents of
+/// `start..<end` one element later in memory and replacing `end` with
+/// `end + 1`.
 @inline(always)
-public fun shift_backward1(
-  from start: Pointer<RecordMemberType>,
-  until end: Pointer<RecordMemberType>
+public fun open_hole_at_start(
+  of_range_from start: Pointer<RecordMemberType>,
+  until end: inout Pointer<RecordMemberType>
 ) {
   var e = end.copy()
   while e != start {
@@ -377,16 +379,19 @@ public fun shift_backward1(
     e.set_pointee(e0.pointee().copy())
     &e.value = e0.value
   }
+  &end += 1
 }
 
-/// Inserts `x` at the head of the `start..<end`.
+/// Inserts `x` at the head of the `start..<end`, shifting the contents of
+/// `start..<end` one element later in memory and replacing `end` with
+/// `end + 1`.
 @inline(always)
 public fun insert(
   x: RecordMemberType,
   at_head_of_range_from start: Pointer<RecordMemberType>,
-  until end: Pointer<RecordMemberType>)
+  until end: inout Pointer<RecordMemberType>)
 {
-  shift_backward1(from: start, until: end)
+  open_hole_at_start(of_range_from: start, until: &end)
   start.set_pointee(x.copy())
 }
 
@@ -405,7 +410,6 @@ public fun insert(
     while_its_alignment_is_less_than: a)
 
   insert(x, at_head_of_range_from: i, until: &end)
-  &end += 1
 }
 
 /// Inserts each pointee in `source_start_..<source_end` (in order)
@@ -413,7 +417,7 @@ public fun insert(
 /// `destination_start...destination_end` such that all following
 /// elements are less aligned.
 ///
-/// - Precondition: The source and destination ranges are
+/// - Precondition: The source and initial destination ranges are
 ///   non-overlapping.
 ///
 /// - Note: may increase `destination_end` *and* mutate the `pointee`s
@@ -442,9 +446,9 @@ public fun insert_in_order_before_max_less_aligned_suffix(
   }
 }
 
-/// Replaces `start..<end` with its elements having `alignment() <
-/// n_alignment`, or having `alignment() == n_alignment` but occurring
-/// at a position < `n`, stably-sorted by decreasing alignment.
+/// Replaces `start..<end` with its elements having `alignment() > a`,
+/// or having `alignment() == a` but occurring at a position < `p`,
+/// stably-sorted by decreasing alignment.
 ///
 /// - Note: reduces `start..<end` to a subrange of its initial value
 ///   *and* mutates the `pointee`s of `start..<end`.
@@ -452,34 +456,34 @@ public fun insert_in_order_before_max_less_aligned_suffix(
 public fun stable_sort_by_decreasing_alignment(
   from start: inout Pointer<RecordMemberType>,
   until end: inout Pointer<RecordMemberType>,
-  keeping_only_alignments_exceeding n_alignment: Alignment,
-  or_equaling_but_positioned_before n: Pointer<RecordMemberType>
+  keeping_only_alignments_exceeding a: Alignment,
+  or_equaling_but_positioned_before p: Pointer<RecordMemberType>
 ) {
-  // Drop initial unretained elements before n
+  // Drop initial unretained elements before p
   drop_first(
-    of_range_from: &start, until: n,
-    while_its_alignment_doesnt_exceed: n_alignment - (1 as Alignment))
+    of_range_from: &start, until: p,
+    while_its_alignment_doesnt_exceed: a - (1 as Alignment))
 
   var new_end: Pointer<RecordMemberType>
   sink let tail_start: Pointer<RecordMemberType>
 
-  if start != n {
-    // insert elements up to n
+  if start != p {
+    // insert elements up to p
     &new_end = start + 1
 
     insert_in_order_before_max_less_aligned_suffix(
-      range_from: start + 1, until: n,
-      where_alignment_exceeds: n_alignment - (1 as Alignment),
+      range_from: start + 1, until: p,
+      where_alignment_exceeds: a - (1 as Alignment),
       into_range_from: start, until: &new_end)
 
-    &tail_start.value = (n + 1).value
+    &tail_start.value = (p + 1).value
   }
   else {
-    // Drop unretained elements after n
-    &start = n + 1
+    // Drop unretained elements after p
+    &start = p + 1
     drop_first(
       of_range_from: &start, until: end,
-      while_its_alignment_doesnt_exceed: n_alignment)
+      while_its_alignment_doesnt_exceed: a)
 
     if start == end {
       return
@@ -489,10 +493,10 @@ public fun stable_sort_by_decreasing_alignment(
     &tail_start.value = new_end.value
   }
 
-  // insert elements after n
+  // insert elements after p
   insert_in_order_before_max_less_aligned_suffix(
     range_from: tail_start, until: end,
-    where_alignment_exceeds: n_alignment,
+    where_alignment_exceeds: a,
     into_range_from: start, until: &new_end)
 
   &end.value = new_end.value
