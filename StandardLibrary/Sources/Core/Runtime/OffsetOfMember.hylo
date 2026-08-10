@@ -345,7 +345,7 @@ public fun drop_last(
 ) {
   while end != start {
     if (end - 1).pointee().alignment() >= a { return }
-    end -= 1
+    &end -= 1
   }
 }
 
@@ -361,7 +361,7 @@ public fun drop_first(
     if start.pointee().alignment() > a {
       return
     }
-    start += 1
+    &start += 1
   }
 }
 
@@ -405,7 +405,7 @@ public fun insert(
     while_its_alignment_is_less_than: a)
 
   insert(x, at_head_of_range_from: i, until: &end)
-  end += 1
+  &end += 1
 }
 
 /// Inserts each pointee in `source_start_..<source_end` (in order)
@@ -438,7 +438,7 @@ public fun insert_in_order_before_max_less_aligned_suffix(
         before_max_suffix_aligned_less_than:
           source_start.pointee().alignment())
     }
-    source_start += 1
+    &source_start += 1
   }
 }
 
