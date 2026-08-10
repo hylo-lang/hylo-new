@@ -87,7 +87,7 @@ private struct StackFrame {
   public var currentStep: InstructionPointer
 
   /// Location of values passed to the function.
-  var parameters: [Memory.TypedAddress]
+  var parameters: [Access<Memory.TypedAddress>]
 
 }
 
@@ -101,7 +101,7 @@ private struct Stack {
   public mutating func enter(
     _ f: GlobalFunctionIdentity,
     definedIn p: Program,
-    withParameters ps: [Memory.TypedAddress]
+    withParameters ps: [Access<Memory.TypedAddress>]
   ) {
     let s = InstructionPointer(interpreting: f, definedIn: p)
     let f = StackFrame(currentStep: s, parameters: ps)
