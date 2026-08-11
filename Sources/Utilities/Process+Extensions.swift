@@ -1,6 +1,56 @@
+import Dispatch
 import Foundation
 
+/// A file handle being read to the end of its contents on a dedicated thread.
+private struct AsynchronousDrain: ~Copyable {
+
+  /// The state shared with the reading thread.
+  ///
+  /// - Thread safety: `data` is written only by the reading thread, before it signals `finished`,
+  ///   and read only after `finished` was awaited.
+  private final class State: @unchecked Sendable {
+
+    /// The data read from the handle, meaningful only after `finished` was signaled.
+    var data = Data()
+
+    /// Signaled once `data` holds the complete contents of the handle.
+    let finished = DispatchSemaphore(value: 0)
+
+  }
+
+  /// The state shared with the reading thread.
+  private let state = State()
+
+  /// Starts reading the contents of `handle` on a new thread, signaling `s.finished` when done.
+  init(_ handle: FileHandle) {
+    let s = state
+    Thread {
+      s.data = handle.readDataToEndOfFile()
+      s.finished.signal()
+    }.start()
+  }
+
+  /// Returns the complete contents of the handle, blocking until it has been fully read.
+  consuming func contents() -> Data {
+    state.finished.wait()
+    return state.data
+  }
+
+}
+
 extension Process {
+
+  /// Returns the contents of `a` and `b`, read until their end.
+  ///
+  /// The two streams are drained concurrently to avoid deadlocks.
+  private static func drainedOutputs(_ a: Pipe, _ b: Pipe) -> (a: String, b: String) {
+    let bContents = AsynchronousDrain(b.fileHandleForReading)
+    let aContents = a.fileHandleForReading.readDataToEndOfFile()
+
+    return (
+      String(decoding: aContents, as: UTF8.self),
+      String(decoding: bContents.contents(), as: UTF8.self))
+  }
 
   /// The error thrown when a process exits with a non-zero status.
   public struct NonzeroExit: Error, CustomStringConvertible {
@@ -23,8 +73,8 @@ extension Process {
     /// A textual description of the failure.
     public var description: String {
       """
-      '\(executable) \(arguments.joined(separator: " "))' exited with status \(exitCode).
-      
+      '\(executable.path) \(arguments.joined(separator: " "))' exited with status \(exitCode).
+
       Standard Output:
       \(standardOutput)
 
@@ -41,31 +91,12 @@ extension Process {
   public static func executionOutput(
     _ executable: URL, arguments: [String] = []
   ) throws -> String {
-    let process = Process()
-    let standardOutput = Pipe()
-    let standardError = Pipe()
-    process.executableURL = executable
-    process.arguments = arguments
-    process.standardOutput = standardOutput
-    process.standardError = standardError
-    try process.run()
-    process.waitUntilExit()
-
-    let output = String(
-      decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-    let error = String(
-      decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-
-    if process.terminationStatus != 0 {
-      throw NonzeroExit(
-        exitCode: process.terminationStatus,
-        standardOutput: output,
-        standardError: error,
-        executable: executable,
-        arguments: arguments)
+    let r = try execute(executable, arguments: arguments)
+    if r.exitCode != 0 {
+      throw NonzeroExit(exitCode: r.exitCode, standardOutput: r.standardOutput, 
+        standardError: r.standardError, executable: executable, arguments: arguments)
     }
-
-    return output
+    return r.standardOutput
   }
 
   /// Runs `executable` with `arguments`, setting the working directory if provided, and returns its
@@ -84,20 +115,15 @@ extension Process {
       process.currentDirectoryURL = d
     }
     try process.run()
+
+    let (output, error) = drainedOutputs(standardOutput, standardError)
+
     process.waitUntilExit()
 
-    let output = String(
-      decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-    let error = String(
-      decoding: standardError.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-
     return .init(
-      standardOutput: output,
-      standardError: error,
-      exitCode: process.terminationStatus,
+      standardOutput: output, standardError: error, exitCode: process.terminationStatus,
       terminationReason: process.terminationReason)
   }
-
 
   /// The result of executing a process.
   public struct ExecutionReport {
