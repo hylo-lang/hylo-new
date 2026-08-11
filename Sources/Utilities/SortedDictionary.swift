@@ -108,9 +108,10 @@ public struct SortedDictionary<Key: Comparable, Value> {
 
     // Otherwise, merge the contents of the RHS into the LHS.
     var keys = ContiguousArray<Key>()
-    keys.reserveCapacity(self.count)
+    let c = Swift.max(self.count, other.count)
+    keys.reserveCapacity(c)
     var values = ContiguousArray<Value>()
-    values.reserveCapacity(self.count)
+    values.reserveCapacity(c)
 
     var i = 0
     var j = 0
