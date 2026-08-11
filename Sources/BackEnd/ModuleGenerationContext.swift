@@ -73,7 +73,7 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// contains a pointer to the witnesses the type arguments. Otherwise, the witness is for a type
   /// constructor of arity `-n` and the tail buffer contains a pointer to a function implementing
   /// that constructor.
-  internal let typeWitnessHeader: [LLVMType]
+  internal let typeWitnessHeader: SwiftyLLVM.StructType.UnsafeReference
 
   /// Creates the initial state of a compilation of `m`.
   internal init(compiling hylo: HyloModule.ID, into llvm: consuming LLVMModule) {
@@ -95,7 +95,7 @@ internal struct ModuleGenerationContext: ~Copyable {
     self.plateau = self.llvm.functionType(from: [ptr, ptr, fun, ptr], to: i32)
     self.nestedProject = self.llvm.structType([ptr, fun, ptr])
     self.plateauCallback = self.llvm.structType([fun, ptr])
-    self.typeWitnessHeader = [iptr, i32, i16, i16]
+    self.typeWitnessHeader = self.llvm.structType(named: "$htwh", [iptr, i32, i16, i16])
   }
 
   /// Returns the resources held by this instance.
@@ -114,6 +114,15 @@ internal struct ModuleGenerationContext: ~Copyable {
       return llvm.i32
     default:
       return llvm.i64
+    }
+  }
+
+  /// Returns the default alignment of a dynamically sized alloca.
+  internal func dynamicAllocationAlignment() -> Int {
+    if let n = llvm.layout.stackAlignment {
+      return n
+    } else {
+      return llvm.layout.preferredAlignment(of: llvm.iptr)
     }
   }
 

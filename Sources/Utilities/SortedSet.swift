@@ -55,7 +55,7 @@ public struct SortedSet<Element: Comparable>: Equatable {
   }
 
   /// Creates an instance with the given elements, which are sorted.
-  private init(sorted elements: ContiguousArray<Element>) {
+  internal init(sorted elements: ContiguousArray<Element>) {
     assert(elements.indices.dropLast().allSatisfy({ (i) in elements[i] < elements[i + 1] }))
     self.elements = elements
   }
@@ -103,6 +103,11 @@ public struct SortedSet<Element: Comparable>: Equatable {
   /// Returns a set containing the elements `self` that do not occur in `other`.
   public func subtracting<S: Sequence<Element>>(_ other: S) -> Self {
     self.subtracting(SortedSet(other))
+  }
+
+  /// Inserts the contents of `other` into `self`.
+  public mutating func formUnion<S: Sequence<Element>>(_ other: S) {
+    for o in other { self.insert(o) }
   }
 
 }

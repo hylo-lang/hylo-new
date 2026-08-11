@@ -928,8 +928,9 @@ extension IRFunction: Showable {
       for b in blocks.addresses {
         result.append("%b\(b.rawValue):\n")
         for i in instructions(in: b) {
+          var p = printer
           let r = IRValue.register(i)
-          result.append("  \(printer.show(r)) = \(at(i).show(using: &printer))\n")
+          result.append("  \(p.show(r)) = \(at(i).show(using: &p))\n")
         }
       }
       result.append("}")

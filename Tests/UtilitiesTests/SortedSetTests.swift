@@ -162,6 +162,15 @@ final class SortedSetTests: XCTestCase {
     }
   }
 
+  func testUnionWithSequence() {
+    var g = SeedableRandomNumberGenerator(seed: 0)
+    for (a, b) in g.randomSetPairs() {
+      var c = a
+      c.formUnion(Array(b))
+      XCTAssertEqual(a.union(b), c)
+    }
+  }
+
   func testIntersection() {
     var g = SeedableRandomNumberGenerator(seed: 0)
     for (a, b) in g.randomSetPairs() {
