@@ -13,6 +13,9 @@ extension IRFunction {
   /// deallocated or flows into a `set` access. This situation may occur when deinitialization was
   /// left implicit during IR lowering. These new instructions are emitted into `m`, using `typer`
   /// to resolve implementations.
+  ///
+  /// Lifetime normalization is part of the mandatory transformation pipeline and is expected to
+  /// run after access reification and last use analysis.
   internal mutating func normalizeLifetimes(
     emittingInto m: Module.ID, using typer: inout Typer
   ) -> Bool {
