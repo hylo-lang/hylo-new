@@ -1,16 +1,16 @@
-//! stage:typing
+//! stage:typing no-std
 
-struct S is Deinitializable {
+struct S {
 
   public var value: Builtin.ptr
 
   public memberwise init
 
-  public fun infix+ (x: UInt32) -> Self {
+  public fun infix+ (x: S) -> Self {
     Self(value: self.value)
   }
 
-  public fun infix+ (x: Int) -> Self {
+  public fun infix+ (x: Void) -> Self {
     Self(value: self.value)
   }
 
@@ -18,8 +18,8 @@ struct S is Deinitializable {
 
 fun use(x: Builtin.ptr) {}
 
-fun use(x: UInt32) {}
+fun use(x: Void) {}
 
 fun f(x: S) {
-  use((x + 1).value)
+  use((x + x).value)
 }
