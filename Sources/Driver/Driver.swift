@@ -270,7 +270,7 @@ public struct Driver {
     if let r = relocation.asClangArgument { a.append(r) }
 
     _ = try Process.executionOutput(
-      try Host.findNativeExecutable(invokedAs: "clang"), arguments: a)
+      try Host.findBinaryExecutable(invokedAs: "clang"), arguments: a)
     return o
   }
 
@@ -375,13 +375,13 @@ public struct Driver {
     arguments += objectFiles.map(\.path)
 
     #if os(macOS)
-    let xcrun = try Host.findNativeExecutable(invokedAs: "xcrun")
+    let xcrun = try Host.findBinaryExecutable(invokedAs: "xcrun")
     let sdk = try Process.executionOutput(xcrun, arguments: ["--sdk", "macosx", "--show-sdk-path"])
       .trimmingCharacters(in: .whitespacesAndNewlines)
     arguments += ["-isysroot", sdk, "-lSystem"]
     #endif
 
-    let clang = try Host.findNativeExecutable(invokedAs: "clang")
+    let clang = try Host.findBinaryExecutable(invokedAs: "clang")
     _ = try Process.executionOutput(clang, arguments: arguments)
   }
 

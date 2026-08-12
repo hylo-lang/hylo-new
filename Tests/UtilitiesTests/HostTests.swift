@@ -7,9 +7,9 @@ typealias Host = Utilities.Host
 
 final class HostTests: XCTestCase {
 
-  func testFindNativeExecutableThrowsForUnknownCommand() throws {
+  func testFindBinaryExecutableThrowsForUnknownCommand() throws {
     XCTAssertThrowsError(
-      try Host.findNativeExecutable(invokedAs: "randomNotFoundExecutable"), "",
+      try Host.findBinaryExecutable(invokedAs: "randomNotFoundExecutable"), "",
       { (error) in
         if let e = error as? Host.ExecutableNotFound {
           XCTAssertEqual(e.name, "randomNotFoundExecutable")
@@ -21,16 +21,16 @@ final class HostTests: XCTestCase {
   }
 
   #if os(Windows)
-    func testFindNativeExecutableFindsAndExecutesWhereExe() throws {
-      let whereExe = try Host.findNativeExecutable(invokedAs: "where")
+    func testFindBinaryExecutableFindsAndExecutesWhereExe() throws {
+      let whereExe = try Host.findBinaryExecutable(invokedAs: "where")
       XCTAssertEqual(whereExe.lastPathComponent.lowercased(), "where.exe")
 
       let output = try Process.executionOutput(whereExe, arguments: ["cmd"])
       XCTAssertTrue(output.lowercased().contains("cmd.exe"))
     }
   #else
-    func testFindNativeExecutableFindsAndExecutesBash() throws {
-      let bash = try Host.findNativeExecutable(invokedAs: "bash")
+    func testFindBinaryExecutableFindsAndExecutesBash() throws {
+      let bash = try Host.findBinaryExecutable(invokedAs: "bash")
       XCTAssertEqual(bash.lastPathComponent, "bash")
 
       let output = try Process.executionOutput(bash, arguments: ["-lc", "printf '%s' bash-ok"])
@@ -40,10 +40,10 @@ final class HostTests: XCTestCase {
 
   func testExecutionOutputThrowsOnNonzeroExit() throws {
     #if os(Windows)
-      let executable = try Host.findNativeExecutable(invokedAs: "cmd")
+      let executable = try Host.findBinaryExecutable(invokedAs: "cmd")
       let arguments = ["/c", "exit", "42"]
     #else
-      let executable = try Host.findNativeExecutable(invokedAs: "bash")
+      let executable = try Host.findBinaryExecutable(invokedAs: "bash")
       let arguments = ["-lc", "exit 42"]
     #endif
 
@@ -64,10 +64,10 @@ final class HostTests: XCTestCase {
 
   func testExecuteReturnsReportOnNonzeroExit() throws {
     #if os(Windows)
-      let executable = try Host.findNativeExecutable(invokedAs: "cmd")
+      let executable = try Host.findBinaryExecutable(invokedAs: "cmd")
       let arguments = ["/c", "exit", "42"]
     #else
-      let executable = try Host.findNativeExecutable(invokedAs: "bash")
+      let executable = try Host.findBinaryExecutable(invokedAs: "bash")
       let arguments = ["-lc", "exit 42"]
     #endif
 
