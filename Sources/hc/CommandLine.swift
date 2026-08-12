@@ -484,7 +484,7 @@ private typealias Module = FrontEnd.Module
   /// Given the desired name of the compiler's product, returns the file to write when "binary" is
   /// selected as the output type.
   private func binaryFile(_ productName: Module.Name) -> URL {
-    outputURL ?? URL(fileURLWithPath: productName.description + Host.nativeExecutableSuffix)
+    outputURL ?? URL(fileURLWithPath: productName.description + Host.binaryExecutableSuffix)
   }
 
   private func inferenceLoggerFilter() -> ((AnySyntaxIdentity, Program) -> Bool)? {
