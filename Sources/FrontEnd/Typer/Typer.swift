@@ -3281,6 +3281,28 @@ public struct Typer {
     }
   }
 
+  /// Returns the type of `requirement` presented through a witness table.
+  ///
+  /// In witness tables, implementations of function requirements are presented via interfaces
+  /// that accept a witness table as their first parameter (the instance of `P.Self`) and where a
+  /// skolem is substituted for each generic parameter of the requiring trait. This substitution
+  /// ensures that abstract parts are properly existentialized during lowering.
+  ///
+  /// - Requires: `requirement` is a function requirement in a trait declaration.
+  internal mutating func typeOfInterface(for requirement: DeclarationIdentity) -> AnyTypeIdentity {
+    assert(program.isFunctionRequirement(requirement))
+
+    let t = typeOfTraitSelf(in: program.traitRequiring(requirement)!)
+    let implementation = declaredType(of: requirement)
+    let (c, h) = program.types.contextAndHead(implementation)
+    let a = (program.types[h] as! Arrow).withInputsModified { (ps) in
+      .init(Parameter(access: .let, type: t), prependedTo: ps)
+    }
+
+    let sansContext = program.types.demand(a)
+    return program.types.introduce(c, into: sansContext.erased)
+  }
+
   /// Returns the context parameters of the type of an instance of `Self` in `s`.
   private mutating func contextOfSelf(in s: TraitDeclaration.ID) -> ContextClause {
     let w = typeOfTraitSelf(in: s)
@@ -3718,7 +3740,7 @@ public struct Typer {
     let e = thread.environment.assuming(givens: gs)
     let t = demand(EqualityWitness(lhs: a, rhs: b)).erased
     let w = WitnessExpression(
-      value: .termApplication(.init(builtin: .coercion, type: t), thread.witness),
+      value: .termApplication(.init(value: .builtin(.coercion), type: t), thread.witness),
       type: b)
     return .next([thread.copy(matching: w, to: b, in: e)])
   }
@@ -4055,7 +4077,7 @@ public struct Typer {
         if name.isSimple && name.identifier == "Self" {
           let t = typeOfSelf(in: d).erased
           let u = demand(Metatype(inhabitant: t)).erased
-          candidates = [.init(reference: .builtin(.alias), type: u)]
+          candidates = [.init(reference: .builtin(.selfAlias), type: u)]
         } else {
           report(.error, "enclosing trait can only be used to refer to 'Self'", about: m)
           return context.obligations.assume(e, hasType: .error, at: site)
@@ -4207,7 +4229,7 @@ public struct Typer {
     case "Self":
       if let t = typeOfSelf(in: scopeOfUse) {
         let u = demand(Metatype(inhabitant: t))
-        return [.init(reference: .builtin(.alias), type: u.erased)]
+        return [.init(reference: .builtin(.selfAlias), type: u.erased)]
       } else {
         return []
       }
@@ -4216,19 +4238,19 @@ public struct Typer {
       let p = demand(GenericParameter.nth(0, .proper))
       let t = demand(Metatype(inhabitant: p.erased))
       let u = metatype(of: UniversalType(parameters: [p], head: t.erased))
-      return [.init(reference: .builtin(.alias), type: u.erased)]
+      return [.init(reference: .builtin(.metatypeAlias), type: u.erased)]
 
     case "Never":
       let u = demand(Metatype(inhabitant: .never))
-      return [.init(reference: .builtin(.alias), type: u.erased)]
+      return [.init(reference: .builtin(.neverAlias), type: u.erased)]
 
     case "Void":
       let t = demand(Metatype(inhabitant: .void))
-      return [.init(reference: .builtin(.alias), type: t.erased)]
+      return [.init(reference: .builtin(.voidAlias), type: t.erased)]
 
     case "Builtin":
       let t = demand(Namespace(identifier: .builtin))
-      return [.init(reference: .builtin(.alias), type: t.erased)]
+      return [.init(reference: .builtin(.module), type: t.erased)]
 
     default:
       return []
@@ -4242,12 +4264,12 @@ public struct Typer {
 
     // Are we selecting a machine type?
     else if let m = MachineType(n.identifier) {
-      return [.init(reference: .builtin(.alias), type: metatype(of: m).erased)]
+      return [.init(reference: .builtin(.type), type: metatype(of: m).erased)]
     }
 
     // Are we selecting a literal type?
     else if let m = LiteralType(n.identifier) {
-      return [.init(reference: .builtin(.alias), type: metatype(of: m).erased)]
+      return [.init(reference: .builtin(.type), type: metatype(of: m).erased)]
     }
 
     // Are we selecting a built-in function?

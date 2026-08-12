@@ -35,6 +35,13 @@ public struct Arrow: TypeTree {
     self.output = output
   }
 
+  /// Creates the type of a function accepting `inputs` and returning an instance of `output`.
+  public init(_ inputs: (AccessEffect, AnyTypeIdentity)..., to output: AnyTypeIdentity) {
+    self.init(
+      inputs: inputs.map({ (k, t) in .init(access: k, type: t) }),
+      output: output)
+  }
+
   /// Creates the type of a built-in function accepting `inputs`, which are the types of unlabeled
   /// `let` parameters, and returning an instance of `output`.
   public init<T: TypeIdentity>(_ inputs: MachineType.ID..., to output: T) {
@@ -74,6 +81,15 @@ public struct Arrow: TypeTree {
     }
 
     return i == labels.endIndex
+  }
+
+  /// Returns `self` with its parameters modified by `update`.
+  public func withInputsModified(_ update: ([Parameter]) -> [Parameter]) -> Arrow {
+    .init(
+      style: style, effect: effect,
+      environment: environment,
+      inputs: update(inputs),
+      output: output)
   }
 
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.

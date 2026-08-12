@@ -75,6 +75,78 @@ public struct SortedDictionary<Key: Comparable, Value> {
     }
   }
 
+  /// Accesses the value associated to `key`, falling back to `defaultValue` if there isn't any.
+  ///
+  /// Complexity: O(n log n) where n is the number of key/value pairs in `self`.
+  public subscript(key: Key, default defaultValue: @autoclosure () -> Value) -> Value {
+    get {
+      self[key] ?? defaultValue()
+    }
+    _modify {
+      if let k = keys.firstIndex(of: key) {
+        yield &values[k]
+      } else {
+        var v = defaultValue()
+        defer {
+          let (_, k) = keys.index(insertingIfAbsent: key)
+          values.insert(v, at: k)
+        }
+        yield &v
+      }
+    }
+  }
+
+  /// Returns a dictionary with the contents of `self` merged with the contents of `other`, using
+  /// `combine` to determine the values of duplicate keys.
+  ///
+  /// Complexity: O(n) where n is the number of key/value pairs in the largest dictionary.
+  public func merging(
+    _ other: Self, uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) rethrows -> Self {
+    // Trivial if either side is empty.
+    if other.isEmpty { return self } else if self.isEmpty { return other }
+
+    // Otherwise, merge the contents of the RHS into the LHS.
+    var keys = ContiguousArray<Key>()
+    let c = Swift.max(self.count, other.count)
+    keys.reserveCapacity(c)
+    var values = ContiguousArray<Value>()
+    values.reserveCapacity(c)
+
+    var i = 0
+    var j = 0
+    while true {
+      if i == self.count {
+        keys.append(contentsOf: other.keys[j...])
+        values.append(contentsOf: other.values[j...])
+        break
+      } else if j == other.count {
+        keys.append(contentsOf: self.keys[i...])
+        values.append(contentsOf: self.values[i...])
+        break
+      } else if self.keys[i] < other.keys[j] {
+        keys.append(self.keys[i])
+        values.append(self.values[i])
+        i += 1
+      } else if self.keys[i] > other.keys[j] {
+        keys.append(other.keys[j])
+        values.append(other.values[j])
+        j += 1
+      } else {
+        keys.append(self.keys[i])
+        try values.append(combine(self.values[i], other.values[j]))
+        i += 1
+        j += 1
+      }
+    }
+
+    assert(keys.count == values.count)
+    var result = Self()
+    result.keys = .init(sorted: keys)
+    result.values = values
+    return result
+  }
+
 }
 
 extension SortedDictionary: ExpressibleByDictionaryLiteral {

@@ -70,7 +70,8 @@ extension IRProperty: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "property \"\(printer.program.nameOrTag(of: property))\" of \(printer.show(record))"
+    let n = printer.program.nameOrTag(of: property)
+    return "property \"\(n)\" of \(printer.show(record)) as \(printer.show(propertyType))"
   }
 
 }
