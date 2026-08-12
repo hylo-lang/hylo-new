@@ -1,0 +1,1 @@
+fun identity(x: sink let Int) -> Int { x }

@@ -1,0 +1,3 @@
+negative/illegal-remote-type.hylo:1.22-25: error: type expression may have at most one access effect
+fun identity(x: sink let Int) -> Int { x }
+                     ~~~
