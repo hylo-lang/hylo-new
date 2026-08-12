@@ -15,14 +15,22 @@ public struct IRSubfield: Instruction {
   public let path: IndexPath
 
   /// The type of the subfield being accessed.
-  public let typeOfSubfield: AnyTypeIdentity
+  public let subfieldType: AnyTypeIdentity
+
+  /// The declaration of the entity that the subfield represents, if any.
+  public let declaration: DeclarationIdentity?
 
   /// Creates an instance with the given properties.
-  public init(base: IRValue, path: IndexPath, typeOfSubfield: AnyTypeIdentity, anchor: Anchor) {
+  public init(
+    base: IRValue, path: IndexPath, subfieldType: AnyTypeIdentity,
+    declaration: DeclarationIdentity?,
+    anchor: Anchor
+  ) {
     self.operands = [base]
     self.anchor = anchor
     self.path = path
-    self.typeOfSubfield = typeOfSubfield
+    self.subfieldType = subfieldType
+    self.declaration = declaration
   }
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
@@ -30,7 +38,8 @@ public struct IRSubfield: Instruction {
     self.operands = [properties[other.base]]
     self.anchor = properties.anchor(other)
     self.path = other.path
-    self.typeOfSubfield = other.typeOfSubfield
+    self.subfieldType = other.subfieldType
+    self.declaration = other.declaration
   }
 
   /// The address of the record containing the subfield whose address is computed.
@@ -40,7 +49,7 @@ public struct IRSubfield: Instruction {
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .place(typeOfSubfield)
+    .place(subfieldType)
   }
 
   /// `true`.
@@ -53,7 +62,7 @@ extension IRSubfield: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "subfield \(printer.show(base)) at \(list: path) as \(printer.show(typeOfSubfield))"
+    "subfield \(printer.show(base)) at \(list: path) as \(printer.show(subfieldType))"
   }
 
 }

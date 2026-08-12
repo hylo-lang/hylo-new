@@ -1373,7 +1373,7 @@ internal struct IREmitter {
 
       // Is `d` a stored property of a type whose layout is visible?
       if let i = storedPropertyIndex(of: d, in: program.parent(containing: e)) {
-        return lowering(e, { $0._subfield(q, at: [i]) })
+        return lowering(e, { $0._subfield(q, at: [i], declaredBy: d) })
       } else {
         return lowering(e, { $0._property(d, of: q, withType: t) })
       }
@@ -2215,17 +2215,19 @@ internal struct IREmitter {
   }
 
   /// Inserts a `subfield` instruction.
-  internal mutating func _subfield(_ base: IRValue, at path: IndexPath) -> IRValue {
+  internal mutating func _subfield(
+    _ base: IRValue, at path: IndexPath, declaredBy declaration: DeclarationIdentity? = nil
+  ) -> IRValue {
     // The instruction is equivalent to the identity if the path is empty.
     if path.isEmpty { return base }
 
     let (root, _) = currentFunction.result(of: base) ?? badOperand()
-    let typeOfSubfield = program.withTyper(typing: module) { (tp) in
+    let subfieldType = program.withTyper(typing: module) { (tp) in
       tp.field(of: root, at: path)
     }
 
     let s = IRSubfield(
-      base: base, path: path, typeOfSubfield: typeOfSubfield!,
+      base: base, path: path, subfieldType: subfieldType!, declaration: declaration,
       anchor: currentAnchor)
     return insert(s)!
   }

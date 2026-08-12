@@ -15,10 +15,14 @@ extension IRFunction {
   /// Combines `i` with its user if there is only one.
   private mutating func fold(_ i: IRSubfield.ID) {
     let s = at(i)
-    if let u = uses[.register(i.erased)]?.uniqueElement, let t = at(u.user) as? IRSubfield {
+    if
+      let u = uses[.register(i.erased)]?.uniqueElement,
+      let t = at(u.user) as? IRSubfield,
+      s.declaration == t.declaration
+    {
       let folded = IRSubfield(
         base: s.base, path: s.path.appending(contentsOf: t.path),
-        typeOfSubfield: t.typeOfSubfield, anchor: t.anchor)
+        subfieldType: t.subfieldType, declaration: t.declaration, anchor: t.anchor)
       replace(u.user, with: folded)
       remove(i.erased)
     }
