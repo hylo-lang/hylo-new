@@ -13,6 +13,9 @@ extension IRFunction {
   /// deallocated or flows into a `set` access. This situation may occur when deinitialization was
   /// left implicit during IR lowering. These new instructions are emitted into `m`, using `typer`
   /// to resolve implementations.
+  ///
+  /// Lifetime normalization is part of the mandatory transformation pipeline and is expected to
+  /// run after access reification and last use analysis.
   internal mutating func normalizeLifetimes(
     emittingInto m: Module.ID, using typer: inout Typer
   ) -> Bool {
@@ -235,7 +238,7 @@ private struct Transfer: AbstractTransferFunction {
 
     // Check if the access is violating immutability. If it is, then report an illegal access and
     // skip further changes to the context to avoid cascading diagnostics.
-    let isLegal = (k == .let) || !f.isBoundImmutably(access.source)
+    let isLegal = upholdsBindingImmutability(i, in: f)
     if !isLegal {
       report(program.illegalAccess(k, at: access.anchor))
     }
@@ -691,6 +694,82 @@ private struct Transfer: AbstractTransferFunction {
       return us
     case .mixed(let ps):
       return .init(combining: ps.map(consumers(_:)))
+    }
+  }
+
+  /// Returns the declaration binding `v`, which computes the source of an access in `f`, or `nil`
+  /// if such a declaration cannot be identified.
+  private func binding(declaring v: IRValue, in f: IRFunction) -> VariableDeclaration.ID? {
+    if let d = f.declaration(v) {
+      return program.cast(d, to: VariableDeclaration.self)
+    } else if let r = v.register, let s = f.at(r) as? IRSubfield, let d = s.declaration {
+      return program.cast(d, to: VariableDeclaration.self)
+    } else {
+      return nil
+    }
+  }
+
+  /// Returns the introducer of the binding associated with `v`, which computes the source of an
+  /// access in `f`, along with a value defining the place referred to by `v`.
+  private func introducer(
+    binding v: IRValue, in f: IRFunction
+  ) -> (BindingPattern.Introducer?, IRValue) {
+    var s = v
+    while true {
+      // Is `s` attached to a binding declaration?
+      if let b = binding(declaring: s, in: f).flatMap(program.bindingDeclaration(containing:)) {
+        let k = program[program[b].pattern].introducer.value
+        if (k == .let) && (!program.isLocal(b) || program.isMember(b)) {
+          return (.sinklet, s)
+        } else {
+          return (k, s)
+        }
+      }
+
+      // Should we look further?
+      else if let r = s.register.flatMap(f.source(_:)) { s = r }
+
+      // No binding declaration.
+      else { return (nil, s) }
+    }
+  }
+
+  /// Returns `true` iff `i`, which is in `f`, is not a mutable access on an immutable binding.
+  ///
+  /// At a high level, this method checks whether an access is "syntactically" legal, verifying
+  /// that a mutating capability cannot be formed on a place represented by an immutable binding.
+  /// Control flow is taken into account when the place is referred to by a `sink let` binding. In
+  /// this case, a `set` access is legal only if the source is fully uninitialized, and a `sink`
+  /// access is legal only if the source is fully initialized.
+  private mutating func upholdsBindingImmutability(_ i: IRAccess.ID, in f: IRFunction) -> Bool {
+    let s = f.at(i)
+    let k = s.capabilities.uniqueElement!
+
+    // A `let` access never violates immutability.
+    if k == .let { return true }
+
+    // Look for the binding declaration associated with the source of the access, if any.
+    switch introducer(binding: s.source, in: f) {
+    case (.some(.let), _):
+      return false
+
+    case (.some(.sinklet), let source):
+      // An `inout` access to a `sink let` binding is always invalid.
+      if (k == .inout) || f.isBoundImmutably(source) { return false }
+
+      // Otherwise validity depends on the sequencing of the access relative to other uses.
+      let a = context.locals[s.source]!.place!
+      let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
+      if k == .sink {
+        return o.value == .uniform(.initialized)
+      }
+      if k == .set {
+        return o.value == .uniform(.uninitialized)
+      }
+      unreachable()
+
+    case (_, let source):
+      return !f.isBoundImmutably(source)
     }
   }
 

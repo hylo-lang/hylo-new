@@ -1,0 +1,15 @@
+negative/illegal-sink-let.hylo:11.17-18: error: illegal 'set' access
+      &self.x = 1     // error
+                ^
+negative/illegal-sink-let.hylo:21.15-16: error: illegal 'set' access
+    &self.x = 0       // error
+              ^
+negative/illegal-sink-let.hylo:33.14-15: error: illegal 'set' access
+      &w.1 = 1        // error
+             ^
+negative/illegal-sink-let.hylo:34.14-15: error: illegal 'set' access
+      &w.0 = 2        // error
+             ^
+negative/illegal-sink-let.hylo:36.9-10: error: illegal 'sink' access
+    _ = z             // error
+        ^

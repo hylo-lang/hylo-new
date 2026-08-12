@@ -1832,8 +1832,15 @@ public struct Parser {
   ) throws -> RemoteTypeExpression.ID {
     let k = parseAccessEffect()
     let e = try parseExpression(in: &file)
-    return file.insert(
-      RemoteTypeExpression(access: k, projectee: e, site: k.site.extended(upTo: position.index)))
+    let s = k.site.extended(upTo: position.index)
+
+    if let n = file[e] as? RemoteTypeExpression {
+      report(.init("type expression may have at most one access effect", at: n.access.site))
+      let r = RemoteTypeExpression(access: k, projectee: n.projectee, site: s)
+      return file.replace(e, with: r)
+    } else {
+      return file.insert(RemoteTypeExpression(access: k, projectee: e, site: s))
+    }
   }
 
   /// Parses an access effect.

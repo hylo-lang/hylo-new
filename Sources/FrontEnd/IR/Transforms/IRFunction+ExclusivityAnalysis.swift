@@ -28,7 +28,7 @@ extension IRFunction {
 
   /// Returns the access instruction from which `i` reborrows, if any.
   fileprivate func reborrowedSource(_ i: IRAccess.ID) -> IRAccess.ID? {
-    source(i).register.flatMap({ (r) in cast(r, to: IRAccess.self) })
+    root(i).register.flatMap({ (r) in cast(r, to: IRAccess.self) })
   }
 
   /// Returns `true` iff it is legal to form an immutable access on a place bound by `bs` with an
