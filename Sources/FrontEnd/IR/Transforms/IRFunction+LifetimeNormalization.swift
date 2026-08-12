@@ -694,28 +694,27 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Returns the pattern binding declaration introducing the entity referred to by `v`, which is
-  /// the source of an access in `f`, or `nil` if such a declaration cannot be identified.
-  private func binding(declaring v: IRValue, in f: IRFunction) -> BindingDeclaration.ID? {
-    let b: VariableDeclaration.ID? = if let d = f.declaration(v) {
-      program.cast(d, to: VariableDeclaration.self)
+  /// Returns the declaration binding `v`, which computes the source of an access in `f`, or `nil`
+  /// if such a declaration cannot be identified.
+  private func binding(declaring v: IRValue, in f: IRFunction) -> VariableDeclaration.ID? {
+    if let d = f.declaration(v) {
+      return program.cast(d, to: VariableDeclaration.self)
     } else if let r = v.register, let s = f.at(r) as? IRSubfield, let d = s.declaration {
-      program.cast(d, to: VariableDeclaration.self)
+      return program.cast(d, to: VariableDeclaration.self)
     } else {
-      nil
+      return nil
     }
-    return b.flatMap(program.bindingDeclaration(containing:))
   }
 
-  /// Returns the introducer of the binding associated with `v`, which is the source of an access
-  /// in `f`, along with a value defining the place referred to by `v`.
+  /// Returns the introducer of the binding associated with `v`, which computes the source of an
+  /// access in `f`, along with a value defining the place referred to by `v`.
   private func introducer(
     binding v: IRValue, in f: IRFunction
   ) -> (BindingPattern.Introducer?, IRValue) {
     var s = v
     while true {
       // Is `s` attached to a binding declaration?
-      if let b = binding(declaring: s, in: f) {
+      if let b = binding(declaring: s, in: f).flatMap(program.bindingDeclaration(containing:)) {
         let k = program[program[b].pattern].introducer.value
         if (k == .let) && (!program.isLocal(b) || program.isMember(b)) {
           return (.sinklet, s)
