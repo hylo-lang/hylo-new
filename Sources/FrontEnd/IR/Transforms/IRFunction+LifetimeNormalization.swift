@@ -725,18 +725,7 @@ private struct Transfer: AbstractTransferFunction {
       }
 
       // Should we look further?
-      else if let r = s.register {
-        switch f.tag(of: r) {
-        case IRCase.self:
-          s = (f.at(r) as! IRCase).source
-        case IRPlaceCast.self:
-          s = (f.at(r) as! IRPlaceCast).source
-        case IRSubfield.self:
-          s = (f.at(r) as! IRSubfield).base
-        default:
-          return (nil, s)
-        }
-      }
+      else if let r = s.register.flatMap(f.source(_:)) { s = r }
 
       // No binding declaration.
       else { return (nil, s) }
