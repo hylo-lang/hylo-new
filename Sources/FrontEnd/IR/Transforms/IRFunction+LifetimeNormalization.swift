@@ -235,7 +235,7 @@ private struct Transfer: AbstractTransferFunction {
 
     // Check if the access is violating immutability. If it is, then report an illegal access and
     // skip further changes to the context to avoid cascading diagnostics.
-    let isLegal = isUpholdingImmutability(i, in: f)
+    let isLegal = upholdsBindingImmutability(i, in: f)
     if !isLegal {
       report(program.illegalAccess(k, at: access.anchor))
     }
@@ -739,7 +739,7 @@ private struct Transfer: AbstractTransferFunction {
   /// Control flow is taken into account when the place is referred to by a `sink let` binding. In
   /// this case, a `set` access is legal only if the source is fully uninitialized, and a `sink`
   /// access is legal only if the source is fully initialized.
-  private mutating func isUpholdingImmutability(_ i: IRAccess.ID, in f: IRFunction) -> Bool {
+  private mutating func upholdsBindingImmutability(_ i: IRAccess.ID, in f: IRFunction) -> Bool {
     let s = f.at(i)
     let k = s.capabilities.uniqueElement!
 
