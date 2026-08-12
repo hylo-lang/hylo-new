@@ -235,7 +235,7 @@ private struct Transfer: AbstractTransferFunction {
 
     // Check if the access is violating immutability. If it is, then report an illegal access and
     // skip further changes to the context to avoid cascading diagnostics.
-    let isLegal = (k == .let) || !f.isBoundImmutably(access.source)
+    let isLegal = isUpholdingImmutability(i, in: f)
     if !isLegal {
       report(program.illegalAccess(k, at: access.anchor))
     }
@@ -691,6 +691,88 @@ private struct Transfer: AbstractTransferFunction {
       return us
     case .mixed(let ps):
       return .init(combining: ps.map(consumers(_:)))
+    }
+  }
+
+  /// Returns the pattern binding declaration introducing the entity referred to by `v`, which is
+  /// the source of an access in `f`, or `nil` if such a declaration cannot be identified.
+  private func binding(declaring v: IRValue, in f: IRFunction) -> BindingDeclaration.ID? {
+    let b: VariableDeclaration.ID? = if let d = f.declaration(v) {
+      program.cast(d, to: VariableDeclaration.self)
+    } else if let r = v.register, let s = f.at(r) as? IRSubfield, let d = s.declaration {
+      program.cast(d, to: VariableDeclaration.self)
+    } else {
+      nil
+    }
+    return b.flatMap(program.bindingDeclaration(containing:))
+  }
+
+  /// Returns the introducer of the binding associated with `v`, which is the source of an access
+  /// in `f`, along with a value defining the place referred to by `v`.
+  private func introducer(
+    binding v: IRValue, in f: IRFunction
+  ) -> (BindingPattern.Introducer?, IRValue) {
+    var s = v
+    while true {
+      // Is `s` attached to a binding declaration?
+      if let b = binding(declaring: s, in: f) {
+        let k = program[program[b].pattern].introducer.value
+        if (k == .let) && (!program.isLocal(b) || program.isMember(b)) {
+          return (.sinklet, s)
+        } else {
+          return (k, s)
+        }
+      }
+
+      // Should we look further?
+      else if let r = s.register {
+        switch f.tag(of: r) {
+        case IRCase.self:
+          s = (f.at(r) as! IRCase).source
+        case IRPlaceCast.self:
+          s = (f.at(r) as! IRPlaceCast).source
+        case IRSubfield.self:
+          s = (f.at(r) as! IRSubfield).base
+        default:
+          return (nil, s)
+        }
+      }
+
+      // No binding declaration.
+      else { return (nil, s) }
+    }
+  }
+
+  /// Returns `true` iff `i`, which is in `f`, is not a mutable access on an immutable binding.
+  private mutating func isUpholdingImmutability(_ i: IRAccess.ID, in f: IRFunction) -> Bool {
+    let s = f.at(i)
+    let k = s.capabilities.uniqueElement!
+
+    // A `let` access never violates immutability.
+    if k == .let { return true }
+
+    // Look for the binding declaration associated with the source of the access, if any.
+    switch introducer(binding: s.source, in: f) {
+    case (.some(.let), _):
+      return false
+
+    case (.some(.sinklet), let source):
+      // An `inout` access to a `sink let` binding is always invalid.
+      if (k == .inout) || f.isBoundImmutably(source) { return false }
+
+      // Otherwise validity depends on the sequencing of the access relative to other uses.
+      let a = context.locals[s.source]!.place!
+      let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
+      if k == .sink {
+        return o.value == .uniform(.initialized)
+      }
+      if k == .set {
+        return o.value == .uniform(.uninitialized)
+      }
+      unreachable()
+
+    case (_, let source):
+      return !f.isBoundImmutably(source)
     }
   }
 

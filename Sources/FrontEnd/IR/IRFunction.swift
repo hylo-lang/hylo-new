@@ -271,6 +271,8 @@ public struct IRFunction: Sendable {
     var s = at(i).source
     while let r = s.register {
       switch tag(of: r) {
+      case IRCase.self:
+        s = (at(r) as! IRCase).source
       case IRPlaceCast.self:
         s = (at(r) as! IRPlaceCast).source
       case IRSubfield.self:
