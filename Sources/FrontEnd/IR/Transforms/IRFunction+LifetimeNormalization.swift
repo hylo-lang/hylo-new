@@ -733,6 +733,12 @@ private struct Transfer: AbstractTransferFunction {
   }
 
   /// Returns `true` iff `i`, which is in `f`, is not a mutable access on an immutable binding.
+  ///
+  /// At a high level, this method checks whether an access is "syntactically" legal, verifying
+  /// that a mutating capability cannot be formed on a place represented by an immutable binding.
+  /// Control flow is taken into account when the place is referred to by a `sink let` binding. In
+  /// this case, a `set` access is legal only if the source is fully uninitialized, and a `sink`
+  /// access is legal only if the source is fully initialized.
   private mutating func isUpholdingImmutability(_ i: IRAccess.ID, in f: IRFunction) -> Bool {
     let s = f.at(i)
     let k = s.capabilities.uniqueElement!
