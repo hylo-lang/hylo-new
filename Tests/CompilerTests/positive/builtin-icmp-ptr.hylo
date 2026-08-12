@@ -1,0 +1,14 @@
+public fun main() -> Int32 {
+  var x = (3, 4)
+  var three = Builtin.address(of: x.0)
+  var four = Builtin.address(of: x.1)
+  precondition(Bool(value: Builtin.icmp_eq_ptr(three, three)))
+  precondition(Bool(value: Builtin.icmp_eq_ptr(four, four)))
+
+  precondition(!Bool(value: Builtin.icmp_eq_ptr(three, four)))
+  precondition(!Bool(value: Builtin.icmp_eq_ptr(four, three)))
+
+  precondition(Bool(value: Builtin.icmp_ult_ptr(three, four)))
+  precondition(!Bool(value: Builtin.icmp_ult_ptr(four, three)))
+  return 0
+}

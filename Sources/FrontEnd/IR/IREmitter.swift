@@ -1382,7 +1382,8 @@ internal struct IREmitter {
       return lowering(e, { $0._emitTypeWitness(of: t) })
 
     default:
-      fatalError()
+      fatalError(
+        "Lowering not implemented for \(program.show(program.declaration(referredToBy: e)))")
     }
   }
 
