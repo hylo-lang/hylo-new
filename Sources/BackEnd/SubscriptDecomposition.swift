@@ -115,6 +115,11 @@ extension FunctionGenerationContext {
     (ir.tag(of: y) == IRProject.self) && result.isRamp
   }
 
+  /// Returns `true` iff `p` is dominated by a `yield` instruction.
+  fileprivate func precedesSlide(_ p: RegionPrologue) -> Bool {
+    ir.tag(of: p.boundary) == IRYield.self
+  }
+
   /// Allocates a buffer of pointers, initialized with the values of all captures in `prologue`.
   fileprivate mutating func saveCaptures(_ prologue: RegionPrologue) -> LLVMValue {
     let frame = module.llvm.insertAlloca(prologue.captureFrame, atEntryOf: llvm).v
@@ -284,8 +289,19 @@ extension Program {
     // Incorporate the contents of the slide.
     let reachable = nested.ir.blocks(reachableFrom: entryInSource)
     for b in nested.dominance where reachable.contains(b) && !nested.factoredOut.contains(b) {
-      let i = nested.firstInstruction(in: b, dominatedBy: prologue.boundary)!
-      incorporate(from: i, in: &nested)
+      let start = nested.firstInstruction(in: b, dominatedBy: prologue.boundary)!
+      let v = nested.demandBasicBlock(nested.ir.block(defining: start))
+      nested.insertionPoint = nested.module.llvm.endOf(v)
+
+      var next: AnyInstructionIdentity? = start
+      while let i = next {
+        // Closing projection requires special handling when it occurs in a slide.
+        if let n = nested.ir.cast(i, to: IRProject.End.self) {
+          next = incorporate(n, dominatedBy: prologue, in: &nested)
+        } else {
+          next = incorporate(i, in: &nested)
+        }
+      }
     }
 
     ctx = nested.release()
@@ -367,7 +383,6 @@ extension Program {
     var work = nested.dominance.region(dominatedBy: entryInSource)
     while let b = work.next() {
       if nested.factoredOut.contains(b) { continue }
-
       let v = nested.demandBasicBlock(b)
       nested.insertionPoint = nested.module.llvm.endOf(v)
 
@@ -380,6 +395,7 @@ extension Program {
       coveredYield = coveredYield || source.contains(in: b, IRYield.self)
     }
 
+    covered.formUnion(nested.factoredOut)
     ctx = nested.release()
 
     // If a yield statement was covered, then all blocks reachable from the boundary have been
@@ -442,7 +458,7 @@ extension Program {
   }
 
   /// Generates the LLVM IR code corresponding to `i`, which is the end of a projection occurring
-  /// in the plateau dominated by `p`.
+  /// in the slide or plateau dominated by `p`.
   private func incorporate(
     _ i: IRProject.End.ID, dominatedBy p: RegionPrologue,
     in ctx: inout FunctionGenerationContext
@@ -464,7 +480,11 @@ extension Program {
 
     // The start of the projection has been captured.
     else if let c = p.captureIndex(of: s.start) {
-      let x0 = ctx.llvm.unsafe[].parameters[1]
+      // The position of the parameters representing the captures from the prologue depends on the
+      // kind of continuation behind compiled.
+      let captureIndex = ctx.precedesSlide(p) ? 0 : 1
+
+      let x0 = ctx.llvm.unsafe[].parameters[captureIndex]
       let x1 = ctx.module.llvm.insertGetElementPointerInBounds(
         of: x0, typed: p.captureFrame, indices: [0, 1, c], indexType: ctx.module.llvm.i32,
         at: ctx.insertionPoint!)
@@ -485,21 +505,21 @@ extension Program {
   /// Generates the LLVM IR code corresponding to `i`, which is the end of a projection occurring
   /// in the plateau dominated by `p`.
   private func incorporate(
-    _ i: IRSwitch.ID, dominatedBy p: RegionPrologue,
-    in ctx: inout FunctionGenerationContext
-  ) -> AnyInstructionIdentity? {
-    fatalError()
-  }
-
-  /// Generates the LLVM IR code corresponding to `i`, which is the end of a projection occurring
-  /// in the plateau dominated by `p`.
-  private func incorporate(
     _ i: IRReturn.ID, dominatedBy p: RegionPrologue,
     in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let zero = ctx.module.llvm.i32.unsafe[].constant(0)
     ctx.module.llvm.insertReturn(zero, at: ctx.insertionPoint!)
     return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`, which is the end of a projection occurring
+  /// in the plateau dominated by `p`.
+  private func incorporate(
+    _ i: IRSwitch.ID, dominatedBy p: RegionPrologue,
+    in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    fatalError()
   }
 
   /// Extends `ctx` to map each dominating definition in `prologue` to its value in `captures`,

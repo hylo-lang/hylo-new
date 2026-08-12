@@ -146,7 +146,7 @@ extension Program {
   /// moved back to its original position.
   ///
   /// - Requires: All instructions dominating `start` have been incorporated.
-  internal mutating func incorporate(
+  private mutating func incorporate(
     from start: AnyInstructionIdentity, in ctx: inout FunctionGenerationContext
   ) {
     let v = ctx.demandBasicBlock(ctx.ir.block(defining: start))
