@@ -22,7 +22,7 @@ struct S {
     &self.y = 1       // OK (assignment)
   }
 
-  fun f0() sink -> Int {
+  fun f1() sink -> Int {
     self.x            // OK (move out)
   }
 
