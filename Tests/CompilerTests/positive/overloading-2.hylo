@@ -1,0 +1,25 @@
+//! stage:typing
+
+struct S is Deinitializable {
+
+  public var value: Builtin.ptr
+
+  public memberwise init
+
+  public fun infix+ (x: UInt32) -> Self {
+    Self(value: self.value)
+  }
+
+  public fun infix+ (x: Int) -> Self {
+    Self(value: self.value)
+  }
+
+}
+
+fun use(x: Builtin.ptr) {}
+
+fun use(x: UInt32) {}
+
+fun f(x: S) {
+  use((x + 1).value)
+}
