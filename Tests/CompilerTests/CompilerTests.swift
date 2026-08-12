@@ -63,7 +63,7 @@ final class CompilerTests: XCTestCase {
 
     /// Returns where to save the generated executable upon failure.
     func executableDestination() -> URL {
-      let suffix = Host.nativeExecutableSuffix
+      let suffix = Host.binaryExecutableSuffix
       let tag = ArtifactTag.executable
       if isPackage {
         return root.appending(component: ".\(tag).observed\(suffix)")
