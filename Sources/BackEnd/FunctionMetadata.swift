@@ -11,7 +11,7 @@ internal struct FunctionMetadata {
 
   /// `true` iff the function being compiled is a subscript ramp.
   ///
-  /// This property is `if` when `value` represents either the entry point of a subscript or some
+  /// This property is `true` iff `value` represents either the entry point of a subscript or some
   /// plateau covering a projection whose start dominates a `yield` instruction, in which case
   /// `isPlateau` is also `true`.
   internal let isRamp: Bool
