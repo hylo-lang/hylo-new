@@ -15,7 +15,7 @@ extension Program {
 
   /// Returns `true` iff `lhs` is preferred over `rhs` for overload resolution.
   internal func isPreferred(
-    _ lhs: NameResolutionCandidate, other rhs: NameResolutionCandidate,
+    _ lhs: NameResolutionCandidate, over rhs: NameResolutionCandidate,
     in scopeOfUse: ScopeIdentity
   ) -> StrictOrdering {
     let d: StrictOrdering = switch (lhs.reference, rhs.reference) {
