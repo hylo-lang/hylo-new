@@ -1,3 +1,5 @@
+import Utilities
+
 /// A candidate for resolving a name component.
 internal struct NameResolutionCandidate {
 
@@ -15,28 +17,27 @@ extension Program {
   internal func isPreferred(
     _ lhs: NameResolutionCandidate, other rhs: NameResolutionCandidate,
     in scopeOfUse: ScopeIdentity
-  ) -> Bool {
-    // No candidate is cheaper to elaborate?
-    if lhs.reference.elaborationCost == rhs.reference.elaborationCost {
-      switch (lhs.reference, rhs.reference) {
-      case (.inherited(_, let a, _), .inherited(_, let b, _)):
-        // Members declared in extension are preferred over members inherited by conformance. The
-        // rationale is that the former may serve as implementations for the latter.
-        if isExtensionMember(a) && !isExtensionMember(b) {
-          return true
-        } else {
-          return compareLexicalDistances(a, b, relativeTo: scopeOfUse) == .ascending
-        }
+  ) -> StrictOrdering {
+    let d: StrictOrdering = switch (lhs.reference, rhs.reference) {
+    case (.inherited(_, let a, _), .inherited(_, let b, _)):
+      // Members declared in extension are preferred over members inherited by conformance. The
+      // rationale is that the former may serve as implementations for the latter.
+      if isExtensionMember(a) && !isExtensionMember(b) {
+        .ascending
+      } else {
+        compareLexicalDistances(a, b, relativeTo: scopeOfUse)
+      }
 
-      default:
-        return false
+    default:
+      if let a = lhs.reference.target, let b = rhs.reference.target {
+        compareLexicalDistances(a, b, relativeTo: scopeOfUse)
+      } else {
+        .equal
       }
     }
 
-    // Return `true` iff `lhs` is cheaper to elaborate.
-    else {
-      return lhs.reference.elaborationCost < rhs.reference.elaborationCost
-    }
+    return d.inequalElse(
+      .init(between: lhs.reference.elaborationCost, and: rhs.reference.elaborationCost))
   }
 
 }
