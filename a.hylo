@@ -1,0 +1,8 @@
+struct  X{ 
+
+  fun f() auto -> Int {
+    inout { &(1 as Int) }
+    let { (1 as Int) }
+  }
+
+}

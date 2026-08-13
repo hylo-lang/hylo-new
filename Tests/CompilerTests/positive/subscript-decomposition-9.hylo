@@ -1,0 +1,10 @@
+subscript id(x: Int32) -> Int32 { yield x }
+
+// Two projections start in the same basic block, so the plateau of the outer one contains the
+// plateau of the inner one. The blocks that the inner plateau covers must be reported as covered
+// by the outer plateau as well, or they get compiled a second time, in a context where the
+// definitions they use are not visible.
+public fun main() {
+  let a: Int32 = 23
+  precondition(id[id[a]] == (23 as Int32))
+}
