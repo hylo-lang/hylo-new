@@ -1165,6 +1165,10 @@ public struct Typer {
   }
 
   /// Type checks `s`.
+  ///
+  /// `s` occurs as the else branch of a conditional statement occurring as a statement. If the
+  /// branch is another conditional expression (i.e., `... if else ...`), then that expression is
+  /// also checked as a statement.
   private mutating func check(_ s: If.ElseIdentity) {
     if let n = program.cast(s, to: If.self) {
       checkAsStatement(n)
