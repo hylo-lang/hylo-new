@@ -279,18 +279,24 @@ extension Program {
   internal func undefinedSymbol(
     _ n: Name, memberOf t: AnyTypeIdentity? = nil, at site: SourceSpan
   ) -> Diagnostic {
-    let message: String = {
-      if let u = t {
-        if let m = types[u] as? Metatype {
-          return format("type '%T' has no static member '%S'", [m.inhabitant, n])
-        } else {
-          return format("type '%T' has no member '%S'", [u, n])
-        }
+    if let u = t {
+      let message = if let m = types[u] as? Metatype {
+        format("type '%T' has no static member '%S'", [m.inhabitant, n])
       } else {
-        return "undefined symbol '\(n)'"
+        format("type '%T' has no member '%S'", [u, n])
       }
-    }()
-    return .init(.error, message, at: site)
+
+      // If `*/` occurs in a position where an operator was expected, it may be that the author
+      // intended to close a block comment.
+      var note: Diagnostic? = nil
+      if (n.identifier == "*/") && (n.notation != .none) {
+        note = .init(.note, "is that an unmatched block comment delimiter?", at: site)
+      }
+
+      return .init(.error, message, at: site, notes: Array(contentsOf: note))
+    } else {
+      return .init(.error, "undefined symbol '\(n)'", at: site)
+    }
   }
 
   /// Returns an error diagnosing an undefined symbol.
