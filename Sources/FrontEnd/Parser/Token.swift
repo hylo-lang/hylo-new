@@ -122,7 +122,7 @@ public struct Token: Hashable, Sendable {
   /// `true` iff `self` may be at the beginning of a declaration.
   public var isDeclarationHead: Bool {
     switch tag {
-    case .at, .case, .fun, .given, .import, .struct, .subscript, .trait, .type:
+    case .at, .case, .extension, .fun, .given, .import, .struct, .subscript, .trait, .type:
       return true
     default:
       return isBindingIntroducer || isDeclarationModifier
