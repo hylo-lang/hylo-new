@@ -78,6 +78,25 @@ public struct TypeArguments: Sendable {
     .init(contents.mapValues(transform))
   }
 
+  /// Returns `self` concatenated with `other`.
+  ///
+  /// - Requires: No parameter assigned in `self` is also assigned in `other`.
+  public func extended(with other: TypeArguments) -> TypeArguments {
+    self.extended(with: other.contents.lazy.map({ (p, a) in (p, a) }))
+  }
+
+  /// Returns `self` concatenated with the contents of `other`.
+  ///
+  /// - Requires: No parameter assigned in `self` occurs in `other`.
+  public func extended<S: Sequence<(GenericParameter.ID, AnyTypeIdentity)>>(
+    with other: S
+  ) -> TypeArguments {
+    let cs = self.contents.merging(other) { (_, _) in
+      preconditionFailure("duplicate key/value pair")
+    }
+    return .init(cs)
+  }
+
 }
 
 extension TypeArguments: ExpressibleByDictionaryLiteral {
