@@ -287,7 +287,7 @@ extension Memory {
 
   /// Stores `v` at `p`.
   ///
-  /// - Precondition: `v` is an instance of type `p.type`.
+  /// - Precondition: `v` is an instance of type `p.location.type`.
   public mutating func store(_ v: RuntimeValue, at p: Access<Memory.TypedAddress>) throws {
     // TODO: throw if it is illegal to write to `p` using its permissions.
     // TODO: throw if location pointed by `p` is not fully uninitialized.
