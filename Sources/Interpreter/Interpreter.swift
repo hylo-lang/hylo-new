@@ -399,7 +399,7 @@ extension Program {
 
 extension IRAccess {
   /// The associated permissions and obligations.
-  var effect: AccessEffect {
+  var finalCapability: AccessEffect {
     // Because IR analysis should ensure single effect.
     // See: Sources/FrontEnd/IR/Instructions/IRAccess.swift.
     precondition(capabilities.count == 1)
