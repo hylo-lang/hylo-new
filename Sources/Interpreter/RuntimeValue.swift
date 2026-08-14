@@ -37,12 +37,7 @@ extension RuntimeValue {
     precondition(b > 0)
     precondition(a > 0)
 
-    var unsignedRepresentation = n.magnitude
-    if n.sign == .minus {
-      let maximumUnsignedValue = BigUInt(1) << (8 * b)
-      unsignedRepresentation = maximumUnsignedValue - unsignedRepresentation
-    }
-
+    var unsignedRepresentation = twosComplementRepresentation(n, size: b)
     var bytes = [UInt8](repeating: 0, count: b)
     for i in 0..<b {
       bytes[i] = UInt8(truncatingIfNeeded: unsignedRepresentation)
@@ -51,4 +46,16 @@ extension RuntimeValue {
 
     self.init(bytes: bytes, havingAlignment: a)
   }
+}
+
+/// Returns the unsigned representation of `n` using `b` bytes in two's-complement form.
+///
+/// - Precondition: `n` must be representable as a signed integer in `b` bytes.
+func twosComplementRepresentation(_ n: BigInt, size b: Int) -> BigUInt {
+  var unsignedRepresentation = n.magnitude
+  if n.sign == .minus {
+    let maximumUnsignedValue = BigUInt(1) << (8 * b)
+    unsignedRepresentation = maximumUnsignedValue - unsignedRepresentation
+  }
+  return unsignedRepresentation
 }

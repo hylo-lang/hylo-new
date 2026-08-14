@@ -240,7 +240,7 @@ public struct Interpreter {
       // TODO: add a real implementation, validating new access in memory and
       // storing the access into register.
       let p = asTypedAddress(x.source)
-      let a = Access<Memory.TypedAddress>(to: p, effect: x.effect)
+      let a = Access<Memory.TypedAddress>(to: p, effect: x.finalCapability)
       return .initializeRegister(to: .init(a))
     case is IRRegionEnd<IRAccess>:
       // TODO: add a real implementation, validating if it is safe to end the access.
