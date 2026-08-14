@@ -111,10 +111,18 @@ public struct Program: Sendable {
     self = emitter.release()
   }
 
-  /// Applies mandatory transformation passes on the IR of `m`.
+  /// Applies mandatory verification and transformation passes on the IR of `m`.
+  ///
+  /// This method applies the checks and transformation necessary to turn *raw* IR produced by the
+  /// emitter into *refined* IR. Functions that successfully go through mandatory passes can be
+  /// considered well-formed and ready to be interpreted or compiled.
+  ///
+  /// If a pass fails, an error diagnostic is reported and the definition of the function in which
+  /// the failure occurred is removed from the program.
   public mutating func applyTransformationPasses(_ m: Module.ID) {
     withTyper(typing: m) { (typer) in
-      // Temporarily move all functions to a local work list.
+      // Temporarily move all functions to a local work list. Those that fail a mandatory pass
+      // won't make it back.
       var work: [(id: IRFunction.ID, function: IRFunction)] = []
       let end = modify(&typer.program[m].ir) { (ir) in
         for i in ir.functions.values.indices where ir[i].isDefined {
@@ -143,13 +151,9 @@ public struct Program: Sendable {
         // The following passes cannot fail.
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
         work[i].function.existentializeIfExposed(emittingInto: m, using: &typer)
-      }
 
-      // Move all functions back.
-      modify(&typer.program[m].ir) { (ir) in
-        while let (i, f) = work.popLast() {
-          ir[i].take(definition: f)
-        }
+        // No error occurred; move the function back.
+        typer.program[m].ir[work[i].id].take(definition: work[i].function)
       }
 
       // New functions may have been introduced during the previous passes. Those that have been
