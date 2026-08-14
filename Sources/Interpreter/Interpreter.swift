@@ -286,13 +286,10 @@ public struct Interpreter {
       }
       return .return
     case let x as IRStore:
-      let v = asRuntimeValue(x.value)
-      let p = asAccess(x.target)
-      try memory.store(v, at: p)
+      try store(x.value, at: x.target)
       return .initializeRegister(to: .init(()))
     case let x as IRSubfield:
-      let p = asTypedAddress(x.base)
-      let l = memory.location(x.path, in: p)
+      let l = location(x.path, in: x.base)
       return .initializeRegister(to: .init(l))
     case let x as IRTypeApply:
       _ = x
@@ -369,6 +366,19 @@ public struct Interpreter {
     default:
       preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
     }
+  }
+
+  /// Returns the address of `subPart` in the address `whole`.
+  private mutating func location(
+    _ subPart: IndexPath,
+    in whole: IRValue
+  ) -> Memory.TypedAddress {
+    memory.location(subPart, in: asTypedAddress(whole))
+  }
+
+  /// Stores the value carried by `v` at the location pointed by the address `p`.
+  private mutating func store(_ v: IRValue, at p: IRValue) throws {
+    try memory.store(asRuntimeValue(v), at: asAccess(p))
   }
 }
 
