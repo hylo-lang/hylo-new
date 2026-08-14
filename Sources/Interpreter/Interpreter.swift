@@ -78,6 +78,12 @@ private struct Value {
     storage as? Access<Memory.TypedAddress>
   }
 
+  /// A concrete value of a Hylo type, if `self` is an rvalue during program
+  /// execution.
+  public var rvalue: RuntimeValue? {
+    storage as? RuntimeValue
+  }
+
 }
 
 /// The part of one instruction's execution that follows any memory and I/O effects.
@@ -207,7 +213,13 @@ public struct Interpreter {
   /// - Precondition: `p.entry != nil`
   public init(_ p: Program) {
     memory = Memory(forRunning: p, on: UnrealABI())
-    callStack.enter(p.entry, definedIn: p, withParameters: [])
+    let l = memory.allocate(.init(.void))
+    let a = Access(
+      to: Memory.TypedAddress(
+        allocation: l.allocation,
+        offset: l.offset, type: .init(.void)),
+      effect: .set)
+    callStack.enter(p.entry, definedIn: p, withParameters: [a])
   }
 
   /// Executes a single instruction.
@@ -274,7 +286,10 @@ public struct Interpreter {
       }
       return .return
     case let x as IRStore:
-      _ = x
+      let v = asRuntimeValue(x.value)
+      let p = asAccess(x.target)
+      try memory.store(v, at: p)
+      return .initializeRegister(to: .init(()))
     case let x as IRSubfield:
       let p = asTypedAddress(x.base)
       let l = memory.location(x.path, in: p)
@@ -344,6 +359,19 @@ public struct Interpreter {
     }
   }
 
+  /// Returns the value occurring in the interpreted program that is carried by `v`.
+  private mutating func asRuntimeValue(_ v: IRValue) -> RuntimeValue {
+    switch v {
+    case .register(let r):
+      return topOfStack.registers[r]!.rvalue!
+    case .integer(let n, let t):
+      let l = memory.layout(.init(t.erased))
+      return .init(integer: n, size: l.size, alignment: l.alignment)
+    default:
+      preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
+    }
+  }
+
   /// Returns the value stored at `p`, consuming the stored value if `p` does not
   /// point to a `MachineType`.
   private mutating func load(
@@ -379,7 +407,7 @@ extension IRAccess {
     // Because IR analysis should ensure single effect.
     // See: Sources/FrontEnd/IR/Instructions/IRAccess.swift.
     precondition(capabilities.count == 1)
-    return capabilities[0]
+    return capabilities.first!
   }
 }
 
