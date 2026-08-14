@@ -1196,27 +1196,6 @@ internal struct IREmitter {
     return LoweredCallee(value: f.value, typeArguments: ts, arguments: xs, result: x)
   }
 
-  private mutating func argumentsFromQualification(
-    _ q: ExpressionIdentity, instantiating v: IRValue
-  ) -> TypeArguments {
-    guard
-      let t = currentFunction.result(of: v),
-      let u = program.types.cast(t.type, to: UniversalType.self)
-    else { return [:] }
-
-    let x = program.type(assignedTo: q)
-    let y = program.types.dealiased(x)
-    if let a = program.types.select(y, \Metatype.inhabitant, as: TypeApplication.self) {
-      var result = TypeArguments()
-      for p in program.types[u].parameters {
-        if let v = program.types[a].arguments[p] { result[p] = v } else { break }
-      }
-      return result
-    } else {
-      return [:]
-    }
-  }
-
   /// Generates the IR for using `e` as the callee of `c` or a synthesized call.
   private mutating func loweredCallee(
     _ e: StaticCall.ID, appliedBy c: Call.ID?, writingResultTo r: IRValue
@@ -3174,16 +3153,36 @@ internal struct IREmitter {
   }
 
   /// Returns the type arguments defined in the type of `q`, which occurs as qualification for a
-  /// reference to a static member, if any.
-  private mutating func argumentsFromStaticQualification(
-    _ q: ExpressionIdentity
-  ) -> TypeArguments? {
-    let t = program.type(assignedTo: q)
-    let u = program.types.dealiased(t)
-    if let v = program.types.select(u, \Metatype.inhabitant, as: TypeApplication.self) {
-      return program.types[v].arguments
+  /// reference to a static member, and that can serve to instantiate `v`.
+  ///
+  /// If `v` is instance of a universal type `T` and the type of `q` is a type application, then
+  /// the result is a map from each type parameter of `T` having a corresponding argument in the
+  /// type of `q`. Consider the following to illustrate:
+  ///
+  ///     struct S<T> { static fun f<U>() {} }
+  ///     let x = S<A>.f<B>()
+  ///
+  /// The lowered form of `f` accepts two type parameters. The expression `S<A>.f<U>` denotes a use
+  /// of this function. `argumentsFromQualification(_:instantiating:)` extracts the first type
+  /// arguments from the type of `S<A>`.
+  private mutating func argumentsFromQualification(
+    _ q: ExpressionIdentity, instantiating v: IRValue
+  ) -> TypeArguments {
+    guard
+      let t = currentFunction.result(of: v),
+      let u = program.types.cast(t.type, to: UniversalType.self)
+    else { return [:] }
+
+    let x = program.type(assignedTo: q)
+    let y = program.types.dealiased(x)
+    if let a = program.types.select(y, \Metatype.inhabitant, as: TypeApplication.self) {
+      var result = TypeArguments()
+      for p in program.types[u].parameters {
+        if let v = program.types[a].arguments[p] { result[p] = v } else { break }
+      }
+      return result
     } else {
-      return nil
+      return [:]
     }
   }
 
