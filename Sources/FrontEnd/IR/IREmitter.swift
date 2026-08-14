@@ -961,7 +961,6 @@ internal struct IREmitter {
 
     /// Returns `self` notionally applied to `a`.
     ///
-    ///
     /// `a` is appended to the type arguments of `self`. The result denotes a function partially
     /// applied to `a` and possibly expecting more arguments.
     ///
