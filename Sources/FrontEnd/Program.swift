@@ -1355,25 +1355,29 @@ public struct Program: Sendable {
       .flatMap({ (e) in e.value.string })
   }
 
-  /// Returns the left-most tree in the qualification of `e` iff `e` is a name or new expression.
+  /// Returns the left-most tree in the qualification of `e` iff `e` expresses a name.
   public func rootQualification(of e: ExpressionIdentity) -> ExpressionIdentity? {
-    var root: ExpressionIdentity
-
-    if let n = cast(e, to: NameExpression.self) {
-      guard let q = self[n].qualification else { return nil }
-      root = q
-    } else if let n = cast(e, to: New.self) {
-      root = self[n].qualification
-    } else {
-      return nil
-    }
+    // The outermost expression may be a constructor.
+    var root = cast(e, to: New.self).map({ self[$0].qualification }) ?? e
 
     while true {
-      if let x = cast(root, to: NameExpression.self) {
-        if let y = self[x].qualification { root = y } else { return root }
-      } else if let x = cast(root, to: Call.self) {
-        root = self[x].callee
-      } else {
+      switch tag(of: root) {
+      case NameExpression.self:
+        // Select `q` in `q.n`.
+        let n = castUnchecked(root, to: NameExpression.self)
+        if let q = self[n].qualification { root = q } else { return root }
+
+      case Call.self:
+        // Select `q` in `q(...)`.
+        let n = castUnchecked(root, to: Call.self)
+        root = self[n].callee
+
+      case StaticCall.self:
+        // Select `q` in `q<...>`.
+        let n = castUnchecked(root, to: StaticCall.self)
+        root = self[n].callee
+
+      default:
         return root
       }
     }
