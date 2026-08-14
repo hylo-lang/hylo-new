@@ -86,6 +86,7 @@ public struct Token: Hashable, Sendable {
     case error
     case unterminatedBlockComment
     case unterminatedStringLiteral
+    case unterminatedQuotedIdentifier
 
   }
 
