@@ -1,7 +1,7 @@
 import BigInt
 import FrontEnd
 
-/// A value occuring during program execution.
+/// A value occurring during program execution.
 struct RuntimeValue {
 
   /// The bytes of value, preceded by zero or more bytes of padding to satisfy
