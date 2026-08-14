@@ -90,52 +90,53 @@ internal struct Solver {
     defer { typer = self.typer.sink() }
 
     while let g = fresh.popLast() {
-      if current > best {
-        log("- abort")
-        return nil
-      } else {
-        goals[g].update { (t) in
-          self.typer.program.types.reify(t, applying: substitutions, withVariables: .kept)
-        }
-        log("- solve: " + self.typer.program.show(goals[g]))
+      goals[g].update { (t) in
+        self.typer.program.types.reify(t, applying: substitutions, withVariables: .kept)
+      }
+      log("- solve: " + self.typer.program.show(goals[g]))
 
-        let s = indenting { (me) -> Solution? in
-          assert(me.outcomes[g].isPending, "goal already discharged")
+      let status = indenting { (me) -> SolverStatus in
+        assert(me.outcomes[g].isPending, "goal already discharged")
 
-          let o: GoalOutcome
-          switch me.goals[g] {
-          case is EqualityConstraint:
-            o = me.solve(equality: g)
-          case is CoercionConstraint:
-            o = me.solve(coercion: g)
-          case is WideningConstraint:
-            o = me.solve(widening: g)
-          case is ConstructorConversionConstraint:
-            o = me.solve(constructorConversion: g)
-          case is CallConstraint:
-            o = me.solve(call: g)
-          case is StaticCallConstraint:
-            o = me.solve(staticCall: g)
-          case is MemberConstraint:
-            o = me.solve(member: g)
-          case is TupleMemberConstraint:
-            o = me.solve(tupleMember: g)
-          case is OverloadConstraint:
-            return me.solve(overload: g)
-          default:
-            unreachable()
-          }
-
-          me.log(outcome: o)
-          me.outcomes[g] = o
-          if me.outcomes.failed(g) { me.current.errors += 1 }
-          return nil
+        let o: GoalOutcome
+        switch me.goals[g] {
+        case is EqualityConstraint:
+          o = me.solve(equality: g)
+        case is CoercionConstraint:
+          o = me.solve(coercion: g)
+        case is WideningConstraint:
+          o = me.solve(widening: g)
+        case is ConstructorConversionConstraint:
+          o = me.solve(constructorConversion: g)
+        case is CallConstraint:
+          o = me.solve(call: g)
+        case is StaticCallConstraint:
+          o = me.solve(staticCall: g)
+        case is MemberConstraint:
+          o = me.solve(member: g)
+        case is TupleMemberConstraint:
+          o = me.solve(tupleMember: g)
+        case is OverloadConstraint:
+          return me.solve(overload: g).map(SolverStatus.terminated(_:)) ?? .canceled
+        default:
+          unreachable()
         }
 
-        if let result = s { return result }
+        me.log(outcome: o)
+        me.outcomes[g] = o
+        if me.outcomes.failed(g) { me.current.errors += 1 }
+
+        return me.current > best ? .canceled : .running
       }
 
-      if fresh.isEmpty { refreshCoercionAndWideningConstraints() }
+      switch status {
+      case .running:
+        if fresh.isEmpty { refreshCoercionAndWideningConstraints() }
+      case .canceled:
+        return nil
+      case .terminated(let result):
+        return result
+      }
     }
 
     // Not enough context to solve the remaining stale constraints.
@@ -551,7 +552,7 @@ internal struct Solver {
   }
 
   /// Discharges `g`, which is an overload constraint.
-  private mutating func solve(overload g: GoalIdentity) -> Solution {
+  private mutating func solve(overload g: GoalIdentity) -> Solution? {
     let k = goals[g] as! OverloadConstraint
 
     var viable: [(choice: NameResolutionCandidate, solution: Solution)] = []
@@ -580,6 +581,12 @@ internal struct Solver {
       }
     }
 
+    // No result if all choices led to solutions more expensive than the best found so far.
+    if viable.isEmpty {
+      return nil
+    }
+
+    // Otherwise, identify the right choice.
     let scopeOfUse = program.parent(containing: k.name)
     let least = viable.least { (a, b) in
       program.isPreferred(a.choice, other: b.choice, in: scopeOfUse)
@@ -588,7 +595,6 @@ internal struct Solver {
     if let (_, s) = least {
       return s
     } else {
-      // There must be at least one solution.
       var s = viable[0].solution
       s.add(.init(.error, "ambiguous use of '\(program[k.name].name.value)'", at: k.site))
       return s
@@ -782,6 +788,20 @@ private enum GoalOutcome {
   var isPending: Bool {
     if case .pending = self { true } else { false }
   }
+
+}
+
+/// The execution status of an instance of a solving thread.
+private enum SolverStatus {
+
+  /// The thread will be fetching the next goal to discharge.
+  case running
+
+  /// The thread has been canceled because it cannot produce a viable solution.
+  case canceled
+
+  /// The thread has terminated with a solution.
+  case terminated(Solution)
 
 }
 

@@ -267,19 +267,26 @@ public struct IRFunction: Sendable {
   }
 
   /// Returns the value defining the root of the place on which `i` forms an access.
-  public func source(_ i: IRAccess.ID) -> IRValue {
-    var s = at(i).source
-    while let r = s.register {
-      switch tag(of: r) {
-      case IRPlaceCast.self:
-        s = (at(r) as! IRPlaceCast).source
-      case IRSubfield.self:
-        s = (at(r) as! IRSubfield).base
-      default:
-        return s
-      }
+  public func root(_ i: IRAccess.ID) -> IRValue {
+    var result = at(i).source
+    while let r = result.register.flatMap(source(_:)) {
+      result = r
     }
-    return s
+    return result
+  }
+
+  /// Returns the source of the place denoted by `i`, if any.
+  public func source(_ i: AnyInstructionIdentity) -> IRValue? {
+    switch tag(of: i) {
+    case IRCase.self:
+      return (at(i) as! IRCase).source
+    case IRPlaceCast.self:
+      return (at(i) as! IRPlaceCast).source
+    case IRSubfield.self:
+      return (at(i) as! IRSubfield).base
+    default:
+      return nil
+    }
   }
 
   /// Returns the last use of `v` in `b`, if any.
@@ -928,8 +935,9 @@ extension IRFunction: Showable {
       for b in blocks.addresses {
         result.append("%b\(b.rawValue):\n")
         for i in instructions(in: b) {
+          var p = printer
           let r = IRValue.register(i)
-          result.append("  \(printer.show(r)) = \(at(i).show(using: &printer))\n")
+          result.append("  \(p.show(r)) = \(at(i).show(using: &p))\n")
         }
       }
       result.append("}")

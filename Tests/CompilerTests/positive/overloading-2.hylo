@@ -1,0 +1,25 @@
+//! stage:typing no-std
+
+struct S {
+
+  public var value: Builtin.ptr
+
+  public memberwise init
+
+  public fun infix+ (x: S) -> Self {
+    Self(value: self.value)
+  }
+
+  public fun infix+ (x: Void) -> Self {
+    Self(value: self.value)
+  }
+
+}
+
+fun use(x: Builtin.ptr) {}
+
+fun use(x: Void) {}
+
+fun f(x: S) {
+  use((x + x).value)
+}

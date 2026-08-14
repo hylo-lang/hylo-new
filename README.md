@@ -36,6 +36,8 @@ cd hylo-new
 git submodule update --init
 ```
 
+The project requires the Swift 6.3 compiler or later.
+
 ### Linux
 - Install `zstd`'s development package: `sudo apt-get install libzstd-dev`
 - Install the latest Swift compiler using [swiftly](https://github.com/swift-server/swiftly)

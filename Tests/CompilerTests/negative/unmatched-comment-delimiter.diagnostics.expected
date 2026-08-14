@@ -1,0 +1,6 @@
+negative/unmatched-comment-delimiter.hylo:4.3-5: error: type 'Void' has no member 'prefix*/'
+  */()
+  ~~
+negative/unmatched-comment-delimiter.hylo:4.3-5: note: is that an unmatched block comment delimiter?
+  */()
+  ~~

@@ -146,7 +146,7 @@ extension Program {
   /// moved back to its original position.
   ///
   /// - Requires: All instructions dominating `start` have been incorporated.
-  internal mutating func incorporate(
+  private mutating func incorporate(
     from start: AnyInstructionIdentity, in ctx: inout FunctionGenerationContext
   ) {
     let v = ctx.demandBasicBlock(ctx.ir.block(defining: start))
@@ -235,14 +235,26 @@ extension Program {
     _ i: IRAlloca.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
-    assert(s.witness == nil, "unsupported dynamically sized alloca")
-
-    let t = metadata(of: s.storage, in: &ctx.module)
-    let x = ctx.module.llvm.insertAlloca(t.llvm, atEntryOf: ctx.llvm)
-    ctx.module.llvm.setAlignment(t.layout.alignment, for: x)
-
     let v = IRValue.register(i.erased)
-    ctx.value[v] = x.v
+
+    // Is the alloca dynamically sized?
+    if let t = s.witness {
+      // Read the size of the allocation from the type witness.
+      let n = insertLoadTypeSize(from: ctx.value[t]!, in: &ctx)
+      let x = ctx.module.llvm.insertAlloca(
+        arrayOf: n, ctx.module.llvm.i8, at: ctx.insertionPoint!)
+      ctx.module.llvm.setAlignment(ctx.module.dynamicAllocationAlignment(), for: x)
+      ctx.value[v] = x.v
+    }
+
+    // Size and alignment are determined at compile-time.
+    else {
+      let t = metadata(of: s.storage, in: &ctx.module)
+      let x = ctx.module.llvm.insertAlloca(t.llvm, atEntryOf: ctx.llvm)
+      ctx.module.llvm.setAlignment(t.layout.alignment, for: x)
+      ctx.value[v] = x.v
+    }
+
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -293,17 +305,44 @@ extension Program {
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertSignedDiv(
         exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .urem(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertUnsignedRem(
+        xs[0], xs[1], at: ctx.insertionPoint!).v
     case .signedAdditionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedAdditionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.uadd.with.overflow, for: t, with: s.arguments, in: &ctx)
     case .signedSubtractionWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.usub.with.overflow, for: t, with: s.arguments, in: &ctx)
     case .signedMultiplicationWithOverflow(let t):
       ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
         IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
-
-    case .icmp(let p, let t):
+    case .unsignedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.umul.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .advancedByBytes(byteOffset: let t):
+      assert(s.arguments.count == 2)
+      let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
+      let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: p, typed: ctx.module.llvm.i8, indices: offsets, at: ctx.insertionPoint!).v
+    case .zext(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      let t = metadata(of: to, in: &ctx.module).llvm
+      ctx.value[v] = ctx.module.llvm.insertZeroExtend(
+        xs[0], to: t, at: ctx.insertionPoint!).v
+    case .trunc(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      let t = metadata(of: to, in: &ctx.module).llvm
+      ctx.value[v] = ctx.module.llvm.insertTrunc(
+        xs[0], to: t, at: ctx.insertionPoint!).v    case .icmp(let p, let t):
       ctx.value[v] = insertCallBuiltinPredicate(
         p, for: t, with: s.arguments, in: &ctx)
 
@@ -387,8 +426,11 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
     let x = demandGlobal(s.source, in: &ctx.module)
+    let y = ctx.module.llvm.insertAlloca(ctx.module.llvm.ptr, at: ctx.insertionPoint!)
+    ctx.module.llvm.insertStore(x, to: y, at: ctx.insertionPoint!)
+
     let v = IRValue.register(i.erased)
-    ctx.value[v] = x.v
+    ctx.value[v] = y.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -663,7 +705,7 @@ extension Program {
 
     let tableType = metadata(of: s.witnessType, in: &ctx.module)
 
-    unimplemented(if: !entries.allSatisfy(\.unsafe[].isConstant), 
+    unimplemented(if: !entries.allSatisfy(\.unsafe[].isConstant),
       """
       Runtime-defined IRWitnessTable operand. https://github.com/hylo-lang/hylo-new/issues/342
 
@@ -935,8 +977,7 @@ extension Program {
     }
 
     // Declare the symbol.
-    let storage = ctx.llvm.structType(ctx.typeWitnessHeader)
-    let symbol = ctx.llvm.declareGlobalVariable(name, storage)
+    let symbol = ctx.llvm.declareGlobalVariable(name, ctx.typeWitnessHeader)
     ctx.llvm.setLinkage(.private, for: symbol)
 
     // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
@@ -951,10 +992,10 @@ extension Program {
       ctx.llvm.i16.unsafe[].zero.v,
     ]
 
-    let alignment = ctx.llvm.layout.preferredAlignment(of: storage)
+    let alignment = ctx.llvm.layout.preferredAlignment(of: ctx.typeWitnessHeader)
     ctx.llvm.setAlignment(alignment, for: symbol)
 
-    let initializer = ctx.llvm.structConstant(of: storage, aggregating: fields)
+    let initializer = ctx.llvm.structConstant(of: ctx.typeWitnessHeader, aggregating: fields)
     ctx.llvm.setInitializer(initializer, for: symbol)
     ctx.llvm.setGlobalConstant(true, for: symbol)
 
@@ -1016,6 +1057,20 @@ extension Program {
     return xs.map { (x) in
       ctx.module.llvm.insertLoad(m.llvm, from: ctx.value[x]!, at: ctx.insertionPoint!).v
     }
+  }
+
+  /// Returns the size of a type witnessed by `witness`, which is a pointer to the start of a type
+  /// witness stored in memory.
+  private mutating func insertLoadTypeSize(
+    from witness: LLVMValue, in ctx: inout FunctionGenerationContext
+  ) -> SwiftyLLVM.Load.UnsafeReference {
+    let x0 = ctx.module.llvm.insertLoad(
+      ctx.module.llvm.ptr, from: witness, at: ctx.insertionPoint!)
+    let x1 = ctx.module.llvm.insertGetStructElementPointer(
+      of: x0, typed: ctx.module.typeWitnessHeader, index: 1, at: ctx.insertionPoint!)
+    let x2 = ctx.module.llvm.insertLoad(
+      ctx.module.llvm.i32, from: x1, at: ctx.insertionPoint!)
+    return x2
   }
 
   /// Returns the representations of `arguments`, which are passed to `callee`, in LLVM IR.

@@ -1,0 +1,23 @@
+//! exit-status:42
+
+trait DefaultConstructible { init() }
+
+trait P {
+  fun f() sink -> Int32
+  fun g(y: Self) -> Int32 { 1 }
+}
+
+struct S is DefaultConstructible & P {
+  var x: Int32
+  init() { &self.x = 42 as Int32 }
+  fun f() sink -> Int32 { self.x }
+}
+
+fun make<T is DefaultConstructible & P>() -> Int32 {
+  var x = T()
+  return x.f()
+}
+
+public fun main() -> Int32 {
+  make<S>()
+}

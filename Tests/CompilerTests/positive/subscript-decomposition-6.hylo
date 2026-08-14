@@ -1,0 +1,22 @@
+//! exit-status:42
+
+struct Q is Deinitializable {
+
+  init() {}
+
+  subscript s0() -> Int32 {
+    var x = 21 as Int32
+    yield x
+    &x = 0
+  }
+
+  subscript s1() -> Int32 {
+    yield self.s0[]
+  }
+
+}
+
+fun main() -> Int32 {
+  let q = Q()
+  return q.s0[] + q.s1[]
+}

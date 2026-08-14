@@ -10,7 +10,7 @@ extension IRFunction {
   /// IR pass guarantees that invariant.
   ///
   /// This pass is expected to run after dead access elimination.
-  internal mutating func closeOpenEndedRegions(in xs: [AnyInstructionIdentity]) {
+  internal mutating func closeOpenEndedRegions<S: Sequence<AnyInstructionIdentity>>(in xs: S) {
     let g = controlFlow()
     var m: [IRValue: Lifetime] = [:]
     for i in xs {
@@ -110,7 +110,7 @@ extension IRFunction {
     }
 
     // Propagate liveness starting from the blocks in which the operand is being used.
-    var approximation: [IRBlock.ID: (liveIn: Bool, liveOut: Bool)] = [:]
+    var approximation: SortedDictionary<IRBlock.ID, (liveIn: Bool, liveOut: Bool)> = [:]
     while true {
       guard let occurrence = occurrences.popFirst() else { break }
 

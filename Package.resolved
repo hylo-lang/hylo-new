@@ -1,12 +1,13 @@
 {
-  "originHash" : "96e06451e9ac59cf98b1f8b3d4c6980e797dd87a5343028a3376ea191994682b",
+  "originHash" : "c050aa06f1f1c37a0ad6d40f44d64b7aee54c6653d96bf505027b74442c12305",
   "pins" : [
     {
       "identity" : "archivist",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tothambrus11/Archivist.git",
+      "location" : "https://github.com/kyouko-taiga/Archivist.git",
       "state" : {
-        "revision" : "c7a5d710fbff1457e01cce0a207f1cb51c718189"
+        "revision" : "8f983a115222c8eb944b36cdde9d45449e604fda",
+        "version" : "1.0.0"
       }
     },
     {

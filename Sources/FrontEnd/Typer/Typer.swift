@@ -1153,9 +1153,30 @@ public struct Typer {
   }
 
   /// Type checks `s`.
+  private mutating func check(_ s: Block.ID) {
+    for n in program[s].statements { check(n) }
+    program[s.module].setType(.void, for: s)
+  }
+
+  /// Type checks `s`.
   private mutating func check(_ s: Discard.ID) {
     check(program[s].value)
     program[s.module].setType(.void, for: s)
+  }
+
+  /// Type checks `s`.
+  ///
+  /// `s` occurs as the else branch of a conditional statement occurring as a statement. If the
+  /// branch is another conditional expression (i.e., `... if else ...`), then that expression is
+  /// also checked as a statement.
+  private mutating func check(_ s: If.ElseIdentity) {
+    if let n = program.cast(s, to: If.self) {
+      checkAsStatement(n)
+    } else if let n = program.cast(s, to: Block.self) {
+      check(n)
+    } else {
+      program.unexpected(s)
+    }
   }
 
   /// Type checks `s`.
@@ -2261,10 +2282,8 @@ public struct Typer {
 
     // Is the expression occurring as a statement?
     if isStatement {
-      context.withSubcontext { (ctx) in
-        _ = inferredType(of: program[e].success, occurringAsStatement: true, in: &ctx)
-        _ = inferredType(of: program[e].failure, occurringAsStatement: true, in: &ctx)
-      }
+      check(program[e].success)
+      check(program[e].failure)
       return context.obligations.assume(e, hasType: .void, at: program[e].site)
     }
 
@@ -2822,34 +2841,6 @@ public struct Typer {
     return context.obligations.assume(d, hasType: t, at: program[d].site)
   }
 
-  /// Returns the inferred type of `b`, which occurs in `context`.
-  private mutating func inferredType(
-    of b: Block.ID, occurringAsStatement isStatement: Bool,
-    in context: inout InferenceContext
-  ) -> AnyTypeIdentity {
-    context.obligations.assume(b, hasType: .void, at: program[b].site)
-    if !isStatement, let e = program.singleExpression(of: b) {
-      return inferredType(of: e, in: &context)
-    } else {
-      for s in program[b].statements { check(s) }
-      return .void
-    }
-  }
-
-  /// Returns the inferred type of `b`, which occurs in `context`.
-  private mutating func inferredType(
-    of b: If.ElseIdentity, occurringAsStatement isStatement: Bool,
-    in context: inout InferenceContext
-  ) -> AnyTypeIdentity {
-    if let e = program.cast(b, to: If.self) {
-      return inferredType(of: e, occurringAsStatement: isStatement, in: &context)
-    } else if let s = program.cast(b, to: Block.self) {
-      return inferredType(of: s, occurringAsStatement: isStatement, in: &context)
-    } else {
-      program.unexpected(b)
-    }
-  }
-
   /// Returns the inferred type `q`, which is the qualification of some name expression occurring
   /// in `context`.
   private mutating func inferredType(
@@ -3279,6 +3270,28 @@ public struct Typer {
     else {
       return metatype(of: AssociatedType(declaration: requirement, qualification: witness)).erased
     }
+  }
+
+  /// Returns the type of `requirement` presented through a witness table.
+  ///
+  /// In witness tables, implementations of function requirements are presented via interfaces
+  /// that accept a witness table as their first parameter (the instance of `P.Self`) and where a
+  /// skolem is substituted for each generic parameter of the requiring trait. This substitution
+  /// ensures that abstract parts are properly existentialized during lowering.
+  ///
+  /// - Requires: `requirement` is a function requirement in a trait declaration.
+  internal mutating func typeOfInterface(for requirement: DeclarationIdentity) -> AnyTypeIdentity {
+    assert(program.isFunctionRequirement(requirement))
+
+    let t = typeOfTraitSelf(in: program.traitRequiring(requirement)!)
+    let implementation = declaredType(of: requirement)
+    let (c, h) = program.types.contextAndHead(implementation)
+    let a = (program.types[h] as! Arrow).withInputsModified { (ps) in
+      .init(Parameter(access: .let, type: t), prependedTo: ps)
+    }
+
+    let sansContext = program.types.demand(a)
+    return program.types.introduce(c, into: sansContext.erased)
   }
 
   /// Returns the context parameters of the type of an instance of `Self` in `s`.

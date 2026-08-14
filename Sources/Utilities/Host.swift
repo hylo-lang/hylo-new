@@ -63,17 +63,17 @@ public enum Host: Sendable {
   /// The separator between individual locations in executable search path.
   public static let searchPathSeparator: Character = Host.operatingSystem == .windows ? ";" : ":"
 
-  /// The suffix of native executables.
-  public static let nativeExecutableSuffix = operatingSystem == .windows ? ".exe" : ""
+  /// The suffix of binary executables.
+  public static let binaryExecutableSuffix = operatingSystem == .windows ? ".exe" : ""
 
-  /// Returns the location of the native executable invoked as `name` using the search path or
+  /// Returns the location of the binary executable invoked as `name` using the search path or
   /// throws `ExecutableNotFound` if no executable could be found.
   ///
-  /// `name` shall be supplied without the native executable suffix, e.g. without `.exe` on Windows.
-  /// Only native executables are resolved. Script files such as `.cmd`, `.bat`, and `.ps1` are not.
-  public static func findNativeExecutable(invokedAs name: String) throws -> URL {
+  /// `name` shall be supplied without the binary executable suffix, e.g. without `.exe` on Windows.
+  /// Only binary executables are resolved. Script files such as `.cmd`, `.bat`, and `.ps1` are not.
+  public static func findBinaryExecutable(invokedAs name: String) throws -> URL {
    for base in searchPathLocations() {
-     let p =  URL(fileURLWithPath: base).appendingPathComponent(name + nativeExecutableSuffix)
+     let p =  URL(fileURLWithPath: base).appendingPathComponent(name + binaryExecutableSuffix)
      if FileManager.default.isExecutableFile(atPath: p.path) { return p }
    }
    throw ExecutableNotFound(name: name)
@@ -82,7 +82,7 @@ public enum Host: Sendable {
   /// Error thrown when an executable is not found on the PATH.
   public struct ExecutableNotFound: Error, CustomStringConvertible {
     
-    /// Name of the executable without native executable suffix.
+    /// Name of the executable without binary executable suffix.
     public let name: String
 
     /// A description of the error.

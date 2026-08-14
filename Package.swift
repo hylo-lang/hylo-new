@@ -28,8 +28,8 @@ let package = Package(
       url: "https://github.com/attaswift/BigInt.git",
       from: "5.7.0"),
     .package(
-      url: "https://github.com/tothambrus11/Archivist.git",
-      revision: "c7a5d710fbff1457e01cce0a207f1cb51c718189"),
+      url: "https://github.com/kyouko-taiga/Archivist.git",
+      from: "1.0.0"),
     .package(
       url: "https://github.com/apple/swift-algorithms.git",
       from: "1.2.0"),
@@ -166,6 +166,10 @@ let package = Package(
         .target(name: "BackEnd"),
         .target(name: "Driver")
       ],
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
+      name: "RuntimeTests",
       swiftSettings: commonSwiftSettings),
 
     .testTarget(
