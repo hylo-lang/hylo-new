@@ -1478,7 +1478,7 @@ public struct Parser {
       let m = file.insert(TupleMember(parent: head, member: .init(n, at: i.site), site: s))
       return .init(m)
     } else {
-      let n = try parseName()
+      let n = try parseName(allowingKeywords: true)
       let s = span(from: file[head].site.start)
       let m = file.insert(NameExpression(qualification: head, name: n, site: s))
       return .init(m)
@@ -1870,7 +1870,7 @@ public struct Parser {
     in file: inout Module.SourceContainer
   ) throws -> NameExpression.ID {
     let dot = try take(.dot) ?? expected("'.'")
-    let n = try parseName()
+    let n = try parseName(allowingKeywords: true)
     let q = file.insert(ImplicitQualification(site: dot.site))
     return file.insert(NameExpression(qualification: .init(q), name: n, site: span(from: dot)))
   }
@@ -1883,12 +1883,14 @@ public struct Parser {
   private mutating func parseUnqualifiedNameExpression(
     in file: inout Module.SourceContainer
   ) throws -> NameExpression.ID {
-    let n = try parseName()
+    let n = try parseName(allowingKeywords: false)
     return file.insert(NameExpression(n))
   }
 
   /// Parses a name.
-  private mutating func parseName() throws -> Parsed<Name> {
+  private mutating func parseName(
+    allowingKeywords keywordsAreAllowed: Bool
+  ) throws -> Parsed<Name> {
     let head = try peek() ?? expected("name")
 
     var identifier: String
@@ -1897,9 +1899,10 @@ public struct Parser {
 
     if head.isOperatorNotation {
       (notation, identifier) = try parseOperatorIdentifier().value
-    } else if head.tag == .name {
-      _ = take()
-      identifier = String(head.text)
+    } else if let n = take(.name) {
+      identifier = String(n.text)
+    } else if keywordsAreAllowed, let n = take(if: \.isKeyword) {
+      identifier = String(n.text)
     } else {
       throw expected("name")
     }
