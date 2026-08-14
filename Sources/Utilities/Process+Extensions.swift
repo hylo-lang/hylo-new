@@ -1,6 +1,56 @@
+import Dispatch
 import Foundation
 
+/// A file handle being read to the end of its contents on a dedicated thread.
+private struct AsynchronousDrain: ~Copyable {
+
+  /// The state shared with the reading thread.
+  ///
+  /// - Thread safety: `data` is written only by the reading thread, before it signals `finished`,
+  ///   and read only after `finished` was awaited.
+  private final class State: @unchecked Sendable {
+
+    /// The data read from the handle, meaningful only after `finished` was signaled.
+    var data = Data()
+
+    /// Signaled once `data` holds the complete contents of the handle.
+    let finished = DispatchSemaphore(value: 0)
+
+  }
+
+  /// The state shared with the reading thread.
+  private let state = State()
+
+  /// Starts reading the contents of `handle` on a new thread, signaling `s.finished` when done.
+  init(_ handle: FileHandle) {
+    let s = state
+    Thread {
+      s.data = handle.readDataToEndOfFile()
+      s.finished.signal()
+    }.start()
+  }
+
+  /// Returns the complete contents of the handle, blocking until it has been fully read.
+  consuming func contents() -> Data {
+    state.finished.wait()
+    return state.data
+  }
+
+}
+
 extension Process {
+
+  /// Returns the contents of `a` and `b`, read until their end.
+  ///
+  /// The two streams are drained concurrently to avoid deadlocks.
+  private static func drainedOutputs(_ a: Pipe, _ b: Pipe) -> (a: String, b: String) {
+    let bContents = AsynchronousDrain(b.fileHandleForReading)
+    let aContents = a.fileHandleForReading.readDataToEndOfFile()
+
+    return (
+      aContents.decodedAsRepairedUTF8(),
+      bContents.contents().decodedAsRepairedUTF8())
+  }
 
   /// The error thrown when a process exits with a non-zero status.
   public struct NonzeroExit: Error, CustomStringConvertible {
@@ -23,8 +73,8 @@ extension Process {
     /// A textual description of the failure.
     public var description: String {
       """
-      '\(executable) \(arguments.joined(separator: " "))' exited with status \(exitCode).
-      
+      '\(executable.path) \(arguments.joined(separator: " "))' exited with status \(exitCode).
+
       Standard Output:
       \(standardOutput)
 
@@ -71,17 +121,9 @@ extension Process {
     }
     try process.run()
 
-    // Read pipes on background threads to prevent deadlock if output
-    // exceeds pipe buffer size.  The child process will block if pipe
-    // buffers fill up, so we must drain them continuously.
-    let stdoutData = readPipeInBackground(standardOutput)
-    let stderrData = readPipeInBackground(standardError)
+    let (output, error) = drainedOutputs(standardOutput, standardError)
 
     process.waitUntilExit()
-
-    // Retrieve the data (blocks until background reads complete)
-    let output = stdoutData().decodedAsRepairedUTF8()
-    let error = stderrData().decodedAsRepairedUTF8()
 
     return .init(
       standardOutput: output,
@@ -116,36 +158,6 @@ extension Process {
       self.terminationReason = terminationReason
     }
 
-  }
-}
-
-/// Starts reading all data from `pipe` using event-driven I/O.
-///
-/// Returns a closure that blocks until reading completes and returns the data.
-/// This prevents pipe buffer deadlocks by draining pipes while the process runs.
-/// Uses non-blocking I/O with readability handlers for efficiency.
-private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
-  // Box to safely share mutable state across concurrency boundary
-  final class ReadCompletion: Operation, @unchecked Sendable {
-    var data = Data()
-    override func main() {
-    }
-  }
-
-  let completion = ReadCompletion()
-  pipe.fileHandleForReading.readabilityHandler = { handle in
-    let chunk = handle.availableData
-    if chunk.isEmpty {  // EOF on the pipe
-      pipe.fileHandleForReading.readabilityHandler = nil
-      completion.start()
-    } else {
-      completion.data.append(chunk)
-    }
-  }
-
-  return {
-    completion.waitUntilFinished()
-    return completion.data
   }
 }
 
