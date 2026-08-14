@@ -74,8 +74,8 @@ extension Process {
     // Read pipes on background threads to prevent deadlock if output
     // exceeds pipe buffer size.  The child process will block if pipe
     // buffers fill up, so we must drain them continuously.
-    let stdoutData = readPipeInBackground(standardOutput)
-    let stderrData = readPipeInBackground(standardError)
+    let stdoutData = try readPipeInBackground(standardOutput)
+    let stderrData = try readPipeInBackground(standardError)
 
     process.waitUntilExit()
 
@@ -119,33 +119,29 @@ extension Process {
   }
 }
 
-/// Starts reading all data from `pipe` using event-driven I/O.
+/// Starts reading all data from `pipe` on a dedicated background thread.
 ///
-/// Returns a closure that blocks until reading completes and returns the data.
-/// This prevents pipe buffer deadlocks by draining pipes while the process runs.
-/// Uses non-blocking I/O with readability handlers for efficiency.
-private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
+/// Returns a closure that blocks until reading completes and returns the data, rethrowing any
+/// error thrown by the read.
+private func readPipeInBackground(_ pipe: Pipe) -> () throws -> Data {
   // Box to safely share mutable state across concurrency boundary
-  final class ReadCompletion: Operation, @unchecked Sendable {
-    var data = Data()
-    override func main() {
-    }
+  final class ResultBox: @unchecked Sendable {
+    var result: Result<Data, any Error> = .success(Data())
   }
+  let box = ResultBox()
+  let group = DispatchGroup()
 
-  let completion = ReadCompletion()
-  pipe.fileHandleForReading.readabilityHandler = { handle in
-    let chunk = handle.availableData
-    if chunk.isEmpty {  // EOF on the pipe
-      pipe.fileHandleForReading.readabilityHandler = nil
-      completion.start()
-    } else {
-      completion.data.append(chunk)
-    }
+  group.enter()
+  let reader = Thread {
+    box.result = Result { try pipe.fileHandleForReading.readToEnd() ?? Data() }
+    group.leave()
   }
+  reader.qualityOfService = .userInitiated
+  reader.start()
 
   return {
-    completion.waitUntilFinished()
-    return completion.data
+    group.wait()
+    return try box.result.get()
   }
 }
 
