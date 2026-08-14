@@ -1,3 +1,6 @@
+import BigInt
+import FrontEnd
+
 /// A value occuring during program execution.
 struct RuntimeValue {
 
@@ -23,4 +26,27 @@ struct RuntimeValue {
     storage[baseOffset...] = bytes[...]
   }
 
+}
+
+extension RuntimeValue {
+  /// Creates an instance for an integer of size `b` bytes having value `n` and
+  /// alignment `a`.
+  public init(integer n: BigInt, size b: Int, alignment a: Int) {
+    precondition(b > 0)
+    precondition(a > 0)
+
+    var unsignedRepresentation = n.magnitude
+    if n.sign == .minus {
+      let maximumUnsignedValue = BigUInt(1) << (8 * b)
+      unsignedRepresentation = maximumUnsignedValue - unsignedRepresentation
+    }
+
+    var bytes = [UInt8](repeating: 0, count: b)
+    for i in 0..<b {
+      bytes[i] = UInt8(truncatingIfNeeded: unsignedRepresentation)
+      unsignedRepresentation >>= 8
+    }
+
+    self.init(bytes: bytes, havingAlignment: a)
+  }
 }
