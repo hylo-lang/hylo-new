@@ -74,14 +74,14 @@ extension Process {
     // Read pipes on background threads to prevent deadlock if output
     // exceeds pipe buffer size.  The child process will block if pipe
     // buffers fill up, so we must drain them continuously.
-    let stdoutData = try readPipeInBackground(standardOutput)
-    let stderrData = try readPipeInBackground(standardError)
+    let stdoutData = readPipeInBackground(standardOutput)
+    let stderrData = readPipeInBackground(standardError)
 
     process.waitUntilExit()
 
     // Retrieve the data (blocks until background reads complete)
-    let output = stdoutData().decodedAsRepairedUTF8()
-    let error = stderrData().decodedAsRepairedUTF8()
+    let output = try stdoutData().decodedAsRepairedUTF8()
+    let error = try stderrData().decodedAsRepairedUTF8()
 
     return .init(
       standardOutput: output,
