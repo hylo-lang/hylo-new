@@ -126,26 +126,26 @@ extension Process {
 /// Uses non-blocking I/O with readability handlers for efficiency.
 private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
   // Box to safely share mutable state across concurrency boundary
-  final class DataBox: @unchecked Sendable {
+  final class ReadCompletion: Operation, @unchecked Sendable {
     var data = Data()
+    override func main() {
+    }
   }
-  let box = DataBox()
-  let group = DispatchGroup()
 
-  group.enter()
+  let completion = ReadCompletion()
   pipe.fileHandleForReading.readabilityHandler = { handle in
     let chunk = handle.availableData
     if chunk.isEmpty {  // EOF on the pipe
       pipe.fileHandleForReading.readabilityHandler = nil
-      group.leave()
+      completion.start()
     } else {
-      box.data.append(chunk)
+      completion.data.append(chunk)
     }
   }
 
   return {
-    group.wait()
-    return box.data
+    completion.waitUntilFinished()
+    return completion.data
   }
 }
 
