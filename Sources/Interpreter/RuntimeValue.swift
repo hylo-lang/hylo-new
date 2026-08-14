@@ -26,6 +26,8 @@ struct RuntimeValue {
     storage[baseOffset...] = bytes[...]
   }
 
+  /// Raw bytes of the value.
+  public var bytes: ArraySlice<UInt8> { storage[baseOffset...] }
 }
 
 extension RuntimeValue {
