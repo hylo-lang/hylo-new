@@ -135,12 +135,10 @@ private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
     let chunk = handle.availableData
     if chunk.isEmpty {  // EOF on the pipe
       pipe.fileHandleForReading.readabilityHandler = nil
-      Task {
-        #if os(Windows)
-        try! pipe.fileHandleForReading.close()
-        #endif
-        completion.start()
-      }
+      #if os(Windows)
+      try! pipe.fileHandleForReading.close()
+      #endif
+      completion.start()
     } else {
       completion.data.append(chunk)
     }
