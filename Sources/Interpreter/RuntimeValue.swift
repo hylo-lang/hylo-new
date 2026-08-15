@@ -1,5 +1,6 @@
 import BigInt
 import FrontEnd
+import Utilities
 
 /// A value occurring during program execution.
 struct RuntimeValue {
@@ -28,27 +29,50 @@ struct RuntimeValue {
 }
 
 extension RuntimeValue {
+
   /// Creates an instance for an integer of size `b` bytes having value `n` and
   /// alignment `a`.
   public init(integer n: BigInt, size b: Int, alignment a: Int) {
-    precondition(b > 0)
+    precondition(b == 1 || b == 2 || b == 4 || b == 8)
     precondition(a > 0)
 
-    var unsignedRepresentation = twosComplementRepresentation(n, size: b)
-    var bytes = [UInt8](repeating: 0, count: b)
-    for i in 0..<b {
-      bytes[i] = UInt8(truncatingIfNeeded: unsignedRepresentation)
-      unsignedRepresentation >>= 8
-    }
+    let unsignedRepresentation = twosComplementRepresentation(n, size: b)
+    self.init(
+      bytes: byteRepresentation(unsignedRepresentation, size: b),
+      havingAlignment: a)
+  }
 
-    self.init(bytes: bytes, havingAlignment: a)
+}
+
+/// Returns the in-memory representation of `n` as an unsigned integer of size `b` bytes.
+internal func byteRepresentation(_ n: BigUInt, size b: Int) -> [UInt8] {
+  precondition(b == 1 || b == 2 || b == 4 || b == 8)
+  switch b {
+  case 1:
+    let value = UInt8(truncatingIfNeeded: n)
+    return withUnsafeBytes(of: value, Array.init)
+
+  case 2:
+    let value = UInt16(truncatingIfNeeded: n)
+    return withUnsafeBytes(of: value, Array.init)
+
+  case 4:
+    let value = UInt32(truncatingIfNeeded: n)
+    return withUnsafeBytes(of: value, Array.init)
+
+  case 8:
+    let value = UInt64(truncatingIfNeeded: n)
+    return withUnsafeBytes(of: value, Array.init)
+
+  default:
+    unreachable()
   }
 }
 
 /// Returns the unsigned representation of `n` using `b` bytes in two's-complement form.
 ///
 /// - Precondition: `n` must be representable as a signed integer in `b` bytes.
-func twosComplementRepresentation(_ n: BigInt, size b: Int) -> BigUInt {
+internal func twosComplementRepresentation(_ n: BigInt, size b: Int) -> BigUInt {
   var unsignedRepresentation = n.magnitude
   if n.sign == .minus {
     let maximumUnsignedValue = BigUInt(1) << (8 * b)
