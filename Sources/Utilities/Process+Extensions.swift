@@ -130,7 +130,8 @@ private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
     var data = Data()
     override init() {
       super.init()
-      self.qualityOfService = .userInitiated
+      self.qualityOfService = .userInteractive
+      self.queuePriority = .veryHigh
     }
   }
 
