@@ -25,6 +25,13 @@ final class RuntimeValueTests: XCTestCase {
     XCTAssertEqual(
       RuntimeValue(integer: -1, size: 2, alignment: 2).bytes,
       withUnsafeBytes(of: UInt16(65535), Array.init)[...])
+
+    XCTAssertEqual(
+      RuntimeValue(integer: 1, size: 4, alignment: 4).bytes,
+      withUnsafeBytes(of: UInt32(1), Array.init)[...])
+    XCTAssertEqual(
+      RuntimeValue(integer: 1, size: 8, alignment: 8).bytes,
+      withUnsafeBytes(of: UInt64(1), Array.init)[...])
   }
 
 }
