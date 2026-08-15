@@ -1,0 +1,45 @@
+subscript either(x: auto Int, y: auto Int) auto -> Int {
+  let { x }
+  inout { &x }
+}
+
+fun use(x: Int) {}
+
+fun modify(x: inout Int) {}
+
+public fun main() {
+  var w = 0
+  var x = 0
+
+  // lifetime of y starts here
+  let y = either[w, x]
+
+  use(w)      // OK
+  modify(&w)  // error
+  use(x)      // OK
+  modify(&x)  // error
+
+  use(y)
+  // lifetime of y ends here
+
+  use(w)      // OK
+  modify(&w)  // OK
+  use(x)      // OK
+  modify(&x)  // OK
+
+  // lifetime of z starts here
+  inout z = either[&w, &x]
+
+  use(w)      // error
+  modify(&w)  // error
+  use(x)      // error
+  modify(&x)  // error
+
+  modify(&z)
+  // lifetime of z ends here
+
+  use(w)      // OK
+  modify(&w)  // OK
+  use(x)      // OK
+  modify(&x)  // OK
+}

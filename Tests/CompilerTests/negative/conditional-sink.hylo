@@ -1,0 +1,9 @@
+fun f0(x: sink Int) {
+  // Deinitialization is inserted in the else branch of the condition.
+  if x > 0 { _ = x }
+}
+
+fun f1(x: sink Int) {
+  // Deinitialization is inserted before the loop, revealing an illegal use.
+  while x > 0 { _ = x }
+}

@@ -421,9 +421,14 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns the set of basic blocks reachable from `b`, which includes `b`.
-  public func blocks(reachableFrom b: IRBlock.ID) -> IRBlockSet {
-    var work = [b]
+  /// Returns the set of basic blocks reachable from `root`, which includes `root`.
+  public func blocks(reachableFrom root: IRBlock.ID) -> IRBlockSet {
+    blocks(reachableFrom: [root])
+  }
+
+  /// Returns the set of basic blocks reachable from `roots`, which includes `roots`.
+  public func blocks(reachableFrom roots: [IRBlock.ID]) -> IRBlockSet {
+    var work = roots
     var reachable = IRBlockSet()
     while let w = work.popLast() {
       reachable.insert(w)

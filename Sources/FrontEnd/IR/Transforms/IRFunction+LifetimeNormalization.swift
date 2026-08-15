@@ -25,10 +25,7 @@ extension IRFunction {
     }
 
     var transfer = Transfer(emittingInto: m)
-    transfer.fixedPoint(interpreting: &self, startingFrom: initial, using: &typer)
-
-    assert(!transfer.didFoundError || typer.program[m].containsError, "undiagnosed error")
-    return !transfer.didFoundError
+    return transfer.fixedPoint(interpreting: &self, startingFrom: initial, using: &typer)
   }
 
   /// Configures `context` with the initial state of `p`, which is the `i`-th parameter of `self`.
@@ -60,9 +57,6 @@ private struct Transfer: AbstractTransferFunction {
   /// The context being updated.
   private var context: Context = .init()
 
-  /// `true` iff an application of this function raised an error.
-  fileprivate private(set) var didFoundError: Bool = false
-
   /// Creates an instance for interpreting the contents of `m`.
   fileprivate init(emittingInto m: Module.ID) {
     self.module = m
@@ -78,7 +72,7 @@ private struct Transfer: AbstractTransferFunction {
     _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
     precededBy predecessors: SortedDictionary<IRBlock.ID, Context>,
     using typer: inout Typer
-  ) -> [IRBlock.ID] {
+  ) -> IRBlockSet {
     self.typer = consume typer
     swap(&context, &c)
 
@@ -88,8 +82,8 @@ private struct Transfer: AbstractTransferFunction {
     }
 
     // Are there unstable states that need fixing?
-    let changed = stabilize(predecessors: predecessors, from: &f)
-    if !changed.isEmpty { return changed }
+    let modified = stabilize(predecessors: predecessors, from: &f)
+    if !modified.isEmpty { return modified }
 
     // Interpret the instructions of the block.
     var pc = f.blocks[b].first
@@ -166,8 +160,8 @@ private struct Transfer: AbstractTransferFunction {
   /// the basic blocks that have been modified, if any.
   private mutating func stabilize(
     predecessors: SortedDictionary<IRBlock.ID, Context>, from f: inout IRFunction
-  ) -> [IRBlock.ID] {
-    var changed: [IRBlock.ID] = []
+  ) -> IRBlockSet {
+    var changed: IRBlockSet = []
     for (k, v) in context.locals {
       switch v {
       case .object(let o):
@@ -180,7 +174,7 @@ private struct Transfer: AbstractTransferFunction {
           for (p, c) in predecessors {
             inContext(c) { (me) in
               if me.ensureDeinitialized(parts, at: k, before: f.blocks[p].last!, in: &f) {
-                changed.append(p)
+                changed.insert(p)
               }
             }
           }
@@ -903,7 +897,7 @@ private struct Transfer: AbstractTransferFunction {
 
     if !initialized.isEmpty {
       let success = deinitialize(initialized, at: place, before: i, in: &f)
-      if !success { didFoundError = true }
+      if !success { context.setError() }
       return success
     } else {
       return false
@@ -997,7 +991,7 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Reports the diagnostic `d`.
   private mutating func report(_ d: Diagnostic) {
-    if d.level == .error { didFoundError = true }
+    if d.level == .error { context.setError() }
     program[module].addDiagnostic(d)
   }
 

@@ -131,10 +131,16 @@ public struct Program: Sendable {
         return ir.functions.values.endIndex
       }
 
-      // Mandatory intra-procedural passes.
+      // Apply mandatory intra-procedural passes.
       for i in work.indices {
+        // Make sure there are no silent errors.
+        defer { assert(work[i].function.isDefined || typer.program[m].containsError) }
+
+        // Dead code elimination and constant folding are performed early to reduce the amount of
+        // work fed to more expensive passes downstream. One exception is made for control-flow to
+        // limit the scope of non-local updates made during lifetime normalization.
+
         work[i].function.foldRedundantInstructions()
-        work[i].function.simplifyControlFlow()
         work[i].function.removeCodeAfterNeverReturningCalls()
         work[i].function.removeUnreachableBlocks()
         work[i].function.removedUnusedDefinitions()
@@ -149,6 +155,7 @@ public struct Program: Sendable {
         if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
 
         // The following passes cannot fail.
+        work[i].function.simplifyControlFlow()
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
         work[i].function.existentializeIfExposed(emittingInto: m, using: &typer)
 
