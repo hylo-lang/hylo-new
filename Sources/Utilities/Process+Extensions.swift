@@ -24,7 +24,7 @@ extension Process {
     public var description: String {
       """
       '\(executable) \(arguments.joined(separator: " "))' exited with status \(exitCode).
-      
+
       Standard Output:
       \(standardOutput)
 
@@ -41,8 +41,8 @@ extension Process {
   /// Throws a `NonzeroExit` upon terminating with non-zero exit code.
   public static func executionOutput(
     _ executable: URL, arguments: [String] = []
-  ) throws -> String {
-    let x = try execute(executable, arguments: arguments)
+  ) async throws -> String {
+    let x = try await execute(executable, arguments: arguments)
     if x.exitCode != 0 {
       throw NonzeroExit(
         exitCode: x.exitCode,
@@ -56,9 +56,11 @@ extension Process {
 
   /// Runs `executable` with `arguments`, setting the working
   /// directory if provided, and returns its execution report.
+  ///
+  /// Task cancellation during execution has no effect.
   public static func execute(
     _ executable: URL, arguments: [String] = [], workingDirectory: URL? = nil
-  ) throws -> ExecutionReport {
+  ) async throws -> ExecutionReport {
     let process = Process()
     let standardOutput = Pipe()
     let standardError = Pipe()
@@ -69,29 +71,40 @@ extension Process {
     if let d = workingDirectory {
       process.currentDirectoryURL = d
     }
-    try process.run()
 
-    // Read pipes on background threads to prevent deadlock if output
-    // exceeds pipe buffer size.  The child process will block if pipe
-    // buffers fill up, so we must drain them continuously.
-    let stdoutData = readPipeInBackground(standardOutput)
-    let stderrData = readPipeInBackground(standardError)
+    // Drain both pipes concurrently while the process runs.
+    async let output = readToEnd(standardOutput.fileHandleForReading)
+    async let error = readToEnd(standardError.fileHandleForReading)
 
-    process.waitUntilExit()
+    // Launch the process and wait for it to exit.
+    //
+    // Cancellation of the current task is ignored. We always wait for the process to terminate.
+    do {
+      try await withCheckedThrowingContinuation { (continuation) in
+        process.terminationHandler = { (_) in continuation.resume() }
+        do {
+          try process.run()
+        } catch {
+          continuation.resume(throwing: error)
+        }
+      }
+    } catch {
+      // Close files when `run` fails, then rethrow.
+      try? standardOutput.fileHandleForWriting.close()
+      try? standardError.fileHandleForWriting.close()
+      throw error
+    }
 
-    // Retrieve the data (blocks until background reads complete)
-    let output = stdoutData().decodedAsRepairedUTF8()
-    let error = stderrData().decodedAsRepairedUTF8()
-
+    // Read failures are rethrown once the process has exited.
     return .init(
-      standardOutput: output,
-      standardError: error,
+      standardOutput: try await output.get().decodedAsRepairedUTF8(),
+      standardError: try await error.get().decodedAsRepairedUTF8(),
       exitCode: process.terminationStatus,
       terminationReason: process.terminationReason)
   }
 
   /// The result of executing a process.
-  public struct ExecutionReport {
+  public struct ExecutionReport: Sendable {
 
     /// The data written to the standard output of the process.
     public let standardOutput: String
@@ -119,34 +132,14 @@ extension Process {
   }
 }
 
-/// Starts reading all data from `pipe` using event-driven I/O.
-///
-/// Returns a closure that blocks until reading completes and returns the data.
-/// This prevents pipe buffer deadlocks by draining pipes while the process runs.
-/// Uses non-blocking I/O with readability handlers for efficiency.
-private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
-  // Box to safely share mutable state across concurrency boundary
-  final class ReadCompletion: Operation, @unchecked Sendable {
-    var data = Data()
-  }
-
-  let completion = ReadCompletion()
-  pipe.fileHandleForReading.readabilityHandler = { handle in
-    let chunk = handle.availableData
-    if chunk.isEmpty {  // EOF on the pipe
-      pipe.fileHandleForReading.readabilityHandler = nil
-      #if os(Windows)
-      try! pipe.fileHandleForReading.close()
-      #endif
-      completion.start()
-    } else {
-      completion.data.append(chunk)
-    }
-  }
-
-  return {
-    completion.waitUntilFinished()
-    return completion.data
+/// Returns the data read from `handle` until end-of-file, or the error that
+/// interrupted the read.
+private func readToEnd(_ handle: FileHandle) async -> Result<Data, any Error> {
+  await withCheckedContinuation { (continuation) in
+    Thread {
+      // Block the thread until we read the file to end.
+      continuation.resume(returning: Result { try handle.readToEnd() ?? Data() })
+    }.start()
   }
 }
 

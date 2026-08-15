@@ -213,7 +213,7 @@ private typealias Module = FrontEnd.Module
 
       assert(outputType == .binary)
       try await perform("generating executable", for: module) {
-        try driver.generateExecutable(from: module, writingTo: binaryFile(product))
+        try await driver.generateExecutable(from: module, writingTo: binaryFile(product))
       }
     }
 

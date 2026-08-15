@@ -204,8 +204,8 @@ public struct Driver {
     from module: Module.ID,
     withCSources cSources: [URL] = [],
     writingTo output: URL
-  ) throws -> PhaseResult {
-    let elapsed = try ContinuousClock().measure {
+  ) async throws -> PhaseResult {
+    let elapsed = try await ContinuousClock().measure {
       let modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
 
@@ -217,12 +217,13 @@ public struct Driver {
         cSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
       }
 
-      try FileManager.default.withUniqueTemporaryDirectory { (d) in
+      try await FileManager.default.withUniqueTemporaryDirectory { (d) in
         let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
-        let cObjects = try cSources.map { (s) in
-          try compileCToObject(source: s, destinationDirectory: d)
+        var cObjects: [URL] = []
+        for s in cSources {
+          cObjects.append(try await compileCToObject(source: s, destinationDirectory: d))
         }
-        try linkExecutable(from: hyloObjects + cObjects, writingTo: output)
+        try await linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }
     }
     return .init(elapsed: elapsed, containsError: program[module].containsError)
@@ -259,7 +260,7 @@ public struct Driver {
   /// Compiles `source` using `clang` to an object file.
   ///
   /// Returns the path to the object file within `destinationDirectory`.
-  public func compileCToObject(source: URL, destinationDirectory: URL) throws -> URL {
+  public func compileCToObject(source: URL, destinationDirectory: URL) async throws -> URL {
     let uniquePrefix = source.hashValue
     let fileName = source.deletingPathExtension().appendingPathExtension("o").lastPathComponent
 
@@ -269,7 +270,7 @@ public struct Driver {
     var a = ["-c", source.path, "-o", o.path]
     if let r = relocation.asClangArgument { a.append(r) }
 
-    _ = try Process.executionOutput(
+    _ = try await Process.executionOutput(
       try Host.findBinaryExecutable(invokedAs: "clang"), arguments: a)
     return o
   }
@@ -368,7 +369,7 @@ public struct Driver {
   /// Links the provided object files into an executable at `output`, using lld.
   ///
   /// - Throws: if the parent folder of `output` doesn't exist.
-  private func linkExecutable(from objectFiles: [URL], writingTo output: URL) throws {
+  private func linkExecutable(from objectFiles: [URL], writingTo output: URL) async throws {
     var arguments = ["-o", output.path]
     arguments += librarySearchPaths.map({ "-L\($0.path)" })
     arguments += librariesToLink.map({ "-l\($0)" })
@@ -376,13 +377,14 @@ public struct Driver {
 
     #if os(macOS)
     let xcrun = try Host.findBinaryExecutable(invokedAs: "xcrun")
-    let sdk = try Process.executionOutput(xcrun, arguments: ["--sdk", "macosx", "--show-sdk-path"])
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let sdk = try await Process.executionOutput(
+      xcrun, arguments: ["--sdk", "macosx", "--show-sdk-path"]
+    ).trimmingCharacters(in: .whitespacesAndNewlines)
     arguments += ["-isysroot", sdk, "-lSystem"]
     #endif
 
     let clang = try Host.findBinaryExecutable(invokedAs: "clang")
-    _ = try Process.executionOutput(clang, arguments: arguments)
+    _ = try await Process.executionOutput(clang, arguments: arguments)
   }
 
   /// The name of `module`.

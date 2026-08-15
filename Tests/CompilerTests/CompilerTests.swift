@@ -249,7 +249,7 @@ final class CompilerTests: XCTestCase {
       // Should an executable be tested?
       if input.manifest.stage == .execution {
         let e = try XCTUnwrap(r.artifacts.executable)
-        let x = try Process.execute(e, workingDirectory: input.workingDirectory)
+        let x = try await Process.execute(e, workingDirectory: input.workingDirectory)
         if input.manifest.shouldTrap {
           XCTAssert(x.terminationReason == .uncaughtSignal, "program did not trap")
         } else {
@@ -408,7 +408,8 @@ final class CompilerTests: XCTestCase {
     if stage == .execution {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
-      _ = try driver.generateExecutable(from: m, withCSources: cSources, writingTo: executable)
+      _ = try await driver.generateExecutable(
+        from: m, withCSources: cSources, writingTo: executable)
       artifacts.executable = executable
     }
   }
