@@ -80,8 +80,8 @@ extension Process {
     process.waitUntilExit()
 
     // Retrieve the data (blocks until background reads complete)
-    let output = stdoutData().decodedAsRepairedUTF8()
-    let error = stderrData().decodedAsRepairedUTF8()
+    let output = try stdoutData().decodedAsRepairedUTF8()
+    let error = try stderrData().decodedAsRepairedUTF8()
 
     return .init(
       standardOutput: output,
@@ -124,7 +124,7 @@ extension Process {
 /// Returns a closure that blocks until reading completes and returns the data.
 /// This prevents pipe buffer deadlocks by draining pipes while the process runs.
 /// Uses non-blocking I/O with readability handlers for efficiency.
-private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
+private func readPipeInBackground(_ pipe: Pipe) -> () throws -> Data {
   // Box to safely share mutable state across concurrency boundary
   final class ReadCompletion: Operation, @unchecked Sendable {
     var data = Data()
@@ -139,7 +139,6 @@ private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
   pipe.fileHandleForReading.readabilityHandler = { handle in
     let chunk = handle.availableData
     if chunk.isEmpty {  // EOF on the pipe
-      pipe.fileHandleForReading.closeFile()
       pipe.fileHandleForReading.readabilityHandler = nil
       completion.start()
     } else {
@@ -148,6 +147,7 @@ private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
   }
 
   return {
+    try pipe.fileHandleForReading.close()
     completion.waitUntilFinished()
     return completion.data
   }
