@@ -299,9 +299,9 @@ extension Program {
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
     case .advancedByBytes(let t):
       let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
-      let n = insertLoad([s.arguments[1]], of: t, in: &ctx)
+      let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: p, typed: ctx.module.llvm.i8, indices: n, at: ctx.insertionPoint!).v
+        of: p, typed: ctx.module.llvm.i8, indices: offsets , at: ctx.insertionPoint!).v
 
     case .add(let o, let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
