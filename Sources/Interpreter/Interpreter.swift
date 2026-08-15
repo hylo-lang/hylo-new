@@ -398,6 +398,7 @@ extension Program {
 }
 
 extension IRAccess {
+
   /// The associated permissions and obligations.
   var finalCapability: AccessEffect {
     // Because IR analysis should ensure single effect.
@@ -405,6 +406,7 @@ extension IRAccess {
     precondition(capabilities.count == 1)
     return capabilities.first!
   }
+
 }
 
 /// An indication of malformed IR.
