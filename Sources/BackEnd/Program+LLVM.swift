@@ -185,6 +185,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IREnumTag.self), in: &ctx)
     case IRConditionalBranch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRConditionalBranch.self), in: &ctx)
+    case IRConstantString.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRConstantString.self), in: &ctx)
     case IRGlobalAccess.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRGlobalAccess.self), in: &ctx)
     case IRLoad.self:
@@ -512,6 +514,15 @@ extension Program {
     ctx.module.llvm.insertCondBr(
       if: ctx.value[s.condition]!, then: a, else: b, at: ctx.insertionPoint!)
     return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRConstantString.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    ctx.value[.register(i.erased)] = demandGlobalString(s.contents, in: &ctx.module)
+    return ctx.ir.instruction(after: i.erased)
   }
 
   /// Generates the LLVM IR code corresponding to `i`.
@@ -1096,32 +1107,34 @@ extension Program {
     return symbol
   }
 
+  /// Returns the internal representation of an instance of `Hylo.String` equal to `value` and
+  /// whose contents is allocated statically.
   private func demandGlobalString(
-    _ s: String, in ctx: inout ModuleGenerationContext
+    _ value: String, in ctx: inout ModuleGenerationContext
   ) -> LLVMValue {
     // Did we compute the representation already?
-    if let v = ctx.strings[s] { return v }
+    if let v = ctx.strings[value] { return v }
 
     let iptr = ctx.llvm.iptr
-    let payloadSize = s.utf8.count
+    let payloadSize = value.utf8.count
     let pointerSize = ctx.llvm.layout.pointerSize
 
     // Do the contents fit inline storage?
     if (payloadSize < pointerSize) && (pointerSize <= 8) {
       var units = UInt64(truncatingIfNeeded: payloadSize) << 2
-      for (i, u) in s.utf8.enumerated() {
+      for (i, u) in value.utf8.enumerated() {
         units |= UInt64(u) << (i + 1) * 8
       }
       let v = iptr.unsafe[].constant(units).v
-      ctx.strings[s] = v
+      ctx.strings[value] = v
       return v
     }
 
     // Contents must be allocated in static memory.
-    let name = String(FNV1.hash(s.utf8, into: FNV1.u128()).state, radix: 36)
-    let payload = ctx.llvm.arrayConstant(bytes: s.utf8)
+    let name = String(FNV1.hash(value.utf8, into: FNV1.u128()).state, radix: 36)
+    let payload = ctx.llvm.arrayConstant(bytes: value.utf8)
     let storage = ctx.llvm.structType([iptr.t, iptr.t, payload.unsafe[].type])
-    let symbol = ctx.llvm.declareGlobalVariable("str_\(name)", storage)
+    let symbol = ctx.llvm.declareGlobalVariable("$hstr\(name)", storage)
     ctx.llvm.setLinkage(.private, for: symbol)
 
     // Guarantee minimum alignment of 4 so that we can reserve low bits for tagging.
@@ -1136,7 +1149,7 @@ extension Program {
 
     let v = ctx.llvm.constantPointerToInteger(bitPattern: symbol)
     let w = ctx.llvm.constantAdd(v, iptr.unsafe[].constant(0b11))
-    ctx.strings[s] = w
+    ctx.strings[value] = w
     return w
   }
 
