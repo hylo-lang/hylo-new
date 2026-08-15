@@ -72,7 +72,7 @@ private struct Transfer: AbstractTransferFunction {
     _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
     precededBy predecessors: SortedDictionary<IRBlock.ID, Context>,
     using typer: inout Typer
-  ) -> [IRBlock.ID] {
+  ) -> IRBlockSet {
     self.typer = consume typer
     swap(&context, &c)
 
@@ -82,8 +82,8 @@ private struct Transfer: AbstractTransferFunction {
     }
 
     // Are there unstable states that need fixing?
-    let changed = stabilize(predecessors: predecessors, from: &f)
-    if !changed.isEmpty { return changed }
+    let modified = stabilize(predecessors: predecessors, from: &f)
+    if !modified.isEmpty { return modified }
 
     // Interpret the instructions of the block.
     var pc = f.blocks[b].first
@@ -160,8 +160,8 @@ private struct Transfer: AbstractTransferFunction {
   /// the basic blocks that have been modified, if any.
   private mutating func stabilize(
     predecessors: SortedDictionary<IRBlock.ID, Context>, from f: inout IRFunction
-  ) -> [IRBlock.ID] {
-    var changed: [IRBlock.ID] = []
+  ) -> IRBlockSet {
+    var changed: IRBlockSet = []
     for (k, v) in context.locals {
       switch v {
       case .object(let o):
@@ -174,7 +174,7 @@ private struct Transfer: AbstractTransferFunction {
           for (p, c) in predecessors {
             inContext(c) { (me) in
               if me.ensureDeinitialized(parts, at: k, before: f.blocks[p].last!, in: &f) {
-                changed.append(p)
+                changed.insert(p)
               }
             }
           }

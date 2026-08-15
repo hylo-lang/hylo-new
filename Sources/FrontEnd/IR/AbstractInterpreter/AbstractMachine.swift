@@ -23,17 +23,17 @@ internal protocol AbstractTransferFunction {
   /// `typer` to compute type-related information.
   ///
   /// `c` is the context obtained by merging the contents of `predecessors`, which is a map from
-  /// a subset of the predecessors of `b` to their corresponding post-context. This map is only
+  /// a subset of the predecessors of `b` to their corresponding post-contexts. This map is only
   /// defined for the basic blocks that have been visited at least once.
   ///
-  /// The return value is a set containing the basic blocks that may have been modified during the
-  /// application of this method. Those blocks are placed back to the work list of the interpreter
-  /// during the computation of a fixed point.
+  /// The return value is the set of basic blocks that have been modified during the call, each of
+  /// which must be a predecessor of `b`. These blocks are moved to the work list of the abstract
+  /// interpreter during the computation of a fixed point, even if they have already been visited.
   mutating func apply(
     _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
     precededBy predecessors: SortedDictionary<IRBlock.ID, Context>,
     using typer: inout Typer
-  ) -> [IRBlock.ID]
+  ) -> IRBlockSet
 
 }
 
@@ -79,9 +79,6 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
   /// A FILO list of blocks to visit.
   private var work: Deque<IRBlock.ID> = []
 
-  /// The set of blocks that no longer need to be visited.
-  private var done: IRBlockSet = []
-
   /// Creates an instance for interpreting `f` with transfer function `interpret`.
   fileprivate init(interpreting f: IRFunction) {
     self.cfg = f.controlFlow()
@@ -96,17 +93,9 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
     with interpret: inout Transfer, _ typer: inout Typer,
     startingFrom initialContext: Transfer.Context
   ) -> Bool {
-    // Process the entry.
-    let entry = dominance.root
-    let (contextAfterEntry, _) = postContext(
-      of: entry, in: &f, precededBy: [:], mergedInto: initialContext,
-      using: &interpret, &typer)
-
-    state = [entry: (sources: [], pre: initialContext, contextAfterEntry)]
-    done.insert(entry)
-
-    // Enumerate the blocks to visit according to the dominance relation.
-    work = Deque(dominance.dropFirst())
+    // The dominance relation is a good heuristic to visit basic blocks in the right order.
+    work = Deque(dominance)
+    state = [:]
 
     // Search for a fixed point.
     var success = true
@@ -116,35 +105,36 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
         continue
       }
 
-      let (sources, before) = preContext(of: blockToProcess)
+      let (sources, before) = preContext(of: blockToProcess, root: initialContext)
 
       // Did the initial conditions of the block changed since the last time we processed it?
       if let s = state[blockToProcess], s.sources == sources.keys, s.pre == before {
-        if sources.count == cfg.predecessors(of: blockToProcess).count {
-          done.insert(blockToProcess)
-        } else {
+        if sources.count != cfg.predecessors(of: blockToProcess).count {
           work.append(blockToProcess)
         }
       }
 
       // If the initial conditions changed, interpret the block.
       else {
-        let (after, updated) = postContext(
+        let (after, updates) = postContext(
           of: blockToProcess, in: &f, precededBy: sources, mergedInto: before,
           using: &interpret, &typer)
         state[blockToProcess] = (sources: sources.keys, pre: before, post: after)
-        work.append(blockToProcess)
+        success = success && !after.containsError
 
-        // `updated` contains the blocks that have been modified by the transfer function and must
-        // be re-inserted into the work list, along with their successors.
-        var ls: [IRBlock.ID] = []
-        for u in updated {
-          state[u] = nil
-          if done.remove(u) != nil { ls.append(u) }
-        }
-        while let u = ls.popLast() {
-          work.append(u)
-          ls.append(contentsOf: cfg.successors(of: u).filter(done.contains(_:)))
+        if updates.isEmpty {
+          // No changes to other blocks; just schedule an additional visit.
+          if !after.containsError { work.append(blockToProcess) }
+        } else {
+          // Other blocks changed. The post context of each block reachable from a modified block
+          // has to be invalidated and a visit must be rescheduled.
+          let invalidated = f.blocks(reachableFrom: Array(updates.elements))
+          for b in invalidated.elements {
+            if let s = state[b], !s.post.containsError {
+              state[b] = nil
+              work.append(b)
+            }
+          }
         }
       }
     }
@@ -173,13 +163,16 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
     state[b] != nil
   }
 
-  /// Returns the pre-context of `b` and the predecessors from which it's been computed.
+  /// Returns the pre-context of `b` and the predecessors from which it's been computed iff `b` is
+  /// not the function's entry; otherwise, returns `initialContext`.
   ///
   /// - Requires: `isVisitable(b)` is `true`
   private func preContext(
-    of b: IRBlock.ID
+    of b: IRBlock.ID, root initialContext: Transfer.Context
   ) -> (sources: SortedDictionary<IRBlock.ID, Transfer.Context>, pre: Transfer.Context) {
-    assert(b != dominance.root, "entry shouldn't have any predecessor")
+    if b == dominance.root {
+      return ([:], initialContext)
+    }
 
     // If no predecessor has been visited yet, just create an empty context.
     let predecessors = cfg.predecessors(of: b)
@@ -214,10 +207,10 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
     precededBy predecessors: SortedDictionary<IRBlock.ID, Transfer.Context>,
     mergedInto initialContext: Transfer.Context,
     using interpret: inout Transfer, _ typer: inout Typer
-  ) -> (next: Transfer.Context, updated: [IRBlock.ID]) {
+  ) -> (next: Transfer.Context, updates: IRBlockSet) {
     var next = initialContext
-    let updated = interpret.apply(b, from: &f, in: &next, precededBy: predecessors, using: &typer)
-    return (next, updated)
+    let updates = interpret.apply(b, from: &f, in: &next, precededBy: predecessors, using: &typer)
+    return (next, updates)
   }
 
 }

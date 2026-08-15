@@ -88,7 +88,7 @@ private struct Transfer: AbstractTransferFunction {
     _ b: IRBlock.ID, from f: inout IRFunction, in c: inout Context,
     precededBy predecessors: SortedDictionary<IRBlock.ID, Context>,
     using typer: inout Typer
-  ) -> [IRBlock.ID] {
+  ) -> IRBlockSet {
     self.typer = consume typer
     swap(&context, &c)
 

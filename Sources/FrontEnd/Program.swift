@@ -137,7 +137,6 @@ public struct Program: Sendable {
         defer { assert(work[i].function.isDefined || typer.program[m].containsError) }
 
         work[i].function.foldRedundantInstructions()
-        work[i].function.simplifyControlFlow()
         work[i].function.removeCodeAfterNeverReturningCalls()
         work[i].function.removeUnreachableBlocks()
         work[i].function.removedUnusedDefinitions()
@@ -152,6 +151,7 @@ public struct Program: Sendable {
         if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
 
         // The following passes cannot fail.
+        work[i].function.simplifyControlFlow()
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
         work[i].function.existentializeIfExposed(emittingInto: m, using: &typer)
 
