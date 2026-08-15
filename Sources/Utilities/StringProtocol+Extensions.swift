@@ -34,6 +34,17 @@ extension StringProtocol {
     replacingOccurrences(of: "\r\n", with: "\n")  // Windows
   }
 
+  /// `self` in which escaped sequences have been replaced by the characters that they represent.
+  public var unescaped: String {
+    let entities = ["\0", "\t", "\n", "\r", "\"", "\'", "\\"]
+    var current = String(self)
+    for e in entities {
+      let s = String(e.debugDescription.dropFirst().dropLast())
+      current = current.replacingOccurrences(of: s, with: e)
+    }
+    return current
+  }
+
 }
 
 extension StringProtocol where SubSequence == Substring {
