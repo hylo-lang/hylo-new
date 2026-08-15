@@ -403,8 +403,7 @@ extension IRAccess {
   var finalCapability: AccessEffect {
     // Because IR analysis should ensure single effect.
     // See: Sources/FrontEnd/IR/Instructions/IRAccess.swift.
-    precondition(capabilities.count == 1)
-    return capabilities.first!
+    capabilities.uniqueElement!
   }
 
 }
