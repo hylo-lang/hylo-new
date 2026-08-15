@@ -120,28 +120,6 @@ extension Process {
 }
 
 
-// Windows crashes when we use `Operation` for synchronization, and
-// macOS gives priority inversion warnings when we use
-// `DispatchGroup`, thus the two implementations of `OneShotLock`.
-
-#if os(Windows)
-/// A lock that starts out locked and can be unlocked exactly once (from one
-/// thread) and waited on (from another thread).
-private class OneShotLock: @unchecked Sendable {
-
-  private let implementation = DispatchGroup()
-
-  /// Creates a locked instance.
-  init() { implementation.enter() }
-
-  /// Unlocks `self`.
-  func unlock() { implementation.leave() }
-
-  /// Blocks the current thread until `unlock()` is called on `self`.
-  func waitUntilUnlocked() { implementation.wait() }
-
-}
-#else
 /// A lock that starts out locked and can be unlocked exactly once (from one
 /// thread) and waited on (from another thread).
 private class OneShotLock: Operation, @unchecked Sendable {
@@ -153,7 +131,6 @@ private class OneShotLock: Operation, @unchecked Sendable {
   func waitUntilUnlocked() { self.waitUntilFinished() }
 
 }
-#endif
 
 /// Starts reading all data from `pipe` using event-driven I/O.
 ///
@@ -173,7 +150,10 @@ private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
     let chunk = handle.availableData
     if chunk.isEmpty {  // EOF on the pipe
       pipe.fileHandleForReading.readabilityHandler = nil
-      completion.unlock()
+      try! pipe.fileHandleForReading.close()
+      Task {
+        completion.unlock()
+      }
     } else {
       completion.collectedOutput.append(chunk)
     }
