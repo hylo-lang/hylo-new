@@ -128,7 +128,9 @@ private func readPipeInBackground(_ pipe: Pipe) -> () -> Data {
   // Box to safely share mutable state across concurrency boundary
   final class ReadCompletion: Operation, @unchecked Sendable {
     var data = Data()
-    override func main() {
+    override init() {
+      super.init()
+      self.qualityOfService = .userInitiated
     }
   }
 
