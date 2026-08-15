@@ -1,0 +1,8 @@
+/// A Unicode string.
+@_symbol("String")
+public struct String is Deinitializable {
+
+  /// The UTF8 code units in the collection.
+  var units: UInt64
+
+}
