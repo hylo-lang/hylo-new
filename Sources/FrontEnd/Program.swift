@@ -136,6 +136,10 @@ public struct Program: Sendable {
         // Make sure there are no silent errors.
         defer { assert(work[i].function.isDefined || typer.program[m].containsError) }
 
+        // Dead code elimination and constant folding are performed early to reduce the amount of
+        // work fed to more expensive passes downstream. One exception is made for control-flow to
+        // limit the scope of non-local updates made during lifetime normalization.
+
         work[i].function.foldRedundantInstructions()
         work[i].function.removeCodeAfterNeverReturningCalls()
         work[i].function.removeUnreachableBlocks()
