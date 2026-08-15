@@ -1,0 +1,677 @@
+fun expect(c: Builtin.i1) {
+  precondition(Bool(value: c))
+}
+
+fun expect_not(c: Builtin.i1) {
+  precondition(!Bool(value: c))
+}
+
+// MARK: Testing Builtin.add_*_*()
+
+fun test_Builtin_add() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.add_i64((1 as Int64).value, (2 as Int64).value),
+    (3 as Int64).value))
+
+  // `add` wraps around on overflow.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.add_i64(Int64.max().value, (1 as Int64).value),
+    Int64.min().value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.add_i64(Int64.min().value, (-1 as Int64).value),
+    Int64.max().value))
+
+  // `nuw`/`nsw` variants work right at the limits.
+  expect(Builtin.icmp_eq_i8(
+    Builtin.add_nuw_i8((254 as UInt8).value, (1 as UInt8).value),
+    UInt8.max().value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.add_nsw_i8((-127 as Int8).value, (-1 as Int8).value),
+    Int8.min().value))
+}
+
+// MARK: Testing Builtin.address()
+
+fun test_Builtin_address() {
+  let x = 42 as Int64
+
+  // The address of a binding's storage is non-null and stable.
+  expect(Builtin.icmp_ne_ptr(Builtin.address(of: x), Builtin.zeroinitializer_ptr()))
+  expect(Builtin.icmp_eq_ptr(Builtin.address(of: x), Builtin.address(of: x)))
+}
+
+// MARK: Testing Builtin.advanced_by_bytes_*()
+
+/// Four bytes laid out contiguously, since all properties have the same alignment.
+struct Quad is Deinitializable {
+  public memberwise init
+  public var a: UInt8
+  public var b: UInt8
+  public var c: UInt8
+  public var d: UInt8
+}
+
+fun test_Builtin_advanced_by_bytes() {
+  var q = Quad(a: 1 as UInt8, b: 2 as UInt8, c: 3 as UInt8, d: 4 as UInt8)
+  let p = Builtin.address(of: q)
+
+  // Advancing by zero bytes is the identity.
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_word(p, (0 as Int).value), p))
+
+  // Offsets are measured in bytes.
+  expect(Builtin.icmp_eq_ptr(
+    Builtin.advanced_by_bytes_word(p, (3 as Int).value), Builtin.address(of: q.d)))
+
+  // Offsets are signed.
+  let e = Builtin.address(of: q.d)
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_word(e, (-3 as Int).value), p))
+
+  // The offset may have any builtin integer type.
+  expect(Builtin.icmp_eq_ptr(
+    Builtin.advanced_by_bytes_i32(p, (2 as Int32).value), Builtin.address(of: q.c)))
+  expect(Builtin.icmp_eq_ptr(
+    Builtin.advanced_by_bytes_i32(e, (-1 as Int32).value), Builtin.address(of: q.c)))
+
+  // The storage addressed by an advanced address is that of the corresponding property.
+  let x = Builtin.advanced_by_bytes_word(p, (2 as Int).value) as* (let UInt8)
+  precondition(x == (3 as UInt8))
+
+  inout y = Builtin.advanced_by_bytes_word(p, (1 as Int).value) as* (inout UInt8)
+  &y = 7 as UInt8
+  precondition(q.b == (7 as UInt8))
+}
+
+// MARK: Testing Builtin.and_*()
+
+fun test_Builtin_and() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.and_i64((12 as Int64).value, (10 as Int64).value),
+    (8 as Int64).value))
+
+  // All-ones is the identity of `and`; zero absorbs.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.and_i64((42 as Int64).value, (-1 as Int64).value),
+    (42 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.and_i64((42 as Int64).value, (0 as Int64).value),
+    (0 as Int64).value))
+}
+
+// MARK: Testing Builtin.assume_initialized()
+
+fun s(a: Builtin.ptr) {
+  inout v = a as* (inout Int64)
+  &v = 1334 as Int64
+}
+
+fun test_Builtin_assume_initialized() {
+  var x = 42 as Int64
+  let a = Builtin.address(of: x)
+  Builtin.assume_uninitialized(x)
+
+  s(a)
+
+  Builtin.assume_initialized(x)
+  precondition(x == (1334 as Int64))
+}
+
+// MARK: Testing Builtin.fadd_*_*()
+
+fun test_Builtin_fadd() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fadd_float64((1.5 as Float64).value, (2.25 as Float64).value),
+    (3.75 as Float64).value))
+
+  // Overflow produces infinity, which exceeds every finite value.
+  expect(Builtin.fcmp_ogt_float64(
+    Builtin.fadd_float64((1.0e308 as Float64).value, (1.0e308 as Float64).value),
+    (1.7976931348623157e308 as Float64).value))
+
+  // Fast-math flags do not change exact computations.
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fadd_fast_float64((1.5 as Float64).value, (2.25 as Float64).value),
+    (3.75 as Float64).value))
+}
+
+// MARK: Testing Builtin.fcmp_*_*()
+
+fun test_Builtin_fcmp() {
+  let one = (1.0 as Float64).value
+  let two = (2.0 as Float64).value
+  let nan = Builtin.fdiv_float64((0.0 as Float64).value, (0.0 as Float64).value)
+
+  expect(Builtin.fcmp_oeq_float64(one, one))
+  expect(Builtin.fcmp_one_float64(one, two))
+  expect(Builtin.fcmp_olt_float64(one, two))
+  expect(Builtin.fcmp_ole_float64(one, one))
+  expect(Builtin.fcmp_ogt_float64(two, one))
+  expect(Builtin.fcmp_oge_float64(two, two))
+
+  // `ord` holds without NaN; `uno` holds with it.
+  expect(Builtin.fcmp_ord_float64(one, two))
+  expect_not(Builtin.fcmp_ord_float64(nan, one))
+  expect(Builtin.fcmp_uno_float64(nan, one))
+  expect_not(Builtin.fcmp_uno_float64(one, two))
+
+  // NaN is not ordered-equal to anything, including itself.
+  expect_not(Builtin.fcmp_oeq_float64(nan, nan))
+  expect(Builtin.fcmp_ueq_float64(nan, one)) // unordered or equal
+  expect(Builtin.fcmp_une_float64(nan, nan)) // unordered or not equal
+}
+
+// MARK: Testing Builtin.fdiv_*()
+
+fun test_Builtin_fdiv() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fdiv_float64((3.0 as Float64).value, (2.0 as Float64).value),
+    (1.5 as Float64).value))
+
+  // Division by zero yields signed infinities.
+  expect(Builtin.fcmp_ogt_float64(
+    Builtin.fdiv_float64((1.0 as Float64).value, (0.0 as Float64).value),
+    (1.7976931348623157e308 as Float64).value))
+  expect(Builtin.fcmp_olt_float64(
+    Builtin.fdiv_float64((-1.0 as Float64).value, (0.0 as Float64).value),
+    (-1.7976931348623157e308 as Float64).value))
+}
+
+// MARK: Testing Builtin.fmul_*_*()
+
+fun test_Builtin_fmul() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fmul_float64((1.5 as Float64).value, (2.0 as Float64).value),
+    (3.0 as Float64).value))
+
+  // Overflow produces infinity, which exceeds every finite value.
+  expect(Builtin.fcmp_ogt_float64(
+    Builtin.fmul_float64((1.0e308 as Float64).value, (10.0 as Float64).value),
+    (1.7976931348623157e308 as Float64).value))
+
+  // Fast-math flags do not change exact computations.
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fmul_nnan_ninf_float64((1.5 as Float64).value, (2.0 as Float64).value),
+    (3.0 as Float64).value))
+}
+
+// MARK: Testing Builtin.fpext_*_*()
+
+fun test_Builtin_fpext() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fpext_float32_float64((1.5 as Float32).value),
+    (1.5 as Float64).value))
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fpext_float32_float64((-0.5 as Float32).value),
+    (-0.5 as Float64).value))
+}
+
+// MARK: Testing Builtin.fptosi_*_*()
+
+fun test_Builtin_fptosi() {
+  // `fptosi` truncates towards zero.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptosi_float64_i64((4.99 as Float64).value),
+    (4 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptosi_float64_i64((-4.5 as Float64).value),
+    (-4 as Int64).value))
+
+  // The 64-bit minimum is exactly convertible.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptosi_float64_i64((-9223372036854775808.0 as Float64).value),
+    Int64.min().value))
+}
+
+// MARK: Testing Builtin.fptoui_*_*()
+
+fun test_Builtin_fptoui() {
+  // `fptoui` truncates towards zero. Negative operands are poison unless the truncated value is
+  // representable, i.e. only above -1.0: truncation makes that 0, whereas rounding down wouldn't.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptoui_float64_i64((4.5 as Float64).value),
+    (4 as UInt64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptoui_float64_i64((-0.5 as Float64).value),
+    (0 as UInt64).value))
+
+  // The largest double below 2^64 converts at the limit.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.fptoui_float64_i64((18446744073709549568.0 as Float64).value),
+    (18446744073709549568 as UInt64).value))
+}
+
+// MARK: Testing Builtin.fptrunc_*_*()
+
+fun test_Builtin_fptrunc() {
+  expect(Builtin.fcmp_oeq_float32(
+    Builtin.fptrunc_float64_float32((1.5 as Float64).value),
+    (1.5 as Float32).value))
+  expect(Builtin.fcmp_oeq_float32(
+    Builtin.fptrunc_float64_float32((-0.5 as Float64).value),
+    (-0.5 as Float32).value))
+}
+
+// MARK: Testing Builtin.frem_*()
+
+fun test_Builtin_frem() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.frem_float64((5.5 as Float64).value, (2.0 as Float64).value),
+    (1.5 as Float64).value))
+
+  // `frem` takes the sign of the dividend.
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.frem_float64((-5.5 as Float64).value, (2.0 as Float64).value),
+    (-1.5 as Float64).value))
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.frem_float64((5.5 as Float64).value, (-2.0 as Float64).value),
+    (1.5 as Float64).value))
+}
+
+// MARK: Testing Builtin.fsub_*()
+
+fun test_Builtin_fsub() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fsub_float64((3.75 as Float64).value, (2.25 as Float64).value),
+    (1.5 as Float64).value))
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.fsub_float64((0.0 as Float64).value, (1.5 as Float64).value),
+    (-1.5 as Float64).value))
+}
+
+// MARK: Testing Builtin.icmp_*_*()
+
+fun test_Builtin_icmp() {
+  let zero = (0 as Int64).value
+  let minus_one = (-1 as Int64).value
+
+  expect(Builtin.icmp_eq_i64(zero, zero))
+  expect_not(Builtin.icmp_ne_i64(zero, zero))
+  expect(Builtin.icmp_ne_i64(minus_one, zero))
+
+  // Signed: -1 < 0 and min < max.
+  expect(Builtin.icmp_slt_i64(minus_one, zero))
+  expect(Builtin.icmp_sle_i64(minus_one, minus_one))
+  expect(Builtin.icmp_sgt_i64(zero, minus_one))
+  expect(Builtin.icmp_sge_i64(zero, zero))
+  expect(Builtin.icmp_slt_i64(Int64.min().value, Int64.max().value))
+
+  // Unsigned: the same bit patterns order the other way around.
+  expect(Builtin.icmp_ugt_i64(minus_one, zero))
+  expect(Builtin.icmp_uge_i64(minus_one, minus_one))
+  expect(Builtin.icmp_ult_i64(zero, minus_one))
+  expect(Builtin.icmp_ule_i64(zero, zero))
+  expect(Builtin.icmp_ugt_i64(Int64.min().value, Int64.max().value))
+}
+
+// MARK: Testing Builtin.mul_*_*()
+
+fun test_Builtin_mul() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.mul_i64((6 as Int64).value, (7 as Int64).value),
+    (42 as Int64).value))
+
+  // `mul` wraps around on overflow.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.mul_i64(Int64.max().value, (2 as Int64).value),
+    (-2 as Int64).value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.mul_i8((64 as Int8).value, (2 as Int8).value),
+    Int8.min().value))
+
+  // `nuw`/`nsw` variants work right at the limits.
+  expect(Builtin.icmp_eq_i8(
+    Builtin.mul_nuw_i8((85 as UInt8).value, (3 as UInt8).value),
+    UInt8.max().value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.mul_nsw_i8((-64 as Int8).value, (2 as Int8).value),
+    Int8.min().value))
+}
+
+// MARK: Testing Builtin.or_*()
+
+fun test_Builtin_or() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.or_i64((12 as Int64).value, (10 as Int64).value),
+    (14 as Int64).value))
+
+  // Zero is the identity of `or`; all-ones absorbs.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.or_i64((42 as Int64).value, (0 as Int64).value),
+    (42 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.or_i64((42 as Int64).value, (-1 as Int64).value),
+    (-1 as Int64).value))
+}
+
+// MARK: Testing Builtin.sadd_with_overflow_*()
+
+fun test_Builtin_sadd_with_overflow() {
+  let (r0, o0) = Builtin.sadd_with_overflow_i64((1 as Int64).value, (2 as Int64).value)
+  expect(Builtin.icmp_eq_i64(r0, (3 as Int64).value))
+  expect_not(o0)
+
+  // Overflow wraps and is reported.
+  let (r1, o1) = Builtin.sadd_with_overflow_i64(Int64.max().value, (1 as Int64).value)
+  expect(Builtin.icmp_eq_i64(r1, Int64.min().value))
+  expect(o1)
+}
+
+// MARK: Testing Builtin.sdiv_*_*()
+
+fun test_Builtin_sdiv() {
+  // `sdiv` rounds towards zero.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64((7 as Int64).value, (2 as Int64).value),
+    (3 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64((-7 as Int64).value, (2 as Int64).value),
+    (-3 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64((7 as Int64).value, (-2 as Int64).value),
+    (-3 as Int64).value))
+
+  // Defined at the limits, except for `min / -1`.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64(Int64.min().value, (1 as Int64).value),
+    Int64.min().value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_i64(Int64.max().value, (-1 as Int64).value),
+    (-9223372036854775807 as Int64).value))
+
+  // The `exact` variant is defined when there is no remainder.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sdiv_exact_i64((-8 as Int64).value, (2 as Int64).value),
+    (-4 as Int64).value))
+}
+
+// MARK: Testing Builtin.sext_*_*()
+
+fun test_Builtin_sext() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sext_i8_i64((127 as Int8).value),
+    (127 as Int64).value))
+
+  // `sext` extends with the sign bit, preserving signed values.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sext_i8_i64((-1 as Int8).value),
+    (-1 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sext_i8_i64(Int8.min().value),
+    (-128 as Int64).value))
+}
+
+// MARK: Testing Builtin.sitofp_*_*()
+
+fun test_Builtin_sitofp() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.sitofp_i64_float64((-3 as Int64).value),
+    (-3.0 as Float64).value))
+  expect(Builtin.fcmp_oeq_float32(
+    Builtin.sitofp_i64_float32((-3 as Int64).value),
+    (-3.0 as Float32).value))
+
+  // The 64-bit minimum is exactly representable as a double.
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.sitofp_i64_float64(Int64.min().value),
+    (-9223372036854775808.0 as Float64).value))
+}
+
+// MARK: Testing Builtin.smul_with_overflow_*()
+
+fun test_Builtin_smul_with_overflow() {
+  let (r0, o0) = Builtin.smul_with_overflow_i64((6 as Int64).value, (7 as Int64).value)
+  expect(Builtin.icmp_eq_i64(r0, (42 as Int64).value))
+  expect_not(o0)
+
+  // Overflow wraps and is reported.
+  let (r1, o1) = Builtin.smul_with_overflow_i64(Int64.max().value, (2 as Int64).value)
+  expect(Builtin.icmp_eq_i64(r1, (-2 as Int64).value))
+  expect(o1)
+}
+
+// MARK: Testing Builtin.srem_*()
+
+fun test_Builtin_srem() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.srem_i64((7 as Int64).value, (2 as Int64).value),
+    (1 as Int64).value))
+
+  // `srem` takes the sign of the dividend.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.srem_i64((-7 as Int64).value, (2 as Int64).value),
+    (-1 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.srem_i64((7 as Int64).value, (-2 as Int64).value),
+    (1 as Int64).value))
+
+  // Defined at the limits, except for `min % -1`.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.srem_i64(Int64.min().value, (2 as Int64).value),
+    (0 as Int64).value))
+}
+
+// MARK: Testing Builtin.ssub_with_overflow_*()
+
+fun test_Builtin_ssub_with_overflow() {
+  let (r0, o0) = Builtin.ssub_with_overflow_i64((3 as Int64).value, (5 as Int64).value)
+  expect(Builtin.icmp_eq_i64(r0, (-2 as Int64).value))
+  expect_not(o0)
+
+  // Overflow wraps and is reported.
+  let (r1, o1) = Builtin.ssub_with_overflow_i64(Int64.min().value, (1 as Int64).value)
+  expect(Builtin.icmp_eq_i64(r1, Int64.max().value))
+  expect(o1)
+}
+
+// MARK: Testing Builtin.sub_*_*()
+
+fun test_Builtin_sub() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sub_i64((5 as Int64).value, (3 as Int64).value),
+    (2 as Int64).value))
+
+  // `sub` wraps around on overflow.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sub_i64(Int64.min().value, (1 as Int64).value),
+    Int64.max().value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.sub_i64(Int64.max().value, (-1 as Int64).value),
+    Int64.min().value))
+
+  // `nuw`/`nsw` variants work right at the limits.
+  expect(Builtin.icmp_eq_i8(
+    Builtin.sub_nuw_i8((255 as UInt8).value, (255 as UInt8).value),
+    (0 as UInt8).value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.sub_nsw_i8(Int8.min().value, (-1 as Int8).value),
+    (-127 as Int8).value))
+}
+
+// MARK: Testing Builtin.trunc_*_*()
+
+fun test_Builtin_trunc() {
+  expect(Builtin.icmp_eq_i8(
+    Builtin.trunc_i64_i8((127 as Int64).value),
+    (127 as Int8).value))
+
+  // `trunc` keeps the low bits of its operand.
+  expect(Builtin.icmp_eq_i8(
+    Builtin.trunc_i64_i8((511 as Int64).value),
+    (-1 as Int8).value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.trunc_i64_i8((257 as Int64).value),
+    (1 as Int8).value))
+}
+
+// MARK: Testing Builtin.uadd_with_overflow_*()
+
+fun test_Builtin_uadd_with_overflow() {
+  let (r0, o0) = Builtin.uadd_with_overflow_i64((5 as UInt64).value, (7 as UInt64).value)
+  expect(Builtin.icmp_eq_i64(r0, (12 as UInt64).value))
+  expect_not(o0)
+
+  // Overflow wraps and is reported.
+  let (r1, o1) = Builtin.uadd_with_overflow_i64(UInt64.max().value, (1 as UInt64).value)
+  expect(Builtin.icmp_eq_i64(r1, (0 as UInt64).value))
+  expect(o1)
+}
+
+// MARK: Testing Builtin.udiv_*_*()
+
+fun test_Builtin_udiv() {
+  // `udiv` rounds towards zero.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.udiv_i64((7 as UInt64).value, (2 as UInt64).value),
+    (3 as UInt64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.udiv_i64(UInt64.max().value, UInt64.max().value),
+    (1 as UInt64).value))
+
+  // The `exact` variant is defined when there is no remainder.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.udiv_exact_i64((8 as UInt64).value, (2 as UInt64).value),
+    (4 as UInt64).value))
+}
+
+// MARK: Testing Builtin.uitofp_*_*()
+
+fun test_Builtin_uitofp() {
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.uitofp_i64_float64((3 as UInt64).value),
+    (3.0 as Float64).value))
+  expect(Builtin.fcmp_oeq_float32(
+    Builtin.uitofp_i64_float32((3 as UInt64).value),
+    (3.0 as Float32).value))
+
+  // The 64-bit maximum rounds to the nearest representable value, 2^64.
+  expect(Builtin.fcmp_oeq_float64(
+    Builtin.uitofp_i64_float64(UInt64.max().value),
+    (18446744073709551616.0 as Float64).value))
+}
+
+// MARK: Testing Builtin.umul_with_overflow_*()
+
+fun test_Builtin_umul_with_overflow() {
+  let (r0, o0) = Builtin.umul_with_overflow_i64((6 as UInt64).value, (7 as UInt64).value)
+  expect(Builtin.icmp_eq_i64(r0, (42 as UInt64).value))
+  expect_not(o0)
+
+  // Overflow wraps and is reported.
+  let (r1, o1) = Builtin.umul_with_overflow_i64(UInt64.max().value, (2 as UInt64).value)
+  expect(Builtin.icmp_eq_i64(r1, (18446744073709551614 as UInt64).value))
+  expect(o1)
+}
+
+// MARK: Testing Builtin.urem_*()
+
+fun test_Builtin_urem() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.urem_i64((7 as UInt64).value, (2 as UInt64).value),
+    (1 as UInt64).value))
+
+  // `urem` is defined at the limits.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.urem_i64(UInt64.max().value, UInt64.max().value),
+    (0 as UInt64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.urem_i64(UInt64.max().value, (2 as UInt64).value),
+    (1 as UInt64).value))
+}
+
+// MARK: Testing Builtin.usub_with_overflow_*()
+
+fun test_Builtin_usub_with_overflow() {
+  let (r0, o0) = Builtin.usub_with_overflow_i64((5 as UInt64).value, (3 as UInt64).value)
+  expect(Builtin.icmp_eq_i64(r0, (2 as UInt64).value))
+  expect_not(o0)
+
+  // Overflow wraps and is reported.
+  let (r1, o1) = Builtin.usub_with_overflow_i64((0 as UInt64).value, (1 as UInt64).value)
+  expect(Builtin.icmp_eq_i64(r1, UInt64.max().value))
+  expect(o1)
+}
+
+// MARK: Testing Builtin.xor_*()
+
+fun test_Builtin_xor() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.xor_i64((12 as Int64).value, (10 as Int64).value),
+    (6 as Int64).value))
+
+  // All-ones complements; `x ^ x` is zero.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.xor_i64((5 as Int64).value, (-1 as Int64).value),
+    (-6 as Int64).value))
+  expect(Builtin.icmp_eq_i64(
+    Builtin.xor_i64((42 as Int64).value, (42 as Int64).value),
+    (0 as Int64).value))
+}
+
+// MARK: Testing Builtin.zeroinitializer_*()
+
+fun test_Builtin_zeroinitializer() {
+  // `zeroinitializer` produces the all-zeroes value of each machine type.
+  expect_not(Builtin.zeroinitializer_i1())
+  expect(Builtin.icmp_eq_i8(Builtin.zeroinitializer_i8(), (0 as Int8).value))
+  expect(Builtin.icmp_eq_i64(Builtin.zeroinitializer_i64(), (0 as Int64).value))
+  expect(Builtin.icmp_eq_word(Builtin.zeroinitializer_word(), (0 as Int).value))
+  expect(Builtin.fcmp_oeq_float32(Builtin.zeroinitializer_float32(), (0.0 as Float32).value))
+  expect(Builtin.fcmp_oeq_float64(Builtin.zeroinitializer_float64(), (0.0 as Float64).value))
+  expect(Builtin.icmp_eq_ptr(Builtin.zeroinitializer_ptr(), Builtin.zeroinitializer_ptr()))
+}
+
+// MARK: Testing Builtin.zext_*_*()
+
+fun test_Builtin_zext() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.zext_i8_i64((127 as Int8).value),
+    (127 as Int64).value))
+
+  // `zext` extends with zeroes, so sign bits become value bits.
+  expect(Builtin.icmp_eq_i64(
+    Builtin.zext_i8_i64((-1 as Int8).value),
+    (255 as Int64).value))
+
+  let t = true
+  expect(Builtin.icmp_eq_i64(
+    Builtin.zext_i1_i64(t.value),
+    (1 as Int64).value))
+}
+
+public fun main() {
+  test_Builtin_add()
+  test_Builtin_address()
+  test_Builtin_advanced_by_bytes()
+  test_Builtin_and()
+  test_Builtin_assume_initialized()
+  test_Builtin_fadd()
+  test_Builtin_fcmp()
+  test_Builtin_fdiv()
+  test_Builtin_fmul()
+  test_Builtin_fpext()
+  test_Builtin_fptosi()
+  test_Builtin_fptoui()
+  test_Builtin_fptrunc()
+  test_Builtin_frem()
+  test_Builtin_fsub()
+  test_Builtin_icmp()
+  test_Builtin_mul()
+  test_Builtin_or()
+  test_Builtin_sadd_with_overflow()
+  test_Builtin_sdiv()
+  test_Builtin_sext()
+  test_Builtin_sitofp()
+  test_Builtin_smul_with_overflow()
+  test_Builtin_srem()
+  test_Builtin_ssub_with_overflow()
+  test_Builtin_sub()
+  test_Builtin_trunc()
+  test_Builtin_uadd_with_overflow()
+  test_Builtin_udiv()
+  test_Builtin_uitofp()
+  test_Builtin_umul_with_overflow()
+  test_Builtin_urem()
+  test_Builtin_usub_with_overflow()
+  test_Builtin_xor()
+  test_Builtin_zeroinitializer()
+  test_Builtin_zext()
+}
