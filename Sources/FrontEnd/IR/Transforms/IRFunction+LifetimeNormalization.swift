@@ -25,10 +25,7 @@ extension IRFunction {
     }
 
     var transfer = Transfer(emittingInto: m)
-    transfer.fixedPoint(interpreting: &self, startingFrom: initial, using: &typer)
-
-    assert(!transfer.foundError || typer.program[m].containsError, "undiagnosed error")
-    return !transfer.foundError
+    return transfer.fixedPoint(interpreting: &self, startingFrom: initial, using: &typer)
   }
 
   /// Configures `context` with the initial state of `p`, which is the `i`-th parameter of `self`.
@@ -59,9 +56,6 @@ private struct Transfer: AbstractTransferFunction {
 
   /// The context being updated.
   private var context: Context = .init()
-
-  /// `true` iff an application of this function raised an error.
-  fileprivate private(set) var foundError: Bool = false
 
   /// Creates an instance for interpreting the contents of `m`.
   fileprivate init(emittingInto m: Module.ID) {
@@ -903,7 +897,7 @@ private struct Transfer: AbstractTransferFunction {
 
     if !initialized.isEmpty {
       let success = deinitialize(initialized, at: place, before: i, in: &f)
-      if !success { foundError = true }
+      if !success { context.setError() }
       return success
     } else {
       return false
@@ -997,7 +991,7 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Reports the diagnostic `d`.
   private mutating func report(_ d: Diagnostic) {
-    if d.level == .error { foundError = true }
+    if d.level == .error { context.setError() }
     program[module].addDiagnostic(d)
   }
 

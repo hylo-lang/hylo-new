@@ -127,14 +127,21 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
   /// The state of memory.
   internal var memory: [IRValue: AbstractObject<Domain>] = [:]
 
+  /// `true` iff the context contains an error.
+  internal private(set) var containsError: Bool = false
+
   /// Creates an empty context.
   internal init() {}
 
   /// Merges `other` into `self`.
   internal mutating func merge(_ other: Self) {
-    locals.merge(other.locals)
-    memory.merge(other.memory, uniquingKeysWith: &&)
+    self.locals.merge(other.locals)
+    self.memory.merge(other.memory, uniquingKeysWith: &&)
+    self.containsError = self.containsError || other.containsError
   }
+
+  /// Sets the flag indicating that an error was encountered in this context.
+  internal mutating func setError() {}
 
   /// Returns the result calling `action` with a projection of the object at `place`, using `typer`
   /// to compute abstract layouts.

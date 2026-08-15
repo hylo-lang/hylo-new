@@ -50,9 +50,9 @@ extension AbstractTransferFunction {
   internal mutating func fixedPoint(
     interpreting f: inout IRFunction, startingFrom initialContext: Context,
     using typer: inout Typer,
-  ) {
+  ) -> Bool {
     var m = AbstractMachine<Self>(interpreting: f)
-    m.fixedPoint(interpreting: &f, with: &self, &typer, startingFrom: initialContext)
+    return m.fixedPoint(interpreting: &f, with: &self, &typer, startingFrom: initialContext)
   }
 
 }
@@ -95,7 +95,7 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
     interpreting f: inout IRFunction,
     with interpret: inout Transfer, _ typer: inout Typer,
     startingFrom initialContext: Transfer.Context
-  ) {
+  ) -> Bool {
     // Process the entry.
     let entry = dominance.root
     let (contextAfterEntry, _) = postContext(
@@ -109,6 +109,7 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
     work = Deque(dominance.dropFirst())
 
     // Search for a fixed point.
+    var success = true
     while let blockToProcess = work.popFirst() {
       guard visitable(blockToProcess) else {
         work.append(blockToProcess)
@@ -147,6 +148,8 @@ internal struct AbstractMachine<Transfer: AbstractTransferFunction> {
         }
       }
     }
+
+    return success
   }
 
   /// Returns `true` if `b` is ready to be visited.

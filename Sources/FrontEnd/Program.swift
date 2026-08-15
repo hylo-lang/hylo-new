@@ -131,8 +131,11 @@ public struct Program: Sendable {
         return ir.functions.values.endIndex
       }
 
-      // Mandatory intra-procedural passes.
+      // Apply mandatory intra-procedural passes.
       for i in work.indices {
+        // Make sure there are no silent errors.
+        defer { assert(work[i].function.isDefined || typer.program[m].containsError) }
+
         work[i].function.foldRedundantInstructions()
         work[i].function.simplifyControlFlow()
         work[i].function.removeCodeAfterNeverReturningCalls()
