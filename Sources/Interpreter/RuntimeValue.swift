@@ -13,18 +13,13 @@ struct RuntimeValue {
 
   /// Creates an instance from its bytes representation `bytes`, with alignment `a`.
   public init(bytes: [UInt8], havingAlignment a: Int) {
-    var s = [UInt8](repeating: 0, count: bytes.count)
-
-    // If we didn't get suitably-aligned storage, allocate enough to
-    // ensure we can find a suitably-aligned region of the right
-    // size.
-    if s.withUnsafeBytes({ UInt(bitPattern: $0.baseAddress) % UInt(a) != 0 }) {
-      s = .init(repeating: 0, count: bytes.count + a - 1)
-    }
-
-    baseOffset = s.withUnsafeBytes { $0.firstOffsetAligned(to: a) }
-    s[baseOffset...] = bytes[...]
-
+    var (s, o) = Array.aligned(
+      repeating: 0 as UInt8,
+      count: bytes.count,
+      alignment: a
+    )
+    s[o...] = bytes[...]
+    baseOffset = o
     storage = s
   }
 

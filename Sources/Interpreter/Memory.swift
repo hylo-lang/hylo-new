@@ -72,14 +72,9 @@ struct Memory {
       precondition(n >= 0)
       precondition(m > 0)
 
-      storage = Storage(repeating: 0, count: n)
-      // If we didn't get suitably-aligned storage, allocate enough to
-      // ensure we can find a suitably-aligned region of the right
-      // size.
-      if storage.withUnsafeBytes({ UInt(bitPattern: $0.baseAddress) % UInt(m) != 0 }) {
-        storage = Storage(repeating: 0, count: n + m - 1)
-      }
-      baseOffset = storage.withUnsafeBytes { $0.firstOffsetAligned(to: m) }
+      let (s, o) = Storage.aligned(repeating: 0, count: n, alignment: m)
+      storage = s
+      baseOffset = o
       size = n
       self.id = id
     }
