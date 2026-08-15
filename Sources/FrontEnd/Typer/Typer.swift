@@ -60,6 +60,9 @@ public struct Typer {
     /// A pair of types.
     fileprivate typealias TypePair = Pair<AnyTypeIdentity, AnyTypeIdentity>
 
+    /// A pair composed of an extension and a type.
+    fileprivate typealias ExtensionAndType = Pair<ExtensionDeclaration.ID, AnyTypeIdentity>
+
     /// The cache of `Typer.lookup(_:atTopLevelOf:)`.
     fileprivate var moduleToIdentifierToDeclaration: [LookupTable?]
 
@@ -112,7 +115,7 @@ public struct Typer {
     fileprivate var canDeriveCoercion: [Given: [TypePair: UInt8]]
 
     /// The cache of `Typer.applies(_:to:in:)`.
-    fileprivate var scopeToExtensionApplies: [ScopeIdentity: [TypePair: SummonResult]]
+    fileprivate var scopeToExtensionApplies: [ScopeIdentity: [ExtensionAndType: SummonResult]]
 
     /// Creates an instance for typing `m`, which is a module in `p`.
     fileprivate init(typing m: Module.ID, in p: Program) {
@@ -4638,7 +4641,7 @@ public struct Typer {
     if t == u { return .init(witness: w, substitutions: .init(), penalties: 0) }
 
     // Consult the cache.
-    let key = Pair(t, u)
+    let key = Memos.ExtensionAndType(d, t)
     if let memoized = cache.scopeToExtensionApplies[scopeOfUse]?[key] { return memoized }
 
     // Slow path: use the match judgement of implicit resolution to create a witness describing
