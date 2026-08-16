@@ -1149,7 +1149,7 @@ extension Program {
 
     // Contents must be allocated in static memory.
     let name = String(FNV1.hash(value.utf8, into: FNV1.u128()).state, radix: 36)
-    let payload = ctx.llvm.arrayConstant(bytes: value.utf8)
+    let payload = ctx.llvm.arrayConstant(bytes: Array(value.utf8, terminatedBy: 0))
     let storage = ctx.llvm.structType([iptr.t, iptr.t, payload.unsafe[].type])
     let symbol = ctx.llvm.declareGlobalVariable("$hstr\(name)", storage)
     ctx.llvm.setLinkage(.private, for: symbol)
