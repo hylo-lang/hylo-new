@@ -376,7 +376,7 @@ public struct Driver {
     arguments += objectFiles.map(\.path)
 
     #if os(macOS)
-    let sdk = try await executionOutput(
+    let sdk = try await subprocessOutput(
       of: .name("xcrun"), arguments: ["--sdk", "macosx", "--show-sdk-path"])
       .trimmingCharacters(in: .whitespacesAndNewlines)
     arguments += ["-isysroot", sdk, "-lSystem"]
