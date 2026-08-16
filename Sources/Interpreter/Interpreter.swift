@@ -265,7 +265,8 @@ public struct Interpreter {
     case let x as IRGlobalAccess:
       _ = x
     case let x as IRLoad:
-      _ = x
+      let v = try load(from: x.source)
+      return .initializeRegister(to: .init(v))
     case let x as IRMemoryCopy:
       _ = x
     case let x as IRMove:
@@ -374,6 +375,18 @@ public struct Interpreter {
     in whole: IRValue
   ) -> Memory.TypedAddress {
     memory.location(subPart, in: asTypedAddress(whole))
+  }
+
+  /// Returns the value stored at address `p`, consuming the stored value if `p`
+  /// does not point to a `MachineType`.
+  private mutating func load(from p: IRValue) throws -> RuntimeValue {
+    let a = asAccess(p)
+    let t = program.underlyingType(a.location.type.underlying)
+    if program.tag(t) == MachineType.self {
+      return try memory.read(from: a)
+    } else {
+      return try memory.consume(from: a)
+    }
   }
 
   /// Stores the value carried by `v` at the location pointed by the address `p`.
