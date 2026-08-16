@@ -2064,6 +2064,8 @@ public struct Typer {
       return inferredType(of: castUnchecked(e, to: RemoteTypeExpression.self), in: &context)
     case StaticCall.self:
       return inferredType(of: castUnchecked(e, to: StaticCall.self), in: &context)
+    case StringLiteral.self:
+      return inferredType(of: castUnchecked(e, to: StringLiteral.self), in: &context)
     case TupleLiteral.self:
       return inferredType(of: castUnchecked(e, to: TupleLiteral.self), in: &context)
     case TupleMember.self:
@@ -2631,6 +2633,14 @@ public struct Typer {
         callee: f, arguments: i, output: o, origin: e, site: program[e].site)
       context.obligations.assume(k)
     }
+  }
+
+  /// Returns the inferred type of `e`.
+  private mutating func inferredType(
+    of e: StringLiteral.ID, in context: inout InferenceContext
+  ) -> AnyTypeIdentity {
+    let t = standardLibraryType(.string)
+    return context.obligations.assume(e, hasType: t, at: program[e].site)
   }
 
   /// Returns the inferred type of `e`.

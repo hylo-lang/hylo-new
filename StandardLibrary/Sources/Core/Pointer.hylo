@@ -10,7 +10,6 @@ public struct Pointer<Pointee> is Deinitializable {
   /// Creates an instance that does not address any usable storage.
   public static fun null() -> Self {
     .new(value: Builtin.zeroinitializer_ptr())
-
   }
 
 }

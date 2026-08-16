@@ -690,6 +690,8 @@ internal struct IREmitter {
       lower(store: program.castUnchecked(e, to: NameExpression.self), to: target)
     case StaticCall.self:
       lower(store: program.castUnchecked(e, to: StaticCall.self), to: target)
+    case StringLiteral.self:
+      lower(store: program.castUnchecked(e, to: StringLiteral.self), to: target)
     case SyntheticExpression.self:
       lower(store: program.castUnchecked(e, to: SyntheticExpression.self), to: target)
     case TupleLiteral.self:
@@ -868,6 +870,12 @@ internal struct IREmitter {
   private mutating func lower(store e: StaticCall.ID, to target: IRValue) {
     let v = lowered(lvalue: e)
     lowering(e, { $0._emitMove([.inout, .set], v, to: target) })
+  }
+
+  /// Implements `lower(store:to:)` for string literals.
+  private mutating func lower(store e: StringLiteral.ID, to target: IRValue) {
+    let v = program[e].value
+    lowering(e, { $0._emitStoreString(v, to: target) })
   }
 
   /// Implements `lower(store:to:)` for synthetic expressions.
@@ -2126,6 +2134,13 @@ internal struct IREmitter {
     return insert(s)!
   }
 
+  /// Inserts a `constant_string` instruction.
+  internal mutating func _constant_string(_ contents: String) -> IRValue {
+    let t = program.types.demand(MachineType.word)
+    let s = IRConstantString(contents: contents.unescaped, word: t, anchor: currentAnchor)
+    return insert(s)!
+  }
+
   /// Inserts a `condbr` instruction.
   internal mutating func _condbr(
     _ condition: IRValue, _ onSuccess: IRBlock.ID, _ onFailure: IRBlock.ID
@@ -3083,6 +3098,16 @@ internal struct IREmitter {
       swap(&insertionContext.point, &p)
       return _access([.let], from: a)
     }
+  }
+
+  /// Generates the IR initializing `target` with an instance of `Hylo.String` equal to `value` and
+  /// whose contents are allocated statically.
+  ///
+  /// - Requires: `target` is an uninitialized place of type `Hylo.String`.
+  private mutating func _emitStoreString(_ value: String, to target: IRValue) {
+    let x0 = _constant_string(value)
+    let x1 = _subfield(target, at: [0, 0])
+    _emitInitialize(x1, with: x0)
   }
 
   /// Information necessary to emit the deinitialization of an instance.

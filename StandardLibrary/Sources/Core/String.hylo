@@ -1,0 +1,45 @@
+/// A Unicode string.
+@_symbol("String")
+public struct String is Deinitializable {
+
+  /// The UTF8 code units in the collection.
+  ///
+  /// The two least significant bits of `units` encode the representation discriminator:
+  ///
+  /// ┌──────────────────────╥─────┬─────┐
+  /// │ Form                 ║ b01 │ b00 │
+  /// ├──────────────────────╫─────┼─────┤
+  /// │ inline, owned        ║  0  │  0  │
+  /// │ out-of-line, owned   ║  1  │  0  │
+  /// │ out-of-line, unowned ║  1  │  1  │
+  /// └──────────────────────╨─────┴─────┘
+  ///
+  /// b01 indicates whether the payload of the array is stored out-of-line. If it is, `units` with
+  /// b01 and b00 unset stores a pointer to the out-of-line payload, which is a buffer storing a
+  /// header followed by a contiguous array of bytes containing the units themselves, followed by
+  /// a null terminator. The buffer is aligned at minimum 4 bytes (justifying why b01 and b0 are
+  /// available). The header is a pair of `Int`s whose first and second elements are the number of
+  /// units in the array and its capacity, respectively.
+  ///
+  /// If the payload is inline, the number of units in the view is stored in the 6 highest bits of
+  /// `units`'s least significant byte and the units themselves are stored in the bytes 1 to 7, in
+  /// reverse order. For example, the inline UTF-8 view of "Salut" is as follows:
+  ///
+  ///                 least significant byte
+  ///                                      ↓
+  /// ┌────┬────┬────┬────┬────┬────┬────┬────┐
+  /// | 00 | 00 | 74 | 75 | 6C | 61 | 53 | 05 |
+  /// └────┴────┴────┴────┴────┴────┴────┴────┘
+  ///
+  /// b00 indicates if the view owns its storage, in which case it is responsible for deallocating
+  /// out-of-line storage. An unowned, out-of-line payload corresponds to a static allocation.
+  ///
+  /// The canonical empty string has all bits equal to 0.
+  var units: Int
+
+  /// Creates an empty string.
+  public init() {
+    &self.units = 0
+  }
+
+}

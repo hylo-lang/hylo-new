@@ -50,16 +50,12 @@ extension IRFunction {
       }
 
       // Otherwise, does the block have successors that haven't been visited yet?
-      let ss = successors(of: b).filter({ (s) in !visited.contains(s) })
-      if !ss.isEmpty {
-        work.append(contentsOf: ss)
-        continue
-      }
-
-      // Otherwise, complain that there isn't any yield statement.
-      else {
+      let next = successors(of: b)
+      if next.isEmpty {
         typer.program.reportMissingYield(endOf: b, in: self)
         return false
+      } else {
+        work.append(contentsOf: next.filter({ (s) in !visited.contains(s) }))
       }
     }
 

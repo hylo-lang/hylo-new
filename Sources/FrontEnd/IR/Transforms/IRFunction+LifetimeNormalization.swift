@@ -109,6 +109,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRCase.End.self), from: &f)
       case IRConditionalBranch.self:
         pc = interpret(f.castUnchecked(i, to: IRConditionalBranch.self), from: &f)
+      case IRConstantString.self:
+        pc = interpret(f.castUnchecked(i, to: IRConstantString.self), from: &f)
       case IREnumTag.self:
         pc = interpret(f.castUnchecked(i, to: IREnumTag.self), from: &f)
       case IRGlobalAccess.self:
@@ -387,6 +389,14 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRConditionalBranch.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     assert(context.locals[f.at(i).condition]!.object!.value == .uniform(.initialized))
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRConstantString.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }
 
