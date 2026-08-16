@@ -8,7 +8,8 @@ public struct Access<Region: Regular>: Regular, Equatable {
   /// A unique `Access` identifier.
   public typealias ID = UUID
 
-  /// The identity of an access initiated by a particular instruction during execution.
+  /// The identity of an access initiated by a particular instruction on a
+  /// particular thread during execution.
   public let id: ID
 
   /// The associated permissions and obligations.
