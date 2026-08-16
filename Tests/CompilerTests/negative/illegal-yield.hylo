@@ -21,3 +21,21 @@ subscript f3(x: Bool) -> Bool {
   yield false
   if x { yield true }
 }
+
+// A yield in a loop.
+subscript f4(x: Bool) -> Bool {
+  while x { yield true }
+  yield false
+}
+
+// A yield before a loop is fine.
+subscript g0(x: Bool) -> Bool {
+  yield true
+  while x {}
+}
+
+// A yield after a loop is fine.
+subscript g1(x: Bool) -> Bool {
+  while x {}
+  yield true
+}
