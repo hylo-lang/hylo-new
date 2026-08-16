@@ -3101,7 +3101,7 @@ internal struct IREmitter {
   }
 
   /// Generates the IR initializing `target` with an instance of `Hylo.String` equal to `value` and
-  /// whose contents is allocated statically.
+  /// whose contents are allocated statically.
   ///
   /// - Requires: `target` is an uninitialized place of type `Hylo.String`.
   private mutating func _emitStoreString(_ value: String, to target: IRValue) {

@@ -1124,8 +1124,8 @@ extension Program {
     return symbol
   }
 
-  /// Returns the internal representation of an instance of `Hylo.String` equal to `value` and
-  /// whose contents is allocated statically.
+  /// Returns the internal representation of a Hylo string (i.e., an instance of `Hylo.String`)
+  /// equal to `value` and whose contents are allocated statically.
   private func demandGlobalString(
     _ value: String, in ctx: inout ModuleGenerationContext
   ) -> LLVMValue {
@@ -1140,7 +1140,7 @@ extension Program {
     if (payloadSize < pointerSize) && (pointerSize <= 8) {
       var units = UInt64(truncatingIfNeeded: payloadSize) << 2
       for (i, u) in value.utf8.enumerated() {
-        units |= UInt64(u) << (i + 1) * 8
+        units |= UInt64(u) << ((i + 1) * 8)
       }
       let v = iptr.unsafe[].constant(units).v
       ctx.strings[value] = v
