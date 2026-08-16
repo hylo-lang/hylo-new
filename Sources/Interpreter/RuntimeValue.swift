@@ -12,14 +12,15 @@ struct RuntimeValue {
   /// The number of bytes before the value logically begins.
   private let baseOffset: Int
 
-  /// Creates an instance from its bytes representation `bytes`, with alignment `a`.
-  public init(bytes: [UInt8], havingAlignment a: Int) {
+  /// Creates an instance having bytes representation `bs`, such that the
+  /// address of the first byte is aligned to `a`.
+  public init(bytes bs: [UInt8], havingAlignment a: Int) {
     var (s, o) = Array.aligned(
       repeating: 0 as UInt8,
-      count: bytes.count,
+      count: bs.count,
       alignment: a
     )
-    s[o...] = bytes[...]
+    s[o...] = bs[...]
     baseOffset = o
     storage = s
   }

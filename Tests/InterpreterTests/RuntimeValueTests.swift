@@ -34,4 +34,14 @@ final class RuntimeValueTests: XCTestCase {
       withUnsafeBytes(of: UInt64(1), Array.init)[...])
   }
 
+  func testRuntimeValueAlignment() {
+    for i in 1...10 {
+      let b = Array(repeating: UInt8(0), count: i)
+      let a = UInt(
+        bitPattern: RuntimeValue(bytes: b, havingAlignment: i).bytes.withUnsafeBytes(\.baseAddress)!
+      )
+      XCTAssert(a % UInt(i) == 0)
+    }
+  }
+
 }
