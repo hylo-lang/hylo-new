@@ -1,3 +1,9 @@
+@extern_c_indirect("c_fdopen_indirect")
+public fun fdopen(descriptor: Int, mode: Pointer<UInt8>) -> Pointer<Never>
+
+@extern_c_indirect("c_fwrite_indirect")
+public fun fwrite(data: Pointer<UInt8>, size: Int, count: Int, stream: Pointer<Never>) -> Int
+
 extension Int {
 
   public fun infix&>> (other: Int) -> Self {
@@ -16,6 +22,14 @@ extension Int {
 
 }
 
+extension UInt8 {
+
+  public init(truncating other: Int) {
+    &self.value = Builtin.trunc_word_i8(other.value)
+  }
+
+}
+
 extension Pointer<String.Buffer> {
 
   /// Creates an instance with the same memory representation as `address`.
@@ -25,6 +39,9 @@ extension Pointer<String.Buffer> {
   }
 
 }
+
+@extern_c_indirect("c_free_indirect")
+public fun unsafe_free(pointer: Pointer<Never>) // TODO use MemoryAddress
 
 extension String {
 
@@ -60,6 +77,42 @@ extension String {
     }
   }
 
+  subscript null_terminated() -> Pointer<UInt8> {
+    // If the contents is inline, then copy the code units into a local buffer and project it.
+    if self.is_inline() {
+      var buffer = 0
+      let b = Builtin.address(of: buffer)
+      let n = self.count()
+      var i = 0
+
+      while i < n {
+        let byte = Builtin.advanced_by_bytes_word(b, i.value)
+        set x = byte as* set UInt8
+        &i += 1
+        &x = UInt8(truncating: self.units &>> (i * 8))
+      }
+
+      let result = Pointer<UInt8>(value: b)
+      yield result
+      _ = buffer
+    }
+
+    // Otherwise, projects the out-of-line buffer.
+    else {
+      let p = Pointer<String.Buffer>(bit_pattern: self.units & ~0b11)
+      let b = Builtin.advanced_by_bytes_word(p.value, 16.value) // TODO: read memory layout
+      let result = Pointer<UInt8>(value: b)
+      yield result
+    }
+  }
+
+}
+
+fun print(s: String) {
+  let stdout = fdopen(1, "w".null_terminated[])
+  let length = s.count()
+  _ = fwrite(s.null_terminated[], 1, length, stdout)
+  _ = fwrite("\n".null_terminated[], 1, 1, stdout)
 }
 
 public fun main() {
@@ -69,4 +122,6 @@ public fun main() {
 
   let large = "abcdefghijklmnop"
   precondition(large.count() == 16)
+
+  print("Hello, World!")
 }
