@@ -1,0 +1,17 @@
+public fun main() {
+  var r = 0
+
+  let x = true
+  if x {
+    &r = 1
+  } else {
+    &r = 2
+  }
+
+  let y = false
+  if y {
+    &r = 3
+  } else {
+    &r = 4
+  }
+}
