@@ -1,75 +1,48 @@
 import Foundation
 import Subprocess
 
-/// The reason why a subprocess terminated.
-public enum TerminationReason: Hashable, Sendable {
-
-  /// The process exited normally, with an exit code.
-  case exit
-
-  /// The process was killed by an uncaught signal (or, on Windows, an unhandled exception).
-  case uncaughtSignal
-
-}
-
 extension TerminationStatus {
 
-  #if os(Windows)
-
-  /// The exit code corresponding to `self`.
-  ///
-  /// Windows has no signals; a process killed by an unhandled exception exits with an NTSTATUS
-  /// exit code. Like Foundation's `Process`, the exit code is masked with `0x3FFF_FFFF` so that
-  /// such statuses are reported as positive numbers.
+  /// The exit code or signal number.
   public var exitCode: Int32 {
+    #if os(Windows)
     switch self {
     case .exited(let code):
+      // Ensure status codes are reported as positive numbers.
+      // See: https://github.com/swiftlang/swift-corelibs-foundation/blob/6f4ac1e917b98c7c40a51acb25a47a2aa89b3855/Sources/Foundation/Process.swift#L653 [allow long]
       return Int32(truncatingIfNeeded: code & 0x3FFF_FFFF)
     }
-  }
-
-  /// The termination reason corresponding to `self`.
-  ///
-  /// The process is considered killed by an "uncaught signal" if its exit code has the severity
-  /// bits of an error, warning or customer NTSTATUS, or if it is `3`, which is the exit code used
-  /// by the C runtime's `abort`. This is a heuristic mirroring the behavior of Foundation.
-  public var terminationReason: TerminationReason {
-    switch self {
-    case .exited(let code):
-      switch code & 0xF000_0000 {
-      case 0xC000_0000, 0x8000_0000, 0xE000_0000:
-        return .uncaughtSignal
-      default:
-        return code == 3 ? .uncaughtSignal : .exit
-      }
-    }
-  }
-
-  #else
-
-  /// The exit code corresponding to `self`.
-  ///
-  /// If the process was terminated by a signal, this is the signal number.
-  public var exitCode: Int32 {
+    #else
     switch self {
     case .exited(let code):
       return Int32(truncatingIfNeeded: code)
     case .signaled(let signal):
       return Int32(truncatingIfNeeded: signal)
     }
+    #endif
   }
 
-  /// The termination reason corresponding to `self`.
-  public var terminationReason: TerminationReason {
+  /// `true` iff the process was killed by an uncaught signal or an unhandled exception.
+  ///
+  /// On Windows, the process is considered to have failed abnormally if its exit code has the
+  /// severity bits of an error, warning or customer NTSTATUS, or if it is `3`, which is the exit
+  /// code used by the C runtime's `abort`.
+  public var isAbnormalFailure: Bool {
+    #if os(Windows)
+    // - Heuristic borrowed from: https://github.com/swiftlang/swift-corelibs-foundation/blob/6f4ac1e917b98c7c40a51acb25a47a2aa89b3855/Sources/Foundation/Process.swift#L653 [allow long]
     switch self {
-    case .exited:
-      return .exit
-    case .signaled:
-      return .uncaughtSignal
+    case .exited(let code):
+      switch code & 0xF000_0000 {
+      case 0xC000_0000, 0x8000_0000, 0xE000_0000:
+        return true
+      default:
+        return code == 3
+      }
     }
+    #else
+    if case .signaled = self { return true } else { return false }
+    #endif
   }
-
-  #endif
 
 }
 
@@ -80,8 +53,8 @@ extension ExecutionResult {
   /// If the process was terminated by a signal, this is the signal number.
   public var exitCode: Int32 { terminationStatus.exitCode }
 
-  /// The reason why the process terminated.
-  public var terminationReason: TerminationReason { terminationStatus.terminationReason }
+  /// `true` iff the process was killed by an uncaught signal or an unhandled exception.
+  public var isAbnormalFailure: Bool { terminationStatus.isAbnormalFailure }
 
 }
 

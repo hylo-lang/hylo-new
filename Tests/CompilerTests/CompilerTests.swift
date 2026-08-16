@@ -252,7 +252,7 @@ final class CompilerTests: XCTestCase {
         let e = try XCTUnwrap(r.artifacts.executable)
         let x = try await executeSubprocess(.path(e), workingDirectory: input.workingDirectory)
         if input.manifest.shouldTrap {
-          XCTAssert(x.terminationReason == .uncaughtSignal, "program did not trap")
+          XCTAssert(x.isAbnormalFailure, "program did not trap")
         } else {
           assertExitStatus(x, describedBy: input)
         }
@@ -535,7 +535,7 @@ extension ExecutionReport {
   fileprivate func details(reportingAt testCase: URL) -> String {
     """
     source: \(testCase.path)
-    status: \(exitCode) (\(terminationReason))
+    status: \(terminationStatus)
 
     stdout:
     \(standardOutput)

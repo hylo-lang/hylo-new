@@ -53,19 +53,21 @@ final class SubprocessExtensionsTests: XCTestCase {
   func testRunReturnsResultOnNonzeroExit() async throws {
     let r = try await executeSubprocess(shell, arguments: arguments(running: "exit 42"))
     XCTAssertEqual(r.exitCode, 42)
-    XCTAssertEqual(r.terminationReason, .exit)
+    XCTAssertFalse(r.isAbnormalFailure)
     XCTAssertEqual(r.standardOutput, "")
     XCTAssertEqual(r.standardError, "")
   }
 
   func testExitCodeOnSignal() async throws {
     #if !os(Windows)
-      // The shell sends itself SIGTERM (15), which it does not catch by default.
-      let r = try await execute(shell, arguments: arguments(running: "kill -TERM $$"))
-      XCTAssertEqual(r.terminationReason, .uncaughtSignal)
+      let r = try await executeSubprocess(shell, arguments: arguments(running: "kill -TERM $$"))
+      XCTAssertTrue(r.isAbnormalFailure)
       XCTAssertEqual(r.exitCode, SIGTERM)
     #else
-      throw XCTSkip() // Not very easy to produce a signal on Windows.
+      // Windows has no signals; exit code 3 is what the C runtime's `abort` produces.
+      let r = try await executeSubprocess(shell, arguments: arguments(running: "exit 3"))
+      XCTAssertEqual(r.exitCode, 3)
+      XCTAssertTrue(r.isAbnormalFailure)
     #endif
   }
 
