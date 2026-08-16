@@ -21,7 +21,7 @@ final class SubprocessExtensionsTests: XCTestCase {
 
   func testExecutionOutputThrowsForUnknownExecutable() async throws {
     do {
-      _ = try await executionOutput(of: .name("randomNotFoundExecutable"))
+      _ = try await subprocessOutput(of: .name("randomNotFoundExecutable"))
       XCTFail("Expected an error")
     } catch let e as SubprocessError {
       XCTAssertEqual(e.code, .executableNotFound)
@@ -31,14 +31,14 @@ final class SubprocessExtensionsTests: XCTestCase {
   }
 
   func testExecutionOutputReturnsStandardOutput() async throws {
-    let output = try await executionOutput(of: shell, arguments: arguments(running: "echo ok"))
+    let output = try await subprocessOutput(of: shell, arguments: arguments(running: "echo ok"))
     XCTAssertEqual(output.trimmingCharacters(in: .whitespacesAndNewlines), "ok")
   }
 
   func testExecutionOutputThrowsOnNonzeroExit() async throws {
     let a = arguments(running: "exit 42")
     do {
-      _ = try await executionOutput(of: shell, arguments: a)
+      _ = try await subprocessOutput(of: shell, arguments: a)
       XCTFail("Expected NonzeroExit")
     } catch let e as NonzeroExit {
       XCTAssertEqual(e.exitCode, 42)
@@ -51,11 +51,22 @@ final class SubprocessExtensionsTests: XCTestCase {
   }
 
   func testRunReturnsResultOnNonzeroExit() async throws {
-    let r = try await execute(shell, arguments: arguments(running: "exit 42"))
+    let r = try await executeSubprocess(shell, arguments: arguments(running: "exit 42"))
     XCTAssertEqual(r.exitCode, 42)
     XCTAssertEqual(r.terminationReason, .exit)
     XCTAssertEqual(r.standardOutput, "")
     XCTAssertEqual(r.standardError, "")
+  }
+
+  func testExitCodeOnSignal() async throws {
+    #if !os(Windows)
+      // The shell sends itself SIGTERM (15), which it does not catch by default.
+      let r = try await execute(shell, arguments: arguments(running: "kill -TERM $$"))
+      XCTAssertEqual(r.terminationReason, .uncaughtSignal)
+      XCTAssertEqual(r.exitCode, SIGTERM)
+    #else
+      throw XCTSkip() // Not very easy to produce a signal on Windows.
+    #endif
   }
 
 }
