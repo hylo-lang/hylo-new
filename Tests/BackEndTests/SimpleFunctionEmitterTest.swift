@@ -51,7 +51,7 @@ final class SimpleFunctionEmitterTest: XCTestCase {
     let output = try await FileManager.default.withUniqueTemporaryDirectory { (d) in
       let executable = d.appendingPathComponent(driver.program[m].name)
       _ = try await driver.generateExecutable(from: m, writingTo: executable)
-      return try await executionOutput(of: .path(executable))
+      return try await subprocessOutput(of: .path(executable))
     }
 
     XCTAssertEqual(output.trimming(while: \.isWhitespace), "")

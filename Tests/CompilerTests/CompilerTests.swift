@@ -250,7 +250,7 @@ final class CompilerTests: XCTestCase {
       // Should an executable be tested?
       if input.manifest.stage == .execution {
         let e = try XCTUnwrap(r.artifacts.executable)
-        let x = try await execute(.path(e), workingDirectory: input.workingDirectory)
+        let x = try await executeSubprocess(.path(e), workingDirectory: input.workingDirectory)
         if input.manifest.shouldTrap {
           XCTAssert(x.terminationReason == .uncaughtSignal, "program did not trap")
         } else {

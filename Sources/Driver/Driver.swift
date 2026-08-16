@@ -271,7 +271,7 @@ public struct Driver {
     var a = ["-c", source.path, "-o", o.path]
     if let r = relocation.asClangArgument { a.append(r) }
 
-    _ = try await executionOutput(of: .name("clang"), arguments: a)
+    _ = try await subprocessOutput(of: .name("clang"), arguments: a)
     return o
   }
 
@@ -386,7 +386,7 @@ public struct Driver {
     arguments += ["-lm"]
     #endif
 
-    _ = try await executionOutput(of: .name("clang"), arguments: arguments)
+    _ = try await subprocessOutput(of: .name("clang"), arguments: arguments)
   }
 
   /// The name of `module`.

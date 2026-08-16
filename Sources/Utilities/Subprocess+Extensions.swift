@@ -99,7 +99,7 @@ public typealias ExecutionReport = ExecutionResult<Void, StringOutput<UTF8>, Str
 
 /// Runs `executable` with `arguments` in `workingDirectory` (or the current directory if `nil`),
 /// capturing its standard output and standard error as strings.
-public func execute(
+public func executeSubprocess(
   _ executable: Executable, arguments: [String] = [], workingDirectory: URL? = nil
 ) async throws -> ExecutionReport {
   try await run(
@@ -144,10 +144,10 @@ public struct NonzeroExit: Error, CustomStringConvertible {
 /// Runs `executable` with `arguments` and returns the data written to the standard output.
 ///
 /// Throws a `NonzeroExit` upon terminating with non-zero exit code.
-public func executionOutput(
+public func subprocessOutput(
   of executable: Executable, arguments: [String] = []
 ) async throws -> String {
-  let r = try await execute(executable, arguments: arguments)
+  let r = try await executeSubprocess(executable, arguments: arguments)
   guard r.terminationStatus.isSuccess else {
     throw NonzeroExit(
       exitCode: r.exitCode,
