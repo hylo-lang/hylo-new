@@ -295,12 +295,16 @@ extension Program {
     switch s.callee {
     case .trap:
       insertTrap(in: &ctx)
+
     case .addressOf:
       ctx.value[v] = ctx.value[s.arguments[0]]!
+
     case .zeroinitializer(let t):
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
+
     case .advancedByBytes(let t):
-      let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
+      let u = types.demand(MachineType.ptr)
+      let p = insertLoad([s.arguments[0]], of: u, in: &ctx)[0]
       let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
         of: p, typed: ctx.module.llvm.i8, indices: offsets , at: ctx.insertionPoint!).v
@@ -366,6 +370,10 @@ extension Program {
       let i = ctx.module.llvm.insertFDiv(xs[0], xs[1], at: ctx.insertionPoint!)
       ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
       ctx.value[v] = i.v
+
+    case .lshr(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertLShr(xs[0], xs[1], at: ctx.insertionPoint!).v
 
     case .urem(let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
@@ -444,6 +452,15 @@ extension Program {
       ctx.value[v] = ctx.module.llvm.insertSIToFP(
         xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
 
+    case .inttoptr(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertIntToPtr(xs[0], at: ctx.insertionPoint!).v
+
+    case .ptrtoint(let t):
+      let u = types.demand(MachineType.ptr)
+      let xs = insertLoad(s.arguments, of: u, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertPtrToInt(
+        xs[0], to: metadata(of: t, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
     }
 
     return ctx.ir.instruction(after: i.erased)
