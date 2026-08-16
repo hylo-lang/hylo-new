@@ -1,16 +1,110 @@
-/// A typed memory address whose contents can be read.
+/// A typed pointer whose contents can be read.
 public struct Pointer<Pointee> is Deinitializable {
 
   /// The raw value of this instance.
-  module var value: Builtin.ptr
+  module var base: Builtin.ptr
 
-  /// Creates an instance with the given raw value.
+  /// Creates an instance from its raw value.
   module memberwise init
 
-  /// Creates an instance that does not address any usable storage.
-  public static fun null() -> Self {
-    .new(value: Builtin.zeroinitializer_ptr())
-
+  /// The value at the address represented by `self`.
+  ///
+  /// - Requires: `self` is the address of an object of type `Pointee` and its storage
+  ///     is accessed only through this projection during the projection's lifetime.
+  @inline(always)
+  public subscript unsafe() -> Pointee {
+    yield self.base as* (let Pointee)
   }
 
+  // /// Creates an instance with the same memory representation as `address`.
+  // ///  TODO design int to pointer semantics. https://github.com/hylo-lang/hylo-new/issues/438
+  // public init(bit_pattern address: UInt) {
+  //   &self.base = Builtin.inttoptr_word(address.value)
+  // }
+
+  /// Creates an instance representing the same pointer as `p`.
+  @inline(always)
+  public init(_ p: PointerToMutable<Pointee>) {
+    &self.base = p.base
+  }
+
+  /// Creates an instance referring to the same address as `p`.
+  ///
+  /// Note that dereferencing type punned pointers will cause problems unless the rules for
+  /// `usafe[]` (which see) are followed.
+  @inline(always)
+  public init<Other>(type_punning p: Pointer<Other>) {
+    &self.base = p.base
+  }
+
+  /// Creates an instance referring to the same address as `p`.
+  ///
+  /// Note that dereferencing type punned pointers will cause problems unless the rules for the
+  /// `usafe[]` subscript (which see) are followed.
+  @inline(always)
+  public init<Other>(type_punning p: PointerToMutable<Other>) {
+    &self.base = p.base
+  }
+
+  // /// Projects a copy of `self` as a raw memory address.
+  // /// TODO design raw memory address representation.
+  // @inline(always)
+  // public subscript raw() -> PointerToMutable<Never> {
+  //   yield PointerToMutable<Never>(base: self.base)
+  // }
+
+  // /// Creates an instance with the same memory representation as `address`.
+  // ///  TODO design int to pointer semantics. https://github.com/hylo-lang/hylo-new/issues/438
+  // @inline(always)
+  // public init(bit_pattern address: Int) {
+  //   &self.base = Builtin.inttoptr_word(address.value)
+  // }
+
+  // /// Returns `self` offset forward by `n` array elements of `Pointee` type.
+  // public fun advance(by n: Int) -> Self {
+  //   let offset_in_bytes = MemoryLayout<Pointee>.stride() * n
+  //   return Pointer<Pointee>.new(
+  //     self.base: Builtin.advanced_by_bytes_word(self.base, offset_in_bytes.value))
+  // }
+
+  /// Creates an instance that does not address any usable storage.
+  @inline(always)
+  public static fun null() -> Self {
+    .new(base: Builtin.zeroinitializer_ptr())
+  }
+
+  // MARK: Copyable conformance.
+
+  /// Returns an equivalent instance.
+  @inline(always)
+  public fun copy() -> Self {
+    .new(base: self.base)
+  }
+
+  // MARK: Conformance to Equatable.
+
+  /// Returns `true` iff `other` has an equivalent value.
+  @inline(always)
+  public fun infix== (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_eq_ptr(self.base, other.base))
+  }
+
+  /// Returns `false` iff `other` has an equivalent value.
+  @inline(always)
+  public fun infix!= (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_ne_ptr(self.base, other.base))
+  }
+
+}
+
+public given <T> => Pointer<T> is Movable {}
+
+public given <T> => Pointer<T> is Copyable {}
+
+public given <T> => Pointer<T> is Equatable {}
+
+/// Yields a pointer to `x`.
+@inline(always)
+public subscript pointer<T>(to x: T) -> Pointer<T> {
+  yield Pointer(base: Builtin.address(of: x))
 }
