@@ -261,7 +261,12 @@ public struct Interpreter {
     case let x as IRBranch:
       return .jump(to: entryPoint(x.target))
     case let x as IRConditionalBranch:
-      _ = x
+      let c = asRuntimeValue(x.condition).bool
+      if c {
+        return .jump(to: entryPoint(x.onSuccess))
+      } else {
+        return .jump(to: entryPoint(x.onFailure))
+      }
     case let x as IRGlobalAccess:
       _ = x
     case let x as IRLoad:
