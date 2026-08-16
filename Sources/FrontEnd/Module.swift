@@ -550,6 +550,7 @@ extension Module: Archivable {
       }
 
       var me = Self(name: name, identity: ctx.identities[name]!)
+      me.dependencies = dependencies
 
       // <source count> <identity> <contents> ...
       let count = try Int(archive.readUnsignedLEB128())
@@ -650,7 +651,7 @@ extension Module: Archivable {
         try archive.write(s.variableToBinding, in: &ctx, sortedBy: \.key)
         try archive.write(s.syntaxToType, in: &ctx, sortedBy: \.key)
         try archive.write(s.nameToDeclaration, in: &ctx, sortedBy: \.key)
-        try archive.write(s.witnessTables, in: &ctx)
+        try archive.write(s.witnessTables, in: &ctx, sortedBy: \.key)
       }
 
       // IR functions.
@@ -680,6 +681,22 @@ extension Module: Archivable {
     let name = try archive.read(Name.self)
     let hash = try archive.read(UInt64.self, endianness: .little)
     return (name, hash)
+  }
+
+  /// Returns the name, fingerprint, and dependencies of the module stored in `archive`.
+  public static func headerAndDependencies<A>(
+    _ archive: inout ReadableArchive<A>
+  ) throws -> (name: Module.Name, fingerprint: UInt64, dependencies: [Module.Name]) {
+    let (name, hash) = try header(&archive)
+
+    // <dependency count> [<dependency name> ...]
+    let dependencyCount = try archive.readUnsignedLEB128()
+    var dependencies: [Module.Name] = []
+    for _ in 0 ..< dependencyCount {
+      dependencies.append(try archive.read(Name.self))
+    }
+
+    return (name, hash, dependencies)
   }
 
 }

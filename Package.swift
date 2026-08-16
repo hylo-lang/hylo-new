@@ -159,6 +159,16 @@ let package = Package(
       plugins: ["CompilerTestsPlugin"]),
 
     .testTarget(
+      name: "CommandLineTests",
+      dependencies: [
+        .target(name: "hc"),
+        .target(name: "FrontEnd"),
+        .target(name: "Utilities"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .testTarget(
       name: "FrontEndTests",
       dependencies: [
         .target(name: "FrontEnd"),
