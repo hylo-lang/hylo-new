@@ -259,7 +259,7 @@ public struct Interpreter {
       // TODO: add a real implementation, updating state of composed regions.
       return .initializeRegister(to: .init(()))
     case let x as IRBranch:
-      _ = x
+      return .jump(to: entryPoint(x.target))
     case let x as IRConditionalBranch:
       _ = x
     case let x as IRGlobalAccess:
@@ -392,6 +392,14 @@ public struct Interpreter {
   /// Stores the value carried by `v` at the location pointed by the address `p`.
   private mutating func store(_ v: IRValue, at p: IRValue) throws {
     try memory.store(asRuntimeValue(v), at: asAccess(p))
+  }
+
+  /// Returns pointer to first instruction of `b`.
+  private func entryPoint(_ b: IRBlock.ID) -> InstructionPointer {
+    let m = programCounter.container.module
+    let f = programCounter.container.function
+    let i = program[m].functions[f].blocks[b].first!
+    return .init(i, in: programCounter.container)
   }
 }
 
