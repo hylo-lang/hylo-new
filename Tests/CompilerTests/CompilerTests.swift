@@ -4,6 +4,7 @@ import FrontEnd
 import StandardLibrary
 import Utilities
 import StableCollections
+import Subprocess
 import XCTest
 
 /// `true` iff intermediate compilation artifacts shall be saved for successful tests.
@@ -249,7 +250,7 @@ final class CompilerTests: XCTestCase {
       // Should an executable be tested?
       if input.manifest.stage == .execution {
         let e = try XCTUnwrap(r.artifacts.executable)
-        let x = try Process.execute(e, workingDirectory: input.workingDirectory)
+        let x = try await execute(.path(e), workingDirectory: input.workingDirectory)
         if input.manifest.shouldTrap {
           XCTAssert(x.terminationReason == .uncaughtSignal, "program did not trap")
         } else {
@@ -408,7 +409,8 @@ final class CompilerTests: XCTestCase {
     if stage == .execution {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)
-      _ = try driver.generateExecutable(from: m, withCSources: cSources, writingTo: executable)
+      _ = try await driver.generateExecutable(
+        from: m, withCSources: cSources, writingTo: executable)
       artifacts.executable = executable
     }
   }
@@ -487,9 +489,7 @@ final class CompilerTests: XCTestCase {
   }
 
   /// Asserts that the exit code of `observed` matches the one described by `input`.
-  private func assertExitStatus(
-    _ observed: Process.ExecutionReport, describedBy input: TestDescription
-  ) {
+  private func assertExitStatus(_ observed: ExecutionReport, describedBy input: TestDescription) {
     XCTAssertEqual(
       observed.exitCode, input.manifest.exitStatus,
       "mismatched exit code.\n\(observed.details(reportingAt: input.root))")
@@ -529,7 +529,7 @@ final class CompilerTests: XCTestCase {
 
 }
 
-extension Process.ExecutionReport {
+extension ExecutionReport {
 
   /// Returns a description of `self`, which is the result of running `testCase`.
   fileprivate func details(reportingAt testCase: URL) -> String {
