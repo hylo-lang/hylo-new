@@ -2136,8 +2136,8 @@ internal struct IREmitter {
 
   /// Inserts a `constant_string` instruction.
   internal mutating func _constant_string(_ contents: String) -> IRValue {
-    let t = program.types.demand(MachineType.i(64))
-    let s = IRConstantString(contents: contents.unescaped, i64: t, anchor: currentAnchor)
+    let t = program.types.demand(MachineType.word)
+    let s = IRConstantString(contents: contents.unescaped, word: t, anchor: currentAnchor)
     return insert(s)!
   }
 

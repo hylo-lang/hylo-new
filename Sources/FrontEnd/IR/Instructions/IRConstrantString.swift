@@ -2,7 +2,8 @@ import Archivist
 
 /// Creates the internal representation of constant string allocated statically.
 ///
-/// The result is a 64-bit integer corresponding to the byte representation of a string in Hylo.
+/// The result is a pointer-sized integer encoding to the internal representation of a Hylo string
+/// allocated statically.
 @Archivable
 public struct IRConstantString: Instruction {
 
@@ -16,9 +17,9 @@ public struct IRConstantString: Instruction {
   public let contents: String
 
   /// Creates an instance with the given properties.
-  public init(contents: String, i64: MachineType.ID, anchor: Anchor) {
+  public init(contents: String, word: MachineType.ID, anchor: Anchor) {
     self.contents = contents
-    self.type = .value(i64.erased)
+    self.type = .value(word.erased)
     self.anchor = anchor
   }
 
