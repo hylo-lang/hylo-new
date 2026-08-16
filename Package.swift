@@ -40,6 +40,9 @@ let package = Package(
       url: "https://github.com/apple/swift-collections.git",
       from: "1.1.0"),
     .package(path: "./Swifty-LLVM"),
+    .package(
+      url: "https://github.com/swiftlang/swift-subprocess.git",
+      from: "1.0.0"),
   ],
   targets: [
     .executableTarget(
@@ -84,6 +87,7 @@ let package = Package(
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
         .product(name: "Archivist", package: "archivist"),
+        .product(name: "Subprocess", package: "swift-subprocess"),
         .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
       ],
       swiftSettings: commonSwiftSettings),
@@ -129,6 +133,7 @@ let package = Package(
       dependencies: [
         .product(name: "Algorithms", package: "swift-algorithms"),
         .product(name: "Collections", package: "swift-collections"),
+        .product(name: "Subprocess", package: "swift-subprocess"),
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -147,6 +152,7 @@ let package = Package(
         .target(name: "FrontEnd"),
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
+        .product(name: "Subprocess", package: "swift-subprocess"),
       ],
       exclude: ["negative", "positive", "README.md"],
       swiftSettings: commonSwiftSettings,
@@ -164,7 +170,8 @@ let package = Package(
       name: "BackEndTests",
       dependencies: [
         .target(name: "BackEnd"),
-        .target(name: "Driver")
+        .target(name: "Driver"),
+        .target(name: "Utilities"),
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -182,7 +189,8 @@ let package = Package(
     .testTarget(
       name: "UtilitiesTests",
       dependencies: [
-        .target(name: "Utilities")
+        .target(name: "Utilities"),
+        .product(name: "Subprocess", package: "swift-subprocess"),
       ],
       swiftSettings: commonSwiftSettings),
 
