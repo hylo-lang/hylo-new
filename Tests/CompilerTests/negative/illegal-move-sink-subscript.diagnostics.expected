@@ -1,0 +1,9 @@
+negative/illegal-move-sink-subscript.hylo:13.11-16: error: no given instance of 'Movable<S>' in this scope
+  var a = id[y] // Attempt to move the result to new storage.
+          ~~~~~
+negative/illegal-move-sink-subscript.hylo:14.10-13: error: illegal move
+  return a.x
+         ~~~
+negative/illegal-move-sink-subscript.hylo:14.10-13: error: use of uninitialized object
+  return a.x
+         ~~~
