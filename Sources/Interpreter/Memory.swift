@@ -250,9 +250,10 @@ extension UnsafeRawBufferPointer {
 
   /// Returns the number of bytes from the notional base address to
   /// the nearest address aligned to `a`.
+  ///
+  /// If `self.baseAddress == nil`, returns `0`.
   internal func firstOffsetAligned(to a: Int) -> Int {
-    precondition(baseAddress != nil)
-    return baseAddress!.roundedUp(toNearestMultipleOf: a)
+    baseAddress?.roundedUp(toNearestMultipleOf: a) ?? 0
   }
 
 }
