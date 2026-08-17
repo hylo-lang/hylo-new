@@ -279,7 +279,7 @@ extension Memory {
     layout(MonomorphicTypeIdentity(t))
   }
 
-  /// Returns layout fo `t`.
+  /// Returns layout of `t`.
   public mutating func layout(_ t: MachineType.ID) -> TypeLayout {
     layout(t.erased)
   }
