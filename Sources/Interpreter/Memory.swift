@@ -272,6 +272,18 @@ extension Memory {
     typeLayouts.layout(t, in: &program)
   }
 
+  /// Returns layout of `t`.
+  ///
+  /// - Precondition: `t` is a monomorphic type.
+  public mutating func layout(_ t: AnyTypeIdentity) -> TypeLayout {
+    layout(MonomorphicTypeIdentity(t))
+  }
+
+  /// Returns layout fo `t`.
+  public mutating func layout(_ t: MachineType.ID) -> TypeLayout {
+    layout(t.erased)
+  }
+
   /// Returns the address of `subPart` in `whole`.
   public mutating func location(_ subPart: IndexPath, in whole: TypedAddress) -> TypedAddress {
     let (t, o) =
