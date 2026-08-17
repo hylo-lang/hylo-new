@@ -239,7 +239,7 @@ extension UnsafeRawPointer {
 
   /// Returns the number of bytes from `self` to the nearest address
   /// aligned to `a`.
-  fileprivate func offsetToAlignment(_ a: Int) -> Int {
+  fileprivate func roundedUp(toNearestMultipleOf a: Int) -> Int {
     let b = UInt(bitPattern: self)
     return Int(b.roundedUp(toNearestMultipleOf: UInt(a)) - b)
   }
@@ -250,10 +250,9 @@ extension UnsafeRawBufferPointer {
 
   /// Returns the number of bytes from the notional base address to
   /// the nearest address aligned to `a`.
-  ///
-  /// If `self.baseAddress == nil`, returns `0`.
   internal func firstOffsetAligned(to a: Int) -> Int {
-    return baseAddress?.offsetToAlignment(a) ?? 0
+    precondition(baseAddress != nil)
+    return baseAddress!.roundedUp(toNearestMultipleOf: a)
   }
 
 }
