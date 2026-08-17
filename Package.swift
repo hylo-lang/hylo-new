@@ -208,6 +208,9 @@ let package = Package(
 
     .testTarget(
       name: "RuntimeTests",
+      dependencies: [
+        .target(name: "Utilities")
+      ],
       swiftSettings: commonSwiftSettings),
 
     .testTarget(

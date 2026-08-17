@@ -97,7 +97,7 @@ struct TypeLayoutCache {
     let d = layout(abi.enumDiscriminator(count: cases.count, in: &p), in: &p)
 
     let payload = TypeLayout.StorageRequirements(
-      alignment: Int(cases.map(\.alignment).lcm() ?? 1),
+      alignment: cases.map(\.alignment).max() ?? 1,
       size: cases.map(\.size).max() ?? 0)
 
     let l = storageLayoutOfRecord(havingMembers: [

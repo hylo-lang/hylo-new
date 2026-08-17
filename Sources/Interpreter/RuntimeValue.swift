@@ -13,7 +13,7 @@ struct RuntimeValue {
   private let baseOffset: Int
 
   /// Creates an instance having bytes `bs` and alignment `a`.
-  public init(bytes bs: [UInt8], havingAlignment a: Int) {
+  public init(bytes bs: [UInt8], havingAlignment a: Alignment) {
     var (s, o) = Array.aligned(
       repeating: 0 as UInt8,
       count: bs.count,
@@ -31,9 +31,8 @@ struct RuntimeValue {
 extension RuntimeValue {
 
   /// Creates a `w`-bit integer having value `n` and alignment `a`.
-  public init(integer n: BigInt, bitWidth w: Int, alignment a: Int) {
+  public init(integer n: BigInt, bitWidth w: Int, alignment a: Alignment) {
     precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
-    precondition(a > 0)
 
     let r = twosComplementRepresentation(n)
     self.init(bytes: byteRepresentation(r, bitWidth: w), havingAlignment: a)

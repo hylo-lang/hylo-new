@@ -1,3 +1,4 @@
+import FrontEnd
 import SwiftyLLVM
 
 /// A description of the layout of a Hylo type for a particular target.
@@ -63,6 +64,6 @@ internal struct ConcreteLayout {
   internal let size: Footprint
 
   /// The alignment requirement.
-  internal let alignment: Int
+  internal let alignment: Alignment
 
 }

@@ -1,4 +1,5 @@
 import FrontEnd
+import Utilities
 import XCTest
 
 @testable import Interpreter
@@ -52,10 +53,11 @@ final class RuntimeValueTests: XCTestCase {
   func testRuntimeValueAlignment() {
     for i in 1...10 {
       let b = Array(repeating: UInt8(0), count: i)
+      let n = Alignment(bytes: UInt(i).roundedUpToPowerOf2)
       let a = UInt(
-        bitPattern: RuntimeValue(bytes: b, havingAlignment: i).bytes.withUnsafeBytes(\.baseAddress)!
+        bitPattern: RuntimeValue(bytes: b, havingAlignment: n).bytes.withUnsafeBytes(\.baseAddress)!
       )
-      XCTAssert(a % UInt(i) == 0)
+      XCTAssert(a.isMultiple(of: n))
     }
   }
 
