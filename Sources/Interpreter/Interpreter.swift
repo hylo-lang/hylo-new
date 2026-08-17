@@ -72,17 +72,8 @@ private struct Value {
     }
   }
 
-  /// The location pointed to by `self` together with its associated permissions
-  /// and obligations, if any.
-  public var accessedLocation: Access<Memory.TypedAddress>? {
-    storage as? Access<Memory.TypedAddress>
-  }
-
-  /// A concrete value of a Hylo type, if `self` is an rvalue during program
-  /// execution.
-  public var rvalue: RuntimeValue? {
-    storage as? RuntimeValue
-  }
+  /// `self` if it is a `T`, or `nil` otherwise.
+  public func `as`<T>(_: T.Type) -> T? { storage as? T }
 
 }
 
@@ -213,12 +204,14 @@ public struct Interpreter {
   /// - Precondition: `p.entry != nil`
   public init(_ p: Program) {
     memory = Memory(forRunning: p, on: UnrealABI())
-    let l = memory.allocate(.init(.void))
-    let a = Access(
-      to: Memory.TypedAddress(
-        allocation: l.allocation,
-        offset: l.offset, type: .init(.void)),
-      effect: .set)
+
+    // `main` takes a `set` access to a `Void` value, so create the
+    // corresponding storage and access.
+    let l = memory.allocate(storageFor: .void)
+    let a = Access<Memory.TypedAddress>(
+      to: .init(allocation: l.allocation, offset: l.offset, type: .init(.void)),
+      effect: .set
+    )
     callStack.enter(p.entry, definedIn: p, withParameters: [a])
   }
 
@@ -241,23 +234,23 @@ public struct Interpreter {
       // storing the access into register.
       let p = asTypedAddress(x.source)
       let a = Access<Memory.TypedAddress>(to: p, effect: x.finalCapability)
-      return .initializeRegister(to: .init(a))
+      return initializeRegister(to: a)
     case is IRRegionEnd<IRAccess>:
       // TODO: add a real implementation, validating if it is safe to end the access.
-      return .initializeRegister(to: .init(()))
+      return initializeRegister(to: ())
     case let x as IRAlloca:
       if x.witness != nil {
         unimplemented("dynamically sized stack allocation is not supported yet.")
       }
-      let p = allocateOnStack(.init(x.storage))
-      return .initializeRegister(to: .init(p))
+      let p = allocate(storageFor: x.storage)
+      return initializeRegister(to: p)
     case let x as IRApply:
       _ = x
     case let x as IRApplyBuiltin:
       _ = x
     case is IRAssumeState:
       // TODO: add a real implementation, updating state of composed regions.
-      return .initializeRegister(to: .init(()))
+      return initializeRegister(to: ())
     case let x as IRBranch:
       _ = x
     case let x as IRConditionalBranch:
@@ -287,10 +280,10 @@ public struct Interpreter {
       return .return
     case let x as IRStore:
       try store(x.value, at: x.target)
-      return .initializeRegister(to: .init(()))
+      return initializeRegister(to: ())
     case let x as IRSubfield:
       let l = location(x.path, in: x.base)
-      return .initializeRegister(to: .init(l))
+      return initializeRegister(to: l)
     case let x as IRTypeApply:
       _ = x
     case let x as IRTypeWitness:
@@ -318,12 +311,19 @@ public struct Interpreter {
     programCounter.position = i
   }
 
+  /// Returns an epilogue that initializes the instruction's register to `v`.
+  private func initializeRegister(to v: Any) -> InstructionEpilogue {
+    return .initializeRegister(to: .init(v))
+  }
+
   /// Allocates storage on `callStack` for a value of type `t`, ready to be initialized,
   /// and returns its address.
-  private mutating func allocateOnStack(_ t: MonomorphicTypeIdentity) -> Memory.TypedAddress {
-    let a = memory.allocate(t)
+  ///
+  /// - Precondition: `t` is a monomorphic type.
+  private mutating func allocate(storageFor t: AnyTypeIdentity) -> Memory.TypedAddress {
+    let a = memory.allocate(storageFor: t)
     topOfStack.allocations.append(a)
-    return .init(allocation: a.allocation, offset: a.offset, type: t)
+    return .init(allocation: a.allocation, offset: a.offset, type: .init(t))
   }
 
   /// Returns the memory location pointed to by `v`.
@@ -349,7 +349,7 @@ public struct Interpreter {
     case .parameter(let i):
       topOfStack.parameters[i]
     case .register(let r):
-      topOfStack.registers[r]!.accessedLocation!
+      topOfStack.registers[r]!.`as`(Access<Memory.TypedAddress>.self)!
     default:
       preconditionFailure("\(program.show(v)) is not a Access<Memory.TypedAddress>.")
     }
@@ -359,7 +359,7 @@ public struct Interpreter {
   private mutating func asRuntimeValue(_ v: IRValue) -> RuntimeValue {
     switch v {
     case .register(let r):
-      return topOfStack.registers[r]!.rvalue!
+      return topOfStack.registers[r]!.`as`(RuntimeValue.self)!
     case .integer(let n, let t):
       let l = memory.layout(.init(t.erased))
       return .init(integer: n, size: l.size, alignment: l.alignment)

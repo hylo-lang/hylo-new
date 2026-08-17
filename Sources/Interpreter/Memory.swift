@@ -259,6 +259,14 @@ extension UnsafeRawBufferPointer {
 }
 
 extension Memory {
+
+  /// Allocates `n` contiguous instances of `t` and returns the`Address` of the first instance.
+  ///
+  /// - Precondition: `t` is a monomorphic type.
+  public mutating func allocate(storageFor t: AnyTypeIdentity, count n: Int = 1) -> Address {
+    allocate(.init(t), count: n)
+  }
+
   /// Returns layout of `t`.
   public mutating func layout(_ t: MonomorphicTypeIdentity) -> TypeLayout {
     typeLayouts.layout(t, in: &program)
