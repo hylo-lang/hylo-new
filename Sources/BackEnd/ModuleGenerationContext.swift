@@ -65,7 +65,7 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// The tuple contains:
   /// - A string describing the type being witnessed;
   /// - The size of the type, as a 32-bit unsigned integer;
-  /// - The alignment of the type, as a 16-bit unsigned ingeter;
+  /// - The base-2 logarithm of the alignment of the type in bytes, as a 16-bit unsigned integer;
   /// - The number of type parameters or type arguments, encoded using a 16-bit signed integer.
   ///
   /// Let `n` be the value of the 4-th component. If `n` is non-negative, then the witness is for a
@@ -123,11 +123,11 @@ internal struct ModuleGenerationContext: ~Copyable {
   }
 
   /// Returns the default alignment of a dynamically sized alloca.
-  internal func dynamicAllocationAlignment() -> Int {
+  internal func dynamicAllocationAlignment() -> Alignment {
     if let n = llvm.layout.stackAlignment {
-      return n
+      return Alignment(bytes: n)
     } else {
-      return llvm.layout.preferredAlignment(of: llvm.iptr)
+      return Alignment(bytes: llvm.layout.preferredAlignment(of: llvm.iptr))
     }
   }
 

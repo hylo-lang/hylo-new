@@ -8,7 +8,7 @@ final class TypeLayoutTests: XCTestCase {
   var p = Program(forTesting: true)
   var l = TypeLayoutCache(for: UnrealABI())
 
-  func check(layoutOf t: MachineType, hasSize s: Int, andAlignment a: Int) {
+  func check(layoutOf t: MachineType, hasSize s: Int, andAlignment a: Alignment) {
     let r = layout(p.types.demand(t).erased)
     XCTAssertEqual(r.size, s)
     XCTAssertEqual(r.alignment, a)
@@ -420,7 +420,7 @@ final class TypeLayoutTests: XCTestCase {
       )
 
       XCTAssert(
-        o1 % m1.alignment == 0,
+        o1.isMultiple(of: m1.alignment),
         """
           member \(i1) at offset \(o1) not aligned to \(m1.alignment)!
         \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
@@ -438,7 +438,7 @@ final class TypeLayoutTests: XCTestCase {
       let padding = o1 &- end0
 
       XCTAssertLessThanOrEqual(
-        padding, m1.alignment,
+        padding, m1.alignment.bytes,
         """
         Needless padding \(padding) before member at offset \(o1)
         \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
@@ -449,17 +449,17 @@ final class TypeLayoutTests: XCTestCase {
   func testOffsetOfMember() {
 
     check_offsets(members: [
-      .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 9, size: 5),
+      .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 8, size: 5),
     ])
     check_offsets(members: [
-      .init(alignment: 4, size: 7), .init(alignment: 8, size: 5), .init(alignment: 3, size: 0),
-      .init(alignment: 4, size: 9), .init(alignment: 7, size: 1),
+      .init(alignment: 4, size: 7), .init(alignment: 8, size: 5), .init(alignment: 2, size: 0),
+      .init(alignment: 4, size: 9), .init(alignment: 16, size: 1),
     ])
 
     for _ in 0..<3 {
       let a = (0..<1).map { _ in
         TypeLayout.StorageRequirements(
-          alignment: Int.random(in: 1..<10),
+          alignment: Alignment(log2: UInt8.random(in: 0..<5)),
           size: Int.random(in: 0..<10)
         )
       }
@@ -468,7 +468,7 @@ final class TypeLayoutTests: XCTestCase {
     for _ in 0..<100 {
       let a = (0..<2).map { _ in
         TypeLayout.StorageRequirements(
-          alignment: Int.random(in: 1..<10),
+          alignment: Alignment(log2: UInt8.random(in: 0..<5)),
           size: Int.random(in: 0..<10)
         )
       }
@@ -478,7 +478,7 @@ final class TypeLayoutTests: XCTestCase {
     for _ in 0..<2000 {
       let a = (0..<10).map { _ in
         TypeLayout.StorageRequirements(
-          alignment: Int.random(in: 1..<10),
+          alignment: Alignment(log2: UInt8.random(in: 0..<5)),
           size: Int.random(in: 0..<10)
         )
       }
@@ -489,10 +489,10 @@ final class TypeLayoutTests: XCTestCase {
   func testBytesOfStorageLayoutOfRecord() {
     XCTAssertEqual(
       storageLayoutOfRecord(havingMembers: [
-        .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 9, size: 5),
+        .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 8, size: 5),
       ]).footprint,
 
-      .init(alignment: 18, size: 14)
+      .init(alignment: 8, size: 14)
     )
   }
 

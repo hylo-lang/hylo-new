@@ -68,9 +68,8 @@ struct Memory {
     }
 
     /// Creates an instance having `n` bytes with alignment `m` and the given `id`.
-    private init(_ n: Int, bytesWithAlignment m: Int, id: ID) {
+    private init(_ n: Int, bytesWithAlignment m: Alignment, id: ID) {
       precondition(n >= 0)
-      precondition(m > 0)
 
       let (s, o) = Storage.aligned(repeating: 0, count: n, alignment: m)
       storage = s
@@ -105,7 +104,7 @@ struct Memory {
       to _: T.Type, at a: Offset, _ body: (UnsafeMutablePointer<T>) -> R
     ) -> R {
       precondition(a + MemoryLayout<T>.size <= size)
-      precondition(offset(a, hasAlignment: MemoryLayout<T>.alignment))
+      precondition(offset(a, hasAlignment: Alignment(bytes: MemoryLayout<T>.alignment)))
       return storage.withUnsafeMutableBytes { p in
         body((p.baseAddress! + baseOffset + a).assumingMemoryBound(to: T.self))
       }
@@ -138,10 +137,10 @@ struct Memory {
       }
     }
 
-    /// Returns `true` iff `o` is aligned to an `n` byte boundary.
-    public func offset(_ o: Offset, hasAlignment n: Int) -> Bool {
+    /// Returns `true` iff `o` is aligned to `n`.
+    public func offset(_ o: Offset, hasAlignment n: Alignment) -> Bool {
       storage.withUnsafeBytes {
-        UInt(bitPattern: $0.baseAddress! + baseOffset + o) % UInt(n) == 0
+        UInt(bitPattern: $0.baseAddress! + baseOffset + o).isMultiple(of: n)
       }
     }
   }
@@ -208,8 +207,8 @@ struct Memory {
     }
   }
 
-  /// Returns true if `a` is aligned to an `n` byte boundary.
-  public func address(_ a: Address, hasAlignment n: Int) -> Bool {
+  /// Returns true if `a` is aligned to `n`.
+  public func address(_ a: Address, hasAlignment n: Alignment) -> Bool {
     allocation[a.allocation]!.offset(a.offset, hasAlignment: n)
   }
 
@@ -280,9 +279,9 @@ extension UnsafeRawPointer {
 
   /// Returns the number of bytes from `self` to the nearest address
   /// aligned to `a`.
-  fileprivate func roundedUp(toNearestMultipleOf a: Int) -> Int {
+  fileprivate func roundedUp(toNearestMultipleOf a: Alignment) -> Int {
     let b = UInt(bitPattern: self)
-    return Int(b.roundedUp(toNearestMultipleOf: UInt(a)) - b)
+    return Int(b.roundedUp(toNearestMultipleOf: a) - b)
   }
 
 }
@@ -293,7 +292,7 @@ extension UnsafeRawBufferPointer {
   /// the nearest address aligned to `a`.
   ///
   /// If `self.baseAddress == nil`, returns `0`.
-  internal func firstOffsetAligned(to a: Int) -> Int {
+  internal func firstOffsetAligned(to a: Alignment) -> Int {
     baseAddress?.roundedUp(toNearestMultipleOf: a) ?? 0
   }
 
