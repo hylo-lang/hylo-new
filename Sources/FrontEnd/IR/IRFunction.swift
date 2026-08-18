@@ -590,10 +590,9 @@ public struct IRFunction: Sendable {
   /// Returns the instructions that follows `i` in the block containing `i`.
   public func instructions(after i: AnyInstructionIdentity) -> IRBlock.Iterator {
     let b = block(defining: i)
-    return .init(
-      slots: slots,
-      last: blocks[b].last,
-      next: slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)))
+    let l = blocks[b].last
+    let n = slots.address(after: i.address).map(AnyInstructionIdentity.init(address:)) ?? l
+    return .init(slots: slots, last: l, next: n)
   }
 
   /// Returns `true` iff `b` contains an instruction of type `T`.
