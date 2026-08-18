@@ -531,7 +531,21 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRProperty.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .initialized)
+    let s = f.at(i)
+
+    // If the property is referring to a stored property in a struct whose layout is visible, the
+    // instruction behaves like `subfield`.
+    if let index = program.storedPropertyIndex(of: s.property, in: s.anchor.scope) {
+      let field = context.locals[s.record]!.place!.appending(contentsOf: [index])
+      context.locals[.register(i.erased)] = .place(field)
+    }
+
+    // Otherwise, it defines a new place.
+    else {
+      assert(isInitialized(place: s.record), "abstract property on uninitialized object")
+      context.declare(i.erased, from: f, initially: .initialized)
+    }
+
     return f.instruction(after: i.erased)
   }
 
@@ -691,16 +705,13 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Returns the declaration binding `v`, which computes the source of an access in `f`, or `nil`
-  /// if such a declaration cannot be identified.
-  private func binding(declaring v: IRValue, in f: IRFunction) -> VariableDeclaration.ID? {
-    if let d = f.declaration(v) {
-      return program.cast(d, to: VariableDeclaration.self)
-    } else if let r = v.register, let s = f.at(r) as? IRSubfield, let d = s.declaration {
-      return program.cast(d, to: VariableDeclaration.self)
-    } else {
-      return nil
-    }
+  /// Returns the introducer of the binding declared by `d`, if any.
+  private func introducer(binding d: DeclarationIdentity) -> BindingPattern.Introducer? {
+    guard
+      let v = program.cast(d, to: VariableDeclaration.self),
+      let b = program.bindingDeclaration(containing: v)
+    else { return nil }
+    return program[program[b].pattern].introducer.value
   }
 
   /// Returns the introducer of the binding associated with `v`, which computes the source of an
@@ -709,22 +720,23 @@ private struct Transfer: AbstractTransferFunction {
     binding v: IRValue, in f: IRFunction
   ) -> (BindingPattern.Introducer?, IRValue) {
     var s = v
-    while true {
-      // Is `s` attached to a binding declaration?
-      if let b = binding(declaring: s, in: f).flatMap(program.bindingDeclaration(containing:)) {
-        let k = program[program[b].pattern].introducer.value
-        if (k == .let) && (!program.isLocal(b) || program.isMember(b)) {
-          return (.sinklet, s)
-        } else {
-          return (k, s)
-        }
+    while let r = s.register {
+      if let s = f.at(r) as? IRProperty, let i = introducer(binding: s.property) {
+        let presented = (i == .let) && program.isMember(s.property) ? .sinklet : i
+        return (presented, s.record)
+      } else if let next = f.source(r) {
+        s = next
+      } else {
+        break
       }
+    }
 
-      // Should we look further?
-      else if let r = s.register.flatMap(f.source(_:)) { s = r }
-
+    if let d = f.declaration(s), let i = introducer(binding: d) {
+      let presented = (i == .let) && !program.isLocal(d) ? .sinklet : i
+      return (presented, s)
+    } else {
       // No binding declaration.
-      else { return (nil, s) }
+      return (nil, s)
     }
   }
 
@@ -749,7 +761,7 @@ private struct Transfer: AbstractTransferFunction {
 
     case (.some(.sinklet), let source):
       // An `inout` access to a `sink let` binding is always invalid.
-      if (k == .inout) || f.isBoundImmutably(source) { return false }
+      if (k == .inout) || isBoundImmutably(source, in: f) { return false }
 
       // Otherwise validity depends on the sequencing of the access relative to other uses.
       let a = context.locals[s.source]!.place!
@@ -763,7 +775,56 @@ private struct Transfer: AbstractTransferFunction {
       unreachable()
 
     case (_, let source):
-      return !f.isBoundImmutably(source)
+      return !isBoundImmutably(source, in: f)
+    }
+  }
+
+  /// Returns `true` iff `v` cannot be used to modify or update a value.
+  private func isBoundImmutably(_ v: IRValue, in f: IRFunction) -> Bool {
+    switch v {
+    case .parameter(let i):
+      return f.termParameters[i].access == .let
+    case .register(let i):
+      return isBoundImmutably(i, in: f)
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
+  private func isBoundImmutably(_ i: AnyInstructionIdentity, in f: IRFunction) -> Bool {
+    switch f.tag(of: i) {
+    case IRAlloca.self:
+      return false
+    case IRAccess.self:
+      return (f.at(i) as! IRAccess).capabilities == [.let]
+    case IRCase.self:
+      return isBoundImmutably((f.at(i) as! IRCase).source, in: f)
+    case IRPlaceCast.self:
+      return (f.at(i) as! IRPlaceCast).access == .let
+    case IRPointerToPlace.self:
+      return (f.at(i) as! IRPointerToPlace).access == .let
+    case IRProject.self:
+      return (f.at(i) as! IRProject).access == .let
+    case IRProperty.self:
+      return isBoundImmutably(f.castUnchecked(i, to: IRProperty.self), in: f)
+    case IRSubfield.self:
+      return isBoundImmutably((f.at(i) as! IRSubfield).base, in: f)
+    default:
+      return true
+    }
+  }
+
+  /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
+  private func isBoundImmutably(_ i: IRProperty.ID, in f: IRFunction) -> Bool {
+    if
+      let v = program.cast(f.at(i).property, to: VariableDeclaration.self),
+      let d = program.bindingDeclaration(containing: v),
+      program[program[d].pattern].introducer.value != .let
+    {
+      return isBoundImmutably(f.at(i).record, in: f)
+    } else {
+      return true
     }
   }
 

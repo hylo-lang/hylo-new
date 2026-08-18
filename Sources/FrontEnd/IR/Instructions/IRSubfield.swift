@@ -17,20 +17,15 @@ public struct IRSubfield: Instruction {
   /// The type of the subfield being accessed.
   public let subfieldType: AnyTypeIdentity
 
-  /// The declaration of the entity that the subfield represents, if any.
-  public let declaration: DeclarationIdentity?
-
   /// Creates an instance with the given properties.
   public init(
     base: IRValue, path: IndexPath, subfieldType: AnyTypeIdentity,
-    declaration: DeclarationIdentity?,
     anchor: Anchor
   ) {
     self.operands = [base]
     self.anchor = anchor
     self.path = path
     self.subfieldType = subfieldType
-    self.declaration = declaration
   }
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
@@ -39,7 +34,6 @@ public struct IRSubfield: Instruction {
     self.anchor = properties.anchor(other)
     self.path = other.path
     self.subfieldType = other.subfieldType
-    self.declaration = other.declaration
   }
 
   /// The address of the record containing the subfield whose address is computed.

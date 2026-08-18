@@ -280,7 +280,20 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRProperty.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    context.declare(i.erased, from: f, initially: .unique)
+    let s = f.at(i)
+
+    // If the property is referring to a stored property in a struct whose layout is visible, the
+    // instruction behaves like `subfield`.
+    if let index = program.storedPropertyIndex(of: s.property, in: s.anchor.scope) {
+      let field = context.locals[s.record]!.place!.appending(contentsOf: [index])
+      context.locals[.register(i.erased)] = .place(field)
+    }
+
+    // Otherwise, it defines a new place.
+    else {
+      context.declare(i.erased, from: f, initially: .unique)
+    }
+
     return f.instruction(after: i.erased)
   }
 

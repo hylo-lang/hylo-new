@@ -1125,6 +1125,27 @@ public struct Program: Sendable {
     return result
   }
 
+  /// If `d` declares a stored property of a type whose layout is visible in `scopeOfUse`, returns
+  /// that property's index; otherwise, returns `nil`.
+  ///
+  /// The index of a stored property is used in instances of `IndexPath` to represent the location
+  /// of a part relative to the location of a whole. For example, if `S` is a struct with two
+  /// stored properties `x` and `y`, declared in that order, the index of `y` is 1.
+  ///
+  /// If resilience is enabled in the module containing `d`, the layout of the type declared by `d`
+  /// is visible if `d` is the same module as `scopeOfUse` or if `d` is annotated with `@frozen`.
+  /// Layouts are always visible when resilience is disabled.
+  public mutating func storedPropertyIndex(
+    of d: DeclarationIdentity, in scopeOfUse: ScopeIdentity
+  ) -> Int? {
+    guard
+      let v = cast(d, to: VariableDeclaration.self),
+      let p = parent(containing: v, as: StructDeclaration.self),
+      isLayoutVisible(p, in: scopeOfUse)
+    else { return nil }
+    return storedProperties(of: p).firstIndex(of: v)
+  }
+
   /// Returns the binding declaration that contains `d`, if any.
   ///
   /// - Requires: The module containing `s` is scoped.
@@ -1344,7 +1365,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns the name of the C function implementing `d` iff `d` is annotated with
+  /// Returns the name of the C implementation of `d` iff it declares a function annotated with
   /// `@extern_c_indirect`.
   public func externCName(of d: DeclarationIdentity) -> String? {
     annotation("extern_c_indirect", appliedTo: d).flatMap { (a) in
@@ -1353,6 +1374,16 @@ public struct Program: Sendable {
       } else {
         return nil
       }
+    }
+  }
+
+  /// Returns the name of the C implementation of the function named by `f` iff that function's
+  /// declaration is annotated with `@extern_c_indirect`.
+  public func externCName(of f: IRFunction.Name) -> String? {
+    if case .lowered(let d) = f {
+      return externCName(of: d)
+    } else {
+      return nil
     }
   }
 
