@@ -2207,9 +2207,7 @@ internal struct IREmitter {
   }
 
   /// Inserts a `subfield` instruction.
-  internal mutating func _subfield(
-    _ base: IRValue, at path: IndexPath, declaredBy declaration: DeclarationIdentity? = nil
-  ) -> IRValue {
+  internal mutating func _subfield(_ base: IRValue, at path: IndexPath) -> IRValue {
     // The instruction is equivalent to the identity if the path is empty.
     if path.isEmpty { return base }
 
@@ -2219,7 +2217,7 @@ internal struct IREmitter {
     }
 
     let s = IRSubfield(
-      base: base, path: path, subfieldType: subfieldType!, declaration: declaration,
+      base: base, path: path, subfieldType: subfieldType!,
       anchor: currentAnchor)
     return insert(s)!
   }
