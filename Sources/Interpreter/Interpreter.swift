@@ -73,7 +73,7 @@ private struct Value {
   }
 
   /// `self` if it is a `T`, or `nil` otherwise.
-  public func `as`<T>(_: T.Type) -> T? { storage as? T }
+  public func callAsFunction<T>(as: T.Type) -> T? { storage as? T }
 
 }
 
@@ -208,10 +208,7 @@ public struct Interpreter {
     // `main` takes a `set` access to a `Void` value, so create the
     // corresponding storage and access.
     let l = memory.allocate(storageFor: .void)
-    let a = Access<Memory.TypedAddress>(
-      to: .init(allocation: l.allocation, offset: l.offset, type: .init(.void)),
-      effect: .set
-    )
+    let a = Access(to: l.asTypedAddress(.void), effect: .set)
     callStack.enter(p.entry, definedIn: p, withParameters: [a])
   }
 
@@ -233,7 +230,7 @@ public struct Interpreter {
       // TODO: add a real implementation, validating new access in memory and
       // storing the access into register.
       let p = x.source.asTypedAddress(in: self)
-      let a = Access<Memory.TypedAddress>(to: p, effect: x.finalCapability)
+      let a = Access(to: p, effect: x.finalCapability)
       return initializeRegister(to: a)
     case is IRRegionEnd<IRAccess>:
       // TODO: add a real implementation, validating if it is safe to end the access.
@@ -323,7 +320,7 @@ public struct Interpreter {
   private mutating func allocate(storageFor t: AnyTypeIdentity) -> Memory.TypedAddress {
     let a = memory.allocate(storageFor: t)
     topOfStack.allocations.append(a)
-    return .init(allocation: a.allocation, offset: a.offset, type: .init(t))
+    return a.asTypedAddress(t)
   }
 
   /// Stores the value carried by `v` at the location pointed by the address `p`.
@@ -358,9 +355,9 @@ extension IRValue {
     case .parameter(let i):
       executor.topOfStack.parameters[i]
     case .register(let r):
-      executor.topOfStack.registers[r]!.`as`(Access<Memory.TypedAddress>.self)!
+      executor.topOfStack.registers[r]!(as: Access<Memory.TypedAddress>.self)!
     default:
-      preconditionFailure("\(executor.program.show(self)) is not a Access<Memory.TypedAddress>.")
+      preconditionFailure("\(executor.program.show(self)) is not an Access<Memory.TypedAddress>.")
     }
   }
 
@@ -369,7 +366,7 @@ extension IRValue {
   fileprivate func asRuntimeValue(in executor: inout Interpreter) -> RuntimeValue {
     switch self {
     case .register(let r):
-      return executor.topOfStack.registers[r]!.`as`(RuntimeValue.self)!
+      return executor.topOfStack.registers[r]!(as: RuntimeValue.self)!
     case .integer(let n, let t):
       let l = executor.memory.layout(t)
       return .init(integer: n, size: l.size, alignment: l.alignment)

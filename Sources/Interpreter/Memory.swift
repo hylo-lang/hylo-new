@@ -157,6 +157,20 @@ struct Memory {
 
     public var description: String { "@\(allocation):0x\(String(offset, radix: 16))" }
 
+    /// Returns a `TypedAddress` referring to the same location as `self`, viewed
+    /// as the address of a value of type `t`.
+    public func asTypedAddress(_ t: MonomorphicTypeIdentity) -> TypedAddress {
+      .init(allocation: self.allocation, offset: self.offset, type: t)
+    }
+
+    /// Returns a `TypedAddress` referring to the same location as `self`, viewed
+    /// as the address of a value of type `t`.
+    ///
+    /// - Precondition: `t` is a monomorphic type.
+    public func asTypedAddress(_ t: AnyTypeIdentity) -> TypedAddress {
+      asTypedAddress(.init(t))
+    }
+
   }
 
   /// A typed location in memory.
