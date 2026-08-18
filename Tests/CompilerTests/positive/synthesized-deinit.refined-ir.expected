@@ -28,7 +28,7 @@ fun Deinitializable.deinit<Self: S0>(let %p0: Deinitializable<Self>, sink %p1: S
 
 fun S0.deinit(sink %p0: S0, set %p1: Void) {
 %b0:
-  %r0 = subfield %p0 at 0 as Int
+  %r0 = property "i" of %p0 as Int
   %r1 = access [sink] %r0
   %r2 = assume_state %r1 uninitialized
   %r3 = end %r1
