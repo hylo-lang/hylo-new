@@ -223,40 +223,6 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `true` iff `v` cannot be used to modify or update a value.
-  public func isBoundImmutably(_ v: IRValue) -> Bool {
-    switch v {
-    case .parameter(let i):
-      return termParameters[i].access == .let
-    case .register(let i):
-      return isBoundImmutably(i)
-    default:
-      return false
-    }
-  }
-
-  /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
-  public func isBoundImmutably(_ i: AnyInstructionIdentity) -> Bool {
-    switch tag(of: i) {
-    case IRAlloca.self:
-      return false
-    case IRAccess.self:
-      return (at(i) as! IRAccess).capabilities == [.let]
-    case IRCase.self:
-      return isBoundImmutably((at(i) as! IRCase).source)
-    case IRPlaceCast.self:
-      return (at(i) as! IRPlaceCast).access == .let
-    case IRPointerToPlace.self:
-      return (at(i) as! IRPointerToPlace).access == .let
-    case IRProject.self:
-      return (at(i) as! IRProject).access == .let
-    case IRSubfield.self:
-      return isBoundImmutably((at(i) as! IRSubfield).base)
-    default:
-      return true
-    }
-  }
-
   /// Returns `true` iff `v` is a built-in value, using `program` to examine types.
   public func isBuiltinValue(_ v: IRValue, using program: Program) -> Bool {
     if let t = result(of: v) {

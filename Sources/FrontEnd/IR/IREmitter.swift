@@ -1390,13 +1390,7 @@ internal struct IREmitter {
     case .member(let d):
       // Emit the receiver.
       let q = lowered(lvalue: program[e].qualification!)
-
-      // Is `d` a stored property of a type whose layout is visible?
-      if let i = storedPropertyIndex(of: d, in: program.parent(containing: e)) {
-        return lowering(e, { $0._subfield(q, at: [i], declaredBy: d) })
-      } else {
-        return lowering(e, { $0._property(d, of: q, withType: t) })
-      }
+      return lowering(e, { $0._property(d, of: q, withType: t) })
 
     case .builtin(.selfAlias):
       return lowering(e, { $0._emitTypeWitness(of: t) })
@@ -1943,29 +1937,6 @@ internal struct IREmitter {
       let rhs = program[s].elements[i]
       visit(lhs, nextTo: rhs, at: path.appending(i), calling: visitor)
     }
-  }
-
-  /// If `d` declares a stored property of a type whose layout is visible in `scopeOfUse`, returns
-  /// that property's index; otherwise, returns `nil`.
-  ///
-  /// The index of a stored property is used in instances of `IndexPath` to represent the location
-  /// of a part relative to the location of a whole. For example, if `S` is a struct with two
-  /// stored properties `x` and `y`, declared in that order, the index of `y` is 1.
-  ///
-  /// If resilience is enabled in the module containing `d`, the layout of the type declared by `d`
-  /// is visible if `d` is the same module as `scopeOfUse` or if `d` is annotated with `@frozen`.
-  /// Layouts are always visible when resilience is disabled.
-  private mutating func storedPropertyIndex(
-    of d: DeclarationIdentity, in scopeOfUse: ScopeIdentity
-  ) -> Int? {
-    guard
-      let v = program.cast(d, to: VariableDeclaration.self),
-      let p = program.parent(containing: v, as: StructDeclaration.self),
-      program.isLayoutVisible(p, in: scopeOfUse)
-    else { return nil }
-
-    let properties = program.storedProperties(of: p)
-    return properties.firstIndex(of: v)
   }
 
   /// Reports the diagnostic `d`.
