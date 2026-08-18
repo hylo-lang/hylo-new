@@ -746,7 +746,13 @@ internal struct IREmitter {
       lower(memberwiseInitialization: e, of: target)
     }
 
-    // Are we lowering an ordinary call?
+    // Are we lowering a subscript application?
+    else if program[e].style == .bracketed {
+      let y = lower(call: e, output: .poison(.place(.error)))
+      lowering(e, { $0._emitMove([.inout, .set], y, to: target) })
+    }
+
+    // Otherwise lower a function call.
     else {
       lower(call: e, output: target)
     }
@@ -1261,6 +1267,9 @@ internal struct IREmitter {
   /// The callee of `e` is the expression of a function or subscript other than a built-in function
   /// or scalar conversion. If `e` is an ordinary function call, `target` is the place in which the
   /// result of the call is written. Otherwise, it is a poison value.
+  ///
+  /// - Returns: a place holding the result of the call: for a function call, the place into which
+  ///   the callee writes its result; for a subscript call, the resulting projection.
   @discardableResult
   private mutating func lower(call e: Call.ID, output target: IRValue) -> IRValue {
     // Compute the value of the callee, which may be a function or subscript.
@@ -1289,7 +1298,7 @@ internal struct IREmitter {
 
     return lowering(e) { (me) in
       // Form accesses on the parameters right before the call. Note that we won't close these
-      // accesses here because, if the callee is a subscript, then the lifetimes the parameters'
+      // accesses here because, if the callee is a subscript, then the lifetimes of the parameters'
       // accesses have to cover all uses of the projected value, which are not known yet. We'll
       // delay the work until lifetime analysis instead.
       if me.program[e].style == .parenthesized {

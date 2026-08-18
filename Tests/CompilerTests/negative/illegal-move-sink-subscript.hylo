@@ -1,0 +1,15 @@
+struct S is Deinitializable {
+  var x: Int32
+  memberwise init
+}
+
+/// A `sink` subscript projects an owned value that the caller may move into new storage.
+subscript id(x: sink S) sink -> S {
+  yield &x
+}
+
+fun main() -> Int32 {
+  var y = S(x: 42 as Int32)
+  var a = id[y] // Attempt to move the result to new storage.
+  return a.x
+}
