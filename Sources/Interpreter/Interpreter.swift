@@ -323,9 +323,24 @@ public struct Interpreter {
     return a.asTypedAddress(t)
   }
 
-  /// Stores the value carried by `v` at the location pointed by the address `p`.
+  /// Stores `v` at the address `p`.
   private mutating func store(_ v: IRValue, at p: IRValue) throws {
-    try memory.store(v.asRuntimeValue(in: &self), at: p.asAccess(in: self))
+    try memory.store(self[v], at: p.asAccess(in: self))
+  }
+
+  /// Returns the value corresponding to `v` in the current execution state.
+  private subscript(_ v: IRValue) -> RuntimeValue {
+    mutating get {
+      switch v {
+      case .register(let r):
+        return topOfStack.registers[r]!(as: RuntimeValue.self)!
+      case .integer(let n, let t):
+        let l = memory.layout(t)
+        return .init(integer: n, bitWidth: l.size, alignment: l.alignment)
+      default:
+        preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
+      }
+    }
   }
 
 }
@@ -359,20 +374,6 @@ extension IRValue {
       executor.topOfStack.registers[r]!(as: Access<Memory.TypedAddress>.self)!
     default:
       preconditionFailure("\(executor.program.show(self)) is not an Access<Memory.TypedAddress>.")
-    }
-  }
-
-  /// Returns the value in the interpreted program corresponding to `self` in the
-  /// current execution state of `executor`.
-  fileprivate func asRuntimeValue(in executor: inout Interpreter) -> RuntimeValue {
-    switch self {
-    case .register(let r):
-      return executor.topOfStack.registers[r]!(as: RuntimeValue.self)!
-    case .integer(let n, let t):
-      let l = executor.memory.layout(t)
-      return .init(integer: n, size: l.size, alignment: l.alignment)
-    default:
-      preconditionFailure("\(executor.program.show(self)) is not a RuntimeValue.")
     }
   }
 
