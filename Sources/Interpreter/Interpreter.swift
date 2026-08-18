@@ -332,7 +332,8 @@ public struct Interpreter {
 
 extension IRValue {
 
-  /// Returns the memory location pointed to by `self` in the context of `executor`.
+  /// Returns the memory location pointed to by `self` in the current execution
+  /// state of `executor`.
   ///
   /// - Precondition: `self` contains a place.
   fileprivate func asTypedAddress(in executor: Interpreter) -> Memory.TypedAddress {
@@ -346,8 +347,8 @@ extension IRValue {
     }
   }
 
-  /// Returns the memory location pointed to by `self` together with its
-  /// associated permissions and obligations, in the context of `executor`.
+  /// Returns the memory location pointed to by `self`, together with its
+  /// permissions and obligations, in the current execution state of `executor`.
   ///
   /// - Precondition: `v` contains a place computed by `access` instruction.
   fileprivate func asAccess(in executor: Interpreter) -> Access<Memory.TypedAddress> {
@@ -361,8 +362,8 @@ extension IRValue {
     }
   }
 
-  /// Returns the value occurring in the interpreted program that is carried by
-  /// `self` in the context of `executor`.
+  /// Returns the value in the interpreted program corresponding to `self` in the
+  /// current execution state of `executor`.
   fileprivate func asRuntimeValue(in executor: inout Interpreter) -> RuntimeValue {
     switch self {
     case .register(let r):
