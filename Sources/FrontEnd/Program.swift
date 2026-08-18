@@ -1365,7 +1365,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns the name of the C function implementing `d` iff `d` is annotated with
+  /// Returns the name of the C implementation of `d` iff it declares a function annotated with
   /// `@extern_c_indirect`.
   public func externCName(of d: DeclarationIdentity) -> String? {
     annotation("extern_c_indirect", appliedTo: d).flatMap { (a) in
@@ -1374,6 +1374,16 @@ public struct Program: Sendable {
       } else {
         return nil
       }
+    }
+  }
+
+  /// Returns the name of the C implementation of the function named by `f` iff that function's
+  /// declaration is annotated with `@extern_c_indirect`.
+  public func externCName(of f: IRFunction.Name) -> String? {
+    if case .lowered(let d) = f {
+      return externCName(of: d)
+    } else {
+      return nil
     }
   }
 
