@@ -747,14 +747,12 @@ internal struct IREmitter {
     }
 
     // Are we lowering a subscript application?
-    else {
-      let y = lower(lvalue: e)
-      if program[e].style == .bracketed {
-        lowering(e, { $0._emitMove([.inout, .set], y, to: target) })
-      }
+    else if program[e].style == .bracketed {
+      let y = lower(call: e, output: .poison(.place(.error)))
+      lowering(e, { $0._emitMove([.inout, .set], y, to: target) })
     }
 
-    // Are we lowering an ordinary call?
+    // Otherwise lower a function call.
     else {
       lower(call: e, output: target)
     }
