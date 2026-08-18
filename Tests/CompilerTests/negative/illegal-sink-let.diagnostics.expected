@@ -13,3 +13,12 @@ negative/illegal-sink-let.hylo:34.14-15: error: illegal 'set' access
 negative/illegal-sink-let.hylo:36.9-10: error: illegal 'sink' access
     _ = z             // error
         ^
+negative/illegal-sink-let.hylo:45.12-13: error: illegal 'set' access
+    &s.x = 0          // error
+           ^
+negative/illegal-sink-let.hylo:56.16-17: error: illegal 'set' access
+    &t.s.0.x = 0      // error
+               ^
+negative/illegal-sink-let.hylo:57.16-17: error: illegal 'set' access
+    &t.s.0.y = 1      // error
+               ^
