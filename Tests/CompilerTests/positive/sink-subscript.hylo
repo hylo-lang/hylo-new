@@ -1,4 +1,5 @@
-/// A `sink` subscript projects an owned value that the caller *may* move into its own storage.
+/// A `sink` subscript projects a value that the caller must consume,
+/// e.g. by move assignment to fresh storage or by implicit deinitialization.
 subscript id(x: sink Int32) sink -> Int32 { yield &x }
 subscript id(x: sink Immovable) sink -> Immovable { yield &x }
 
