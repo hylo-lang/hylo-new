@@ -293,7 +293,7 @@ extension Program {
         note = .init(.note, "is that an unmatched block comment delimiter?", at: site)
       }
 
-      return .init(.error, message, at: site, notes: Array(contentsOf: note))
+      return .init(.error, message, at: site, notes: Array(unwrapping: note))
     } else {
       return .init(.error, "undefined symbol '\(n)'", at: site)
     }
