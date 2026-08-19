@@ -5,15 +5,14 @@ import Utilities
 /// A value occurring during program execution.
 struct RuntimeValue {
 
-  /// The bytes of value, preceded by zero or more bytes of padding to satisfy
+  /// The bytes of the value preceded by zero or more bytes of padding to satisfy
   /// its alignment.
   private let storage: [UInt8]
 
   /// The number of bytes before the value logically begins.
   private let baseOffset: Int
 
-  /// Creates an instance having bytes representation `bs`, such that the
-  /// address of the first byte is aligned to `a`.
+  /// Creates an instance having bytes `bs` and alignment `a`.
   public init(bytes bs: [UInt8], havingAlignment a: Int) {
     var (s, o) = Array.aligned(
       repeating: 0 as UInt8,
@@ -31,16 +30,13 @@ struct RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Creates an instance for an integer of size `b` bytes having value `n` and
-  /// alignment `a`.
-  public init(integer n: BigInt, size b: Int, alignment a: Int) {
-    precondition(b == 1 || b == 2 || b == 4 || b == 8)
+  /// Creates a `w`-bit integer having value `n` and alignment `a`.
+  public init(integer n: BigInt, bitWidth w: Int, alignment a: Int) {
+    precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
     precondition(a > 0)
 
-    let unsignedRepresentation = twosComplementRepresentation(n, size: b)
-    self.init(
-      bytes: byteRepresentation(unsignedRepresentation, size: b),
-      havingAlignment: a)
+    let r = twosComplementRepresentation(n)
+    self.init(bytes: byteRepresentation(r, bitWidth: w), havingAlignment: a)
   }
 
   /// Returns the result of calling `body` on a pointer to the value's bytes
@@ -65,39 +61,41 @@ extension RuntimeValue {
 
 }
 
-/// Returns the in-memory representation of `n` as an unsigned integer of size `b` bytes.
-internal func byteRepresentation(_ n: BigUInt, size b: Int) -> [UInt8] {
-  precondition(b == 1 || b == 2 || b == 4 || b == 8)
-  switch b {
-  case 1:
+/// Returns an in-memory byte representation of the low-order `w` bits of `n`.
+internal func byteRepresentation(_ n: UInt128, bitWidth w: Int) -> [UInt8] {
+  precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
+  switch w {
+  case 8:
     let value = UInt8(truncatingIfNeeded: n)
     return withUnsafeBytes(of: value, Array.init)
 
-  case 2:
+  case 16:
     let value = UInt16(truncatingIfNeeded: n)
     return withUnsafeBytes(of: value, Array.init)
 
-  case 4:
+  case 32:
     let value = UInt32(truncatingIfNeeded: n)
     return withUnsafeBytes(of: value, Array.init)
 
-  case 8:
+  case 64:
     let value = UInt64(truncatingIfNeeded: n)
     return withUnsafeBytes(of: value, Array.init)
+
+  case 128:
+    return withUnsafeBytes(of: n, Array.init)
 
   default:
     unreachable()
   }
 }
 
-/// Returns the unsigned representation of `n` using `b` bytes in two's-complement form.
+/// Returns 128-bit two's-complement representation of `n`.
 ///
-/// - Precondition: `n` must be representable as a signed integer in `b` bytes.
-internal func twosComplementRepresentation(_ n: BigInt, size b: Int) -> BigUInt {
-  var unsignedRepresentation = n.magnitude
-  if n.sign == .minus {
-    let maximumUnsignedValue = BigUInt(1) << (8 * b)
-    unsignedRepresentation = maximumUnsignedValue - unsignedRepresentation
+/// - Precondition: `n` must be representable as a signed 128-bit integer.
+internal func twosComplementRepresentation(_ n: BigInt) -> UInt128 {
+  if n.sign == .plus {
+    return UInt128(n.magnitude)
   }
-  return unsignedRepresentation
+
+  return UInt128.max - UInt128(n.magnitude) + 1
 }

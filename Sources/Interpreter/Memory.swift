@@ -157,6 +157,20 @@ struct Memory {
 
     public var description: String { "@\(allocation):0x\(String(offset, radix: 16))" }
 
+    /// Returns a `TypedAddress` referring to the same location as `self`, viewed
+    /// as the address of a value of type `t`.
+    public func asTypedAddress(_ t: MonomorphicTypeIdentity) -> TypedAddress {
+      .init(allocation: self.allocation, offset: self.offset, type: t)
+    }
+
+    /// Returns a `TypedAddress` referring to the same location as `self`, viewed
+    /// as the address of a value of type `t`.
+    ///
+    /// - Precondition: `t` is a monomorphic type.
+    public func asTypedAddress(_ t: AnyTypeIdentity) -> TypedAddress {
+      asTypedAddress(.init(t))
+    }
+
   }
 
   /// A typed location in memory.
@@ -239,7 +253,7 @@ extension UnsafeRawPointer {
 
   /// Returns the number of bytes from `self` to the nearest address
   /// aligned to `a`.
-  fileprivate func offsetToAlignment(_ a: Int) -> Int {
+  fileprivate func roundedUp(toNearestMultipleOf a: Int) -> Int {
     let b = UInt(bitPattern: self)
     return Int(b.roundedUp(toNearestMultipleOf: UInt(a)) - b)
   }
@@ -253,15 +267,35 @@ extension UnsafeRawBufferPointer {
   ///
   /// If `self.baseAddress == nil`, returns `0`.
   internal func firstOffsetAligned(to a: Int) -> Int {
-    return baseAddress?.offsetToAlignment(a) ?? 0
+    baseAddress?.roundedUp(toNearestMultipleOf: a) ?? 0
   }
 
 }
 
 extension Memory {
+
+  /// Allocates `n` contiguous instances of `t` and returns the`Address` of the first instance.
+  ///
+  /// - Precondition: `t` is a monomorphic type.
+  public mutating func allocate(storageFor t: AnyTypeIdentity, count n: Int = 1) -> Address {
+    allocate(.init(t), count: n)
+  }
+
   /// Returns layout of `t`.
   public mutating func layout(_ t: MonomorphicTypeIdentity) -> TypeLayout {
     typeLayouts.layout(t, in: &program)
+  }
+
+  /// Returns layout of `t`.
+  ///
+  /// - Precondition: `t` is a monomorphic type.
+  public mutating func layout(_ t: AnyTypeIdentity) -> TypeLayout {
+    layout(MonomorphicTypeIdentity(t))
+  }
+
+  /// Returns layout of `t`.
+  public mutating func layout(_ t: MachineType.ID) -> TypeLayout {
+    layout(t.erased)
   }
 
   /// Returns the address of `subPart` in `whole`.
