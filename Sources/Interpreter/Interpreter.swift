@@ -338,7 +338,7 @@ public struct Interpreter {
         return topOfStack.registers[r]!(as: RuntimeValue.self)!
       case .integer(let n, let t):
         let l = memory.layout(t)
-        return .init(integer: n, bitWidth: l.size, alignment: l.alignment)
+        return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
