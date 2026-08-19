@@ -325,6 +325,7 @@ extension Memory {
   public mutating func consume(from p: Access<Memory.TypedAddress>) throws -> RuntimeValue {
     // TODO: throw if it is illegal to consume from `p` using its permissions.
     // TODO: throw if location pointed by `p` is uninitialized.
+    // TODO: implement consume semantics.
     read(from: p.location)
   }
 

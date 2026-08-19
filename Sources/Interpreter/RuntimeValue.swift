@@ -43,7 +43,7 @@ extension RuntimeValue {
   /// interpreted as a `T` instance.
   ///
   /// - Precondition: `self` is aligned for `T`.
-  public func withUnsafePointer<T, R>(
+  internal func withUnsafePointer<T, R>(
     to _: T.Type, _ body: (UnsafePointer<T>) -> R
   ) -> R {
     precondition(MemoryLayout<T>.size <= bytes.count)
