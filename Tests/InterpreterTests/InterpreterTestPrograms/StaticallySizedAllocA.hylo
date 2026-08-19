@@ -1,4 +1,4 @@
 public fun main() {
-  let x = 2
-  let y = -1
+  let x: UInt8 = 2
+  let y: Int8 = -1
 }
