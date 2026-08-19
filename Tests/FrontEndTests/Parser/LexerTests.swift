@@ -137,6 +137,14 @@ final class LexerTests: XCTestCase {
     XCTAssertNil(scanner.next())
   }
 
+  func testQuotedIdentifier() throws {
+    var scanner = Lexer(tokenizing: "`fun` `//` `` `abc ")
+    try assertNext(from: &scanner, is: .name, withValue: "fun")
+    try assertNext(from: &scanner, is: .name, withValue: "//")
+    try assertNext(from: &scanner, is: .error, withValue: "")
+    try assertNext(from: &scanner, is: .unterminatedQuotedIdentifier, withValue: "abc ")
+  }
+
   func testKeywords() throws {
     let input: SourceFile = """
       auto case else enum extension false fun given if import infix init inout let match module

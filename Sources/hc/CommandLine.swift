@@ -213,7 +213,7 @@ private typealias Module = FrontEnd.Module
 
       assert(outputType == .binary)
       try await perform("generating executable", for: module) {
-        try driver.generateExecutable(from: module, writingTo: binaryFile(product))
+        try await driver.generateExecutable(from: module, writingTo: binaryFile(product))
       }
     }
 
@@ -224,7 +224,7 @@ private typealias Module = FrontEnd.Module
     }
 
     // Catch linker failures.
-    catch let e as Process.NonzeroExit {
+    catch let e as NonzeroExit {
       var stderr = StandardError()
       print(e.standardError, to: &stderr)
       CommandLine.exit(withError: ExitCode(e.exitCode))

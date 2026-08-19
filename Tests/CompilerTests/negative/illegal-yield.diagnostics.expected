@@ -19,3 +19,9 @@ negative/illegal-yield.hylo:22.10: error: subscript cannot project more than onc
 negative/illegal-yield.hylo:21.3: note: value already projected here
   yield false
   ^
+negative/illegal-yield.hylo:28.3: error: subscript cannot project more than once
+  yield false
+  ^
+negative/illegal-yield.hylo:27.13: note: value already projected here
+  while x { yield true }
+            ^

@@ -28,16 +28,7 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
     private var contents: ContiguousArray<Slot> = []
 
     /// Creates an empty context.
-    internal init() {}
-
-    /// Forms a context by merging the contents of `batch`.
-    internal init<T: Collection<Self>>(merging batch: T) {
-      if let (h, t) = batch.headAndTail {
-        self = t.reduce(into: h, { (a, b) in a.merge(b) })
-      } else {
-        self.init()
-      }
-    }
+    fileprivate init() {}
 
     /// Accesses the value at assigned to `key`, which is either a register or a parameter.
     ///
@@ -82,7 +73,7 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
     }
 
     /// Merges `other` into `self`.
-    internal mutating func merge(_ other: Self) {
+    fileprivate mutating func merge(_ other: Self) {
       var l = 0
       var r = 0
 
@@ -127,14 +118,21 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
   /// The state of memory.
   internal var memory: [IRValue: AbstractObject<Domain>] = [:]
 
+  /// `true` iff the context contains an error.
+  internal private(set) var containsError: Bool = false
+
   /// Creates an empty context.
   internal init() {}
 
   /// Merges `other` into `self`.
   internal mutating func merge(_ other: Self) {
-    locals.merge(other.locals)
-    memory.merge(other.memory, uniquingKeysWith: &&)
+    self.locals.merge(other.locals)
+    self.memory.merge(other.memory, uniquingKeysWith: &&)
+    self.containsError = self.containsError || other.containsError
   }
+
+  /// Sets the flag indicating that an error was encountered in this context.
+  internal mutating func setError() {}
 
   /// Returns the result calling `action` with a projection of the object at `place`, using `typer`
   /// to compute abstract layouts.
