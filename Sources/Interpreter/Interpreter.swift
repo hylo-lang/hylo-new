@@ -229,7 +229,7 @@ public struct Interpreter {
     case let x as IRAccess:
       // TODO: add a real implementation, validating new access in memory and
       // storing the access into register.
-      let p = x.source.asTypedAddress(in: self)
+      let p = address(of: x.source)
       let a = Access(to: p, effect: x.finalCapability)
       return initializeRegister(to: a)
     case is IRRegionEnd<IRAccess>:
@@ -325,10 +325,12 @@ public struct Interpreter {
 
   /// Stores `v` at the address `p`.
   private mutating func store(_ v: IRValue, at p: IRValue) throws {
-    try memory.store(self[v], at: p.asAccess(in: self))
+    try memory.store(self[v], at: access(of: p))
   }
 
   /// Returns the value corresponding to `v` in the current execution state.
+  ///
+  /// - Precondition: `v` is a runtimve value.
   private subscript(_ v: IRValue) -> RuntimeValue {
     mutating get {
       switch v {
@@ -343,39 +345,38 @@ public struct Interpreter {
     }
   }
 
+  /// Returns the memory location pointed to by `v` in the current execution context.
+  ///
+  /// - Precondition: `v` is a place.
+  fileprivate func address(of v: IRValue) -> Memory.TypedAddress {
+    switch v {
+    case .parameter(let i):
+      topOfStack.parameters[i].location
+    case .register(let r):
+      topOfStack.registers[r]!.location!
+    default:
+      preconditionFailure("\(program.show(v)) is not a Memory.TypedAddress.")
+    }
+  }
+
+  /// Returns the memory location pointed to by `v`, together with its
+  /// permissions and obligations, in the current execution state.
+  ///
+  /// - Precondition: `v` is a place computed by `access` instruction.
+  private func access(of v: IRValue) -> Access<Memory.TypedAddress> {
+    switch v {
+    case .parameter(let i):
+      topOfStack.parameters[i]
+    case .register(let r):
+      topOfStack.registers[r]!(as: Access<Memory.TypedAddress>.self)!
+    default:
+      preconditionFailure("\(program.show(v)) is not an Access<Memory.TypedAddress>.")
+    }
+  }
+
 }
 
 extension IRValue {
-
-  /// Returns the memory location pointed to by `self` in the current execution
-  /// state of `executor`.
-  ///
-  /// - Precondition: `self` contains a place.
-  fileprivate func asTypedAddress(in executor: Interpreter) -> Memory.TypedAddress {
-    switch self {
-    case .parameter(let i):
-      executor.topOfStack.parameters[i].location
-    case .register(let r):
-      executor.topOfStack.registers[r]!.location!
-    default:
-      preconditionFailure("\(executor.program.show(self)) is not a Memory.TypedAddress.")
-    }
-  }
-
-  /// Returns the memory location pointed to by `self`, together with its
-  /// permissions and obligations, in the current execution state of `executor`.
-  ///
-  /// - Precondition: `v` contains a place computed by `access` instruction.
-  fileprivate func asAccess(in executor: Interpreter) -> Access<Memory.TypedAddress> {
-    switch self {
-    case .parameter(let i):
-      executor.topOfStack.parameters[i]
-    case .register(let r):
-      executor.topOfStack.registers[r]!(as: Access<Memory.TypedAddress>.self)!
-    default:
-      preconditionFailure("\(executor.program.show(self)) is not an Access<Memory.TypedAddress>.")
-    }
-  }
 
   /// Returns the address of part `p` in the address pointed by `self`
   /// in the context of `executor`.
@@ -385,7 +386,7 @@ extension IRValue {
     ofPart p: IndexPath,
     in executor: inout Interpreter
   ) -> Memory.TypedAddress {
-    let a = asTypedAddress(in: executor)
+    let a = executor.address(of: self)
     return executor.memory.location(p, in: a)
   }
 
