@@ -1,0 +1,22 @@
+//! stage:llvm
+// TODO: move test case into ./sink-subscript.hylo once local conformances compile.
+
+struct S is Deinitializable {
+  var x: Int32
+  memberwise init
+}
+
+subscript id(x: sink S) sink -> S { yield &x }
+
+fun test_locally_movable() {
+  // It's OK if S is only Movable at the application of `id`, not within the subscript.
+  given S is Movable {}
+  var y = S(x: 42 as Int32)
+  var a = id[y]
+
+  precondition(a.x == (42 as Int32))
+}
+
+public fun main() {
+  test_locally_movable()
+}

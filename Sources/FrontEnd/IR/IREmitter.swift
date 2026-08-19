@@ -315,23 +315,22 @@ internal struct IREmitter {
           let defaultImplementation = me.demandLoweredDeclaration(functionOrConformance: m)
           let x0 = me.functionReference(to: defaultImplementation)
           let x1 = me._type_apply(x0, to: table.arguments)
-
-          let f = LoweredCallee(
-            value: x1, arguments: [.parameter(0)],
-            result: me.currentFunction.returnRegister ?? .poison(.place(.error)))
-          me._emitCallToRequirementImplementation(f)
+          me._emitCallToRequirementImplementation(x1, [.parameter(0)])
         }
 
       default:
         // The implementations is defined outside the trait.
         defining(interface, at: program.anchor(introducerOf: d)) { (me) in
+          unimplemented(
+            if: me.program.types.hasContext(me.program.type(assignedTo: r)),
+            "generic trait requirement")
           me.associate(.init(d), with: .parameter(0))
 
-          let o = me.currentFunction.returnRegister ?? .poison(.place(.error))
-          let f = me.loweredCallee(
+          let result = me.currentFunction.returnRegister ?? .poison(.place(.error))
+          let callee = me.loweredCallee(
             referringTo: implementation, qualifiedBy: nil, appliedBy: nil,
-            writingResultTo: o, at: me.currentAnchor)
-          me._emitCallToRequirementImplementation(f)
+            writingResultTo: result, at: me.currentAnchor)
+          me._emitCallToRequirementImplementation(callee.value, Array(callee.arguments))
         }
       }
     }
@@ -747,7 +746,13 @@ internal struct IREmitter {
       lower(memberwiseInitialization: e, of: target)
     }
 
-    // Are we lowering an ordinary call?
+    // Are we lowering a subscript application?
+    else if program[e].style == .bracketed {
+      let y = lower(call: e, output: .poison(.place(.error)))
+      lowering(e, { $0._emitMove([.inout, .set], y, to: target) })
+    }
+
+    // Otherwise lower a function call.
     else {
       lower(call: e, output: target)
     }
@@ -905,43 +910,72 @@ internal struct IREmitter {
   private struct LoweredCallee {
 
     /// The IR values in the representation of `self.`
-    private let properties: [IRValue]
+    private let operands: [IRValue]
+
+    /// The type arguments notionally applied to the callee.
+    let typeArguments: TypeArguments
 
     /// Creates an instance with the given properties.
-    init<T: Sequence<IRValue>>(value: IRValue, arguments: T, result: IRValue) {
+    init<T: Sequence<IRValue>>(
+      value: IRValue, typeArguments: TypeArguments, arguments: T, result: IRValue
+    ) {
       var vs: [IRValue] = .init(minimumCapacity: arguments.underestimatedCount + 2)
       vs.append(value)
       vs.append(result)
       vs.append(contentsOf: arguments)
-      self.properties = vs
+      self.operands = vs
+      self.typeArguments = typeArguments
     }
 
     /// The lowered value of the callee (e.g., a function pointer).
     var value: IRValue {
-      properties[0]
+      operands[0]
     }
 
     /// The place in which the result of the call is written iff `value` is not a subscript.
     var result: IRValue {
-      properties[1]
+      operands[1]
     }
 
-    /// A sequence of arguments notionally applied to the callee if it is partially applied.
+    /// The term arguments notionally applied to the callee.
     ///
-    /// This property is assigned to the using parameters passed to `value`. Moreover, if `value`
-    /// is a bound member, this property includes the receiver of that member.
+    /// This property includes the using parameters passed to `value` and, if `value` is a bound
+    /// member, the receiver of that member.
     var arguments: ArraySlice<IRValue> {
-      properties[2...]
+      operands[2...]
     }
 
     /// Returns `self` notionally applied to `a`.
+    ///
+    /// `a` is appended to the term arguments of `self`. The result denotes a function partially
+    /// applied to `a` and possibly expecting more arguments.
     consuming func partiallyApplied(to a: IRValue) -> LoweredCallee {
-      .init(value: value, arguments: Array(arguments, terminatedBy: a), result: result)
+      let xs = Array(arguments, terminatedBy: a)
+      return .init(value: value, typeArguments: typeArguments, arguments: xs, result: result)
     }
 
-    /// Returns `self` substituting `v` for `self.value`.
-    consuming func substituting(value v: IRValue) -> LoweredCallee {
-      .init(value: v, arguments: arguments, result: result)
+    /// Returns `self` notionally applied to `a`.
+    ///
+    /// `a` is appended to the type arguments of `self`. The result denotes a function partially
+    /// applied to `a` and possibly expecting more arguments.
+    ///
+    /// - Requires: `self.typeArguments` is disjoint from `a`.
+    consuming func partiallyApplied(to a: TypeArguments) -> LoweredCallee {
+      let ts = typeArguments.extended(with: a)
+      return .init(value: value, typeArguments: ts, arguments: arguments, result: result)
+    }
+
+    /// Returns `self` notionally applied to `a`.
+    ///
+    /// `a` is appended to the type arguments of `self`. The result denotes a function partially
+    /// applied to `a` and possibly expecting more arguments.
+    ///
+    /// - Requires: `self.typeArguments` is disjoint from `a`.
+    consuming func partiallyApplied<S: Sequence<(GenericParameter.ID, AnyTypeIdentity)>>(
+      to a: S
+    ) -> LoweredCallee {
+      let ts = typeArguments.extended(with: a)
+      return .init(value: value, typeArguments: ts, arguments: arguments, result: result)
     }
 
   }
@@ -1019,11 +1053,8 @@ internal struct IREmitter {
     case .direct(let d):
       // The callee refers to a function directly.
       let f = loweredCallee(referringTo: d, boundTo: nil, appliedBy: c, writingResultTo: r)
-
-      // The qualification may define type arguments.
-      if let ts = qualification.flatMap({ (e) in argumentsFromStaticQualification(e) }) {
-        let g = lowering(at: anchor, { $0._type_apply(f.value, to: ts) })
-        return f.substituting(value: g)
+      if let q = qualification {
+        return f.partiallyApplied(to: argumentsFromQualification(q, instantiating: f.value))
       } else {
         return f
       }
@@ -1037,8 +1068,7 @@ internal struct IREmitter {
       // the receiver's expression.
       let output = currentFunction.result(of: receiver)!.type
       if let ts = program.types.select(output, \TypeApplication.arguments) {
-        let g = lowering(at: anchor, { $0._type_apply(f.value, to: ts) })
-        return f.substituting(value: g)
+        return f.partiallyApplied(to: ts)
       } else {
         return f
       }
@@ -1057,9 +1087,9 @@ internal struct IREmitter {
           // type and term arguments passed to parameters declared on the extension itself.
           let (e, ts, xs) = me._emit(decompose: w)
           assert(e.value == .reference(.init(parent)))
-
-          let f = ts.isEmpty ? target.value : me._type_apply(target.value, to: ts)
-          return LoweredCallee(value: f, arguments: xs + target.arguments, result: target.result)
+          let ys = xs + target.arguments
+          return LoweredCallee(
+            value: target.value, typeArguments: ts, arguments: ys, result: target.result)
         }
       }
 
@@ -1070,7 +1100,7 @@ internal struct IREmitter {
           let x0 = me._emit(witness: w)
           let x1 = me._property(m, of: x0, withType: interface)
           let xs = Array(x0, prependedTo: Array(contentsOf: receiver))
-          return LoweredCallee(value: x1, arguments: xs, result: r)
+          return LoweredCallee(value: x1, typeArguments: [:], arguments: xs, result: r)
         }
       }
 
@@ -1118,8 +1148,10 @@ internal struct IREmitter {
     boundTo receiver: IRValue?,
     writingResultTo r: IRValue
   ) -> LoweredCallee {
-    let v = functionReference(to: f)
-    return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: r)
+    LoweredCallee(
+      value: functionReference(to: f),
+      typeArguments: [:], arguments: Array(contentsOf: receiver),
+      result: r)
   }
 
   /// Generates the IR for using `f` as a callee that is optionally bound to `receiver`.
@@ -1150,7 +1182,8 @@ internal struct IREmitter {
       let s = IRFunction.Signature(types: types, terms: terms, output: output)
       let t = program.types.demand(s)
       let v = IRValue.bundle(f, t, candidates)
-      return LoweredCallee(value: v, arguments: Array(contentsOf: receiver), result: r)
+      return LoweredCallee(
+        value: v, typeArguments: [:], arguments: Array(contentsOf: receiver), result: r)
     }
   }
 
@@ -1164,14 +1197,9 @@ internal struct IREmitter {
     let f = loweredCallee(program[e].target, appliedBy: c, writingResultTo: r)
 
     // The qualification may define type arguments.
-    let g = if let ts = argumentsFromStaticQualification(program[e].qualification) {
-      lowering(e, { $0._type_apply(f.value, to: ts) })
-    } else {
-      f.value
-    }
-
+    let ts = argumentsFromQualification(program[e].qualification, instantiating: f.value)
     let xs = Array(f.arguments, terminatedBy: f.result)
-    return LoweredCallee(value: g, arguments: xs, result: x)
+    return LoweredCallee(value: f.value, typeArguments: ts, arguments: xs, result: x)
   }
 
   /// Generates the IR for using `e` as the callee of `c` or a synthesized call.
@@ -1185,15 +1213,17 @@ internal struct IREmitter {
     let (context, _) = program.types.contextAndHead(f)
 
     // Construct a mapping from type parameter to its argument.
-    let a = TypeArguments(
-      mapping: context.parameters,
-      to: program[e].arguments.map({ (x) in
-        let t = program.type(assignedTo: x, assuming: Metatype.self)
-        return program.types[t].inhabitant
-      }))
+    let ps = context.parameters.dropFirst(poly.typeArguments.count)
+    let ts = zip(ps, program[e].arguments).map { (p, a) in
+      let t = program.type(assignedTo: a, assuming: Metatype.self)
+      return (p, program.types[t].inhabitant)
+    }
 
-    let mono = lowering(e, { (me) in me._type_apply(poly.value, to: a) })
-    return poly.substituting(value: mono)
+    let mono = poly.partiallyApplied(to: ts)
+    assert(
+      context.parameters.elementsEqual(mono.typeArguments.parameters),
+      "invalid type arguments")
+    return mono
   }
 
   /// Generates the IR for using `e` as the callee of `c` or a synthesized call.
@@ -1225,8 +1255,7 @@ internal struct IREmitter {
 
     case .typeApplication(let f, let a):
       let poly = loweredCallee(f, output: result, at: site, in: scope)
-      let mono = lowering(at: site, in: scope, { (me) in me._type_apply(poly.value, to: a) })
-      return poly.substituting(value: mono)
+      return poly.partiallyApplied(to: a)
 
     default:
       fatalError("not implemented")
@@ -1238,13 +1267,18 @@ internal struct IREmitter {
   /// The callee of `e` is the expression of a function or subscript other than a built-in function
   /// or scalar conversion. If `e` is an ordinary function call, `target` is the place in which the
   /// result of the call is written. Otherwise, it is a poison value.
+  ///
+  /// - Returns: a place holding the result of the call: for a function call, the place into which
+  ///   the callee writes its result; for a subscript call, the resulting projection.
   @discardableResult
   private mutating func lower(call e: Call.ID, output target: IRValue) -> IRValue {
     // Compute the value of the callee, which may be a function or subscript.
     let f = loweredCallee(program[e].callee, appliedBy: e, writingResultTo: target)
+    let callee = f.typeArguments.isEmpty
+      ? f.value : lowering(program[e].callee, { $0._type_apply(f.value, to: f.typeArguments) })
 
     // At this point the callee must be a monomorphic term abstraction.
-    let t = currentFunction.result(of: f.value)!
+    let t = currentFunction.result(of: callee)!
     let u = program.types.seenAsTermAbstraction(t.type)!
     let parameters = program.types[u].inputs
 
@@ -1264,14 +1298,14 @@ internal struct IREmitter {
 
     return lowering(e) { (me) in
       // Form accesses on the parameters right before the call. Note that we won't close these
-      // accesses here because, if the callee is a subscript, then the lifetimes the parameters'
+      // accesses here because, if the callee is a subscript, then the lifetimes of the parameters'
       // accesses have to cover all uses of the projected value, which are not known yet. We'll
       // delay the work until lifetime analysis instead.
       if me.program[e].style == .parenthesized {
-        me._apply(f.value, arguments, into: f.result, argumentAccesses: .form)
+        me._apply(callee, arguments, into: f.result, argumentAccesses: .form)
         return f.result
       } else {
-        return me._project(f.value, arguments, afterFormingAccesses: true)
+        return me._project(callee, arguments, afterFormingAccesses: true)
       }
     }
   }
@@ -1365,13 +1399,7 @@ internal struct IREmitter {
     case .member(let d):
       // Emit the receiver.
       let q = lowered(lvalue: program[e].qualification!)
-
-      // Is `d` a stored property of a type whose layout is visible?
-      if let i = storedPropertyIndex(of: d, in: program.parent(containing: e)) {
-        return lowering(e, { $0._subfield(q, at: [i], declaredBy: d) })
-      } else {
-        return lowering(e, { $0._property(d, of: q, withType: t) })
-      }
+      return lowering(e, { $0._property(d, of: q, withType: t) })
 
     case .builtin(.selfAlias):
       return lowering(e, { $0._emitTypeWitness(of: t) })
@@ -1920,29 +1948,6 @@ internal struct IREmitter {
     }
   }
 
-  /// If `d` declares a stored property of a type whose layout is visible in `scopeOfUse`, returns
-  /// that property's index; otherwise, returns `nil`.
-  ///
-  /// The index of a stored property is used in instances of `IndexPath` to represent the location
-  /// of a part relative to the location of a whole. For example, if `S` is a struct with two
-  /// stored properties `x` and `y`, declared in that order, the index of `y` is 1.
-  ///
-  /// If resilience is enabled in the module containing `d`, the layout of the type declared by `d`
-  /// is visible if `d` is the same module as `scopeOfUse` or if `d` is annotated with `@frozen`.
-  /// Layouts are always visible when resilience is disabled.
-  private mutating func storedPropertyIndex(
-    of d: DeclarationIdentity, in scopeOfUse: ScopeIdentity
-  ) -> Int? {
-    guard
-      let v = program.cast(d, to: VariableDeclaration.self),
-      let p = program.parent(containing: v, as: StructDeclaration.self),
-      program.isLayoutVisible(p, in: scopeOfUse)
-    else { return nil }
-
-    let properties = program.storedProperties(of: p)
-    return properties.firstIndex(of: v)
-  }
-
   /// Reports the diagnostic `d`.
   private mutating func report(_ d: Diagnostic) {
     program[module].addDiagnostic(d)
@@ -2211,9 +2216,7 @@ internal struct IREmitter {
   }
 
   /// Inserts a `subfield` instruction.
-  internal mutating func _subfield(
-    _ base: IRValue, at path: IndexPath, declaredBy declaration: DeclarationIdentity? = nil
-  ) -> IRValue {
+  internal mutating func _subfield(_ base: IRValue, at path: IndexPath) -> IRValue {
     // The instruction is equivalent to the identity if the path is empty.
     if path.isEmpty { return base }
 
@@ -2223,7 +2226,7 @@ internal struct IREmitter {
     }
 
     let s = IRSubfield(
-      base: base, path: path, subfieldType: subfieldType!, declaration: declaration,
+      base: base, path: path, subfieldType: subfieldType!,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2485,14 +2488,15 @@ internal struct IREmitter {
   ///
   /// This method is called during the construction of a witness table to generate the definition
   /// of the current function, which is an interface function wrapping a call to `f`.
-  private mutating func _emitCallToRequirementImplementation(_ f: LoweredCallee) {
+  private mutating func _emitCallToRequirementImplementation(
+    _ f: IRValue, _ arguments: [IRValue]) {
     // Gather the parameters.
-    var operands = Array(f.arguments)
+    var operands = Array(arguments)
     for i in 1 ..< currentFunction.termParameters.count {
       operands.append(.parameter(i))
     }
 
-    let t = currentFunction.resultAsTermAbstraction(of: f.value, in: program) ?? badOperand()
+    let t = currentFunction.resultAsTermAbstraction(of: f, in: program) ?? badOperand()
     var ps = program.types[t].inputs
     if !currentFunction.isSubscript {
       ps.append(.init(access: .set, type: program.types[t].output))
@@ -2506,11 +2510,11 @@ internal struct IREmitter {
 
     // Do the call.
     if currentFunction.isSubscript {
-      let x0 = _project(f.value, operands, afterFormingAccesses: true)
+      let x0 = _project(f, operands, afterFormingAccesses: true)
       _yield(x0)
     } else {
       let x0 = operands.removeLast()
-      _apply(f.value, operands, into: x0, argumentAccesses: .form)
+      _apply(f, operands, into: x0, argumentAccesses: .form)
     }
 
     _return()
@@ -3127,16 +3131,36 @@ internal struct IREmitter {
   }
 
   /// Returns the type arguments defined in the type of `q`, which occurs as qualification for a
-  /// reference to a static member, if any.
-  private mutating func argumentsFromStaticQualification(
-    _ q: ExpressionIdentity
-  ) -> TypeArguments? {
-    let t = program.type(assignedTo: q)
-    let u = program.types.dealiased(t)
-    if let v = program.types.select(u, \Metatype.inhabitant, as: TypeApplication.self) {
-      return program.types[v].arguments
+  /// reference to a static member, and that can serve to instantiate `v`.
+  ///
+  /// If `v` is instance of a universal type `T` and the type of `q` is a type application, then
+  /// the result is a map from each type parameter of `T` having a corresponding argument in the
+  /// type of `q`. Consider the following to illustrate:
+  ///
+  ///     struct S<T> { static fun f<U>() {} }
+  ///     let x = S<A>.f<B>()
+  ///
+  /// The lowered form of `f` accepts two type parameters. The expression `S<A>.f<U>` denotes a use
+  /// of this function. `argumentsFromQualification(_:instantiating:)` extracts the first type
+  /// arguments from the type of `S<A>`.
+  private mutating func argumentsFromQualification(
+    _ q: ExpressionIdentity, instantiating v: IRValue
+  ) -> TypeArguments {
+    guard
+      let t = currentFunction.result(of: v),
+      let u = program.types.cast(t.type, to: UniversalType.self)
+    else { return [:] }
+
+    let x = program.type(assignedTo: q)
+    let y = program.types.dealiased(x)
+    if let a = program.types.select(y, \Metatype.inhabitant, as: TypeApplication.self) {
+      var result = TypeArguments()
+      for p in program.types[u].parameters {
+        if let v = program.types[a].arguments[p] { result[p] = v } else { break }
+      }
+      return result
     } else {
-      return nil
+      return [:]
     }
   }
 

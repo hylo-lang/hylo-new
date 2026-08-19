@@ -111,10 +111,18 @@ public struct Program: Sendable {
     self = emitter.release()
   }
 
-  /// Applies mandatory transformation passes on the IR of `m`.
+  /// Applies mandatory verification and transformation passes on the IR of `m`.
+  ///
+  /// This method applies the checks and transformation necessary to turn *raw* IR produced by the
+  /// emitter into *refined* IR. Functions that successfully go through mandatory passes can be
+  /// considered well-formed and ready to be interpreted or compiled.
+  ///
+  /// If a pass fails, an error diagnostic is reported and the definition of the function in which
+  /// the failure occurred is removed from the program.
   public mutating func applyTransformationPasses(_ m: Module.ID) {
     withTyper(typing: m) { (typer) in
-      // Temporarily move all functions to a local work list.
+      // Temporarily move all functions to a local work list. Those that fail a mandatory pass
+      // won't make it back.
       var work: [(id: IRFunction.ID, function: IRFunction)] = []
       let end = modify(&typer.program[m].ir) { (ir) in
         for i in ir.functions.values.indices where ir[i].isDefined {
@@ -123,10 +131,16 @@ public struct Program: Sendable {
         return ir.functions.values.endIndex
       }
 
-      // Mandatory intra-procedural passes.
+      // Apply mandatory intra-procedural passes.
       for i in work.indices {
+        // Make sure there are no silent errors.
+        defer { assert(work[i].function.isDefined || typer.program[m].containsError) }
+
+        // Dead code elimination and constant folding are performed early to reduce the amount of
+        // work fed to more expensive passes downstream. One exception is made for control-flow to
+        // limit the scope of non-local updates made during lifetime normalization.
+
         work[i].function.foldRedundantInstructions()
-        work[i].function.simplifyControlFlow()
         work[i].function.removeCodeAfterNeverReturningCalls()
         work[i].function.removeUnreachableBlocks()
         work[i].function.removedUnusedDefinitions()
@@ -141,15 +155,12 @@ public struct Program: Sendable {
         if !work[i].function.upholdInliningRequirements(in: m, using: &typer) { continue }
 
         // The following passes cannot fail.
+        work[i].function.simplifyControlFlow()
         work[i].function.depolymorphize(emittingInto: m, using: &typer)
         work[i].function.existentializeIfExposed(emittingInto: m, using: &typer)
-      }
 
-      // Move all functions back.
-      modify(&typer.program[m].ir) { (ir) in
-        while let (i, f) = work.popLast() {
-          ir[i].take(definition: f)
-        }
+        // No error occurred; move the function back.
+        typer.program[m].ir[work[i].id].take(definition: work[i].function)
       }
 
       // New functions may have been introduced during the previous passes. Those that have been
@@ -1114,6 +1125,27 @@ public struct Program: Sendable {
     return result
   }
 
+  /// If `d` declares a stored property of a type whose layout is visible in `scopeOfUse`, returns
+  /// that property's index; otherwise, returns `nil`.
+  ///
+  /// The index of a stored property is used in instances of `IndexPath` to represent the location
+  /// of a part relative to the location of a whole. For example, if `S` is a struct with two
+  /// stored properties `x` and `y`, declared in that order, the index of `y` is 1.
+  ///
+  /// If resilience is enabled in the module containing `d`, the layout of the type declared by `d`
+  /// is visible if `d` is the same module as `scopeOfUse` or if `d` is annotated with `@frozen`.
+  /// Layouts are always visible when resilience is disabled.
+  public mutating func storedPropertyIndex(
+    of d: DeclarationIdentity, in scopeOfUse: ScopeIdentity
+  ) -> Int? {
+    guard
+      let v = cast(d, to: VariableDeclaration.self),
+      let p = parent(containing: v, as: StructDeclaration.self),
+      isLayoutVisible(p, in: scopeOfUse)
+    else { return nil }
+    return storedProperties(of: p).firstIndex(of: v)
+  }
+
   /// Returns the binding declaration that contains `d`, if any.
   ///
   /// - Requires: The module containing `s` is scoped.
@@ -1333,7 +1365,7 @@ public struct Program: Sendable {
     }
   }
 
-  /// Returns the name of the C function implementing `d` iff `d` is annotated with
+  /// Returns the name of the C implementation of `d` iff it declares a function annotated with
   /// `@extern_c_indirect`.
   public func externCName(of d: DeclarationIdentity) -> String? {
     annotation("extern_c_indirect", appliedTo: d).flatMap { (a) in
@@ -1342,6 +1374,16 @@ public struct Program: Sendable {
       } else {
         return nil
       }
+    }
+  }
+
+  /// Returns the name of the C implementation of the function named by `f` iff that function's
+  /// declaration is annotated with `@extern_c_indirect`.
+  public func externCName(of f: IRFunction.Name) -> String? {
+    if case .lowered(let d) = f {
+      return externCName(of: d)
+    } else {
+      return nil
     }
   }
 
@@ -1355,25 +1397,29 @@ public struct Program: Sendable {
       .flatMap({ (e) in e.value.string })
   }
 
-  /// Returns the left-most tree in the qualification of `e` iff `e` is a name or new expression.
+  /// Returns the left-most tree in the qualification of `e` iff `e` expresses a name.
   public func rootQualification(of e: ExpressionIdentity) -> ExpressionIdentity? {
-    var root: ExpressionIdentity
-
-    if let n = cast(e, to: NameExpression.self) {
-      guard let q = self[n].qualification else { return nil }
-      root = q
-    } else if let n = cast(e, to: New.self) {
-      root = self[n].qualification
-    } else {
-      return nil
-    }
+    // The outermost expression may be a constructor.
+    var root = cast(e, to: New.self).map({ self[$0].qualification }) ?? e
 
     while true {
-      if let x = cast(root, to: NameExpression.self) {
-        if let y = self[x].qualification { root = y } else { return root }
-      } else if let x = cast(root, to: Call.self) {
-        root = self[x].callee
-      } else {
+      switch tag(of: root) {
+      case NameExpression.self:
+        // Select `q` in `q.n`.
+        let n = castUnchecked(root, to: NameExpression.self)
+        if let q = self[n].qualification { root = q } else { return root }
+
+      case Call.self:
+        // Select `q` in `q(...)`.
+        let n = castUnchecked(root, to: Call.self)
+        root = self[n].callee
+
+      case StaticCall.self:
+        // Select `q` in `q<...>`.
+        let n = castUnchecked(root, to: StaticCall.self)
+        root = self[n].callee
+
+      default:
         return root
       }
     }

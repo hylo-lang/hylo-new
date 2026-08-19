@@ -27,6 +27,8 @@ public struct Lexer: IteratorProtocol, Sequence {
       return takeStringLiteral()
     } else if head.isIdentifierHead {
       return takeKeywordOrIdentifier()
+    } else if head == "`" {
+      return takeQuotedIdentifier()
     } else if head == "#" {
       return takePoundKeywordOrLiteral()
     } else if head.isOperator {
@@ -187,6 +189,23 @@ public struct Lexer: IteratorProtocol, Sequence {
 
     assert(!word.isEmpty)
     return .init(tag: tag, site: span(word.startIndex ..< word.endIndex))
+  }
+
+  /// Consumes and returns an identifier in backqotes.
+  private mutating func takeQuotedIdentifier() -> Token {
+    _ = take()
+    let start = position
+
+    while position < source.endIndex {
+      if take("`") != nil {
+        let end = source.index(before: position)
+        return .init(tag: (start == end) ? .error : .name, site: span(start ..< end))
+      } else {
+        discard()
+      }
+    }
+
+    return .init(tag: .unterminatedQuotedIdentifier, site: span(start ..< position))
   }
 
   /// Consumes and returns a keyword prefixed by a '#' symbol.

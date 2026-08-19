@@ -12,6 +12,15 @@ extension <T> A<T> {
   public fun id() -> Self { fatal_error() }
 }
 
+struct B<T> is Deinitializable {
+  public fun initialize() set {}
+}
+
+extension B<Void> {
+  public init<U>() { &self.initialize() }
+  public static fun make<U>() -> Self { .new<U>() }
+}
+
 public fun use<T>(x: A<T>) {}
 
 public fun main() {
@@ -21,4 +30,9 @@ public fun main() {
 
   use(.new(x: ()))
   use(.make(()).id())
+
+  // Some type arguments are expressed in the static member's qualification while others are
+  // expressed in the type application of the member itself.
+  let b0: B<Void> = .new<Bool>()
+  let b1: B<Void> = .make<Bool>()
 }

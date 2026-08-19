@@ -57,23 +57,18 @@ extension Program {
   private func llvmName(
     function f: IRFunction.ID, in ctx: borrowing ModuleGenerationContext
   ) -> String {
-    let v = self[ctx.hylo].ir[f].name
-    if case .lowered(let d) = v, let n = externName(of: d) {
-      return n
-    } else {
-      return mangled(v)
-    }
+    llvmName(function: self[ctx.hylo].ir[f].name)
   }
 
-  /// Returns the name of the C function implementing `f` iff `f` was lowered from a declaration
-  /// annotated with `@extern_c_indirect`.
-  private func externCName(
-    of f: IRFunction.ID, in ctx: borrowing ModuleGenerationContext
-  ) -> String? {
-    if case .lowered(let d) = self[ctx.hylo].ir[f].name {
-      return externCName(of: d)
+  /// Returns the name of the function corresponding to `f` in LLVM IR.
+  ///
+  /// The result is the mangled name of `f` unless its declaration has been annotated to specify a
+  /// particular name (e.g., `@extern`).
+  private func llvmName(function f: IRFunction.Name) -> String {
+    if case .lowered(let d) = f, let e = externName(of: d) {
+      return e
     } else {
-      return nil
+      return mangled(f)
     }
   }
 
@@ -297,6 +292,60 @@ extension Program {
       ctx.value[v] = ctx.value[s.arguments[0]]!
     case .zeroinitializer(let t):
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
+    case .advancedByBytes(let t):
+      let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
+      let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: p, typed: ctx.module.llvm.i8, indices: offsets , at: ctx.insertionPoint!).v
+
+    case .add(let o, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertAdd(
+        overflow: o.llvm, xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .signedAdditionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedAdditionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.uadd.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .fadd(let f, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let i = ctx.module.llvm.insertFAdd(xs[0], xs[1], at: ctx.insertionPoint!)
+      ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
+      ctx.value[v] = i.v
+
+    case .sub(let o, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertSub(
+        overflow: o.llvm, xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .signedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedSubtractionWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.usub.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .fsub(let f, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let i = ctx.module.llvm.insertFSub(xs[0], xs[1], at: ctx.insertionPoint!)
+      ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
+      ctx.value[v] = i.v
+
+    case .mul(let o, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertMul(
+        overflow: o.llvm, xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .signedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .unsignedMultiplicationWithOverflow(let t):
+      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
+        IntrinsicFunction.llvm.umul.with.overflow, for: t, with: s.arguments, in: &ctx)
+    case .fmul(let f, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let i = ctx.module.llvm.insertFMul(xs[0], xs[1], at: ctx.insertionPoint!)
+      ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
+      ctx.value[v] = i.v
+
     case .udiv(let e, let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertUnsignedDiv(
@@ -305,49 +354,89 @@ extension Program {
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertSignedDiv(
         exact: e, xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .fdiv(let f, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let i = ctx.module.llvm.insertFDiv(xs[0], xs[1], at: ctx.insertionPoint!)
+      ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
+      ctx.value[v] = i.v
+
     case .urem(let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
-      ctx.value[v] = ctx.module.llvm.insertUnsignedRem(
-        xs[0], xs[1], at: ctx.insertionPoint!).v
-    case .signedAdditionWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.sadd.with.overflow, for: t, with: s.arguments, in: &ctx)
-    case .unsignedAdditionWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.uadd.with.overflow, for: t, with: s.arguments, in: &ctx)
-    case .signedSubtractionWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.ssub.with.overflow, for: t, with: s.arguments, in: &ctx)
-    case .unsignedSubtractionWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.usub.with.overflow, for: t, with: s.arguments, in: &ctx)
-    case .signedMultiplicationWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.smul.with.overflow, for: t, with: s.arguments, in: &ctx)
-    case .unsignedMultiplicationWithOverflow(let t):
-      ctx.value[v] = insertCallBuiltinBinaryWithOverflow(
-        IntrinsicFunction.llvm.umul.with.overflow, for: t, with: s.arguments, in: &ctx)
-    case .advancedByBytes(byteOffset: let t):
-      assert(s.arguments.count == 2)
-      let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
-      let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
-      ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: p, typed: ctx.module.llvm.i8, indices: offsets, at: ctx.insertionPoint!).v
-    case .zext(let from, let to):
+      ctx.value[v] = ctx.module.llvm.insertUnsignedRem(xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .srem(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertSignedRem(xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .frem(let f, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let i = ctx.module.llvm.insertFRem(xs[0], xs[1], at: ctx.insertionPoint!)
+      ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
+      ctx.value[v] = i.v
+
+    case .icmp(let p, let t):
+      ctx.value[v] = insertCallBuiltinPredicate(p, for: t, with: s.arguments, in: &ctx)
+
+    case .assumeInitialized(_):
+      unreachable("assume_initialized must have been lowered as IRAssumeState.")
+
+    case .and(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertBitwiseAnd(xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .or(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertBitwiseOr(xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+    case .xor(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertBitwiseXor(xs[0].v, xs[1].v, at: ctx.insertionPoint!).v
+
+    case .fcmp(let f, let p, let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      let i = ctx.module.llvm.insertFloatingPointComparison(
+        p.llvm, xs[0], xs[1], at: ctx.insertionPoint!)
+      ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
+      ctx.value[v] = i.v
+
+    case .fptrunc(let from, let to):
       let xs = insertLoad(s.arguments, of: from, in: &ctx)
-      let t = metadata(of: to, in: &ctx.module).llvm
-      ctx.value[v] = ctx.module.llvm.insertZeroExtend(
-        xs[0], to: t, at: ctx.insertionPoint!).v
+      ctx.value[v] = ctx.module.llvm.insertFPTrunc(
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+    case .fpext(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertFPExtend(
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+    case .fptoui(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertFPToUI(
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+    case .fptosi(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertFPToSI(
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+
     case .trunc(let from, let to):
       let xs = insertLoad(s.arguments, of: from, in: &ctx)
-      let t = metadata(of: to, in: &ctx.module).llvm
       ctx.value[v] = ctx.module.llvm.insertTrunc(
-        xs[0], to: t, at: ctx.insertionPoint!).v    case .icmp(let p, let t):
-      ctx.value[v] = insertCallBuiltinPredicate(
-        p, for: t, with: s.arguments, in: &ctx)
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
 
-    default:
-      unimplemented(String(describing: s.callee))
+    case .zext(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertZeroExtend(
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+
+    case .sext(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertSignExtend(
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+
+    case .uitofp(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertUIToFP(
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+
+    case .sitofp(let from, let to):
+      let xs = insertLoad(s.arguments, of: from, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertSIToFP(
+        xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+
     }
 
     return ctx.ir.instruction(after: i.erased)
@@ -577,25 +666,31 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
 
-    // Compute the LLVM types of the whole and its part.
-    let recordHyloType = ctx.ir.result(of: s.record)!.type
-    let w = metadata(of: recordHyloType, in: &ctx.module)
-    let p = typeOfProperty(declaredBy: s.property, withType: s.propertyType, in: &ctx.module)
+    // Compute the LLVM representation of the whole.
+    let wholeTypeInHylo = ctx.ir.result(of: s.record)!.type
+    let wholeType = metadata(of: wholeTypeInHylo, in: &ctx.module)
+    let whole = codegen(s.record, in: &ctx)
+
+    // If the property is a field in a struct, lookup its offset.
+    if let index = storedPropertyIndex(of: s.property, in: s.anchor.scope) {
+      let a = insertGetFieldAddress(
+        at: [index], in: whole, instanceOf: wholeTypeInHylo, in: &ctx)
+      ctx.value[.register(i.erased)] = a
+    }
 
     // If the whole is a witness table, the property is a requirement of the trait for which the
     // table is witnessing a conformance.
-    if let (concept, _) = types.seenAsTraitApplication(recordHyloType) {
+    else if let (concept, _) = types.seenAsTraitApplication(wholeTypeInHylo) {
       // The contents of a witness table follow the ordering of its requirements.
       let index = requirements(of: concept).index(of: s.property)!
-      let whole = codegen(s.record, in: &ctx)
       let part = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: whole, typed: w.llvm,
+        of: whole, typed: wholeType.llvm,
         indices: [0, index], indexType: ctx.module.llvm.i32,
         at: ctx.insertionPoint!)
 
-      let x = ctx.module.llvm.insertLoad(p, from: part, at: ctx.insertionPoint!)
-      let v = FrontEnd.IRValue.register(i.erased)
-      ctx.value[v] = x.v
+      let p = llvmType(property: s.property, usedAsInstanceOf: s.propertyType, in: &ctx.module)
+      let a = ctx.module.llvm.insertLoad(p, from: part, at: ctx.insertionPoint!).v
+      ctx.value[.register(i.erased)] = a
     }
 
     // Otherwise, the property is a public property of some resilient type.
@@ -636,31 +731,11 @@ extension Program {
     _ i: IRSubfield.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
+    let record = ctx.value[s.base]!
+    let typeInHylo = ctx.ir.result(of: s.base)!.type
+    let address = insertGetFieldAddress(at: s.path, in: record, instanceOf: typeInHylo, in: &ctx)
 
-    let i32 = ctx.module.llvm.i32
-    let base = ctx.ir.result(of: s.base)!.type
-    var current = base
-    var indices = [i32.unsafe[].constant(0).v]
-    for p in s.path {
-      // Get the logical index of the property in its concrete representation.
-      let m = metadata(of: current, in: &ctx.module)
-      let i = m.layout.propertyToField[p]
-
-      // Stop if the property has been erased. The resulting path will be that of its container.
-      if i < 0 { break }
-
-      // Otherwise, move to the next component.
-      indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).v)
-      current = fields(of: current, visibleFrom: ctx.module.hylo)![p]
-    }
-
-    let b = ctx.value[s.base]!
-    let m = metadata(of: base, in: &ctx.module)
-    let x = ctx.module.llvm.insertGetElementPointerInBounds(
-      of: b, typed: m.llvm, indices: indices, at: ctx.insertionPoint!)
-
-    let v = IRValue.register(i.erased)
-    ctx.value[v] = x.v
+    ctx.value[.register(i.erased)] = address
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -752,29 +827,13 @@ extension Program {
     return nil
   }
 
-  /// Returns the LLVM function corresponding to `f`, declaring it if necessary.
-  ///
-  /// If `f` is a subscript, the result is the function that represents its ramp, which accepts a
-  /// caller plateau and its environment as extra parameters. Slides are declared during the code
-  /// generation of a subscript and are typically never called directly from another context.
+  /// Returns the result of `demandFunction(_:in:)` with the identity of `f`, which is declared in
+  /// the module being compiled.
   private mutating func demandFunction(
     _ f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) -> FunctionMetadata {
     let ir = self[ctx.hylo].ir[f]
-    if let existing = ctx.functionMetadata[ir.name] {
-      return existing
-    }
-
-    let name = llvmName(function: f, in: ctx)
-    let signature = ir.signature()
-
-    let p = prototype(signature.head, in: &ctx)
-    let v = ctx.llvm.declareFunction(name, p.signature)
-    setupAttributes(of: v, compiledFrom: f, in: &ctx)
-
-    let m = FunctionMetadata(prototype: p, value: v, isRamp: ir.isSubscript)
-    ctx.functionMetadata[ir.name] = m
-    return m
+    return demandFunction(ir, in: &ctx)
   }
 
   /// Returns the result of `demandFunction(_:in:)` with the identity of `f`, which is declared in
@@ -784,6 +843,30 @@ extension Program {
   ) -> FunctionMetadata {
     let k = self[ctx.hylo].ir.identity(function: f)!
     return demandFunction(k, in: &ctx)
+  }
+
+  /// Returns the LLVM function corresponding to `ir`, declaring it if necessary.
+  ///
+  /// If `ir` is a subscript, the result is the function that represents its ramp, which accepts a
+  /// caller plateau and its environment as extra parameters. Slides are declared during the code
+  /// generation of a subscript and are typically never called directly from another context.
+  private mutating func demandFunction(
+    _ ir: IRFunction, in ctx: inout ModuleGenerationContext
+  ) -> FunctionMetadata {
+    if let existing = ctx.functionMetadata[ir.name] {
+      return existing
+    }
+
+    let name = llvmName(function: ir.name)
+    let signature = ir.signature()
+
+    let p = prototype(signature.head, in: &ctx)
+    let v = ctx.llvm.declareFunction(name, p.signature)
+    setupAttributes(of: v, compiledFrom: ir, in: &ctx)
+
+    let m = FunctionMetadata(prototype: p, value: v, isRamp: ir.isSubscript)
+    ctx.functionMetadata[ir.name] = m
+    return m
   }
 
   /// Returns the prototype of a LLVM IR function corresponding to a Hylo IR function whose
@@ -868,13 +951,13 @@ extension Program {
     }
   }
 
-  /// Configures the attributes of `g`, which is the LLVM function to which `f` compiles.
+  /// Configures the attributes of `g`, which is the LLVM function to which `ir` compiles.
   private mutating func setupAttributes(
-    of g: Function.UnsafeReference, compiledFrom f: IRFunction.ID,
+    of g: Function.UnsafeReference, compiledFrom ir: IRFunction,
     in ctx: inout ModuleGenerationContext
   ) {
-    if isPrivate(self[ctx.hylo].ir[f].name, in: ctx.hylo) {
-      assert(self[ctx.hylo].ir[f].isDefined || externCName(of: f, in: ctx) != nil)
+    if isPrivate(ir.name, in: ctx.hylo) {
+      assert(ir.isDefined || externCName(of: ir.name) != nil)
       ctx.llvm.setLinkage(.private, for: g)
     }
   }
@@ -1046,6 +1129,34 @@ extension Program {
     return w
   }
 
+  /// Returns a pointer to the field at `path` relative to `record`, which is a pointer to storage
+  /// for an instance of `recordTypeInHylo`.
+  private mutating func insertGetFieldAddress(
+    at path: IndexPath, in record: LLVMValue, instanceOf recordTypeInHylo: AnyTypeIdentity,
+    in ctx: inout FunctionGenerationContext
+  ) -> LLVMValue {
+    let i32 = ctx.module.llvm.i32
+    var current = recordTypeInHylo
+    var indices = [i32.unsafe[].constant(0).v]
+    for p in path {
+      // Get the logical index of the property in its concrete representation.
+      let m = metadata(of: current, in: &ctx.module)
+      let i = m.layout.propertyToField[p]
+
+      // Stop if the property has been erased. The resulting path will be that of its container.
+      if i < 0 { break }
+
+      // Otherwise, move to the next component.
+      indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).v)
+      current = fields(of: current, visibleFrom: ctx.module.hylo)![p]
+    }
+
+    let m = metadata(of: recordTypeInHylo, in: &ctx.module)
+    let r = ctx.module.llvm.insertGetElementPointerInBounds(
+      of: record, typed: m.llvm, indices: indices, at: ctx.insertionPoint!)
+    return r.v
+  }
+
   /// Returns the LLVM values corresponding to `xs`, which are instances of `t`, loaded in memory.
   ///
   /// `xs` is an array of IR values denoting places of type `t`, which are defined in the current
@@ -1151,6 +1262,8 @@ extension Program {
 
   /// Generates the LLVM IR code for applying `callee`, which is the name of a function in the
   /// family of `llvm.x.with.overflow`, to `xs`.
+  ///
+  /// - Requires: `xs` is a list of pointers to the actual operands.
   private mutating func insertCallBuiltinBinaryWithOverflow(
     _ callee: IntrinsicFunction.Name, for integer: MachineType.ID, with xs: [FrontEnd.IRValue],
     in ctx: inout FunctionGenerationContext
@@ -1314,6 +1427,8 @@ extension Program {
       return ctx.value[v]!
     case .integer(let n, let t):
       return codegen(integer: n, instanceOf: t, in: &ctx.module)
+    case .floatingPoint(let literal, let t):
+      return codegen(floatingPoint: literal, instanceOf: t, in: &ctx.module)
     case .function(let n, _):
       return demandFunction(named: n, in: &ctx.module).value.v
     case .type(let t, _):
@@ -1336,6 +1451,17 @@ extension Program {
     } else {
       return t.unsafe[].constant(words: n.words.map(UInt64.init(_:))).v
     }
+  }
+
+  /// Returns a LLVM IR constant equivalent to `literal`, which is the textual representation of
+  /// an instance of a floating-point type `t`.
+  private mutating func codegen(
+    floatingPoint literal: String, instanceOf t: MachineType.ID,
+    in ctx: inout ModuleGenerationContext
+  ) -> LLVMValue {
+    let u = metadata(of: t, in: &ctx)
+    let t = FloatingPointType.UnsafeReference(u.llvm)!
+    return t.unsafe[].constant(parsing: literal).v
   }
 
   /// Returns the LLVM type corresponding to the Hylo type `t`, using `compute` to determine its
@@ -1434,10 +1560,16 @@ extension Program {
         ctx.llvm.integerType(Int(width)).t
       case .word:
         ctx.llvm.iptr.t
+      case .float16:
+        ctx.llvm.half.t
+      case .float32:
+        ctx.llvm.float.t
+      case .float64:
+        ctx.llvm.double.t
+      case .float128:
+        ctx.llvm.fp128.t
       case .ptr:
         ctx.llvm.ptr.t
-      default:
-        unimplemented("no LLVM representation of the type '\(program.show(t))'")
       }
 
       let s = ctx.llvm.layout.storageSize(of: v)
@@ -1453,8 +1585,8 @@ extension Program {
   ) -> TypeMetadata {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
       // TODO: Resilience
-      let properties = program.fields(of: t.erased, visibleFrom: ctx.hylo)!
-      return program.metadata(record: n, fields: properties, in: &ctx)
+      let fields = program.fields(of: t.erased, visibleFrom: ctx.hylo)!
+      return program.metadata(record: n, fields: fields, in: &ctx)
     }
   }
 
@@ -1463,9 +1595,9 @@ extension Program {
     of t: Tuple.ID, in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
-      let (properties, isOpenEnded) = program.types.members(of: t)
+      let (fields, isOpenEnded) = program.types.members(of: t)
       precondition(!isOpenEnded, "no LLVM representation of type '\(program.show(t))'")
-      return program.metadata(record: n, fields: properties, in: &ctx)
+      return program.metadata(record: n, fields: fields, in: &ctx)
     }
   }
 
@@ -1488,8 +1620,8 @@ extension Program {
         let l = ConcreteLayout(
           fields: [], propertyToField: Array(fs.indices), size: .fixed(s), alignment: a)
         return TypeMetadata(llvm: v, layout: l)
-      } else if let properties = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
-        return program.metadata(record: n, fields: properties, in: &ctx)
+      } else if let fields = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
+        return program.metadata(record: n, fields: fields, in: &ctx)
       } else {
         unimplemented("no LLVM representation of the type '\(program.show(t))'")
       }
@@ -1610,10 +1742,10 @@ extension Program {
       fields: elements, propertyToField: fieldToElement, size: .fixed(size), alignment: a)
   }
 
-  /// Returns the LLVM IR type of the entity declared by `d`, which is a property of an opaque
-  /// record having type `t`.
-  private mutating func typeOfProperty(
-    declaredBy d: DeclarationIdentity, withType t: AnyTypeIdentity,
+  /// Returns the LLVM IR type of the entity declared by `d`, which is a property of a record, used
+  /// as an instance of `t`.
+  private mutating func llvmType(
+    property d: DeclarationIdentity, usedAsInstanceOf t: AnyTypeIdentity,
     in ctx: inout ModuleGenerationContext
   ) -> LLVMType {
     if isFunctionOrVariantDeclaration(d) {
@@ -1657,6 +1789,54 @@ extension SwiftyLLVM.IntegerPredicate {
     case .sge: self = .sge
     case .sgt: self = .sgt
     case .sle: self = .sle
+    }
+  }
+
+}
+
+extension FrontEnd.OverflowBehavior {
+
+  /// The LLVM representation of `self`.
+  var llvm: SwiftyLLVM.OverflowBehavior {
+    switch self {
+    case .ignore: .ignore
+    case .nuw: .nuw
+    case .nsw: .nsw
+    }
+  }
+
+}
+
+extension FrontEnd.MathFlags {
+
+  /// The LLVM representation of `self`.
+  var llvm: SwiftyLLVM.FastMathFlags {
+    .init(rawValue: UInt32(rawValue))
+  }
+
+}
+
+extension FrontEnd.FloatingPointPredicate {
+
+  /// The LLVM representation of `self`.
+  var llvm: SwiftyLLVM.FloatingPointPredicate {
+    switch self {
+    case .alwaysFalse: .alwaysFalse
+    case .alwaysTrue: .alwaysTrue
+    case .oeq: .oeq
+    case .one: .one
+    case .ogt: .ogt
+    case .oge: .oge
+    case .olt: .olt
+    case .ole: .ole
+    case .ord: .ord
+    case .ueq: .ueq
+    case .une: .une
+    case .ugt: .ugt
+    case .uge: .uge
+    case .ult: .ult
+    case .ule: .ule
+    case .uno: .uno
     }
   }
 

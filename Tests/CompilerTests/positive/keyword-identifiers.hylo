@@ -1,0 +1,13 @@
+//! stage:typing no-std
+
+struct S {
+  var x: Void
+  memberwise init
+  fun `sink`() sink -> Void { self.x }
+}
+
+public fun main() {
+  var s: S
+  &s.init(x: ())
+  _ = s.sink()
+}

@@ -1,0 +1,18 @@
+negative/exclusivity-violation.hylo:18.3-13: error: illegal 'inout' access
+  modify(&w)  // error
+  ~~~~~~~~~~
+negative/exclusivity-violation.hylo:20.3-13: error: illegal 'inout' access
+  modify(&x)  // error
+  ~~~~~~~~~~
+negative/exclusivity-violation.hylo:33.3-9: error: illegal 'let' access
+  use(w)      // error
+  ~~~~~~
+negative/exclusivity-violation.hylo:34.3-13: error: illegal 'inout' access
+  modify(&w)  // error
+  ~~~~~~~~~~
+negative/exclusivity-violation.hylo:35.3-9: error: illegal 'let' access
+  use(x)      // error
+  ~~~~~~
+negative/exclusivity-violation.hylo:36.3-13: error: illegal 'inout' access
+  modify(&x)  // error
+  ~~~~~~~~~~

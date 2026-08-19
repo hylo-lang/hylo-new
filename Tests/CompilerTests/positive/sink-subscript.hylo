@@ -1,0 +1,33 @@
+/// A `sink` subscript projects a value that the caller must consume,
+/// e.g. by move assignment to fresh storage or by implicit deinitialization.
+subscript id(x: sink Int32) sink -> Int32 { yield &x }
+subscript id(x: sink Immovable) sink -> Immovable { yield &x }
+
+fun test_movable_can_be_stored() {
+  var x = 42 as Int32
+  var a = id[x]
+  precondition(a == (42 as Int32))
+}
+
+fun test_movable_can_be_projected() {
+  var x = 42 as Int32
+  let a = id[x]
+  precondition(a == (42 as Int32))
+}
+
+fun test_immovable_can_be_projected() {
+  var x = Immovable(x: 42 as Int32)
+  let a = id[x]
+  precondition(a.x == (42 as Int32))
+}
+
+struct Immovable is Deinitializable {
+  var x: Int32
+  memberwise init
+}
+
+fun main() {
+  test_movable_can_be_stored()
+  test_movable_can_be_projected()
+  test_immovable_can_be_projected()
+}

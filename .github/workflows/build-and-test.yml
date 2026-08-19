@@ -20,7 +20,10 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Check max line length of 100 characters
-        run: "! grep -rnE --include=*.swift --exclude-dir=cmake.* --exclude-dir=.build '.{101,}' ."
+        # Lines ending with "[allow long]" are exempt.
+        run: >
+          ! grep -rnE --include=*.swift --exclude-dir=cmake.* --exclude-dir=.build '.{101,}' .
+          | grep -vE '\[allow long\]$'
 
   test:
     strategy:
@@ -70,7 +73,7 @@ jobs:
         shell: bash
 
       - name: Set up LLVM
-        uses: hylo-lang/get-llvm@v0.3.0
+        uses: hylo-lang/get-llvm@6a49368ad6b8b735b444d4b9840b0bc466e7875a # v0.4.0
         id: get-llvm
         with:
           llvmVersion: "20.1.6"
