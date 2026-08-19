@@ -1144,7 +1144,7 @@ internal struct IREmitter {
   ) -> LoweredCallee {
     LoweredCallee(
       value: functionReference(to: f),
-      typeArguments: [:], arguments: Array(contentsOf: receiver),
+      typeArguments: [:], arguments: Array(unwrapping: receiver),
       result: r)
   }
 
@@ -1177,7 +1177,7 @@ internal struct IREmitter {
       let t = program.types.demand(s)
       let v = IRValue.bundle(f, t, candidates)
       return LoweredCallee(
-        value: v, typeArguments: [:], arguments: Array(contentsOf: receiver), result: r)
+        value: v, typeArguments: [:], arguments: Array(unwrapping: receiver), result: r)
     }
   }
 

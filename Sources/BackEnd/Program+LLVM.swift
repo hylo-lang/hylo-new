@@ -1667,7 +1667,7 @@ extension Program {
   ) -> TypeMetadata {
     // Trivial if there are less than two cases.
     if cases.count <= 1 {
-      return metadata(record: name, fields: Array(contentsOf: cases.uniqueElement), in: &ctx)
+      return metadata(record: name, fields: Array(unwrapping: cases.uniqueElement), in: &ctx)
     }
 
     // Otherwise, construct a pair leading with the tag.
