@@ -52,8 +52,29 @@ extension Program {
 
 /// A value manipulated by the IR.
 private struct Value {
+
   /// The underlying type-erased representation of value.
-  public var storage: Any
+  private var storage: Any
+
+  /// Creates an instance storing `x`.
+  init(_ x: Any) {
+    storage = x
+  }
+
+  /// The memory location pointed to by `self`, if any.
+  public var location: Memory.TypedAddress? {
+    if let a = storage as? Access<Memory.TypedAddress> {
+      a.location
+    } else if let a = storage as? Memory.TypedAddress {
+      a
+    } else {
+      nil
+    }
+  }
+
+  /// `self` if it is a `T`, or `nil` otherwise.
+  public func callAsFunction<T>(as: T.Type) -> T? { storage as? T }
+
 }
 
 /// The part of one instruction's execution that follows any memory and I/O effects.
@@ -87,7 +108,7 @@ private struct StackFrame {
   public var currentStep: InstructionPointer
 
   /// Location of values passed to the function.
-  var parameters: [Memory.TypedAddress]
+  var parameters: [Access<Memory.TypedAddress>]
 
 }
 
@@ -101,7 +122,7 @@ private struct Stack {
   public mutating func enter(
     _ f: GlobalFunctionIdentity,
     definedIn p: Program,
-    withParameters ps: [Memory.TypedAddress]
+    withParameters ps: [Access<Memory.TypedAddress>]
   ) {
     let s = InstructionPointer(interpreting: f, definedIn: p)
     let f = StackFrame(currentStep: s, parameters: ps)
@@ -142,10 +163,10 @@ private struct Stack {
 public struct Interpreter {
 
   /// The stack- and dynamically-allocated memory in use.
-  private var memory: Memory
+  fileprivate var memory: Memory
 
   /// The program being executed.
-  private var program: Program { memory.program }
+  fileprivate var program: Program { memory.program }
 
   /// The next instruction to execute.
   private var programCounter: InstructionPointer {
@@ -160,7 +181,7 @@ public struct Interpreter {
   private var callStack = Stack()
 
   /// The top stack frame.
-  private var topOfStack: StackFrame {
+  fileprivate private(set) var topOfStack: StackFrame {
     get {
       callStack.top
     }
@@ -183,7 +204,12 @@ public struct Interpreter {
   /// - Precondition: `p.entry != nil`
   public init(_ p: Program) {
     memory = Memory(forRunning: p, on: UnrealABI())
-    callStack.enter(p.entry, definedIn: p, withParameters: [])
+
+    // `main` takes a `set` access to a `Void` value, so create the
+    // corresponding storage and access.
+    let l = memory.allocate(storageFor: .void)
+    let a = Access(to: l.asTypedAddress(.void), effect: .set)
+    callStack.enter(p.entry, definedIn: p, withParameters: [a])
   }
 
   /// Executes a single instruction.
@@ -200,22 +226,28 @@ public struct Interpreter {
   /// Applies the `Memory` and I/O effects of the current instruction and returns its epilogue.
   private mutating func applyCurrentInstruction() throws -> InstructionEpilogue {
     switch currentInstruction {
-    case is IRAccess:
+    case let x as IRAccess:
       // TODO: add a real implementation, validating new access in memory and
       // storing the access into register.
-      return .initializeRegister(to: .init(storage: ()))
+      let p = address(of: x.source)
+      let a = Access(to: p, effect: x.finalCapability)
+      return initializeRegister(to: a)
     case is IRRegionEnd<IRAccess>:
       // TODO: add a real implementation, validating if it is safe to end the access.
-      return .initializeRegister(to: .init(storage: ()))
+      return initializeRegister(to: ())
     case let x as IRAlloca:
-      _ = x
+      if x.witness != nil {
+        unimplemented("dynamically sized stack allocation is not supported yet.")
+      }
+      let p = allocate(storageFor: x.storage)
+      return initializeRegister(to: p)
     case let x as IRApply:
       _ = x
     case let x as IRApplyBuiltin:
       _ = x
     case is IRAssumeState:
       // TODO: add a real implementation, updating state of composed regions.
-      return .initializeRegister(to: .init(storage: ()))
+      return initializeRegister(to: ())
     case let x as IRBranch:
       _ = x
     case let x as IRConditionalBranch:
@@ -239,11 +271,16 @@ public struct Interpreter {
     case let x as IRProperty:
       _ = x
     case is IRReturn:
+      for a in topOfStack.allocations.reversed() {
+        try memory.deallocate(a)
+      }
       return .return
     case let x as IRStore:
-      _ = x
+      try store(x.value, at: x.target)
+      return initializeRegister(to: ())
     case let x as IRSubfield:
-      _ = x
+      let l = x.base.location(ofPart: x.path, in: &self)
+      return initializeRegister(to: l)
     case let x as IRTypeApply:
       _ = x
     case let x as IRTypeWitness:
@@ -270,6 +307,89 @@ public struct Interpreter {
     else { throw IRError() }
     programCounter.position = i
   }
+
+  /// Returns an epilogue that initializes the instruction's register to `v`.
+  private func initializeRegister(to v: Any) -> InstructionEpilogue {
+    return .initializeRegister(to: .init(v))
+  }
+
+  /// Allocates storage on `callStack` for a value of type `t`, ready to be initialized,
+  /// and returns its address.
+  ///
+  /// - Precondition: `t` is a monomorphic type.
+  private mutating func allocate(storageFor t: AnyTypeIdentity) -> Memory.TypedAddress {
+    let a = memory.allocate(storageFor: t)
+    topOfStack.allocations.append(a)
+    return a.asTypedAddress(t)
+  }
+
+  /// Stores `v` at the address `p`.
+  private mutating func store(_ v: IRValue, at p: IRValue) throws {
+    try memory.store(self[v], at: access(of: p))
+  }
+
+  /// Returns the value corresponding to `v` in the current execution state.
+  ///
+  /// - Precondition: `v` is a runtimve value.
+  private subscript(_ v: IRValue) -> RuntimeValue {
+    mutating get {
+      switch v {
+      case .register(let r):
+        return topOfStack.registers[r]!(as: RuntimeValue.self)!
+      case .integer(let n, let t):
+        let l = memory.layout(t)
+        return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
+      default:
+        preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
+      }
+    }
+  }
+
+  /// Returns the memory location pointed to by `v` in the current execution context.
+  ///
+  /// - Precondition: `v` is a place.
+  fileprivate func address(of v: IRValue) -> Memory.TypedAddress {
+    switch v {
+    case .parameter(let i):
+      topOfStack.parameters[i].location
+    case .register(let r):
+      topOfStack.registers[r]!.location!
+    default:
+      preconditionFailure("\(program.show(v)) is not a Memory.TypedAddress.")
+    }
+  }
+
+  /// Returns the memory location pointed to by `v`, together with its
+  /// permissions and obligations, in the current execution state.
+  ///
+  /// - Precondition: `v` is a place computed by `access` instruction.
+  private func access(of v: IRValue) -> Access<Memory.TypedAddress> {
+    switch v {
+    case .parameter(let i):
+      topOfStack.parameters[i]
+    case .register(let r):
+      topOfStack.registers[r]!(as: Access<Memory.TypedAddress>.self)!
+    default:
+      preconditionFailure("\(program.show(v)) is not an Access<Memory.TypedAddress>.")
+    }
+  }
+
+}
+
+extension IRValue {
+
+  /// Returns the address of part `p` in the address pointed by `self`
+  /// in the context of `executor`.
+  ///
+  /// - Precondition: `self` contains a place.
+  fileprivate func location(
+    ofPart p: IndexPath,
+    in executor: inout Interpreter
+  ) -> Memory.TypedAddress {
+    let a = executor.address(of: self)
+    return executor.memory.location(p, in: a)
+  }
+
 }
 
 extension Program {
@@ -285,6 +405,17 @@ extension Program {
     }!
     return .init(module: entryModule, function: entryFunction)
   }
+}
+
+extension IRAccess {
+
+  /// The associated permissions and obligations.
+  var finalCapability: AccessEffect {
+    // Because IR analysis should ensure single effect.
+    // See: Sources/FrontEnd/IR/Instructions/IRAccess.swift.
+    capabilities.uniqueElement!
+  }
+
 }
 
 /// An indication of malformed IR.

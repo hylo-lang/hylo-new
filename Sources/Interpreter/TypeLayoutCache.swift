@@ -221,3 +221,19 @@ func storageLayoutOfRecord(
   }
   return (b, offsets)
 }
+
+extension TypeLayoutCache {
+  /// Returns type and byte offset of `subField` within `t`,
+  /// where `t` is defined in `p`.
+  mutating func typeAndOffset(
+    _ subField: IndexPath, within t: MonomorphicTypeIdentity,
+    definedIn p: inout Program
+  ) -> (type: MonomorphicTypeIdentity, offset: Int) {
+    subField.reduce(into: (t, 0)) { (c, i) in
+      let l = layout(c.type, in: &p)
+      let p = l.parts[i]
+      c.offset += p.offset
+      c.type = p.type
+    }
+  }
+}

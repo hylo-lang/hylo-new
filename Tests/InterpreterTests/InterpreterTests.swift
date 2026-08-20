@@ -10,8 +10,10 @@ final class InterpreterRunTests: XCTestCase {
       includingPropertiesForKeys: nil
     )
     for f in fs {
+      print(f)  // TODO: kept for debugging and observability.
       let p = try await Program.loadForInterpretation(sourceRoot: f)
       try p.interpret()
+      print()
     }
   }
 

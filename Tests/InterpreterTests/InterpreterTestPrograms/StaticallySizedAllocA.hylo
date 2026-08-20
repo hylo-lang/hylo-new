@@ -1,0 +1,4 @@
+public fun main() {
+  let x: UInt8 = 2
+  let y: Int8 = -1
+}

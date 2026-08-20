@@ -72,14 +72,9 @@ struct Memory {
       precondition(n >= 0)
       precondition(m > 0)
 
-      storage = Storage(repeating: 0, count: n)
-      // If we didn't get suitably-aligned storage, allocate enough to
-      // ensure we can find a suitably-aligned region of the right
-      // size.
-      if storage.withUnsafeBytes({ UInt(bitPattern: $0.baseAddress) % UInt(m) != 0 }) {
-        storage = Storage(repeating: 0, count: n + m - 1)
-      }
-      baseOffset = storage.withUnsafeBytes { $0.firstOffsetAligned(to: m) }
+      let (s, o) = Storage.aligned(repeating: 0, count: n, alignment: m)
+      storage = s
+      baseOffset = o
       size = n
       self.id = id
     }
@@ -161,6 +156,20 @@ struct Memory {
     public let offset: Storage.Index
 
     public var description: String { "@\(allocation):0x\(String(offset, radix: 16))" }
+
+    /// Returns a `TypedAddress` referring to the same location as `self`, viewed
+    /// as the address of a value of type `t`.
+    public func asTypedAddress(_ t: MonomorphicTypeIdentity) -> TypedAddress {
+      .init(allocation: self.allocation, offset: self.offset, type: t)
+    }
+
+    /// Returns a `TypedAddress` referring to the same location as `self`, viewed
+    /// as the address of a value of type `t`.
+    ///
+    /// - Precondition: `t` is a monomorphic type.
+    public func asTypedAddress(_ t: AnyTypeIdentity) -> TypedAddress {
+      asTypedAddress(.init(t))
+    }
 
   }
 
@@ -244,7 +253,7 @@ extension UnsafeRawPointer {
 
   /// Returns the number of bytes from `self` to the nearest address
   /// aligned to `a`.
-  fileprivate func offsetToAlignment(_ a: Int) -> Int {
+  fileprivate func roundedUp(toNearestMultipleOf a: Int) -> Int {
     let b = UInt(bitPattern: self)
     return Int(b.roundedUp(toNearestMultipleOf: UInt(a)) - b)
   }
@@ -257,8 +266,61 @@ extension UnsafeRawBufferPointer {
   /// the nearest address aligned to `a`.
   ///
   /// If `self.baseAddress == nil`, returns `0`.
-  fileprivate func firstOffsetAligned(to a: Int) -> Int {
-    return baseAddress?.offsetToAlignment(a) ?? 0
+  internal func firstOffsetAligned(to a: Int) -> Int {
+    baseAddress?.roundedUp(toNearestMultipleOf: a) ?? 0
+  }
+
+}
+
+extension Memory {
+
+  /// Allocates `n` contiguous instances of `t` and returns the`Address` of the first instance.
+  ///
+  /// - Precondition: `t` is a monomorphic type.
+  public mutating func allocate(storageFor t: AnyTypeIdentity, count n: Int = 1) -> Address {
+    allocate(.init(t), count: n)
+  }
+
+  /// Returns layout of `t`.
+  public mutating func layout(_ t: MonomorphicTypeIdentity) -> TypeLayout {
+    typeLayouts.layout(t, in: &program)
+  }
+
+  /// Returns layout of `t`.
+  ///
+  /// - Precondition: `t` is a monomorphic type.
+  public mutating func layout(_ t: AnyTypeIdentity) -> TypeLayout {
+    layout(MonomorphicTypeIdentity(t))
+  }
+
+  /// Returns layout of `t`.
+  public mutating func layout(_ t: MachineType.ID) -> TypeLayout {
+    layout(t.erased)
+  }
+
+  /// Returns the address of `subPart` in `whole`.
+  public mutating func location(_ subPart: IndexPath, in whole: TypedAddress) -> TypedAddress {
+    let (t, o) =
+      typeLayouts.typeAndOffset(subPart, within: whole.type, definedIn: &program)
+    return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
+  }
+
+  /// Stores `v` at `p`.
+  ///
+  /// - Precondition: `v` is an instance of type `p.type`.
+  private mutating func store(_ v: RuntimeValue, at p: Memory.TypedAddress) {
+    let n = v.bytes.count
+    let o = p.offset
+    self[p.allocation].storage[o..<o + n] = v.bytes
+  }
+
+  /// Stores `v` at `p`.
+  ///
+  /// - Precondition: `v` is an instance of type `p.location.type`.
+  public mutating func store(_ v: RuntimeValue, at p: Access<Memory.TypedAddress>) throws {
+    // TODO: throw if it is illegal to write to `p` using its permissions.
+    // TODO: throw if location pointed by `p` is not fully uninitialized.
+    store(v, at: p.location)
   }
 
 }
