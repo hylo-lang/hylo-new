@@ -286,15 +286,15 @@ final class TypeLayoutTests: XCTestCase {
   func testEnumDiscriminator() {
     let i8 = id(MachineType.i(8))
     let i16 = id(MachineType.i(16))
-    XCTAssertEqual(
-      UnrealABI().enumDiscriminator(count: 1, in: &p).underlying,
-      .void)
-    XCTAssertEqual(
-      UnrealABI().enumDiscriminator(count: 2, in: &p).underlying, i8)
-    XCTAssertEqual(
-      UnrealABI().enumDiscriminator(count: 8, in: &p).underlying, i8)
-    XCTAssertEqual(
-      UnrealABI().enumDiscriminator(count: 257, in: &p).underlying, i16)
+    let i32 = id(MachineType.i(32))
+
+    XCTAssertEqual(UnrealABI().enumDiscriminator(count: 1, in: &p).underlying, .void)
+    XCTAssertEqual(UnrealABI().enumDiscriminator(count: 2, in: &p).underlying, i8)
+    XCTAssertEqual(UnrealABI().enumDiscriminator(count: 8, in: &p).underlying, i8)
+    XCTAssertEqual(UnrealABI().enumDiscriminator(count: 256, in: &p).underlying, i8)
+    XCTAssertEqual(UnrealABI().enumDiscriminator(count: 257, in: &p).underlying, i16)
+    XCTAssertEqual(UnrealABI().enumDiscriminator(count: 65536, in: &p).underlying, i16)
+    XCTAssertEqual(UnrealABI().enumDiscriminator(count: 65537, in: &p).underlying, i32)
   }
 
   // TODO: uncomment when raw enum representation gets supported.
