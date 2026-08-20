@@ -90,7 +90,13 @@ jobs:
 
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}
-        run: llvm-cov export $(swift build --show-bin-path)/HyloPackageTests.xctest  --format="lcov" --instr-profile $(swift build --show-bin-path)/codecov/default.profdata > info.lcov
+        # The merge picks up the .profraw files written by 'hc' subprocesses spawned from the
+        # end-to-end command-line tests.
+        # '-object' includes the 'hc' binary's coverage mapping in the export.
+        run: |
+          BIN_PATH=$(swift build --show-bin-path)
+          llvm-profdata merge -sparse $BIN_PATH/codecov/*.profraw -o $BIN_PATH/codecov/merged.profdata
+          llvm-cov export $BIN_PATH/HyloPackageTests.xctest -object $BIN_PATH/hc --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
 
       - name: Upload coverage report to Codecov
         if: ${{ matrix.export-coverage }}

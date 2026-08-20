@@ -14,20 +14,32 @@ private typealias Module = FrontEnd.Module
   /// Configuration for this command.
   public static let configuration = CommandConfiguration(commandName: "hc", version: hyloVersion)
 
-  /// The paths at which libraries may be found.
+  /// The linker's library search path.
   @Option(
     name: [.customShort("L")],
     help: ArgumentHelp(
-      "Add a directory to the library search path.",
+      "Add a directory to the linker's search path.",
       valueName: "path"),
     transform: URL.init(fileURLWithPath:))
-  private var librarySearchPaths: [URL] = []
+  private var librarySearchPath: [URL] = []
+
+  /// The paths at which imported module archives (`.hylomodule`) may be found.
+  @Option(
+    name: [.customLong("module-search-path")],
+    help: ArgumentHelp(
+      "Add a directory to the module search path, where imported module archives are found.",
+      valueName: "path"),
+    transform: URL.init(fileURLWithPath:))
+  private var moduleSearchPath: [URL] = []
 
   /// The path containing cached module data.
   @Option(
     name: [.customLong("module-cache")],
     help: ArgumentHelp(
-      "Specify the module cache path.",
+      """
+      Specify the module cache path (default: a 'hylo' directory in \
+      $\(CommandLine.defaultCacheRootVariable) or the user's caches directory).
+      """,
       valueName: "path"),
     transform: URL.init(fileURLWithPath:))
   private var moduleCachePath: URL?
@@ -90,6 +102,12 @@ private typealias Module = FrontEnd.Module
     help: "Do not load the standard library")
   private var noStandardLibrary: Bool = false
 
+  /// `true` iff the compiler should print the standard library's root and exit.
+  @Flag(
+    name: [.customLong("print-stdlib-root")],
+    help: "Print the path of the standard library's root directory and exit.")
+  private var printStandardLibraryRoot: Bool = false
+
   /// The kind of output that should be produced by the compiler.
   @Option(
     name: [.customLong("emit")],
@@ -103,6 +121,53 @@ private typealias Module = FrontEnd.Module
     name: [.customLong("trace-inference")],
     help: "Trace type inference")
   private var lineTracingInference: LineLocator?
+
+  /// The name of the module being compiled, if specified explicitly.
+  ///
+  /// - See: `effectiveModuleName`.
+  @Option(
+    name: [.customLong("module-name")],
+    help: ArgumentHelp(
+      """
+      The name of the module being compiled. Defaults to the base name of the input if a single \
+      source file is given, or 'Main' otherwise.
+      """,
+      valueName: "name"))
+  private var moduleName: String?
+
+  /// The names of the modules that are dependencies of the module being compiled.
+  ///
+  /// Each dependency is loaded from a `<name>.hylomodule` archive found in the module search paths.
+  @Option(
+    name: [.customLong("import")],
+    help: ArgumentHelp(
+      """
+      Make the given module visible to the module being compiled. Pass this option once for each \
+      dependency.
+      """,
+      valueName: "module"))
+  private var imports: [String] = []
+
+  /// The path at which the archive of the compiled module should be written, if any.
+  @Option(
+    name: [.customLong("emit-module-to")],
+    help: ArgumentHelp(
+      "Serializes the compiled module to <file>, so other modules can import it.",
+      valueName: "file"),
+    transform: URL.init(fileURLWithPath:))
+  private var moduleArchiveURL: URL?
+
+  /// The path at which the compiled module's interface hash should be written, if any.
+  @Option(
+    name: [.customLong("emit-module-interface-hash-to")],
+    help: ArgumentHelp(
+      """
+      Write a hash of the module's observable interface to <file>. When unchanged, \
+      build systems may skip recompiling dependents.
+      """,
+      valueName: "file"),
+    transform: URL.init(fileURLWithPath:))
+  private var writeModuleInterfaceHashAt: URL?
 
   /// The destination to which the result of the compilation is written.
   @Option(
@@ -130,31 +195,70 @@ private typealias Module = FrontEnd.Module
   /// Creates a new instance with default options.
   public init() {}
 
+  /// Checks that the parsed arguments form a consistent configuration.
+  public func validate() throws {
+    if (moduleArchiveURL != nil) && !outputType.supportsModuleEmission {
+      throw ValidationError(
+        "'--emit-module-to' cannot be used with '--emit \(outputType.rawValue)'")
+    }
+    if (writeModuleInterfaceHashAt != nil) && !outputType.supportsModuleEmission {
+      throw ValidationError(
+        "'--emit-module-interface-hash-to' cannot be used with '--emit \(outputType.rawValue)'")
+    }
+    if !imports.isEmpty && outputType.linksDependencies {
+      throw ValidationError("""
+        '--import' is not yet supported with '--emit \(outputType.rawValue)'; \
+        use '--emit object' and link the objects yourself
+        """)
+    }
+    if imports.contains(effectiveModuleName) {
+      throw ValidationError("module '\(effectiveModuleName)' cannot import itself")
+    }
+    if noCaching && (moduleCachePath != nil) {
+      throw ValidationError("'--no-caching' and '--module-cache' are mutually exclusive")
+    }
+    if (outputURL?.relativePath == "-") && !outputType.canBeWrittenToStandardOutput {
+      throw ValidationError("\(outputType.rawValue) cannot be written to the standard output.")
+    }
+  }
+
   /// Executes the command.
   public mutating func run() async throws {
-    try configureSearchPaths()
+    if printStandardLibraryRoot {
+      print(Driver.standardLibraryRoot.path)
+      return
+    }
 
-    var driver = Driver(
-      moduleCachePath: noCaching ? nil : moduleCachePath!,
+    var driver = try Driver(
+      moduleCachePath: noCaching ? nil : (moduleCachePath ?? defaultCachePath()),
       targetSpecification: try resolveTarget(),
       optimization: optimized ? .aggressive : .none,
       relocation: relocationModel ?? Driver.defaultRelocationModel,
       codeModel: codeModel ?? .default,
-      librarySearchPaths: librarySearchPaths)
+      librarySearchPath: Array(librarySearchPath.uniqued()),
+      moduleSearchPath: Array(moduleSearchPath.uniqued()))
 
     do {
-      // Load the standard library.
+      // Load the imported modules.
       if !noStandardLibrary {
         note("load the Hylo standard library")
         try await driver.loadStandardLibrary()
       }
 
+      for i in imports {
+        note("load imported module \(i)")
+        try driver.loadArchivedModule(.init(i))
+      }
+
       // Create a module for the product being compiled.
-      let product = productName(inputs)
+      let product = effectiveModuleName
       note("start compiling \(product)")
       let module = driver.program.demandModule(product)
       if !noStandardLibrary {
         driver.program[module].addDependency(Module.standardLibraryName)
+      }
+      for i in imports {
+        driver.program[module].addDependency(.init(i))
       }
 
       // Compile from sources.
@@ -185,14 +289,14 @@ private typealias Module = FrontEnd.Module
       await perform("normalization", for: module) {
         await driver.applyTransformationPasses(module)
       }
+
+      try emitInterfaceHashIfNeeded(of: module, from: driver)
+      try emitArchiveIfNeeded(of: module, from: driver)
+
       if outputType == .ir {
         try emitIR(module, in: driver.program, name: product)
         return
       }
-
-      // Write the module to the cache for future runs.
-      let a = try driver.program.archive(module: module)
-      note("module archive size: \(a.count)")
 
       try await perform("code generation", for: module) {
         try driver.compileToLLVM(module)
@@ -204,10 +308,9 @@ private typealias Module = FrontEnd.Module
         try write(driver.assembly(of: module), to: asmFile(product))
         return
       } else if outputType == .object {
-        // FIXME: output the dependencies of `module`, including the standard library.
-        let directory = try objectFilesDirectory()
-        try driver.writeObjectFiles(for: [module], into: directory)
-        note("written \(directory.path)")
+        let f = objectFile(product)
+        try driver.emitObjectFile(of: module, to: f)
+        note("written \(f.path)")
         return
       }
 
@@ -342,21 +445,75 @@ private typealias Module = FrontEnd.Module
     }
   }
 
-  /// Sets up the value of search paths for locating libraries and cached artifacts.
-  private mutating func configureSearchPaths() throws {
-    let m = FileManager.default
-    if let cache = moduleCachePath {
-      librarySearchPaths.append(cache)
+  /// Ensures that the latest interface hash of the currently compiled module is written to disk
+  /// if requested.
+  ///
+  /// Only rewrites the file when the content actually changes, as some build tools only track
+  /// modification time.
+  private func emitInterfaceHashIfNeeded(of module: Module.ID, from driver: Driver) throws {
+    guard let u = writeModuleInterfaceHashAt else { return }
+    let h = try driver.moduleInterfaceHash(of: module)
+    let contents = String(format: "%016llx\n", h)
+    let existing = try? String(contentsOf: u, encoding: .utf8)
+    if existing != contents {
+      try contents.write(to: u, atomically: true, encoding: .utf8)
+      note("written \(u.path)")
     } else {
-      let cache = m.temporaryDirectory.appending(path: ".hylocache")
-      try m.createDirectory(at: cache, withIntermediateDirectories: true)
-      note("module cache path: \(cache.path)")
-      librarySearchPaths.append(cache)
-      moduleCachePath = cache
+      note("interface hash unchanged, leaving \(u.path) untouched")
     }
+  }
 
-    librarySearchPaths = .init(librarySearchPaths.uniqued())
-    librarySearchPaths.removeDuplicates()
+  /// Writes the archive of the module being compiled to the requested location, if any, so that
+  /// other modules can import it.
+  private func emitArchiveIfNeeded(of module: Module.ID, from driver: Driver) throws {
+    guard let u = moduleArchiveURL else { return }
+    try driver.writeArchive(of: module, to: u)
+    note("written \(u.path)")
+  }
+
+  /// The name of the environment variable denoting the directory in which the default module
+  /// cache is created.
+  ///
+  /// Build systems set this variable to keep the compiler's cache inside their own workspace
+  /// rather than in the user's caches directory.
+  fileprivate static let defaultCacheRootVariable = "HYLO_DEFAULT_CACHE_ROOT"
+
+  /// Returns the directory to use as the module cache when `--module-cache` is not specified,
+  /// creating it if necessary.
+  ///
+  /// The cache is a 'hylo' directory in the root denoted by `HYLO_DEFAULT_CACHE_ROOT` if that
+  /// variable is set to a non-empty value, in the user's caches directory otherwise.
+  private func defaultCachePath() throws -> URL {
+    let m = FileManager.default
+
+    let base = defaultCacheRoot
+      ?? m.urls(for: .cachesDirectory, in: .userDomainMask).first
+      ?? m.temporaryDirectory
+    let d = base.appending(path: "hylo")
+    try m.createDirectory(at: d, withIntermediateDirectories: true)
+    return d
+  }
+
+  /// The directory in which the default module cache should be created, as specified by the
+  /// environment, or `nil` if the environment does not specify one.
+  private var defaultCacheRoot: URL? {
+    guard let r = ProcessInfo.processInfo.environment[Self.defaultCacheRootVariable], !r.isEmpty
+    else { return nil }
+    return URL(fileURLWithPath: r)
+  }
+
+  /// The name of the module being compiled.
+  ///
+  /// This is `--module-name` if given, the base name of the input if it is a single source file,
+  /// or 'Main' otherwise.
+  private var effectiveModuleName: Module.Name {
+    if let n = moduleName {
+      n
+    } else if inputs.count == 1, !inputs[0].hasDirectoryPath {
+      inputs[0].deletingPathExtension().lastPathComponent
+    } else {
+      "Main"
+    }
   }
 
   /// Returns an array with all the source files in `inputs` and their subdirectories.
@@ -397,7 +554,8 @@ private typealias Module = FrontEnd.Module
   /// Writes `message` to the standard output iff `self.verbose` is `true`.
   private func note(_ message: @autoclosure () -> String) {
     if verbose {
-      print(message())
+      var stderr = StandardError()
+      print(message(), to: &stderr)
     }
   }
 
@@ -406,18 +564,6 @@ private typealias Module = FrontEnd.Module
     for flags: [TreePrinterFlag]
   ) -> TreePrinter.Configuration {
     .init(useVerboseTypes: flags.contains(.verboseTypes))
-  }
-
-  /// If `inputs` contains a single URL `u` whose path is non-empty, returns the last component of
-  /// `u` without any path extension and stripping all leading dots. Otherwise, returns "Main".
-  private func productName(_ inputs: [URL]) -> Module.Name {
-    if let u = inputs.uniqueElement {
-      let n = u.deletingPathExtension().lastPathComponent.drop(while: { (c) in c == "." })
-      if !n.isEmpty {
-        return .init(n)
-      }
-    }
-    return "Main"
   }
 
   /// The type of the output files to generate.
@@ -447,6 +593,35 @@ private typealias Module = FrontEnd.Module
     /// Executable binary.
     case binary = "binary"
 
+    /// `true` iff the invocation may emit a module archive or interface hash, i.e. after mandatory
+    /// transformations.
+    var supportsModuleEmission: Bool {
+      switch self {
+      case .ast, .typedAST, .rawIR:
+        return false
+      case .ir, .llvm, .asm, .object, .binary:
+        return true
+      }
+    }
+
+    /// `true` iff the compiler should link dependencies of the product into the output.
+    var linksDependencies: Bool {
+      switch self {
+      case .binary:
+        return true
+      case .ast, .typedAST, .rawIR, .ir, .llvm, .asm, .object:
+        return false
+      }
+    }
+
+    /// `true` iff the artifact can be written to the standard output when `-o -` is passed.
+    var canBeWrittenToStandardOutput: Bool {
+      switch self {
+      case .ast, .typedAST, .rawIR, .ir, .llvm, .asm: true
+      case .object, .binary: false
+      }
+    }
+
   }
 
   /// Given the desired name of the compiler's product, returns the file to write when "raw-ast" is
@@ -473,12 +648,10 @@ private typealias Module = FrontEnd.Module
     outputURL ?? URL(fileURLWithPath: productName.description + ".s")
   }
 
-  /// Returns the directory to write when "object" is selected as the output type.
-  private func objectFilesDirectory() throws -> URL {
-    guard outputURL?.relativePath != "-" else {
-      throw ValidationError("object files cannot be written to the standard output")
-    }
-    return outputURL ?? URL(fileURLWithPath: "./")
+  /// Given the desired name of the compiler's product, returns the file to write when "object" is
+  /// selected as the output type.
+  private func objectFile(_ productName: Module.Name) -> URL {
+    outputURL ?? URL(fileURLWithPath: "\(productName).o")
   }
 
   /// Given the desired name of the compiler's product, returns the file to write when "binary" is

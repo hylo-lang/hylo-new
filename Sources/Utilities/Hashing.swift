@@ -51,6 +51,11 @@ public enum FNV1 {
     return .init(basis: basis, prime: prime)
   }
 
+  /// Creates an instance producing hashes as instances of `UInt64`.
+  public static func u64() -> Implementation<UInt64> {
+    .init(basis: 0xcbf29ce484222325, prime: 0x100000001b3)
+  }
+
   /// Creates an instance producing hashes as instances of `UInt128`.
   public static func u128() -> Implementation<UInt128> {
     let basis: UInt128 = 0x6c62272e07bb014262b821756295c58d

@@ -39,10 +39,14 @@ final class CollectionTests: XCTestCase {
     XCTAssertEqual(a[toLast: 2], 1)
   }
 
-  func testRemoveDuplicates() {
-    var a0 = [1, 2, 1, 1, 3, 3, 3, 4, 5, 4]
-    a0.removeDuplicates()
-    XCTAssertEqual(a0, [1, 2, 3, 4, 5])
+  func testUniqueIndex() {
+    let a = [1, 2, -1]
+    XCTAssertNil(a.uniqueIndex(where: { $0 > 0 }))
+    XCTAssertNil(a.uniqueIndex(where: { $0 != 2 }))
+
+    XCTAssertEqual(a.uniqueIndex(where: { $0 == 1 }), 0)
+    XCTAssertEqual(a.uniqueIndex(where: { $0 == 2 }), 1)
+    XCTAssertEqual(a.uniqueIndex(where: { $0 == -1 }), 2)
   }
 
 }

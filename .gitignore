@@ -2,6 +2,7 @@
 /.build
 /.*-build
 /Packages
+*.profraw
 
 # IDEs
 /.vscode

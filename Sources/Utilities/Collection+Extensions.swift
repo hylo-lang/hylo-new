@@ -7,10 +7,10 @@ extension Collection {
 
   /// Returns the index of the unique element that satisfies `predicate` if any.
   ///
-  /// - Complexity: At most n applications of `preficate`, where n is the length of `self`.
+  /// - Complexity: At most n applications of `predicate`, where n is the length of `self`.
   public func uniqueIndex(where predicate: (Element) throws -> Bool) rethrows -> Index? {
     if let i = try firstIndex(where: predicate) {
-      return try !suffix(from: i).contains(where: predicate) ? i : nil
+      return try !suffix(from: index(after: i)).contains(where: predicate) ? i : nil
     } else {
       return nil
     }
@@ -58,25 +58,6 @@ extension BidirectionalCollection {
   public subscript(toLast distanceToLast: Int) -> Element {
     let i = index(endIndex, offsetBy: -(distanceToLast + 1))
     return self[i]
-  }
-
-}
-
-extension RangeReplaceableCollection where Element: Hashable {
-
-  /// Removes all except the first element from every consecutive group of equivalent elements.
-  ///
-  /// - Complexity: O(n) where n is the length of `self`.
-  public mutating func removeDuplicates() {
-    var s = Set<Element>(minimumCapacity: count)
-    var i = startIndex
-    while i != endIndex {
-      if s.insert(self[i]).inserted {
-        formIndex(after: &i)
-      } else {
-        remove(at: i)
-      }
-    }
   }
 
 }

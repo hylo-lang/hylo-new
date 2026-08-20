@@ -70,13 +70,14 @@ extension Executable {
 /// The result of a subprocess execution with captured string outputs.
 public typealias ExecutionReport = ExecutionResult<Void, StringOutput<UTF8>, StringOutput<UTF8>>
 
-/// Runs `executable` with `arguments` in `workingDirectory` (or the current directory if `nil`),
-/// capturing its standard output and standard error as strings.
+/// Runs `executable` with `arguments` and `environment` in `workingDirectory` (or the current
+/// directory if `nil`), capturing its standard output and standard error as strings.
 public func executeSubprocess(
-  _ executable: Executable, arguments: [String] = [], workingDirectory: URL? = nil
+  _ executable: Executable, arguments: [String] = [], workingDirectory: URL? = nil,
+  environment: Environment = .inherit
 ) async throws -> ExecutionReport {
   try await run(
-    executable, arguments: .init(arguments),
+    executable, arguments: .init(arguments), environment: environment,
     workingDirectory: workingDirectory.map({ .init($0.path) }),
     output: .string(limit: .max), error: .string(limit: .max))
 }
