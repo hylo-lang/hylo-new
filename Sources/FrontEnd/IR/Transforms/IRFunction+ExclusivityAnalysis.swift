@@ -126,6 +126,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRProperty.self), from: &f)
       case IRSubfield.self:
         pc = interpret(f.castUnchecked(i, to: IRSubfield.self), from: &f)
+      case IRTypeWitness.self:
+        pc = interpret(f.castUnchecked(i, to: IRTypeWitness.self), from: &f)
       case IRWitnessTable.self:
         pc = interpret(f.castUnchecked(i, to: IRWitnessTable.self), from: &f)
       default:
@@ -304,6 +306,14 @@ private struct Transfer: AbstractTransferFunction {
     let s = f.at(i)
     let a = context.locals[s.base]!.place!.appending(contentsOf: s.path)
     context.locals[.register(i.erased)] = .place(a)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRTypeWitness.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
     return f.instruction(after: i.erased)
   }
 

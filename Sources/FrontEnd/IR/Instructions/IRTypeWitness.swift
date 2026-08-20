@@ -10,21 +10,21 @@ public struct IRTypeWitness: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// An existential type describing the type witness being constructed.
-  public var constructor: UniversalType.ID
+  /// The constructor of the witness being formed.
+  public var constructor: AnyTypeIdentity
 
-  /// The type of the type witness being constructed.
-  public let typeOfApplication: TypeWitness.ID
+  /// The type of the type witness being being formed.
+  public let witnessType: TypeWitness.ID
 
   /// Creates an instance with the given properties.
   public init(
-    constructor: UniversalType.ID, arguments: [IRValue], typeOfApplication: TypeWitness.ID,
+    constructor: AnyTypeIdentity, arguments: [IRValue], witnessType: TypeWitness.ID,
     anchor: Anchor
   ) {
     self.operands = arguments
     self.anchor = anchor
     self.constructor = constructor
-    self.typeOfApplication = typeOfApplication
+    self.witnessType = witnessType
   }
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
@@ -32,12 +32,12 @@ public struct IRTypeWitness: Instruction {
     self.operands = other.operands.map({ (o) in properties[o] })
     self.anchor = properties.anchor(other)
     self.constructor = other.constructor
-    self.typeOfApplication = other.typeOfApplication
+    self.witnessType = other.witnessType
   }
 
   /// The type of the instruction's result.
   public var type: IRType {
-    .place(typeOfApplication.erased)
+    .place(witnessType.erased)
   }
 
 }

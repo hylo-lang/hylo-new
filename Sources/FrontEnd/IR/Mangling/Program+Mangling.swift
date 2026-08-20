@@ -11,7 +11,7 @@ extension Program {
   }
 
   /// Returns the mangled representation of `w`.
-  public func mangled(_ w: IRWitnessTable) -> String {
+  public func mangled1(_ w: IRWitnessTable) -> String {
     mangled(w, applying: { (s, m, o) in m.mangled(table: s, to: &o) })
   }
 

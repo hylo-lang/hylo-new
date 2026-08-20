@@ -1,0 +1,12 @@
+/// Allocates `n` bytes of memory on the heap and returns the allocation's address or `.null()` if
+/// the allocation failed.
+@extern_c_indirect("c_malloc_indirect")
+public fun malloc1(n: Int) -> Pointer<Never>
+
+/// Allocates `n` bytes of memory aligned at `a` on the heap and returns the allocations's address.
+///
+/// The function traps if allocation failed.
+@_symbol("allocate(bytes:aligned_at:)")
+fun __hylo_allocate(bytes n: Int, aligned_at a: Int) -> Pointer<Never> {
+  malloc1(n)
+}

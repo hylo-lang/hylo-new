@@ -1,7 +1,7 @@
 import Archivist
 import Utilities
 
-/// Accesses a property stored in an opaque record.
+/// Exposes the place of a property stored in an opaque record.
 @Archivable
 public struct IRProperty: Instruction {
 
@@ -19,10 +19,11 @@ public struct IRProperty: Instruction {
 
   /// Creates an instance with the given properties.
   public init(
-    record: IRValue, property: DeclarationIdentity, propertyType: AnyTypeIdentity,
+    record: IRValue, recordTypeWitness: IRValue?,
+    property: DeclarationIdentity, propertyType: AnyTypeIdentity,
     anchor: Anchor
   ) {
-    self.operands = [record]
+    self.operands = .init(record, prependedTo: Array(unwrapping: recordTypeWitness))
     self.anchor = anchor
     self.property = property
     self.propertyType = propertyType
@@ -30,15 +31,21 @@ public struct IRProperty: Instruction {
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
   public init(_ other: Self, substituting properties: IRSubstitutionTable) {
-    self.operands = [properties[other.record]]
+    self.operands = other.operands.map({ (o) in properties[o] })
     self.anchor = properties.anchor(other)
     self.property = other.property
     self.propertyType = other.propertyType
   }
 
-  /// The address of the record containing the property whose getter is returned.
+  /// The address of the record containing the place being exposed.
   public var record: IRValue {
     operands[0]
+  }
+
+  /// A witness of the run-time type of the record containing the place being exposed iff the
+  /// layout of that type is not available at compile-time.
+  public var recordTypeWitness: IRValue? {
+    operands[1...].first
   }
 
   /// The type of the value loaded by this instruction.
@@ -71,7 +78,12 @@ extension IRProperty: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     let n = printer.program.nameOrTag(of: property)
-    return "property \"\(n)\" of \(printer.show(record)) as \(printer.show(propertyType))"
+    let r = if let w = recordTypeWitness {
+      "(\(printer.show(record)) : \(printer.show(w)))"
+    } else {
+      printer.show(record)
+    }
+    return "property \"\(n)\" of \(r) as \(printer.show(propertyType))"
   }
 
 }

@@ -1193,19 +1193,19 @@ public struct Program: Sendable {
   }
 
   /// Returns the types of stored parts of `t` iff its layout is visible from `module`.
-  public mutating func storage(
-    of t: AnyTypeIdentity, visibleFrom module: Module.ID
+  public mutating func storage<T: TypeIdentity>(
+    of t: T, visibleFrom module: Module.ID
   ) -> [AnyTypeIdentity]? {
     // TODO: Resilience
-    withTyper(typing: module, { (typer) in typer.storage(of: t) })
+    withTyper(typing: module, { (typer) in typer.storage(of: t.erased) })
   }
 
   /// Returns the types of the fields of `t` iff its layout is visible from `module`.
-  public mutating func fields(
-    of t: AnyTypeIdentity, visibleFrom module: Module.ID
+  public mutating func fields<T: TypeIdentity>(
+    of t: T, visibleFrom module: Module.ID
   ) -> [AnyTypeIdentity]? {
     // TODO: Resilience
-    withTyper(typing: module, { (typer) in typer.fields(of: t) })
+    withTyper(typing: module, { (typer) in typer.fields(of: t.erased) })
   }
 
   /// Returns the names introduced by `d`.
@@ -1876,6 +1876,9 @@ extension Program {
     /// `Hylo.ExpressibleByFloatingPointLiteral.init(floating_point_literal:)`.
     case expressibleByFloatingPointLiteralInit =
       "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
+
+    /// `Hylo.allocate(bytes:aligned_at:)`.
+    case runtimeAllocate = "allocate(bytes:aligned_at:)"
 
     /// All standard library integer types.
     static let allIntegerTypes: [StandardLibraryEntity] = [

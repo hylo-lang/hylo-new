@@ -32,16 +32,13 @@ public enum IRValue: Hashable, Sendable {
   /// A reference to a function or subscript bundle not yet reified.
   indirect case bundle(FunctionBundleDeclaration.ID, AnyTypeIdentity, AccessEffectSet)
 
-  /// A type witness.
-  indirect case type(AnyTypeIdentity, TypeWitness.ID)
-
   /// A "poison value", representing the result of an erroneous operation.
   indirect case poison(IRType)
 
   /// `true` iff `self` is a constant.
   public var isConstant: Bool {
     switch self {
-    case .integer, .function, .type:
+    case .integer, .function:
       return true
     default:
       return false
@@ -94,8 +91,6 @@ extension IRValue: Showable {
       return printer.show(n)
     case .bundle(let n, _, let k):
       return "\(printer.program.debugName(of: .init(n)))@{\(list: k)}"
-    case .type(let t, _):
-      return printer.show(t)
     case .poison:
       return "#!poison"
     }

@@ -471,8 +471,6 @@ public struct IRFunction: Sendable {
       return (t, true)
     case .bundle(_, let t, _):
       return (t, true)
-    case .type(_, let t):
-      return (t.erased, false)
     case .poison(let t):
       return resolved(t)
     }

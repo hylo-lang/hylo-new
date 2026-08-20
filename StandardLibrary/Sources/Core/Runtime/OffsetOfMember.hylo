@@ -522,12 +522,29 @@ public fun size_of_record_having_ordered_members(
   return r
 }
 
+@_symbol("size_of_record(members:of_length:)")
+fun __hylo_size_of_record(
+  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
+) -> Size {
+  // TODO
+  return 1 as Size
+}
+
+@_symbol("alignment_of_record(members:of_length:)")
+fun __hylo_alignment_of_record(
+  members member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
+) -> Alignment {
+  // TODO
+  return 1 as Alignment
+}
+
 /// Returns the offset of the `n`th member in declaration order of a
 /// record type having members given by the array of length `l` at
 /// `member_array`.
 ///
 /// Mutates the elements in the array in arbitrary ways.
 @inline(always)
+@_symbol("offset_of_record(n:in:of_length:)")
 public fun __hylo_offset_of_member(
   n: UInt32,
   in member_array: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32

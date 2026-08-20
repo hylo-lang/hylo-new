@@ -25,23 +25,22 @@ public struct IRAlloca: Instruction {
   /// The alignment of the allocated storage.
   public let alignment: IRAlignment
 
-  /// Creates an instance denoting stack-allocated storage of a size known at compile-time.
-  public init(
-    staticallySized storage: AnyTypeIdentity, alignment: IRAlignment,
-    anchor: Anchor
-  ) {
+  /// Creates an instance denoting a stack allocation aligned at `alignment` for storing instances
+  /// of `storage`, whose size is known at compile-time.
+  public init(staticallySized storage: AnyTypeIdentity, alignment: IRAlignment, anchor: Anchor) {
     self.operands = []
     self.anchor = anchor
     self.storage = storage
     self.alignment = alignment
   }
 
-  /// Creates an instance denoting stack-allocated storage of a size known at run-time.
+  /// Creates an instance denoting a stack allocation aligned at `alignment` for storing instances
+  /// of `storage`, show size can only be known at run-time using `storageTypeWitness`.
   public init(
-    dynamicallySized storage: AnyTypeIdentity, witness: IRValue, alignment: IRAlignment,
-    anchor: Anchor
+    dynamicallySized storage: AnyTypeIdentity, witnessedBy storageTypeWitness: IRValue,
+    alignment: IRAlignment, anchor: Anchor
   ) {
-    self.operands = [witness]
+    self.operands = [storageTypeWitness]
     self.anchor = anchor
     self.storage = storage
     self.alignment = alignment
@@ -55,8 +54,9 @@ public struct IRAlloca: Instruction {
     self.alignment = other.alignment
   }
 
-  /// A witness of the run-time type of the allocated storage, iff that type is dynamically sized.
-  public var witness: IRValue? {
+  /// A witness of the run-time type of the allocated storage iff the size of the allocation is not
+  /// available at compile-time.
+  public var storageTypeWitness: IRValue? {
     operands.first
   }
 
@@ -71,7 +71,7 @@ extension IRAlloca: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    if let w = witness {
+    if let w = storageTypeWitness {
       return "alloca \(printer.show(w)) as \(printer.show(storage)), \(printer.show(alignment))"
     } else {
       return "alloca \(printer.show(storage)), \(printer.show(alignment))"

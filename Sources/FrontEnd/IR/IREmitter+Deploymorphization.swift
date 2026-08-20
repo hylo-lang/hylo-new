@@ -236,31 +236,31 @@ extension IREmitter {
     let dominance = DominatorTree(function: poly, controlFlow: poly.controlFlow())
     for b in dominance {
       for i in poly.instructions(in: b) {
-        /// Where the next instruction should be inserted.
-        let p = InsertionPoint.end(of: properties[b])
-
-        switch poly.tag(of: i) {
-        case IRAlloca.self:
-          let s = poly.at(i) as! IRAlloca
-          lowering(p, anchoredTo: s.anchor, in: &target) { (me) in
-            // Gather the generic type parameters that occur free in type of the storage being
-            // allocated. They should be defined by the function being existentialized.
-            let ps = me.program.types.parameters(freeIn: s.storage)
-            assert(ps.allSatisfy(parameters.contains(_:)))
-
-            // If there isn't any generic parameter, we can simply copy the `alloca`. Otherwise,
-            // we have to replace it with an `allocx` applied to a run-time type witness.
-            if ps.isEmpty {
-              properties[.register(i)] = me.insert(s)!
+        // Copy the instruction if it does not use a generic type requiring a witnessed. Otherwise,
+        // replace the instruction with one taking a run-time type witness.
+        lowering(.end(of: properties[b]), anchoredTo: poly.at(i).anchor, in: &target) { (me) in
+          switch poly.tag(of: i) {
+          case IRAlloca.self:
+            let s = poly.at(i) as! IRAlloca
+            let t = s.storage
+            if let w = me._emitTypeWitnessIfGeneric(t, in: poly, reusing: &witnesses) {
+              properties[.register(i)] = me._alloca(w, as: t, alignment: s.alignment)
             } else {
-              let w = me._emitTypeWitness(of: s.storage, reusing: &witnesses)
-              properties[.register(i)] = me._alloca(w, as: s.storage, alignment: s.alignment)
+              properties[.register(i)] = me.insert(s)!
             }
-          }
 
-        default:
-          let s = poly.at(i)
-          lowering(p, anchoredTo: s.anchor, in: &target) { (me) in
+          case IRProperty.self:
+            let s = poly.at(i) as! IRProperty
+            let t = poly.result(of: s.record)!.type
+            if let w = me._emitTypeWitnessIfGeneric(t, in: poly, reusing: &witnesses) {
+              properties[.register(i)] = me._property(
+                s.property, of: s.record, as: s.propertyType, computingLayoutWith: w)
+            } else {
+              properties[.register(i)] = me.insert(s)!
+            }
+
+          default:
+            let s = poly.at(i)
             if let clone = me.insert(s.substituting(properties)) {
               properties[.register(i)] = clone
             }
@@ -271,6 +271,28 @@ extension IREmitter {
 
     depolymorphize(&target, passing: witnesses)
     program[module].ir[mono].take(definition: target)
+  }
+
+  /// Generates IR for accessing a run-time witness of `t` iff it is a generic type, caching
+  /// results into `witnesses`; otherwise, returns `nil` without mutating anything.
+  ///
+  /// `t` is a type occurring in the context of `poly`, which is the function being existentialized
+  /// into `self.currentFunction`. `t` is generic if it contains generic type parameter that occur
+  /// free. These parameters are expected to be defined by `poly` and assigned in `witnesses`.
+  private mutating func _emitTypeWitnessIfGeneric(
+    _ t: AnyTypeIdentity, in poly: IRFunction, reusing witnesses: inout [AnyTypeIdentity: IRValue]
+  ) -> IRValue? {
+    if program.types.seenAsTraitApplication(t) != nil { return nil }
+
+    let ps = program.types.parameters(freeIn: t)
+    assert(ps.allSatisfy(poly.typeParameters.contains(_:)))
+
+    // Nothing to do if `t` is not generic.
+    if ps.isEmpty {
+      return nil
+    } else {
+      return _emitTypeWitness(of: t, reusing: &witnesses)
+    }
   }
 
 }

@@ -207,24 +207,29 @@ public struct Driver {
     writingTo output: URL
   ) async throws -> PhaseResult {
     let elapsed = try await ContinuousClock().measure {
-      let modulesToLink = [module]
+      var modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
 
-      var cSources = cSources
+      var allCSources = cSources
 
       if usesStandardLibrary {
-        // FIXME: Enable this after we can lower the standard library
-        // modulesToLink.append(program.modules[.standardLibrary]!.identity)
-        cSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
+        let m = program.modules[Module.standardLibraryName]!.identity
+        modulesToLink.append(m)
+        _ = try compileToLLVM(m)
+        allCSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
       }
 
       try await FileManager.default.withUniqueTemporaryDirectory { (d) in
-        let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
-        var cObjects: [URL] = []
-        for s in cSources {
-          cObjects.append(try await compileCToObject(source: s, destinationDirectory: d))
+        // Emit Hylo dependencies.
+        var objects = try writeObjectFiles(for: modulesToLink, into: d)
+
+        // Compile and Emit C dependencies.
+        for s in allCSources {
+          objects.append(try await compileCToObject(source: s, destinationDirectory: d))
         }
-        try await linkExecutable(from: hyloObjects + cObjects, writingTo: output)
+
+        // Link everything together.
+        try await linkExecutable(from: objects, writingTo: output)
       }
     }
     return .init(elapsed: elapsed, containsError: program[module].containsError)

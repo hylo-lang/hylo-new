@@ -36,9 +36,9 @@ extension Array {
     return xs
   }
 
-  /// Appends `n` copies of `x` at the end of `self`.
-  public mutating func append(_ x: Element, count n: Int) {
-    append(contentsOf: repeatElement(x, count: n))
+  /// Appends `n` copies of `back` at the end of `self`.
+  public mutating func append(_ back: Element, count n: Int) {
+    append(contentsOf: repeatElement(back, count: n))
   }
 
 }

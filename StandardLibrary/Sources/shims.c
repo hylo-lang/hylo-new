@@ -4,16 +4,16 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-/// Allocates `n` bytes of heap memory and sets `results to the allocation's address,
-/// or 0 on failure.
+/// Allocates `n` bytes of memory on the heap and sets `results` to the allocation's address or `0`
+/// if the allocation failed.
 void c_malloc_indirect(intptr_t const* n, void** result){
   *result = malloc((size_t)(*n));
   // TODO accept `size_t` (UInt) parameter.
 }
 
-/// Deallocates heap memory at `address`.
+/// Deallocates the memory at `address`.
 ///
-/// - Requires: there is a live heap allocation starting at `address`.
+/// - Requires: The memory at `address` is the start of an allocation made via `c_malloc_indirect`.
 void c_free_indirect(void** address){
   free(*address);
 }
