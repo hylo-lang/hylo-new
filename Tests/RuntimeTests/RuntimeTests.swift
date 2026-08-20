@@ -341,6 +341,18 @@ final class LayoutTests: XCTestCase {
   /// Fragments of the Hylo test input file.
   var hyloTestCases: [String] = []
 
+  /// Returns the size of a record having `members` at corresponding `offsets`.
+  private func size(
+    members: [(size: Size, alignment: Alignment)], offsets: [UInt32]
+  ) -> Size {
+    zip(members, offsets).map { (m, o) in m.size + o }.max() ?? 0
+  }
+
+  /// Returns the alignment of a record having `members`.
+  private func alignment(members: [(size: Size, alignment: Alignment)]) -> Alignment {
+    members.map(\.alignment).max() ?? 1
+  }
+
   /// Returns a the test case formatted for the Hylo test
   /// input file.
   private func hyloTestCase(
@@ -354,10 +366,13 @@ final class LayoutTests: XCTestCase {
 
     let sas1 = sas + repeatElement((size: 0, alignment: 0), count: 10 - sas.count)
     let os1 = os + repeatElement(0, count: 10 - os.count)
+    let size = size(members: sas, offsets: os)
+    let alignment = alignment(members: sas)
 
     return """
       \(sas1.map { sa in "\(sa.size) \(sa.alignment)  " }.joined())
       \(os1.map { field($0, width: 4) }.joined(separator: " "))
+      \(field(size, width: 4)) \(field(alignment, width: 4))
       """
   }
 
@@ -484,6 +499,13 @@ final class LayoutTests: XCTestCase {
       if x.count != 10 {
         fatalError("incomplete expectations of length \(x.count)")
       }
+      let y = read(2)
+      if y.count != 2 {
+        fatalError("incomplete size and alignment expectations of length \(y.count)")
+      }
+      XCTAssertEqual(
+        Size(y[0]), size(members: p, offsets: x.prefix(memberCount).map { UInt32($0) }))
+      XCTAssertEqual(Alignment(y[1]), alignment(members: p))
       testCount += 1
     }
     XCTAssertGreaterThan(testCount, 100, "Not much testing happened")

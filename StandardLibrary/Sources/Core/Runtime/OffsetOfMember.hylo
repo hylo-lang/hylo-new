@@ -244,6 +244,12 @@ extension Pointer<RecordMemberType> {
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
   }
 
+  /// Returns `self` advanced in memory by `offset` `Pointee`s.
+  @inline(always)
+  public fun infix+ (offset: UInt32) -> Self {
+    self + Int(offset)
+  }
+
   /// Advances `self` in memory by `offset` `Pointee`s.
   @inline(always)
   public fun infix+= (offset: Int) inout {
@@ -547,4 +553,52 @@ public fun __hylo_offset_of_member(
     in_the_range_from: start, until: end)
   sink let r = preceding_size.rounded_up(to_nearest_multiple_of: nth_alignment)
   return r
+}
+
+/// Stably sorts `start..<end` by decreasing alignment.
+@inline(always)
+public fun sort_by_decreasing_alignment(
+  from start: Pointer<RecordMemberType>,
+  until end: Pointer<RecordMemberType>
+) {
+  if start == end { return }
+  // The first element is a trivially sorted range; insert the others into it, in order.
+  var sorted_end = start + 1
+  insert_in_order_before_max_less_aligned_suffix(
+    range_from: start + 1, until: end,
+    where_alignment_exceeds: 0 as Alignment,
+    into_range_from: start, until: &sorted_end)
+}
+
+/// Returns the size of a record type having members given by the array of length `member_count` at
+/// `member_array`, in declaration order.
+///
+/// - Note: mutates the array pointed to by `member_array`.
+@inline(always)
+public fun __hylo_size_of_record(
+  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
+) -> Size {
+  let start = member_array
+  let end = member_array + member_count
+  sort_by_decreasing_alignment(from: start, until: end)
+  return size_of_record_having_ordered_members(in_the_range_from: start, until: end)
+}
+
+/// Returns the alignment of a record type having members given by the
+/// array of length `member_count` at `member_array`.
+///
+/// The result is the maximal alignment of any member, or `1` if there are no members.
+@inline(always)
+public fun __hylo_alignment_of_record(
+  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
+) -> Alignment {
+  var largest = 1 as Alignment
+  var p = member_array.copy()
+  let end = member_array + member_count
+  while p < end {
+    sink let alignment = p.pointee().alignment()
+    if alignment > largest { &largest = alignment }
+    &p += 1
+  }
+  return largest
 }
