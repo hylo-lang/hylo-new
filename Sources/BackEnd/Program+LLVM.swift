@@ -1709,6 +1709,7 @@ extension Program {
     fields: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
   ) -> ConcreteLayout {
     let rs = fields.map({ (u) in metadata(of: u, in: &ctx) })
+    /// The members ordered according to decreasing alignment, then in increasing declaration order.
     let ps = fields.indices.sorted { (a, b) in
       let lhs = rs[a].layout.alignment
       let rhs = rs[b].layout.alignment
@@ -1737,7 +1738,7 @@ extension Program {
       size = next + fieldSize
     }
 
-    let a = if let max = ps.last { rs[max].layout.alignment } else { 1 }
+    let a = if let max = ps.first { rs[max].layout.alignment } else { 1 }
     return ConcreteLayout(
       fields: elements, propertyToField: fieldToElement, size: .fixed(size), alignment: a)
   }
