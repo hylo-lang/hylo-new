@@ -122,7 +122,7 @@ final class CommandLineEndToEndTests: XCTestCase {
 
       XCTAssertNotEqual(r.exitCode, 0)
       XCTAssert(
-        r.standardError.contains("no archive found for module 'Util' in module search paths []"),
+        r.standardError.contains("No archive found for module 'Util' in module search paths []."),
         r.standardError)
     }
   }
