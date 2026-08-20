@@ -31,10 +31,10 @@ struct TypeLayoutCache {
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let u = underlyingType(t.underlying, in: p)
-    let s = tag(u, in: p)
+    let u = p.underlyingType(t.underlying)
+    let s = p.tag(u)
     if s == MachineType.self {
-      let v = type(u, as: MachineType.self, in: p)
+      let v = p.type(u, as: MachineType.self)
       return TypeLayout(whole: abi.layout(v), type: t, parts: [], isEnumLayout: false)
     } else if s == Struct.self || s == Tuple.self {
       return computeLayout(recordType: t, in: &p)
@@ -132,15 +132,15 @@ struct TypeLayoutCache {
   ///
   /// - Precondition: `t` is an enum.
   private func isRawValueEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
-    let u = underlyingType(t, in: p)
-    let d = type(u, as: Enum.self, in: p).declaration
+    let u = p.underlyingType(t)
+    let d = p.type(u, as: Enum.self).declaration
     return p[d].representation != nil
   }
 
   /// Returns the types of `t`'s stored parts, where `t` is defined in `p`.
   private func storage(recordType t: AnyTypeIdentity, in p: inout Program) -> [AnyTypeIdentity] {
-    let u = underlyingType(t, in: p)
-    if tag(u, in: p) == Tuple.self {
+    let u = p.underlyingType(t)
+    if p.tag(u) == Tuple.self {
       let v = ConcreteTypeIdentity<Tuple>(uncheckedFrom: u)
       let (ms, o) = p.types.members(of: v)
       assert(o == false)
@@ -175,33 +175,6 @@ struct TypeLayoutCache {
       .map { p[$0].identifier.value }
   }
 
-  /// Returns the type identified by `t`, defined in `p`, cast to `U`.
-  private func type<U: TypeTree>(
-    _ t: AnyTypeIdentity, as u: U.Type,
-    in p: Program
-  ) -> U {
-    p.types[p.types.cast(t, to: u)!]
-  }
-
-  /// Returns the tag of `t`, defined in `p`.
-  private func tag(_ t: AnyTypeIdentity, in p: Program) -> any TypeTree.Type {
-    p.types.tag(of: t).value
-  }
-
-  /// Returns the underlying type of `t`, defined in `p`, after unwrapping
-  /// type applications and aliases.
-  private func underlyingType(_ t: AnyTypeIdentity, in p: Program) -> AnyTypeIdentity {
-    let u = tag(t, in: p)
-    if u == TypeApplication.self {
-      let a = type(t, as: TypeApplication.self, in: p)
-      return underlyingType(a.abstraction, in: p)
-    } else if u == TypeAlias.self {
-      let a = type(t, as: TypeAlias.self, in: p)
-      return underlyingType(a.aliasee, in: p)
-    } else {
-      return t
-    }
-  }
 }
 
 /// Returns the storage layout and part offsets of a record having members
