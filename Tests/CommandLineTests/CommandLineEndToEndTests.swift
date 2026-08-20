@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import FrontEnd
+import Subprocess
 import Utilities
 import XCTest
 
@@ -25,7 +26,8 @@ final class CommandLineEndToEndTests: XCTestCase {
     try await FileManager.default.withUniqueTemporaryDirectory { (root) in
       let main = try write("public fun main() {}", to: root.appending(path: "main.hylo"))
       let r = try await hc(
-        ["--emit", "ast", "--emit-module-to", "M.hylomodule", main.path], in: root, cache: nil)
+        ["--emit", "ast", "--emit-module-to", "M.hylomodule", main.path],
+        in: root, cache: .disabled)
 
       XCTAssertEqual(r.exitCode, ExitCode.validationFailure.rawValue)
       XCTAssert(
@@ -151,14 +153,15 @@ final class CommandLineEndToEndTests: XCTestCase {
       let entry = cache.appending(path: Module.standardLibraryName + ".hylomodule")
 
       // A cold run populates the cache with the standard library's archive.
-      let cold = try await hc(["--emit", "ast", "-o", "out.ast", main.path], in: root, cache: cache)
+      let cold =
+        try await hc(["--emit", "ast", "-o", "out.ast", main.path], in: root, cache: .at(cache))
       XCTAssertEqual(cold.exitCode, 0, cold.standardError)
       XCTAssert(fileExists(atPath: entry.path))
 
       // A corrupted entry is recompiled and overwritten rather than reported as an error.
       try write("corrupt", to: entry)
       let healed =
-        try await hc(["--emit", "ast", "-o", "out.ast", main.path], in: root, cache: cache)
+        try await hc(["--emit", "ast", "-o", "out.ast", main.path], in: root, cache: .at(cache))
       XCTAssertEqual(healed.exitCode, 0, healed.standardError)
       let contents = try Data(contentsOf: entry)
       XCTAssertNotEqual(contents, Data("corrupt".utf8))
@@ -187,7 +190,7 @@ final class CommandLineEndToEndTests: XCTestCase {
             "--emit-module-interface-hash-to", "M\(suffix).hash",
             main.path,
           ],
-          in: root, cache: nil)
+          in: root, cache: .disabled)
         XCTAssertEqual(r.exitCode, 0, r.standardError)
         return (
           try Data(contentsOf: root.appending(path: "M\(suffix).hylomodule")),
@@ -201,9 +204,29 @@ final class CommandLineEndToEndTests: XCTestCase {
     }
   }
 
+  func testDefaultCacheRootFromEnvironment() async throws {
+    try await FileManager.default.withUniqueTemporaryDirectory { (root) in
+      let cacheRoot = root.appending(path: "workspace-cache")
+      let main = try write("public fun main() {}", to: root.appending(path: "main.hylo"))
+
+      // Without '--module-cache', the cache is a 'hylo' directory created in the root denoted by
+      // the environment.
+      let r = try await hc(
+        ["--emit", "ast", "-o", "out.ast", main.path], in: root, cache: .implicit,
+        environment: .inherit.updating(["HYLO_DEFAULT_CACHE_ROOT": cacheRoot.path]))
+      XCTAssertEqual(r.exitCode, 0, r.standardError)
+
+      // The default cache root is populated with the standard library's archive.
+      let archive = cacheRoot
+        .appending(path: "hylo")
+        .appending(path: Module.standardLibraryName + ".hylomodule")
+      XCTAssert(fileExists(atPath: archive.path), "no cache entry at \(archive.path)")
+    }
+  }
+
   func testPrintStdlibRoot() async throws {
     try await FileManager.default.withUniqueTemporaryDirectory { (root) in
-      let r = try await hc(["--print-stdlib-root"], in: root, cache: nil)
+      let r = try await hc(["--print-stdlib-root"], in: root, cache: .disabled)
 
       XCTAssertEqual(r.exitCode, 0, r.standardError)
       let path = r.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -238,25 +261,43 @@ final class CommandLineEndToEndTests: XCTestCase {
     super.tearDown()
   }
 
-  /// Runs `hc` with `arguments` in `workingDirectory` and returns its execution report.
+  /// The way a test invocation of `hc` selects its module cache.
+  private enum CacheOption {
+
+    /// Pass `--module-cache <url>`.
+    case at(URL)
+
+    /// Pass `--no-caching`.
+    case disabled
+
+    /// Pass no cache-related option, letting `hc` choose its default cache.
+    case implicit
+
+    /// The command-line arguments corresponding to `self`.
+    var arguments: [String] {
+      switch self {
+      case .at(let u): ["--module-cache", u.path]
+      case .disabled: ["--no-caching"]
+      case .implicit: []
+      }
+    }
+
+  }
+
+  /// Runs `hc` with `arguments` and `environment` in `workingDirectory` and returns its execution
+  /// report.
   ///
-  /// Unless `cache` is `nil`, `--module-cache` is appended to `arguments` so that tests never
-  /// touch the user's actual cache; it defaults to a cache shared by the whole suite. The values
-  /// in `environment` override the corresponding variables inherited from the current process.
+  /// Unless `cache` is `.implicit`, the corresponding option is appended to `arguments` so that
+  /// tests never touch the user's actual cache; it defaults to a cache shared by the whole suite.
   @discardableResult
   private func hc(
     _ arguments: [String], in workingDirectory: URL,
-    cache: URL? = CommandLineEndToEndTests.moduleCache.url
+    cache: CacheOption = .at(CommandLineEndToEndTests.moduleCache.url),
+    environment: Environment = .inherit
   ) async throws -> ExecutionReport {
-    var a = arguments
-    if let c = cache {
-      a.append("--module-cache")
-      a.append(c.path)
-    } else {
-      a.append("--no-caching")
-    }
-    return try await executeSubprocess(
-      .path(Self.hcExecutable), arguments: a, workingDirectory: workingDirectory)
+    try await executeSubprocess(
+      .path(Self.hcExecutable), arguments: arguments + cache.arguments,
+      workingDirectory: workingDirectory, environment: environment)
   }
 
   /// Writes `contents` to `url`, creating intermediate directories, and returns `url`.

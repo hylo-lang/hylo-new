@@ -165,6 +165,7 @@ let package = Package(
         .target(name: "FrontEnd"),
         .target(name: "Utilities"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Subprocess", package: "swift-subprocess"),
       ],
       swiftSettings: commonSwiftSettings),
 

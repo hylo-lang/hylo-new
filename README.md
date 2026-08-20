@@ -59,3 +59,7 @@ The project requires the Swift 6.3 compiler or later.
 ## Hylo Compiler's Runtime Dependencies
 `hc` uses `clang` and `lld` for linking, resolving them from PATH. On macOS, you will need `xcrun` 
 on PATH so the compiler can find the SDK.
+
+## Environment Variables
+
+- `HYLO_DEFAULT_CACHE_ROOT`: the directory in which `hc` saves its module cache by default.

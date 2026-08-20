@@ -36,7 +36,10 @@ private typealias Module = FrontEnd.Module
   @Option(
     name: [.customLong("module-cache")],
     help: ArgumentHelp(
-      "Specify the module cache path (default: a 'hylo' directory in the user's caches directory).",
+      """
+      Specify the module cache path (default: a 'hylo' directory in \
+      $\(CommandLine.defaultCacheRootVariable) or the user's caches directory).
+      """,
       valueName: "path"),
     transform: URL.init(fileURLWithPath:))
   private var moduleCachePath: URL?
@@ -468,13 +471,35 @@ private typealias Module = FrontEnd.Module
     note("written \(u.path)")
   }
 
-  /// Returns the directory to use as the module cache when `--module-cache` is not specified.
+  /// The name of the environment variable denoting the directory in which the default module
+  /// cache is created.
+  ///
+  /// Build systems set this variable to keep the compiler's cache inside their own workspace
+  /// rather than in the user's caches directory.
+  fileprivate static let defaultCacheRootVariable = "HYLO_DEFAULT_CACHE_ROOT"
+
+  /// Returns the directory to use as the module cache when `--module-cache` is not specified,
+  /// creating it if necessary.
+  ///
+  /// The cache is a 'hylo' directory in the root denoted by `HYLO_DEFAULT_CACHE_ROOT` if that
+  /// variable is set to a non-empty value, in the user's caches directory otherwise.
   private func defaultCachePath() throws -> URL {
     let m = FileManager.default
-    let base = m.urls(for: .cachesDirectory, in: .userDomainMask).first ?? m.temporaryDirectory
+
+    let base = defaultCacheRoot
+      ?? m.urls(for: .cachesDirectory, in: .userDomainMask).first
+      ?? m.temporaryDirectory
     let d = base.appending(path: "hylo")
     try m.createDirectory(at: d, withIntermediateDirectories: true)
     return d
+  }
+
+  /// The directory in which the default module cache should be created, as specified by the
+  /// environment, or `nil` if the environment does not specify one.
+  private var defaultCacheRoot: URL? {
+    guard let r = ProcessInfo.processInfo.environment[Self.defaultCacheRootVariable], !r.isEmpty
+    else { return nil }
+    return URL(fileURLWithPath: r)
   }
 
   /// The name of the module being compiled.
