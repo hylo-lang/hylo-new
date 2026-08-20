@@ -9,13 +9,7 @@ import Utilities
 /// The standard library is loaded from the archive cache if an up-to-date archive exists and
 /// compiled from its sources otherwise.
 private let sharedStandardLibrary = Task { () throws -> Program in
-  do {
-    return try await standardLibraryProgram()
-  } catch Driver.Error.invalidModuleArchive(_, .some(let location)) {
-    let a = location.appending(component: Module.standardLibraryName + ".hylomodule")
-    try? FileManager.default.removeItem(at: a)
-    return try await standardLibraryProgram()
-  }
+  return try await standardLibraryProgram()
 }
 
 extension Driver {

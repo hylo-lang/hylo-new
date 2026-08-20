@@ -186,15 +186,15 @@ public struct Driver {
     return .init(elapsed: elapsed, containsError: program[module].containsError)
   }
 
-  /// Applies LLVM IR verification passes to `module` iff this file has been compiled in debug
+  /// Applies LLVM IR verification passes to `m` iff this file has been compiled in debug
   /// mode; does nothing otherwise.
   ///
-  /// - Throws: if `module` failed verification.
+  /// - Throws: if the contents of `m` failed verification.
   private func verify(_ m: borrowing SwiftyLLVM.Module) throws {
     do {
       try m.verifyInDebugBuilds()
     } catch let e as LLVMError {
-      throw Error.llvmVerificationFailure(message: e.description, contents: module.description)
+      throw Error.llvmVerificationFailure(message: e.description, contents: m.description)
     }
   }
 
@@ -408,7 +408,7 @@ public struct Driver {
         do {
           return (u, try Data(contentsOf: u))
         } catch {
-          throw Error(message: "cannot read module archive at '\(u.path)': \(error)")
+          throw Error.unreadableModuleArchive(module: module, location: u, cause: error)
         }
       }
     }
@@ -417,6 +417,9 @@ public struct Driver {
 
   /// Loads `module` and its dependencies from archives found in `moduleSearchPath`, returning the
   /// identity of `module`.
+  ///
+  /// Unlike the module cache, which silently recompiles unusable entries, a malformed archive in a
+  /// module search path is reported as an `Error` naming the offending file.
   @discardableResult
   public mutating func loadArchivedModule(_ module: Module.Name) throws -> Module.ID {
     var ms = Set<Module.Name>()
@@ -433,12 +436,11 @@ public struct Driver {
     if let module = program.identity(module: module) { return module }
 
     if !modulesStartedLoading.insert(module).inserted {
-      throw Error(message: "circular dependency detected while loading module '\(module)'")
+      throw Error.circularModuleDependency(module: module)
     }
 
     guard let (source, data) = try importedArchive(of: module) else {
-      let ps = moduleSearchPath.map(\.path).joined(separator: ", ")
-      throw Error(message: "no archive found for module '\(module)' in module search paths [\(ps)]")
+      throw Error.moduleArchiveNotFound(module: module, searchPaths: moduleSearchPath)
     }
 
     // TODO: save fingerprint of dependencies and check that they match the version `module` was
@@ -449,12 +451,10 @@ public struct Driver {
 
     let h: (name: Module.Name, fingerprint: UInt64, dependencies: [Module.Name])
     do { h = try Module.headerAndDependencies(&a) }
-    catch { throw cannotParseArchive(of: module, at: source) }
+    catch { throw Error.invalidModuleArchive(module: module, location: source) }
 
     guard h.name == module else {
-      throw Error(message: """
-        archive for '\(module)' at '\(source.path)' declares a different module name '\(h.name)'
-        """)
+      throw Error.moduleNameMismatch(module: module, location: source, name: h.name)
     }
     for d in h.dependencies {
       try loadArchivedModule(d, modulesStartedLoading: &modulesStartedLoading)
@@ -464,17 +464,8 @@ public struct Driver {
     do {
       return try program.load(module: module, from: &body).identity
     } catch is ArchiveError {
-      throw cannotParseArchive(of: module, at: source)
+      throw Error.invalidModuleArchive(module: module, location: source)
     }
-  }
-
-  /// Returns an error reporting that the archive of `module` at `location` could not be parsed.
-  private func cannotParseArchive(of module: Module.Name, at location: URL) -> Error {
-    Error(message: """
-      Failed to parse the module archive of '\(module)' at '\(location.path)'.
-
-      Maybe the archive was compiled with a different version of the compiler.
-      """)
   }
 
   /// Writes the archive of `module` to `output`.
@@ -547,8 +538,20 @@ public struct Driver {
   /// An error thrown by the driver.
   public enum Error: Swift.Error, CustomStringConvertible {
 
-    /// The archive of `module`, cached at `location`, could not be parsed.
-    case invalidModuleArchive(module: Module.Name, location: URL?)
+    /// The `.hylomodule` archive of `module` at `location` could not be parsed.
+    case invalidModuleArchive(module: Module.Name, location: URL)
+
+    /// The `.hylomodule` archive of `module` at `location` could not be read because of `cause`.
+    case unreadableModuleArchive(module: Module.Name, location: URL, cause: Swift.Error)
+
+    /// The `.hylomodule` archive of `module` at `location` declares another module named `name`.
+    case moduleNameMismatch(module: Module.Name, location: URL, name: Module.Name)
+
+    /// No `.hylomodule` archive of `module` was found in the directories `searchPaths`.
+    case moduleArchiveNotFound(module: Module.Name, searchPaths: [URL])
+
+    /// A circular dependency was detected while loading `module`.
+    case circularModuleDependency(module: Module.Name)
 
     /// LLVM verification failed with `message` while processing a module with `contents`.
     case llvmVerificationFailure(message: String, contents: String)
@@ -561,11 +564,22 @@ public struct Driver {
       switch self {
       case .invalidModuleArchive(let module, let location):
         """
-        Failed to parse module archive of '\(module)' at '\(location, default: "nil")'.
+        Failed to parse the module archive of '\(module)' at '\(location.path)'.
 
         Maybe the archive was compiled with a different version of the compiler. \
         Try erasing the module cache.
         """
+      case .unreadableModuleArchive(let module, let location, let cause):
+        "Failed to read module archive of '\(module)' at '\(location.path)': \(cause)"
+      case .moduleNameMismatch(let module, let location, let name):
+        "Archive of '\(module)' at '\(location.path)' declares a module named '\(name)'."
+      case .moduleArchiveNotFound(let module, let searchPaths):
+        """
+        No archive found for module '\(module)' in module search paths \
+        [\(searchPaths.map(\.path).joined(separator: ", "))].
+        """
+      case .circularModuleDependency(let module):
+        "Circular dependency detected while loading module '\(module)'."
       case .llvmVerificationFailure(let message, let contents):
         """
         LLVM verification failed with the following message: \(message)
@@ -616,7 +630,7 @@ public struct Driver {
       if let o = objects[relocation] { return o }
 
       let d = try FileManager.default.createUniqueTemporaryDirectory()
-      let s = Driver.chosenStandardLibraryRoot.appending(component: cShimSource)
+      let s = Driver.standardLibraryCShim
       let o = d.appendingPathComponent("shims.o", isDirectory: false)
 
       var a = ["-c", s.path, "-o", o.path]
