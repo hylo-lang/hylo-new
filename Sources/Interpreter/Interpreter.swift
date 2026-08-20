@@ -249,13 +249,13 @@ public struct Interpreter {
       // TODO: add a real implementation, updating state of composed regions.
       return initializeRegister(to: ())
     case let x as IRBranch:
-      return .jump(to: entryPoint(x.target))
+      return .jump(to: start(x.target))
     case let x as IRConditionalBranch:
       let c = self[x.condition].bool
       if c {
-        return .jump(to: entryPoint(x.onSuccess))
+        return .jump(to: start(x.onSuccess))
       } else {
-        return .jump(to: entryPoint(x.onFailure))
+        return .jump(to: start(x.onFailure))
       }
     case let x as IRGlobalAccess:
       _ = x
@@ -392,8 +392,10 @@ public struct Interpreter {
     }
   }
 
-  /// Returns pointer to first instruction of `b`.
-  private func entryPoint(_ b: IRBlock.ID) -> InstructionPointer {
+  /// Returns the pointer to the first instruction of `b`.
+  ///
+  /// - Precondition: `b` is a basic block in `programCounter.container`.
+  private func start(_ b: IRBlock.ID) -> InstructionPointer {
     let m = programCounter.container.module
     let f = programCounter.container.function
     let i = program[m].functions[f].blocks[b].first!
