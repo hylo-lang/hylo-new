@@ -46,7 +46,7 @@ final class DriverTests: XCTestCase {
     try FileManager.default.withUniqueTemporaryDirectory { (root) in
       try writeArchives(withDependencies: [("A", ["B"]), ("B", ["A"])], into: root)
 
-      var d = try Driver(targetSpecification: .host(), moduleSearchPaths: [root])
+      var d = try Driver(targetSpecification: .host(), moduleSearchPath: [root])
       XCTAssertThrowsError(try d.loadArchivedModule("A")) { (e) in
         XCTAssertEqual(
           (e as? Driver.Error)?.message,
@@ -61,7 +61,7 @@ final class DriverTests: XCTestCase {
       try writeArchives(
         withDependencies: [("A", ["B", "C"]), ("B", ["D"]), ("C", ["D"]), ("D", [])], into: root)
 
-      var driver = try Driver(targetSpecification: .host(), moduleSearchPaths: [root])
+      var driver = try Driver(targetSpecification: .host(), moduleSearchPath: [root])
       let a = try driver.loadArchivedModule("A")
 
       XCTAssertEqual(driver.program.identity(module: "A"), a)
@@ -156,7 +156,7 @@ final class DriverTests: XCTestCase {
       try FileManager.default.createDirectory(
         at: root.appending(path: "A.hylomodule"), withIntermediateDirectories: true)
 
-      var d = try Driver(targetSpecification: .host(), moduleSearchPaths: [root])
+      var d = try Driver(targetSpecification: .host(), moduleSearchPath: [root])
       XCTAssertThrowsError(try d.loadArchivedModule("A")) { (e) in
         let m = (e as? Driver.Error)?.message ?? ""
         XCTAssert(m.contains("cannot read module archive at"), "unexpected message: \(m)")
@@ -169,7 +169,7 @@ final class DriverTests: XCTestCase {
       let f = root.appending(path: "A.hylomodule")
       try "invalid".write(to: f, atomically: true, encoding: .utf8)
 
-      var d = try Driver(targetSpecification: .host(), moduleSearchPaths: [root])
+      var d = try Driver(targetSpecification: .host(), moduleSearchPath: [root])
       XCTAssertThrowsError(try d.loadArchivedModule("A")) { (e) in
         let m = (e as? Driver.Error)?.message ?? ""
         XCTAssert(

@@ -14,14 +14,14 @@ private typealias Module = FrontEnd.Module
   /// Configuration for this command.
   public static let configuration = CommandConfiguration(commandName: "hc", version: hyloVersion)
 
-  /// The directories to pass to the linker as library search paths.
+  /// The linker's library search path.
   @Option(
     name: [.customShort("L")],
     help: ArgumentHelp(
       "Add a directory to the linker's search path.",
       valueName: "path"),
     transform: URL.init(fileURLWithPath:))
-  private var librarySearchPaths: [URL] = []
+  private var librarySearchPath: [URL] = []
 
   /// The paths at which imported module archives (`.hylomodule`) may be found.
   @Option(
@@ -30,7 +30,7 @@ private typealias Module = FrontEnd.Module
       "Add a directory to the module search path, where imported module archives are found.",
       valueName: "path"),
     transform: URL.init(fileURLWithPath:))
-  private var moduleSearchPaths: [URL] = []
+  private var moduleSearchPath: [URL] = []
 
   /// The path containing cached module data.
   @Option(
@@ -232,8 +232,8 @@ private typealias Module = FrontEnd.Module
       optimization: optimized ? .aggressive : .none,
       relocation: relocationModel ?? Driver.defaultRelocationModel,
       codeModel: codeModel ?? .default,
-      librarySearchPaths: Array(librarySearchPaths.uniqued()),
-      moduleSearchPaths: Array(moduleSearchPaths.uniqued()))
+      librarySearchPath: Array(librarySearchPath.uniqued()),
+      moduleSearchPath: Array(moduleSearchPath.uniqued()))
 
     do {
       // Load the imported modules.

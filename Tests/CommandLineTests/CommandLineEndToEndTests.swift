@@ -111,7 +111,7 @@ final class CommandLineEndToEndTests: XCTestCase {
     }
   }
 
-  func testImportWithoutSearchPaths() async throws {
+  func testImportWithoutSearchPath() async throws {
     // Import without a search path should fail.
     try await FileManager.default.withUniqueTemporaryDirectory { (root) in
       let main = try write("public fun main() {}", to: root.appending(path: "main.hylo"))

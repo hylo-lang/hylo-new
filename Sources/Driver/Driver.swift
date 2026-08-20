@@ -34,11 +34,11 @@ public struct Driver {
   /// The code model for code generation.
   public var codeModel: CodeModel
 
-  /// The directories to pass to the linker as library search paths.
-  public var librarySearchPaths: [URL]
+  /// The linker's library search path.
+  public var librarySearchPath: [URL]
 
   /// The directories in which imported module archives (`.hylomodule` files) are searched.
-  public var moduleSearchPaths: [URL]
+  public var moduleSearchPath: [URL]
 
   /// The names of the native libraries to link (in addition to any imported Hylo dependencies).
   public var librariesToLink: [String]
@@ -88,7 +88,7 @@ public struct Driver {
     optimization: OptimizationLevel = .none,
     relocation: RelocationModel = Driver.defaultRelocationModel,
     codeModel: CodeModel = .default,
-    librarySearchPaths: [URL] = [], moduleSearchPaths: [URL] = [],
+    librarySearchPath: [URL] = [], moduleSearchPath: [URL] = [],
     librariesToLink: [String] = []
   ) {
     self.moduleCachePath = moduleCachePath
@@ -96,8 +96,8 @@ public struct Driver {
     self.optimization = optimization
     self.relocation = relocation
     self.codeModel = codeModel
-    self.librarySearchPaths = librarySearchPaths
-    self.moduleSearchPaths = moduleSearchPaths
+    self.librarySearchPath = librarySearchPath
+    self.moduleSearchPath = moduleSearchPath
     self.librariesToLink = librariesToLink
     self.program = .init()
   }
@@ -386,11 +386,11 @@ public struct Driver {
     return try? Data(contentsOf: c.appending(path: module + ".hylomodule"))
   }
 
-  /// Returns the location and contents of `module`'s archive found in `moduleSearchPaths`, if any.
+  /// Returns the location and contents of `module`'s archive found in `moduleSearchPath`, if any.
   ///
   /// - Throws if an archive exists but cannot be read.
   private func importedArchive(of module: Module.Name) throws -> (url: URL, data: Data)? {
-    for prefix in moduleSearchPaths {
+    for prefix in moduleSearchPath {
       let u = prefix.appending(path: module + ".hylomodule")
       if FileManager.default.fileExists(atPath: u.path) {
         do {
@@ -403,7 +403,7 @@ public struct Driver {
     return nil
   }
 
-  /// Loads `module` and its dependencies from archives found in `moduleSearchPaths`, returning the
+  /// Loads `module` and its dependencies from archives found in `moduleSearchPath`, returning the
   /// identity of `module`.
   @discardableResult
   public mutating func loadArchivedModule(_ module: Module.Name) throws -> Module.ID {
@@ -411,7 +411,7 @@ public struct Driver {
     return try loadArchivedModule(module, modulesStartedLoading: &ms)
   }
 
-  /// Loads `module` and its dependencies from archives found in `moduleSearchPaths`, returning the
+  /// Loads `module` and its dependencies from archives found in `moduleSearchPath`, returning the
   /// identity of `module` and using `modulesStartedLoading` to detect circular dependencies.
   @discardableResult
   private mutating func loadArchivedModule(
@@ -425,7 +425,7 @@ public struct Driver {
     }
 
     guard let (source, data) = try importedArchive(of: module) else {
-      let ps = moduleSearchPaths.map(\.path).joined(separator: ", ")
+      let ps = moduleSearchPath.map(\.path).joined(separator: ", ")
       throw Error(message: "no archive found for module '\(module)' in module search paths [\(ps)]")
     }
 
@@ -494,7 +494,7 @@ public struct Driver {
   /// - Throws: if the parent folder of `output` doesn't exist.
   private func linkExecutable(from objectFiles: [URL], writingTo output: URL) async throws {
     var arguments = ["-o", output.path]
-    arguments += librarySearchPaths.map({ "-L\($0.path)" })
+    arguments += librarySearchPath.map({ "-L\($0.path)" })
     arguments += librariesToLink.map({ "-l\($0)" })
     arguments += objectFiles.map(\.path)
 
