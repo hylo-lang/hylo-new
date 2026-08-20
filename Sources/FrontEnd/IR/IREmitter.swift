@@ -330,7 +330,7 @@ internal struct IREmitter {
           let callee = me.loweredCallee(
             referringTo: implementation, qualifiedBy: nil, appliedBy: nil,
             writingResultTo: result, at: me.currentAnchor)
-          me._emitCallToRequirementImplementation(callee.value, Array(callee.arguments))
+          me._emitCallToRequirementImplementation(callee.value, callee.arguments)
         }
       }
     }
@@ -906,18 +906,41 @@ internal struct IREmitter {
     /// The IR values in the representation of `self.`
     private let operands: [IRValue]
 
+    /// If `self` is bound, the index of the value in `operands` denoting its receiver; otherwise,
+    /// the length of `operands`.
+    let receiver: IRValue?
+
     /// The type arguments notionally applied to the callee.
     let typeArguments: TypeArguments
 
     /// Creates an instance with the given properties.
-    init<T: Sequence<IRValue>>(
-      value: IRValue, typeArguments: TypeArguments, arguments: T, result: IRValue
+    private init(operands: [IRValue], receiver: IRValue?, typeArguments: TypeArguments) {
+      self.operands = operands
+      self.receiver = receiver
+      self.typeArguments = typeArguments
+    }
+
+    /// Creates an instance representing a use of `value`.
+    ///
+    /// - Parameters:
+    ///   - typeArguments Type arguments partially instantiating the callee.
+    ///   - usings Term arguments passed to the callee's contextual term parameters.
+    ///   - receiver The value to which the callee is bound, if any.
+    ///   - result The argument to the calle's output parameter if it is an ordinary function.
+    init(
+      _ value: IRValue,
+      instantiatedWith typeArguments: TypeArguments = [:],
+      appliedTo usings: [IRValue] = [],
+      boundTo receiver: IRValue? = nil,
+      writingResultTo result: IRValue
     ) {
-      var vs: [IRValue] = .init(minimumCapacity: arguments.underestimatedCount + 2)
+      var vs: [IRValue] = .init(minimumCapacity: usings.underestimatedCount + 2)
       vs.append(value)
       vs.append(result)
-      vs.append(contentsOf: arguments)
+      vs.append(contentsOf: usings)
+
       self.operands = vs
+      self.receiver = receiver
       self.typeArguments = typeArguments
     }
 
@@ -931,21 +954,27 @@ internal struct IREmitter {
       operands[1]
     }
 
+    /// The arguments passed to the callee's contextual term parameters.
+    var usings: ArraySlice<IRValue> {
+      operands[2...]
+    }
+
     /// The term arguments notionally applied to the callee.
     ///
     /// This property includes the using parameters passed to `value` and, if `value` is a bound
     /// member, the receiver of that member.
-    var arguments: ArraySlice<IRValue> {
-      operands[2...]
+    var arguments: Array<IRValue> {
+      var xs = Array(operands[2...])
+      if let r = receiver { xs.append(r) }
+      return xs
     }
 
     /// Returns `self` notionally applied to `a`.
     ///
     /// `a` is appended to the term arguments of `self`. The result denotes a function partially
     /// applied to `a` and possibly expecting more arguments.
-    consuming func partiallyApplied(to a: IRValue) -> LoweredCallee {
-      let xs = Array(arguments, terminatedBy: a)
-      return .init(value: value, typeArguments: typeArguments, arguments: xs, result: result)
+    consuming func applied(to a: IRValue) -> LoweredCallee {
+      .init(operands: operands.appending(a), receiver: receiver, typeArguments: typeArguments)
     }
 
     /// Returns `self` notionally applied to `a`.
@@ -954,9 +983,9 @@ internal struct IREmitter {
     /// applied to `a` and possibly expecting more arguments.
     ///
     /// - Requires: `self.typeArguments` is disjoint from `a`.
-    consuming func partiallyApplied(to a: TypeArguments) -> LoweredCallee {
+    consuming func instantiated(with a: TypeArguments) -> LoweredCallee {
       let ts = typeArguments.extended(with: a)
-      return .init(value: value, typeArguments: ts, arguments: arguments, result: result)
+      return .init(operands: operands, receiver: receiver, typeArguments: ts)
     }
 
     /// Returns `self` notionally applied to `a`.
@@ -965,11 +994,11 @@ internal struct IREmitter {
     /// applied to `a` and possibly expecting more arguments.
     ///
     /// - Requires: `self.typeArguments` is disjoint from `a`.
-    consuming func partiallyApplied<S: Sequence<(GenericParameter.ID, AnyTypeIdentity)>>(
-      to a: S
+    consuming func instantiated<S: Sequence<(GenericParameter.ID, AnyTypeIdentity)>>(
+      with a: S
     ) -> LoweredCallee {
       let ts = typeArguments.extended(with: a)
-      return .init(value: value, typeArguments: ts, arguments: arguments, result: result)
+      return .init(operands: operands, receiver: receiver, typeArguments: ts)
     }
 
   }
@@ -1048,7 +1077,7 @@ internal struct IREmitter {
       // The callee refers to a function directly.
       let f = loweredCallee(referringTo: d, boundTo: nil, appliedBy: c, writingResultTo: r)
       if let q = qualification {
-        return f.partiallyApplied(to: argumentsFromQualification(q, instantiating: f.value))
+        return f.instantiated(with: argumentsFromQualification(q, instantiating: f.value))
       } else {
         return f
       }
@@ -1062,7 +1091,7 @@ internal struct IREmitter {
       // the receiver's expression.
       let output = currentFunction.result(of: receiver)!.type
       if let ts = program.types.select(output, \TypeApplication.arguments) {
-        return f.partiallyApplied(to: ts)
+        return f.instantiated(with: ts)
       } else {
         return f
       }
@@ -1078,12 +1107,19 @@ internal struct IREmitter {
 
         return lowering(at: anchor) { (me) in
           // References to members in extensions are expressed using a witness representing the
-          // type and term arguments passed to parameters declared on the extension itself.
+          // type and term arguments passed to parameters introduced by the extension.
           let (e, ts, xs) = me._emit(decompose: w)
           assert(e.value == .reference(.init(parent)))
-          let ys = xs + target.arguments
+
+          // We don't use `LoweredCallee.applied(to:)` because the type and using parameters of the
+          // extension, which were read from the witness, occur before those of the target, which
+          // where extracted from the callee's expression.
           return LoweredCallee(
-            value: target.value, typeArguments: ts, arguments: ys, result: target.result)
+            target.value,
+            instantiatedWith: ts.extended(with: target.typeArguments),
+            appliedTo: xs + target.usings,
+            boundTo: target.receiver,
+            writingResultTo: target.result)
         }
       }
 
@@ -1092,9 +1128,8 @@ internal struct IREmitter {
         let interface = program.withTyper(typing: module, { (tp) in tp.typeOfInterface(for: m) })
         return lowering(at: anchor) { (me) in
           let x0 = me._emit(witness: w)
-          let x1 = me._property(m, of: x0, withType: interface)
-          let xs = Array(x0, prependedTo: Array(contentsOf: receiver))
-          return LoweredCallee(value: x1, typeArguments: [:], arguments: xs, result: r)
+          let x1 = me._property(m, of: x0, as: interface)
+          return LoweredCallee(x1, appliedTo: [x0], boundTo: receiver, writingResultTo: r)
         }
       }
 
@@ -1142,10 +1177,7 @@ internal struct IREmitter {
     boundTo receiver: IRValue?,
     writingResultTo r: IRValue
   ) -> LoweredCallee {
-    LoweredCallee(
-      value: functionReference(to: f),
-      typeArguments: [:], arguments: Array(unwrapping: receiver),
-      result: r)
+    LoweredCallee(functionReference(to: f), boundTo: receiver, writingResultTo: r)
   }
 
   /// Generates the IR for using `f` as a callee that is optionally bound to `receiver`.
@@ -1176,8 +1208,7 @@ internal struct IREmitter {
       let s = IRFunction.Signature(types: types, terms: terms, output: output)
       let t = program.types.demand(s)
       let v = IRValue.bundle(f, t, candidates)
-      return LoweredCallee(
-        value: v, typeArguments: [:], arguments: Array(unwrapping: receiver), result: r)
+      return LoweredCallee(v, boundTo: receiver, writingResultTo: r)
     }
   }
 
@@ -1185,15 +1216,16 @@ internal struct IREmitter {
   private mutating func loweredCallee(
     _ e: New.ID, appliedBy c: Call.ID?, writingResultTo r: IRValue
   ) -> LoweredCallee {
-    // When the callee is a new expression (e.g., `T.new(x)`), then `result` is passed as the first
+    // When the callee is a new expression (e.g., `T.new(x)`), the `result` is passed as the `self`
     // argument of the underlying initializer. The return type of the initializer is a unit value.
     let x = lowering(e, { (me) in me._alloca(.void) })
     let f = loweredCallee(program[e].target, appliedBy: c, writingResultTo: r)
 
     // The qualification may define type arguments.
     let ts = argumentsFromQualification(program[e].qualification, instantiating: f.value)
-    let xs = Array(f.arguments, terminatedBy: f.result)
-    return LoweredCallee(value: f.value, typeArguments: ts, arguments: xs, result: x)
+    return LoweredCallee(
+      f.value, instantiatedWith: f.typeArguments.extended(with: ts),
+      appliedTo: Array(f.usings), boundTo: f.result, writingResultTo: x)
   }
 
   /// Generates the IR for using `e` as the callee of `c` or a synthesized call.
@@ -1213,7 +1245,7 @@ internal struct IREmitter {
       return (p, program.types[t].inhabitant)
     }
 
-    let mono = poly.partiallyApplied(to: ts)
+    let mono = poly.instantiated(with: ts)
     assert(
       context.parameters.elementsEqual(mono.typeArguments.parameters),
       "invalid type arguments")
@@ -1245,11 +1277,11 @@ internal struct IREmitter {
     case .termApplication(let f, let a):
       let x = loweredCallee(f, output: result, at: site, in: scope)
       let y = lowering(at: site, in: scope, { (me) in me._emit(witness: a) })
-      return x.partiallyApplied(to: y)
+      return x.applied(to: y)
 
     case .typeApplication(let f, let a):
       let poly = loweredCallee(f, output: result, at: site, in: scope)
-      return poly.partiallyApplied(to: a)
+      return poly.instantiated(with: a)
 
     default:
       fatalError("not implemented")
@@ -1268,14 +1300,9 @@ internal struct IREmitter {
     let callee = f.typeArguments.isEmpty
       ? f.value : lowering(program[e].callee, { $0._type_apply(f.value, to: f.typeArguments) })
 
-    // At this point the callee must be a monomorphic term abstraction.
-    let t = currentFunction.result(of: callee)!
-    let u = program.types.seenAsTermAbstraction(t.type)!
-    let parameters = program.types[u].inputs
-
     // There's at least one operand per argument, more if the callee accepts using parameters.
-    var arguments = Array<IRValue>(minimumCapacity: f.arguments.count + program[e].arguments.count)
-    arguments.append(contentsOf: f.arguments)
+    var arguments = f.arguments
+    arguments.reserveCapacity(arguments.count + program[e].arguments.count)
 
     // We compute lvalues first and query accesses next, so that mutable accesses passed down to
     // the call are not formed prematurely. This behavior supports calls to mutating methods in
@@ -1283,9 +1310,6 @@ internal struct IREmitter {
     for a in program[e].arguments {
       arguments.append(lowered(lvalue: a.value))
     }
-
-    assert(!program.types.hasContext(t.type))
-    assert(arguments.count == parameters.count)
 
     return lowering(e) { (me) in
       // Form accesses on the parameters right before the call. Note that we won't close these
@@ -2043,14 +2067,16 @@ internal struct IREmitter {
     _ callee: IRValue, _ arguments: [IRValue], into result: IRValue,
     argumentAccesses: ArgumentAccessHandling
   ) {
-    let t = currentFunction.resultAsTermAbstraction(of: callee, in: program) ?? badOperand()
-    assert(program.types[t].inputs.count == arguments.count)
+    let t = currentFunction.result(of: callee)!.type
+    let u = program.types.seenAsTermAbstraction(t)!
+    assert(!program.types.hasContext(t))
+    assert(program.types[u].inputs.count == arguments.count)
 
     var xs = arguments
     var last = result
 
     if argumentAccesses != .identity {
-      _emitArgumentAccesses(&xs, toApplyOrProject: callee, typed: t)
+      _emitArgumentAccesses(&xs, toApplyOrProject: callee, typed: u)
       last = _access([.set], from: result)
     }
 
@@ -2171,17 +2197,19 @@ internal struct IREmitter {
   internal mutating func _project(
     _ callee: IRValue, _ arguments: consuming [IRValue], afterFormingAccesses formAccesses: Bool
   ) -> IRValue {
-    let t = currentFunction.resultAsTermAbstraction(of: callee, in: program) ?? badOperand()
-    assert(program.types[t].inputs.count == arguments.count)
+    let t = currentFunction.result(of: callee)!.type
+    let u = program.types.seenAsTermAbstraction(t)!
+    assert(!program.types.hasContext(t))
+    assert(program.types[u].inputs.count == arguments.count)
 
     if formAccesses {
-      _emitArgumentAccesses(&arguments, toApplyOrProject: callee, typed: t)
+      _emitArgumentAccesses(&arguments, toApplyOrProject: callee, typed: u)
     }
 
-    let o = program.types.dealiased(program.types[t].output)
+    let o = program.types.dealiased(program.types[u].output)
     let s = IRProject(
       callee: callee, arguments: arguments,
-      access: program.types[t].effect,
+      access: program.types[u].effect,
       projectee: o,
       anchor: currentAnchor)
     return insert(s)!
