@@ -107,14 +107,15 @@ internal struct ModuleGenerationContext: ~Copyable {
     llvm
   }
 
-  /// Returns an unsigned integer type large enough to represent `n`.
-  internal func integerTypeToRepresent(_ n: Int) -> SwiftyLLVM.IntegerType.UnsafeReference {
+  /// Returns an unsigned integer type large enough to represent `n` distinct values.
+  internal func integerTypeToRepresent(count n: Int) -> SwiftyLLVM.IntegerType.UnsafeReference {
+    precondition(n >= 0)
     switch n {
-    case _ where n <= 0xff:
+    case _ where n <= 0x100:
       return llvm.i8
-    case _ where n <= 0xffff:
+    case _ where n <= 0x10000:
       return llvm.i16
-    case _ where n <= 0xffffffff:
+    case _ where n <= 0x1_0000_0000:
       return llvm.i32
     default:
       return llvm.i64

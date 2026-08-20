@@ -1681,7 +1681,7 @@ extension Program {
 
     // Determine the size of the tag.
     assert(cases.count < UInt32.max, "too many enum cases")
-    let tag = ctx.integerTypeToRepresent(cases.count)
+    let tag = ctx.integerTypeToRepresent(count: cases.count)
     let tagSize = ctx.llvm.layout.storageSize(of: tag)
     var fields: [LLVMType] = [
       tag.t,
