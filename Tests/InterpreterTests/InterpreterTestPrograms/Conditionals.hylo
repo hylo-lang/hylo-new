@@ -7,9 +7,16 @@ public fun main() {
     &r = 2
   }
 
+  // TODO: uncomment when precondition gets implemented.
+  // precondition(r == 1)
+
   if false {
     &r = 3
   } else {
     &r = 4
   }
+
+  // TODO: uncomment when precondition gets implemented.
+  // precondition(r == 4)
+
 }
