@@ -581,10 +581,9 @@ extension Program {
 
   /// Generates the LLVM IR code corresponding to `i`.
   ///
-  /// The instruction is compiled as a direct call iff the subscriptsubscript being applied is an
-  /// addressor. Otherwise, code dominated by `i` is compiled into a different function that is
-  /// passed as a callback to the subscript. The call to this subscript returns the identifier of
-  /// the basic block to which control-flow should be transferred, if any.
+  /// Code dominated by `i` is compiled into a different function that is passed as a callback to
+  /// the subscript. The call to this subscript returns the identifier of the basic block to which
+  /// control-flow should be transferred, if any.
   ///
   /// This method extends `ctx.factoredOut` with the basic blocks that have been compiled into the
   /// callback. These basic blocks cannot have been visited yet, since they are dominated by `i`.
@@ -593,15 +592,6 @@ extension Program {
     _ i: IRProject.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
-
-    // Is the callee an addressor?
-    if let n = seenAsAddressor(s.callee, in: ctx) {
-      let f = demandFunction(named: n, in: &ctx.module)
-      let x = insertArguments(s.arguments, mappedWith: f.prototype.mapping, in: &ctx)
-      let y = ctx.module.llvm.insertCall(f.value, on: x, at: ctx.insertionPoint!)
-      _ = y
-      fatalError()
-    }
 
     // Otherwise, compile the plateau following the project instruction.
     let (plateau, captures, covered) = definePlateau(dominatedBy: i, in: &ctx)
@@ -1752,23 +1742,6 @@ extension Program {
       return ctx.llvm.functionPointer.t
     } else {
       return metadata(of: t, in: &ctx).llvm
-    }
-  }
-
-  /// Returns `v` iff identifies a subscript known to have a slide that compiles to a no-op.
-  private func seenAsAddressor(
-    _ v: FrontEnd.IRValue, in ctx: borrowing FunctionGenerationContext
-  ) -> IRFunction.Name? {
-    switch v {
-    case .function(let f, _):
-      if case .remote(_, _, let b) = self[ctx.module.hylo].ir.functions[f]?.output {
-        return b ? f : nil
-      } else {
-        return nil
-      }
-
-    default:
-      return nil
     }
   }
 

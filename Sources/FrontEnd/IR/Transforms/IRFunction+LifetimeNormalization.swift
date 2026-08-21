@@ -638,7 +638,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRYield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let (k, _, _) = f.output.remote!
+    let (k, _) = f.output.remote!
     passArgument(k, f.at(i).projectee, insertingDeinitializationBefore: i.erased, in: &f)
     return f.instruction(after: i.erased)
   }

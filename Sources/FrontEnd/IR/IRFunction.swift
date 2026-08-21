@@ -63,12 +63,12 @@ public struct IRFunction: Sendable {
     case indirect
 
     /// The result is projected.
-    case remote(AccessEffect, AnyTypeIdentity, isAddressor: Bool)
+    case remote(AccessEffect, AnyTypeIdentity)
 
     /// The payload of `self` iff it denotes a projection.
-    public var remote: (AccessEffect, AnyTypeIdentity, Bool)? {
-      if case .remote(let k, let t, let b) = self {
-        return (k, t, b)
+    public var remote: (AccessEffect, AnyTypeIdentity)? {
+      if case .remote(let k, let t) = self {
+        return (k, t)
       } else {
         return nil
       }
@@ -121,7 +121,7 @@ public struct IRFunction: Sendable {
       switch output {
       case .indirect:
         self.head = Arrow(style: .parenthesized, inputs: ps.dropLast(), output: ps.last!.type)
-      case .remote(let k, let o, _):
+      case .remote(let k, let o):
         self.head = Arrow(style: .bracketed, effect: k, inputs: ps, output: o.erased)
       }
     }
@@ -188,15 +188,6 @@ public struct IRFunction: Sendable {
   /// `true` iff the function is a subscript.
   public var isSubscript: Bool {
     output != .indirect
-  }
-
-  /// `true` iff the function is an addressor (i.e., a subscript with an empty slide).
-  public var isAddressor: Bool {
-    if case .remote(_, _, let a) = output {
-      return a
-    } else {
-      return false
-    }
   }
 
    /// `true` iff the function returns a unit value (i.e., an instance of `Hylo.Void`).
@@ -895,8 +886,7 @@ extension IRFunction: Showable {
     }
     result.append(")")
 
-    if case .remote(let k, let t, let b) = self.output {
-      if b { result = "@addressor\n\(result)" }
+    if case .remote(let k, let t) = self.output {
       result.append(" \(k) <: \(printer.show(t))")
     }
 

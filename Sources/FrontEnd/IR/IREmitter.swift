@@ -264,7 +264,7 @@ internal struct IREmitter {
   /// insertion context is configured to generate IR into its lowered form.
   private mutating func lowerDefinition(_ d: ConformanceDeclaration.ID) {
     insertionContext.anchor = program.anchor(introducerOf: d)
-    let (_, w, _) = currentFunction.output.remote!
+    let (_, w) = currentFunction.output.remote!
 
     // If the conformance is a nested given, we can simply extract the witness from the parameter
     // accepting a witness of a conformance to the enclosing trait.
@@ -660,7 +660,7 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Yield.ID) -> ControlFlow {
-    let (k, _, _) = currentFunction.output.remote!
+    let (k, _) = currentFunction.output.remote!
     let v = lowered(lvalue: program[s].value)
     lowering(s) { (me) in
       let x = me._access([k], from: v)
@@ -1668,7 +1668,7 @@ internal struct IREmitter {
       terms.append(IRParameter(type: u, access: .let, declaration: nil))
     }
 
-    return (terms, .remote(.let, witness.head, isAddressor: false))
+    return (terms, .remote(.let, witness.head))
   }
 
   /// Returns the term parameters and return type of `d`'s lowered representation.
@@ -1739,7 +1739,7 @@ internal struct IREmitter {
       terms.append(IRParameter(type: t, access: .set, declaration: nil))
       return (terms, .indirect)
     } else {
-      return (terms, .remote(program.types[shape].effect, t, isAddressor: false))
+      return (terms, .remote(program.types[shape].effect, t))
     }
   }
 
