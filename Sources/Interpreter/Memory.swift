@@ -320,15 +320,6 @@ extension Memory {
     read(from: p.location)
   }
 
-  /// Returns the value stored at `p`, using the permissions and obligations
-  /// associated with `p`, and makes `p` uninitialized.
-  public mutating func consume(from p: Access<Memory.TypedAddress>) throws -> RuntimeValue {
-    // TODO: throw if it is illegal to consume from `p` using its permissions.
-    // TODO: throw if location pointed by `p` is uninitialized.
-    // TODO: implement consume semantics.
-    read(from: p.location)
-  }
-
   /// Stores `v` at `p`.
   ///
   /// - Precondition: `v` is an instance of type `p.type`.

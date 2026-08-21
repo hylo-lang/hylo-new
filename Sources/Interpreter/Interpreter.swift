@@ -332,16 +332,9 @@ public struct Interpreter {
     return a.asTypedAddress(t)
   }
 
-  /// Returns the value stored at address `p`, consuming the stored value if `p`
-  /// does not point to a `MachineType`.
+  /// Returns the value stored at address `p`.
   private mutating func load(from p: IRValue) throws -> RuntimeValue {
-    let a = access(of: p)
-    let t = program.underlyingType(a.location.type.underlying)
-    if program.tag(t) == MachineType.self {
-      return try memory.read(from: a)
-    } else {
-      return try memory.consume(from: a)
-    }
+    try memory.read(from: access(of: p))
   }
 
   /// Stores `v` at the address `p`.
