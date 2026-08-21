@@ -385,9 +385,12 @@ public struct Driver {
 
   /// Replaces the program of `self` with `p`, which contains an already loaded standard library,
   /// and makes the standard library a dependency of modules loaded thereafter.
+  ///
+  /// - Requires: `self` hasn't compiled other modules yet.
   public mutating func installStandardLibrary(from p: Program) {
     precondition(p.modules[Module.standardLibraryName] != nil,
       "program does not contain the standard library")
+    precondition(self.program.modules.isEmpty)
     program = p
     usesStandardLibrary = true
   }
@@ -620,25 +623,31 @@ public struct Driver {
     /// The shared instance.
     static let shared = StandardLibraryShimCache()
 
-    /// The location of the compiled shim for each relocation model.
-    private var objects: [RelocationModel: URL] = [:]
+    /// The compilation of the shim for each relocation model, resulting in the location of the
+    /// compiled object file.
+    private var objects: [RelocationModel: Task<URL, any Swift.Error>] = [:]
 
     /// Returns an object file compiled from the standard library's C shim with `relocation`,
     /// compiling it at most once per process into a temporary directory that lives until the
     /// process exits.
     func object(compiledWith relocation: RelocationModel) async throws -> URL {
-      if let o = objects[relocation] { return o }
+      if let t = objects[relocation] { return try await t.value }
 
-      let d = try FileManager.default.createUniqueTemporaryDirectory()
-      let s = Driver.standardLibraryCShim
-      let o = d.appendingPathComponent("shims.o", isDirectory: false)
+      // The task is registered before this method suspends so that concurrent callers await the
+      // same compilation instead of starting their own.
+      let t = Task {
+        let d = try FileManager.default.createUniqueTemporaryDirectory()
+        let s = Driver.standardLibraryCShim
+        let o = d.appendingPathComponent("shims.o", isDirectory: false)
 
-      var a = ["-c", s.path, "-o", o.path]
-      if let r = relocation.asClangArgument { a.append(r) }
+        var a = ["-c", s.path, "-o", o.path]
+        if let r = relocation.asClangArgument { a.append(r) }
 
-      _ = try await subprocessOutput(of: .name("clang"), arguments: a)
-      objects[relocation] = o
-      return o
+        _ = try await subprocessOutput(of: .name("clang"), arguments: a)
+        return o
+      }
+      objects[relocation] = t
+      return try await t.value
     }
 
   }
