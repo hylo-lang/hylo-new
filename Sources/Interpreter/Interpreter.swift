@@ -166,7 +166,10 @@ public struct Interpreter {
   fileprivate var memory: Memory
 
   /// The program being executed.
-  fileprivate var program: Program { memory.program }
+  fileprivate var program: Program {
+    _read { yield memory.program }
+    _modify { yield &memory.program }
+  }
 
   /// The next instruction to execute.
   private var programCounter: InstructionPointer {

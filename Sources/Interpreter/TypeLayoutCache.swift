@@ -87,7 +87,7 @@ struct TypeLayoutCache {
     enum t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    if isRawValueEnum(t.underlying, in: p) {
+    if isRawValueEnum(t.underlying, in: &p) {
       return computeLayout(rawValueEnum: t, in: &p)
     }
     let cases = storage(nominal: t.underlying, in: &p).map { c in
@@ -131,7 +131,7 @@ struct TypeLayoutCache {
   /// Returns true iff enum `t`, defined in `p`, is a raw value enum.
   ///
   /// - Precondition: `t` is an enum.
-  private func isRawValueEnum(_ t: AnyTypeIdentity, in p: Program) -> Bool {
+  private func isRawValueEnum(_ t: AnyTypeIdentity, in p: inout Program) -> Bool {
     let u = p.underlyingType(t)
     let d = p.type(u, as: Enum.self).declaration
     return p[d].representation != nil

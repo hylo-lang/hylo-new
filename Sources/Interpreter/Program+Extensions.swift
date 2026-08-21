@@ -14,17 +14,12 @@ extension Program {
 
   /// Returns the underlying type of `t`, defined in `p`, after unwrapping
   /// type applications and aliases.
-  internal func underlyingType(_ t: AnyTypeIdentity) -> AnyTypeIdentity {
-    let u = tag(t)
-    if u == TypeApplication.self {
-      let a = type(t, as: TypeApplication.self)
-      return underlyingType(a.abstraction)
-    } else if u == TypeAlias.self {
-      let a = type(t, as: TypeAlias.self)
-      return underlyingType(a.aliasee)
-    } else {
-      return t
+  internal mutating func underlyingType(_ t: AnyTypeIdentity) -> AnyTypeIdentity {
+    var t = types.dealiased(t)
+    while tag(t) == TypeApplication.self {
+      t = type(t, as: TypeApplication.self).abstraction
     }
+    return t
   }
 
 }
