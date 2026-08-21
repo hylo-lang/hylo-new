@@ -17,7 +17,7 @@ private let alwaysSaveArtifacts: Bool = false
 /// manually invoking `hc-tests`.
 ///
 /// - Note: Test assertions are expected to be issued through `FailureLog`.
-@Suite(.standardLibraryWarmup)
+@Suite
 struct CompilerTests {
 
   private typealias Host = Utilities.Host
