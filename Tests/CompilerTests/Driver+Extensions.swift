@@ -45,24 +45,24 @@ extension Testing.Trait where Self == StandardLibraryWarmup {
 /// Returns a program containing the standard library, loaded from the archive cache or compiled
 /// from its sources.
 private func standardLibraryProgram() async throws -> Program {
-  var d = try Driver(moduleCachePath: sharedModuleCachePath(), targetSpecification: .native())
+  var d = try Driver(moduleCachePath: try sharedModuleCachePath(), targetSpecification: .native())
   try await d.loadStandardLibrary()
   return d.program
 }
 
 /// Returns a stable folder for caching compilation artifacts, persistent across test runs
 /// with the same executable.
-private func sharedModuleCachePath() -> URL {
+private func sharedModuleCachePath() throws -> URL {
   let root = URL(filePath: #filePath)
     .deletingLastPathComponent()
     .deletingLastPathComponent()
     .deletingLastPathComponent()  
     .appending(components: ".build", "hylo-test-module-cache")
-  let key = currentBinaryFingerprint()
+  let key = try currentBinaryFingerprint()
   let path = root.appending(component: key)
 
   let m = FileManager.default
-  try! m.createDirectory(at: path, withIntermediateDirectories: true)
+  try m.createDirectory(at: path, withIntermediateDirectories: true)
 
   // Remove caches left over by other compiler builds.
   if let entries = try? m.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) {
@@ -77,18 +77,18 @@ private func sharedModuleCachePath() -> URL {
 /// Returns a fingerprint of the binary containing the compiler code under test.
 ///
 /// The fingerprint captures the last modification time and file size.
-private func currentBinaryFingerprint() -> String {
+private func currentBinaryFingerprint() throws -> String {
   let binary = currentBinary()
   var h = FNV1.native()
   h.combine(binary.path)
-  if let a = try? FileManager.default.attributesOfItem(atPath: binary.path) {
-    if let d = a[.modificationDate] as? Date {
-      h.combine(d.timeIntervalSince1970.bitPattern)
-    }
-    if let s = a[.size] as? NSNumber {
-      h.combine(s.uint64Value)
-    }
+  let a = try FileManager.default.attributesOfItem(atPath: binary.path)
+  if let d = a[.modificationDate] as? Date {
+    h.combine(d.timeIntervalSince1970.bitPattern)
   }
+  if let s = a[.size] as? NSNumber {
+    h.combine(s.uint64Value)
+  }
+
   return String(UInt(bitPattern: h.state), radix: 16)
 }
 

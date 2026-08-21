@@ -177,7 +177,7 @@ final class DriverTests: XCTestCase {
 
       var d = try Driver(targetSpecification: .host(), moduleSearchPath: [root])
       XCTAssertThrowsError(try d.loadArchivedModule("A")) { (e) in
-        guard case .invalidModuleArchive(let m, let location) = e as? Driver.Error else {
+        guard case .unreadableModuleArchive(let m, let location, _) = e as? Driver.Error else {
           return XCTFail("unexpected error: \(e)")
         }
         XCTAssertEqual(m, "A")

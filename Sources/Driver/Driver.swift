@@ -454,7 +454,7 @@ public struct Driver {
 
     let h: (name: Module.Name, fingerprint: UInt64, dependencies: [Module.Name])
     do { h = try Module.headerAndDependencies(&a) }
-    catch { throw Error.invalidModuleArchive(module: module, location: source) }
+    catch { throw Error.unreadableModuleArchive(module: module, location: source, cause: error) }
 
     guard h.name == module else {
       throw Error.moduleNameMismatch(module: module, location: source, name: h.name)
@@ -466,8 +466,12 @@ public struct Driver {
     var body = ReadableArchive(data)
     do {
       return try program.load(module: module, from: &body).identity
-    } catch is ArchiveError {
-      throw Error.invalidModuleArchive(module: module, location: source)
+    } catch {
+      if error is ArchiveError {
+        throw Error.unreadableModuleArchive(module: module, location: source, cause: error)
+      } else {
+        throw error
+      }
     }
   }
 
@@ -541,9 +545,6 @@ public struct Driver {
   /// An error thrown by the driver.
   public enum Error: Swift.Error, CustomStringConvertible {
 
-    /// The `.hylomodule` archive of `module` at `location` could not be parsed.
-    case invalidModuleArchive(module: Module.Name, location: URL)
-
     /// The `.hylomodule` archive of `module` at `location` could not be read because of `cause`.
     case unreadableModuleArchive(module: Module.Name, location: URL, cause: Swift.Error)
 
@@ -565,13 +566,6 @@ public struct Driver {
     /// A textual description of the error.
     public var description: String {
       switch self {
-      case .invalidModuleArchive(let module, let location):
-        """
-        Failed to parse the module archive of '\(module)' at '\(location.path)'.
-
-        Maybe the archive was compiled with a different version of the compiler. \
-        Try erasing the module cache.
-        """
       case .unreadableModuleArchive(let module, let location, let cause):
         "Failed to read module archive of '\(module)' at '\(location.path)': \(cause)"
       case .moduleNameMismatch(let module, let location, let name):

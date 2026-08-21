@@ -500,7 +500,7 @@ struct CompilerTests {
     }
 
     if !report.isEmpty {
-      log.fail("observed output does match expectation:" + report)
+      log.fail("observed output doesn't match expectation:\n" + report)
     }
   }
 
