@@ -34,10 +34,13 @@ public struct Driver {
   /// The code model for code generation.
   public var codeModel: CodeModel
 
-  /// The list of directories in which to search for libraries to link.
-  public var librarySearchPaths: [URL]
+  /// The linker's library search path.
+  public var librarySearchPath: [URL]
 
-  /// The names of the native libraries to link.
+  /// The directories in which imported module archives (`.hylomodule` files) are searched.
+  public var moduleSearchPath: [URL]
+
+  /// The names of the native libraries to link (in addition to any imported Hylo dependencies).
   public var librariesToLink: [String]
 
   /// `true` iff compilation and linking depend on the standard library and its shim.
@@ -65,11 +68,19 @@ public struct Driver {
 
   #if USE_BUNDLED_STANDARD_LIBRARY // Set compiler flag in distributable builds.
   /// The root folder of the standard library's sources.
-  private let chosenStandardLibraryRoot = bundledStandardLibrarySources
+  public static let standardLibraryRoot = bundledStandardLibrarySources
   #else
   /// The root folder of the standard library's sources.
-  private let chosenStandardLibraryRoot = localStandardLibrarySources
+  public static let standardLibraryRoot = localStandardLibrarySources
   #endif
+
+  /// The file within `standardLibraryRoot` implementing the standard library's
+  /// `@extern_c_indirect` declarations.
+  ///
+  /// Build systems linking Hylo objects must compile and link this except in freestanding mode.
+  public static var standardLibraryCShim: URL {
+    standardLibraryRoot.appending(component: cShimSource)
+  }
 
   /// Creates an instance with the given properties.
   public init(
@@ -77,14 +88,16 @@ public struct Driver {
     optimization: OptimizationLevel = .none,
     relocation: RelocationModel = Driver.defaultRelocationModel,
     codeModel: CodeModel = .default,
-    librarySearchPaths: [URL] = [], librariesToLink: [String] = []
+    librarySearchPath: [URL] = [], moduleSearchPath: [URL] = [],
+    librariesToLink: [String] = []
   ) {
     self.moduleCachePath = moduleCachePath
     self.target = targetSpecification
     self.optimization = optimization
     self.relocation = relocation
     self.codeModel = codeModel
-    self.librarySearchPaths = librarySearchPaths
+    self.librarySearchPath = librarySearchPath
+    self.moduleSearchPath = moduleSearchPath
     self.librariesToLink = librariesToLink
     self.program = .init()
   }
@@ -110,9 +123,7 @@ public struct Driver {
 
   /// Assigns the trees in `module` to their scopes.
   @discardableResult
-  public mutating func assignScopes(
-    of module: Module.ID
-  ) async -> PhaseResult {
+  public mutating func assignScopes(of module: Module.ID) async -> PhaseResult {
     let clock = ContinuousClock()
     let elapsed = await clock.measure {
       await program.assignScopes(module)
@@ -135,9 +146,7 @@ public struct Driver {
 
   /// Lowers the contents of `module` to IR.
   @discardableResult
-  public mutating func lower(
-    _ module: Module.ID
-  ) async -> PhaseResult {
+  public mutating func lower(_ module: Module.ID) async -> PhaseResult {
     let clock = ContinuousClock()
     let elapsed = clock.measure {
       program.lower(module)
@@ -147,9 +156,7 @@ public struct Driver {
 
   /// Applies mandatory transformation passes on the IR of `module`.
   @discardableResult
-  public mutating func applyTransformationPasses(
-    _ module: Module.ID
-  ) async -> PhaseResult {
+  public mutating func applyTransformationPasses(_ module: Module.ID) async -> PhaseResult {
     let elapsed = ContinuousClock().measure {
       program.applyTransformationPasses(module)
     }
@@ -168,31 +175,31 @@ public struct Driver {
     let elapsed = try ContinuousClock().measure {
       let t = TargetMachine(
         target: target, optimization: optimization, relocation: relocation, codeModel: codeModel)
-      var m = try program.compileToLLVM(module, target: t)
+      var llvm = try program.compileToLLVM(module, target: t)
 
-      try verify(m)
-      m.runDefaultModulePasses(optimization: optimization)
-      try verify(m)
+      try verify(llvm)
+      llvm.runDefaultModulePasses(optimization: optimization)
+      try verify(llvm)
 
-      llvmModules[module] = LLVMModuleBox(consume m)
+      llvmModules[module] = LLVMModuleBox(consume llvm)
     }
     return .init(elapsed: elapsed, containsError: program[module].containsError)
   }
 
-  /// Applies LLVM IR verification passes to `module` iff this file has been compiled in debug
+  /// Applies LLVM IR verification passes to `m` iff this file has been compiled in debug
   /// mode; does nothing otherwise.
   ///
-  /// - Throws: if the contents of `module` failed verification.
-  private func verify(_ module: borrowing SwiftyLLVM.Module) throws {
+  /// - Throws: if the contents of `m` failed verification.
+  private func verify(_ m: borrowing SwiftyLLVM.Module) throws {
     do {
-      try module.verifyInDebugBuilds()
+      try m.verifyInDebugBuilds()
     } catch let e as LLVMError {
       throw Error(
         message: """
         LLVM verification failed with the following message: \(e.description)
 
         Module contents:
-        \(module.description)
+        \(m.description)
         """)
     }
   }
@@ -215,11 +222,11 @@ public struct Driver {
       if usesStandardLibrary {
         // FIXME: Enable this after we can lower the standard library
         // modulesToLink.append(program.modules[.standardLibrary]!.identity)
-        cSources.append(chosenStandardLibraryRoot.appending(component: cShimSource))
+        cSources.append(Driver.standardLibraryCShim)
       }
 
       try await FileManager.default.withUniqueTemporaryDirectory { (d) in
-        let hyloObjects = try writeObjectFiles(for: modulesToLink, into: d)
+        let hyloObjects = try emitObjectFiles(for: modulesToLink, into: d)
         var cObjects: [URL] = []
         for s in cSources {
           cObjects.append(try await compileCToObject(source: s, destinationDirectory: d))
@@ -235,11 +242,11 @@ public struct Driver {
     llvmModules[module]?.module.llCode()
   }
 
-  /// Returns the assembly of module `m`.
+  /// Returns the assembly of `module`.
   ///
-  /// - Requires: module `m` has been lowered to LLVM.
-  public func assembly(of m: Module.ID) throws -> String {
-    try llvmModules[m]!.module.compile(.assembly).utf8Decoded
+  /// - Requires: `module` has been lowered to LLVM.
+  public func assembly(of module: Module.ID) throws -> String {
+    try llvmModules[module]!.module.compile(.assembly).utf8Decoded
       .unwrapOrThrow(Error(message: "Failed to decode assembly as an UTF8 string."))
   }
 
@@ -248,14 +255,21 @@ public struct Driver {
   /// - Requires: each element of `modules` has been lowered to LLVM.
   /// - Throws: if `destinationDirectory` doesn't exist.
   @discardableResult
-  public func writeObjectFiles(
+  public func emitObjectFiles(
     for modules: [Module.ID], into destinationDirectory: URL
   ) throws -> [URL] {
     try modules.map { (m) in
       let o = destinationDirectory.appendingPathComponent(moduleName(m) + ".o", isDirectory: false)
-      try llvmModules[m]!.module.write(.objectFile, to: o.path)
+      try emitObjectFile(of: m, to: o)
       return o
     }
+  }
+
+  /// Writes the object file of `module` to `output`.
+  ///
+  /// - Requires: `module` has been already lowered to LLVM.
+  public func emitObjectFile(of module: Module.ID, to output: URL) throws {
+    try llvmModules[module]!.module.write(.objectFile, to: output.path)
   }
 
   /// Compiles `source` using `clang` to an object file.
@@ -279,39 +293,52 @@ public struct Driver {
   ///
   /// If `moduleCachePath` is set, the module is loaded from cache if an archive is found and its
   /// fingerprint matches the fingerprint of the source files in `root`. Otherwise, the module is
-  /// compiled from sources and an archive is stored at `moduleCachePath`. If `moduleCachePath` is
-  /// not set, the module is unconditionally compiled from sources and no archive is stored.
+  /// compiled from sources and an archive is stored at `moduleCachePath`; A cached archive that
+  /// cannot be parsed is compiled from sources and overwritten.
   public mutating func load(
     _ module: Module.Name, withSourcesAt root: URL, additionalSources: [SourceFile] = []
   ) async throws {
     let sources = additionalSources + (try sources(at: root))
 
-    // Attempt to load the module from disk.
-    do {
-      if cachingIsEnabled, let data = archive(of: module) {
-        let h = SourceFile.fingerprint(contentsOf: sources)
-        var a = ReadableArchive(data)
-        let (_, fingerprint) = try Module.header(&a)
-        if h == fingerprint {
-          a = ReadableArchive(data)
-          try program.load(module: module, from: &a)
-          return
-        }
+    // If caching is enabled, load the module from disk or compile and cache it if that failed.
+    if cachingIsEnabled {
+      if try !loadCached(module, matching: sources) {
+        let m = try await compile(module, from: sources)
+        try writeToCache(m)
       }
-    } catch ArchiveError.invalidInput {
-      let m = """
-        Failed to parse module archive of '\(module)' at '\(moduleCachePath, default: "nil")'.
-
-        Maybe the archive was compiled with a different version of the compiler. \
-        Try erasing the module cache.
-        """
-      throw Error(message: m)
     }
+    // Otherwise, ignore the cache entirely.
+    else {
+      _ = try await compile(module, from: sources)
+    }
+  }
 
-    // Compile the module from sources.
-    let m = program.demandModule(module)
+  /// Loads `module` from its cache and returns `true` iff its fingerprint matches that of `s`
+  private mutating func loadCached(_ module: Module.Name, matching s: [SourceFile]) throws -> Bool {
+    guard let data = cachedArchive(of: module) else { return false }
+    do {
+      var a = ReadableArchive(data)
+      let (name, fingerprint) = try Module.header(&a)
+      // Invalid name or fingerprint.
+      guard name == module, fingerprint == SourceFile.fingerprint(contentsOf: s) else {
+        return false
+      }
 
-    if usesStandardLibrary && module != Module.standardLibraryName {
+      a = ReadableArchive(data)
+      try program.load(module: module, from: &a)
+      return true
+    } catch is ArchiveError {
+      return false
+    }
+  }
+
+  /// Compiles the module named `n` from `sources` to refined IR, returning its identifier.
+  private mutating func compile(
+    _ n: Module.Name, from sources: [SourceFile]
+  ) async throws -> Module.ID {
+    let m = program.demandModule(n)
+
+    if usesStandardLibrary && (n != Module.standardLibraryName) {
       program[m].addDependency(Module.standardLibraryName)
     }
 
@@ -330,39 +357,135 @@ public struct Driver {
     await applyTransformationPasses(m)
     try throwIfContainsError(m)
 
-    if cachingIsEnabled {
-      let a = try program.archive(module: m)
-      let f = moduleCachePath!.appending(component: module + ".hylomodule")
-      try a.write(into: f)
-    }
+    return m
+  }
+
+  /// Writes `module` to the module cache.
+  ///
+  /// - Requires: `cachingIsEnabled` is `true`.
+  private func writeToCache(_ module: Module.ID) throws {
+    let f = moduleCachePath!.appending(component: program[module].name + ".hylomodule")
+    try writeArchive(of: module, to: f)
   }
 
   /// Loads the standard library with `load(_:withSourcesAt:)` and makes
   /// standard library a dependency of modules loaded thereafter.
-  /// 
+  ///
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
     try await load(
-      Module.standardLibraryName, withSourcesAt: chosenStandardLibraryRoot,
+      Module.standardLibraryName, withSourcesAt: Driver.standardLibraryRoot,
       additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
     usesStandardLibrary = true
   }
 
-  /// Searches for an archive of `module` in `librarySearchPaths`, returning it if found.
-  public func archive(of module: Module.Name) -> Data? {
-    if let prefix = moduleCachePath {
-      let path = prefix.appending(path: module + ".hylomodule")
-      return try? Data(contentsOf: path)
-    } else {
-      return nil
+  /// Returns the archive of `module` in the module cache if present, `nil` otherwise.
+  internal func cachedArchive(of module: Module.Name) -> Data? {
+    guard let c = moduleCachePath else { return nil }
+    return try? Data(contentsOf: c.appending(path: module + ".hylomodule"))
+  }
+
+  /// Returns the location and contents of `module`'s archive found in `moduleSearchPath`, if any.
+  ///
+  /// - Throws if an archive exists but cannot be read.
+  private func importedArchive(of module: Module.Name) throws -> (url: URL, data: Data)? {
+    for prefix in moduleSearchPath {
+      let u = prefix.appending(path: module + ".hylomodule")
+      if FileManager.default.fileExists(atPath: u.path) {
+        do {
+          return (u, try Data(contentsOf: u))
+        } catch {
+          throw Error(message: "cannot read module archive at '\(u.path)': \(error)")
+        }
+      }
+    }
+    return nil
+  }
+
+  /// Loads `module` and its dependencies from archives found in `moduleSearchPath`, returning the
+  /// identity of `module`.
+  @discardableResult
+  public mutating func loadArchivedModule(_ module: Module.Name) throws -> Module.ID {
+    var ms = Set<Module.Name>()
+    return try loadArchivedModule(module, modulesStartedLoading: &ms)
+  }
+
+  /// Loads `module` and its dependencies from archives found in `moduleSearchPath`, returning the
+  /// identity of `module` and using `modulesStartedLoading` to detect circular dependencies.
+  @discardableResult
+  private mutating func loadArchivedModule(
+    _ module: Module.Name, modulesStartedLoading: inout Set<Module.Name>
+  ) throws -> Module.ID {
+    // Nothing to do if the module is already loaded.
+    if let module = program.identity(module: module) { return module }
+
+    if !modulesStartedLoading.insert(module).inserted {
+      throw Error(message: "circular dependency detected while loading module '\(module)'")
+    }
+
+    guard let (source, data) = try importedArchive(of: module) else {
+      let ps = moduleSearchPath.map(\.path).joined(separator: ", ")
+      throw Error(message: "no archive found for module '\(module)' in module search paths [\(ps)]")
+    }
+
+    // TODO: save fingerprint of dependencies and check that they match the version `module` was
+    // compiled against.
+
+    // Ensure the dependencies are loaded before we load `module`.
+    var a = ReadableArchive(data)
+
+    let h: (name: Module.Name, fingerprint: UInt64, dependencies: [Module.Name])
+    do { h = try Module.headerAndDependencies(&a) }
+    catch { throw cannotParseArchive(of: module, at: source) }
+
+    guard h.name == module else {
+      throw Error(message: """
+        archive for '\(module)' at '\(source.path)' declares a different module name '\(h.name)'
+        """)
+    }
+    for d in h.dependencies {
+      try loadArchivedModule(d, modulesStartedLoading: &modulesStartedLoading)
+    }
+
+    var body = ReadableArchive(data)
+    do {
+      return try program.load(module: module, from: &body).identity
+    } catch is ArchiveError {
+      throw cannotParseArchive(of: module, at: source)
     }
   }
 
-  /// Throws the diagnostics of `m` if those contain an error.
-  private func throwIfContainsError(_ m: Module.ID) throws {
-    if program[m].containsError {
-      throw CompilationError(diagnostics: .init(program[m].diagnostics))
+  /// Returns an error reporting that the archive of `module` at `location` could not be parsed.
+  private func cannotParseArchive(of module: Module.Name, at location: URL) -> Error {
+    Error(message: """
+      Failed to parse the module archive of '\(module)' at '\(location.path)'.
+
+      Maybe the archive was compiled with a different version of the compiler.
+      """)
+  }
+
+  /// Writes the archive of `module` to `output`.
+  ///
+  /// The parent directories of `output` are expected to exist.
+  public func writeArchive(of module: Module.ID, to output: URL) throws {
+    try program.archive(module: module).write(into: output)
+  }
+
+  /// Returns a hash of `module` that a build system can use as a rebuild key for its dependents.
+  public func moduleInterfaceHash(of module: Module.ID) throws -> UInt64 {
+    // TODO: Make the interface hash resilient to changes in function bodies.
+    // https://github.com/hylo-lang/hylo-new/issues/321
+
+    // Note: avoiding `.hashValue` for consistency across runs and host platforms.
+    let a = try program.archive(module: module)
+    return FNV1.hash(a, into: FNV1.u64()).state
+  }
+
+  /// Throws the diagnostics of `module` if those contain an error.
+  private func throwIfContainsError(_ module: Module.ID) throws {
+    if program[module].containsError {
+      throw CompilationError(diagnostics: .init(program[module].diagnostics))
     }
   }
 
@@ -371,7 +494,7 @@ public struct Driver {
   /// - Throws: if the parent folder of `output` doesn't exist.
   private func linkExecutable(from objectFiles: [URL], writingTo output: URL) async throws {
     var arguments = ["-o", output.path]
-    arguments += librarySearchPaths.map({ "-L\($0.path)" })
+    arguments += librarySearchPath.map({ "-L\($0.path)" })
     arguments += librariesToLink.map({ "-l\($0)" })
     arguments += objectFiles.map(\.path)
 
@@ -403,8 +526,8 @@ public struct Driver {
     var module: LLVMModule
 
     /// Wraps `module` by consuming it.
-    init(_ module: consuming LLVMModule) {
-      self.module = module
+    init(_ m: consuming LLVMModule) {
+      self.module = m
     }
 
   }
