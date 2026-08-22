@@ -451,7 +451,9 @@ extension IRAccess {
 extension Interpreter {
 
   /// A trap occurred during program execution.
-  public struct Trap: Error, CustomStringConvertible {
+  public struct Trap: Error, Regular, CustomStringConvertible {
+
+    public init() {}
 
     public var description: String {
       "Encountered a trap during program execution."
