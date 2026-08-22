@@ -305,6 +305,21 @@ extension Memory {
     return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
   }
 
+  /// Returns the value stored at `p`.
+  private mutating func read(from p: Memory.TypedAddress) -> RuntimeValue {
+    let l = layout(p.type)
+    let bs = self[p.allocation].storage[p.offset..<p.offset + l.size]
+    return RuntimeValue(bytes: Array(bs), havingAlignment: l.alignment)
+  }
+
+  /// Returns the value stored at `p`, using the permissions and obligations
+  /// associated with `p`.
+  public mutating func read(from p: Access<Memory.TypedAddress>) throws -> RuntimeValue {
+    // TODO: throw if it is illegal to read from `p` using its permissions.
+    // TODO: throw if location pointed by `p` is uninitialized.
+    read(from: p.location)
+  }
+
   /// Stores `v` at `p`.
   ///
   /// - Precondition: `v` is an instance of type `p.type`.

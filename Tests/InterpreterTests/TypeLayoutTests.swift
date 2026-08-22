@@ -283,6 +283,24 @@ final class TypeLayoutTests: XCTestCase {
       ])
   }
 
+  func testNestedAliasedGenericTuple() async throws {
+    let t = layout(
+      await type(
+        named: "Chained",
+        in: """
+          public type CA<T> = {T}
+          public type Chained = CA<CA<CA<Builtin.i16>>>
+          """))
+
+    let i16 = id(MachineType.i(16))
+    let tInner = p.types.tuple(of: [i16])
+    let tMiddle = p.types.tuple(of: [tInner])
+
+    XCTAssertEqual(t.size, 2)
+    XCTAssertEqual(t.alignment, 2)
+    XCTAssertEqual(t.parts, [.init(name: "0", type: .init(tMiddle), offset: 0)])
+  }
+
   func testEnumDiscriminator() {
     let i8 = id(MachineType.i(8))
     let i16 = id(MachineType.i(16))
@@ -328,7 +346,7 @@ final class TypeLayoutTests: XCTestCase {
   private func type(named n: String, in s: SourceFile) async -> AnyTypeIdentity {
     await add(s)
     let d = p.castToDeclaration(p.select(.name(.init(identifier: n))).first!)!
-    let mt = p.type(assignedTo: d, assuming: Metatype.self)
+    let mt = p.types.cast(p.type(maybeAssignedTo: d)!, to: Metatype.self)!
     return p.types[mt].inhabitant
   }
 

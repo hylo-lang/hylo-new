@@ -1,0 +1,22 @@
+public fun main() {
+  var r = 0
+
+  if true {
+    &r = 1
+  } else {
+    &r = 2
+  }
+
+  // TODO: uncomment when precondition gets implemented.
+  // precondition(r == 1)
+
+  if false {
+    &r = 3
+  } else {
+    &r = 4
+  }
+
+  // TODO: uncomment when precondition gets implemented.
+  // precondition(r == 4)
+
+}

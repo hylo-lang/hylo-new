@@ -39,6 +39,26 @@ extension RuntimeValue {
     self.init(bytes: byteRepresentation(r, bitWidth: w), havingAlignment: a)
   }
 
+  /// Returns the result of calling `body` on a pointer to the value's bytes
+  /// interpreted as a `T` instance.
+  ///
+  /// - Precondition: `self` is aligned for `T`.
+  internal func withUnsafePointer<T, R>(
+    to _: T.Type, _ body: (UnsafePointer<T>) -> R
+  ) -> R {
+    precondition(MemoryLayout<T>.size <= bytes.count)
+    return bytes.withUnsafeBytes { p in
+      body(p.baseAddress!.assumingMemoryBound(to: T.self))
+    }
+  }
+
+  /// The boolean value.
+  ///
+  /// - Precondition: `self` is an instance of `MachineType.i(1)`.
+  public var bool: Bool {
+    withUnsafePointer(to: UInt8.self) { $0.pointee != 0 }
+  }
+
 }
 
 /// Returns an in-memory byte representation of the low-order `w` bits of `n`.

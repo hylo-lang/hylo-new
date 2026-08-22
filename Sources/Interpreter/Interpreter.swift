@@ -249,13 +249,19 @@ public struct Interpreter {
       // TODO: add a real implementation, updating state of composed regions.
       return initializeRegister(to: ())
     case let x as IRBranch:
-      _ = x
+      return .jump(to: start(x.target))
     case let x as IRConditionalBranch:
-      _ = x
+      let c = self[x.condition].bool
+      if c {
+        return .jump(to: start(x.onSuccess))
+      } else {
+        return .jump(to: start(x.onFailure))
+      }
     case let x as IRGlobalAccess:
       _ = x
     case let x as IRLoad:
-      _ = x
+      let v = try load(from: x.source)
+      return .initializeRegister(to: .init(v))
     case let x as IRMemoryCopy:
       _ = x
     case let x as IRMove:
@@ -323,6 +329,11 @@ public struct Interpreter {
     return a.asTypedAddress(t)
   }
 
+  /// Returns the value stored at address `p`.
+  private mutating func load(from p: IRValue) throws -> RuntimeValue {
+    try memory.read(from: access(of: p))
+  }
+
   /// Stores `v` at the address `p`.
   private mutating func store(_ v: IRValue, at p: IRValue) throws {
     try memory.store(self[v], at: access(of: p))
@@ -372,6 +383,16 @@ public struct Interpreter {
     default:
       preconditionFailure("\(program.show(v)) is not an Access<Memory.TypedAddress>.")
     }
+  }
+
+  /// Returns the pointer to the first instruction of `b`.
+  ///
+  /// - Precondition: `b` is a basic block in `programCounter.container`.
+  private func start(_ b: IRBlock.ID) -> InstructionPointer {
+    let m = programCounter.container.module
+    let f = programCounter.container.function
+    let i = program[m].functions[f].blocks[b].first!
+    return .init(i, in: programCounter.container)
   }
 
 }
