@@ -244,7 +244,8 @@ public struct Interpreter {
     case let x as IRApply:
       _ = x
     case let x as IRApplyBuiltin:
-      _ = x
+      let v = try call(x.callee, with: x.arguments)
+      return initializeRegister(to: v)
     case is IRAssumeState:
       // TODO: add a real implementation, updating state of composed regions.
       return initializeRegister(to: ())
@@ -395,6 +396,14 @@ public struct Interpreter {
     return .init(i, in: programCounter.container)
   }
 
+  /// Returns the result of calling `f` with `arguments`.
+  private func call(_ f: BuiltinFunction, with arguments: [IRValue]) throws -> RuntimeValue {
+    switch f {
+    case .trap: throw Trap()
+    default: unimplemented("\(program.show(f)) is not implemented yet.")
+    }
+  }
+
 }
 
 extension IRValue {
@@ -435,6 +444,21 @@ extension IRAccess {
     // Because IR analysis should ensure single effect.
     // See: Sources/FrontEnd/IR/Instructions/IRAccess.swift.
     capabilities.uniqueElement!
+  }
+
+}
+
+extension Interpreter {
+
+  /// A trap occurred during program execution.
+  public struct Trap: Error, Regular, CustomStringConvertible {
+
+    public init() {}
+
+    public var description: String {
+      "Encountered a trap during program execution."
+    }
+
   }
 
 }

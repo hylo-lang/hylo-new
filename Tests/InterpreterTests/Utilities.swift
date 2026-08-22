@@ -43,3 +43,18 @@ public func check<E: Error & Equatable, R>(
     XCTAssertEqual($0 as? E, expectedError, "\($0)", file: file, line: line)
   }
 }
+
+/// Executes `action` and reports test failure if it does not throw `error`.
+public func check<E: Error & Equatable, R>(
+  throws expectedError: E,
+  _ action: () async throws -> R,
+  file: StaticString = #filePath,
+  line: UInt = #line
+) async {
+  do {
+    _ = try await action()
+    XCTFail("Expected \(expectedError), but no error was thrown.", file: file, line: line)
+  } catch {
+    XCTAssertEqual(error as? E, expectedError, "\(error)", file: file, line: line)
+  }
+}
