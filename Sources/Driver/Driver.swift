@@ -79,7 +79,7 @@ public struct Driver {
   ///
   /// Build systems linking Hylo objects must compile and link this except in freestanding mode.
   public static var standardLibraryCShim: URL {
-    standardLibraryRoot.appending(component: cShimSource)
+    standardLibraryRoot.appending(component: "Sources").appending(component: cShimSource)
   }
 
   /// Creates an instance with the given properties.
@@ -374,9 +374,15 @@ public struct Driver {
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
+    #if USE_BUNDLED_STANDARD_LIBRARY
+      let additionalSources: [SourceFile] = []
+    #else
+      let additionalSources = [try SourceFile(contentsOf: generatedStandardLibrarySource)]
+    #endif
+
     try await load(
       Module.standardLibraryName, withSourcesAt: Driver.standardLibraryRoot,
-      additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
+      additionalSources: additionalSources)
     usesStandardLibrary = true
   }
 
