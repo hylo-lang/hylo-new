@@ -252,7 +252,7 @@ public struct Interpreter {
     case let x as IRBranch:
       return .jump(to: start(x.target))
     case let x as IRConditionalBranch:
-      let c = self[x.condition].bool
+      let c = try self[x.condition].bool
       if c {
         return .jump(to: start(x.onSuccess))
       } else {
@@ -345,10 +345,18 @@ public struct Interpreter {
   ///
   /// - Precondition: `v` is a runtimve value.
   private subscript(_ v: IRValue) -> RuntimeValue {
-    mutating get {
+    mutating get throws {
       switch v {
       case .register(let r):
-        return topOfStack.registers[r]!(as: RuntimeValue.self)!
+        if let v = topOfStack.registers[r]!(as: RuntimeValue.self) {
+          return v
+        }
+
+        if let p = topOfStack.registers[r]!(as: Access<Memory.TypedAddress>.self) {
+          return try memory.read(from: p)
+        }
+
+        preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       case .integer(let n, let t):
         let l = memory.layout(t)
         return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
@@ -398,9 +406,18 @@ public struct Interpreter {
   }
 
   /// Returns the result of calling `f` with `arguments`.
-  private func call(_ f: BuiltinFunction, with arguments: [IRValue]) throws -> RuntimeValue {
+  private mutating func call(
+    _ f: BuiltinFunction,
+    with arguments: [IRValue]
+  ) throws -> RuntimeValue {
     switch f {
     case .trap: throw Trap()
+    case .icmp(let p, let t):
+      let w = memory.layout(t).size * 8
+      let lhs = try self[arguments[0]]
+      let rhs = try self[arguments[1]]
+      let r = p(lhs, rhs, bitWidth: w)
+      return .init(r, havingLayout: memory.layout(.i(1)).whole)
     default: unimplemented("\(program.show(f)) is not implemented yet.")
     }
   }
