@@ -94,22 +94,23 @@ struct TypeLayoutCache {
       layout(.init(c), in: &p)
     }
 
-    let d = layout(abi.enumDiscriminator(count: cases.count, in: &p), in: &p)
+    let discriminator = abi.enumDiscriminator(count: cases.count, in: &p)
+    let discriminatorLayout = layout(discriminator, in: &p).whole
 
-    let payload = TypeLayout.Bytes(
+    let payloadLayout = TypeLayout.Bytes(
       alignment: Int(cases.map(\.alignment).lcm() ?? 1),
       size: cases.map(\.size).max() ?? 0)
 
-    let l = storageLayoutOfRecord(havingMembers: [
-      payload, .init(alignment: d.alignment, size: d.size),
-    ])
+    let bytes = discriminatorLayout.appending(payloadLayout)
+
+    let payloadOffset = bytes.size - payloadLayout.size
 
     let ns = names(enum: t.underlying, in: &p)
     let parts =
-      zip(cases, ns).map { TypeLayout.Part(name: $0.1, type: $0.0.type, offset: l.partOffsets[0]) }
-      + [.init(name: "discriminator", type: d.type, offset: l.partOffsets[1])]
+      zip(cases, ns).map { TypeLayout.Part(name: $0.1, type: $0.0.type, offset: payloadOffset) }
+      + [.init(name: "discriminator", type: discriminator, offset: 0)]
 
-    return .init(whole: l.bytes, type: t, parts: parts, isEnumLayout: true)
+    return .init(whole: bytes, type: t, parts: parts, isEnumLayout: true)
   }
 
   /// Returns the layout for a raw value enum `t`, defined in `p`.

@@ -142,14 +142,14 @@ final class TypeLayoutTests: XCTestCase {
     let i8 = id(MachineType.i(8))
     let i16Tuple = p.types.tuple(of: [id(MachineType.i(16))])
 
-    XCTAssertEqual(optional.size, 3)
+    XCTAssertEqual(optional.size, 4)
     XCTAssertEqual(optional.alignment, 2)
     XCTAssertEqual(
       optional.parts,
       [
-        .init(name: "some", type: .init(i16Tuple), offset: 0),
-        .init(name: "none", type: .init(.void), offset: 0),
-        .init(name: "discriminator", type: .init(i8), offset: 2),
+        .init(name: "some", type: .init(i16Tuple), offset: 2),
+        .init(name: "none", type: .init(.void), offset: 2),
+        .init(name: "discriminator", type: .init(i8), offset: 0),
       ])
   }
 
@@ -272,14 +272,14 @@ final class TypeLayoutTests: XCTestCase {
     let i8 = id(MachineType.i(8))
     let i16Tuple = p.types.tuple(of: [id(MachineType.i(16))])
 
-    XCTAssertEqual(optional.size, 3)
+    XCTAssertEqual(optional.size, 4)
     XCTAssertEqual(optional.alignment, 2)
     XCTAssertEqual(
       optional.parts,
       [
-        .init(name: "some", type: .init(i16Tuple), offset: 0),
-        .init(name: "none", type: .init(.void), offset: 0),
-        .init(name: "discriminator", type: .init(i8), offset: 2),
+        .init(name: "some", type: .init(i16Tuple), offset: 2),
+        .init(name: "none", type: .init(.void), offset: 2),
+        .init(name: "discriminator", type: .init(i8), offset: 0),
       ])
   }
 
