@@ -27,6 +27,9 @@ public struct IRFunction: Sendable {
     /// The identity of the existentialiezd form of a polymorphic function.
     indirect case existentialized(IRFunction.Name)
 
+    /// The identity of a function underlying a closure.
+    indirect case applied(IRFunction.Name, Int)
+
     /// The identity of a slide resulting from subscript decomposition.
     indirect case slide(IRFunction.Name, Int)
 
@@ -46,6 +49,8 @@ public struct IRFunction: Sendable {
         return d == x
       case .existentialized(let n):
         return n.isLoweredForm(of: d)
+      case .applied:
+        return false
       case .slide(let n, _):
         return n.isLoweredForm(of: d)
       case .plateau(let n, _):
@@ -917,18 +922,24 @@ extension IRFunction.Name: Showable {
       return printer.program.debugName(of: d)
 
     case .initializer(let d):
-      return "\(printer.program.debugName(of: .init(d)))$init"
+      let n = printer.program.debugName(of: .init(d))
+      return "\(n)$initializer"
 
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
-      return "\(printer.program.debugName(of: d))$synthesized<\(list: xs)>"
+      let n = printer.program.debugName(of: d)
+      return "$synthesized[\(n) for \(list: xs)]"
 
     case .implementation(let d, _, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
-      return "\(printer.program.debugName(of: d))<\(list: xs)>"
+      let n = printer.program.debugName(of: d)
+      return "$implementation[\(n) for \(list: xs)]"
 
     case .existentialized(let n):
       return "\(printer.show(n))$existentialized"
+
+    case .applied(let n, let i):
+      return "\(printer.show(n))$applied_\(i)"
 
     case .slide(let n, let i):
       return "\(printer.show(n))$slide_\(i)"
