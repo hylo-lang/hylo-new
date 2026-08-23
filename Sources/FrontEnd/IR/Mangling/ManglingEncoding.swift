@@ -138,9 +138,9 @@ internal struct ManglingEncoding: Sendable {
       case .extensionDeclaration:
         demangled = takeExtensionDeclaration(from: &source)
       case .functionDeclaration:
-        demangled = takeFunctionDeclaration(from: &source)
+        demangled = takeFunctionDeclaration(static: false, from: &source)
       case .staticFunctionDeclaration:
-        demangled = takeStaticFunctionDeclaration(from: &source)
+        demangled = takeFunctionDeclaration(static: true, from: &source)
       case .functionBundleDeclaration:
         demangled = takeFunctionBundleDeclaration(from: &source)
       case .initializerDeclaration:
@@ -436,35 +436,18 @@ internal struct ManglingEncoding: Sendable {
       return
     }
 
-    if program.isStatic(d) {
-      output.add(operator: .staticFunctionDeclaration)
-    } else {
-      output.add(operator: .functionDeclaration)
-    }
-
+    output.add(operator: program.isStatic(d) ? .staticFunctionDeclaration : .functionDeclaration)
     append(name: n, to: &output)
     append(typeOf: d, to: &output)
   }
 
   /// Demangles a function declaration from `source`.
   private static func takeFunctionDeclaration(
-    from source: inout DemanglingContext
+    static isStatic: Bool, from source: inout DemanglingContext
   ) -> DemangledEntity {
     if let n = takeName(from: &source) {
       let t = takeType(from: &source)
-      return .functionDeclaration(name: n, type: t, isStatic: false)
-    } else {
-      return .error
-    }
-  }
-
-  /// Demangles a static function declaration from `source`.
-  private static func takeStaticFunctionDeclaration(
-    from source: inout DemanglingContext
-  ) -> DemangledEntity {
-    if let n = takeName(from: &source) {
-      let t = takeType(from: &source)
-      return .functionDeclaration(name: n, type: t, isStatic: true)
+      return .functionDeclaration(name: n, type: t, isStatic: isStatic)
     } else {
       return .error
     }
