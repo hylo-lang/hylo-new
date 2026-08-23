@@ -2,7 +2,7 @@ import FrontEnd
 import Interpreter
 import XCTest
 
-final class InterpreterRunTests {
+final class InterpreterRunTests: XCTestCase {
 
   func testPositiveTestProgramsRun() async throws {
     let u = Bundle.module.url(
@@ -22,6 +22,21 @@ final class InterpreterRunTests {
   func testBuiltinTrap() async throws {
     await check(throws: Interpreter.Trap()) {
       try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/AlwaysTrap.hylo")
+    }
+  }
+
+  func testIntegerEquality() async throws {
+    await check(throws: Interpreter.Trap()) {
+      try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/TrapOnEqualI8.hylo")
+    }
+    await check(throws: Interpreter.Trap()) {
+      try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/TrapOnEqualI16.hylo")
+    }
+    await check(throws: Interpreter.Trap()) {
+      try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/TrapOnEqualI32.hylo")
+    }
+    await check(throws: Interpreter.Trap()) {
+      try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/TrapOnEqualI64.hylo")
     }
   }
 

@@ -1,0 +1,7 @@
+public fun main() {
+  let x: UInt16 = 1
+  let y: UInt16 = 1
+  if x == y {
+    Builtin.trap()
+  }
+}

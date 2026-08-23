@@ -1,0 +1,7 @@
+public fun main() {
+  let x: UInt64 = 1
+  let y: UInt64 = 1
+  if x == y {
+    Builtin.trap()
+  }
+}
