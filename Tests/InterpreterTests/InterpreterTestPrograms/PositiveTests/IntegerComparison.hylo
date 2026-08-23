@@ -1,4 +1,259 @@
 public fun main() {
-  let x = 2
-  if x == 2 {}
+
+  // UInt8
+  if !((2 as UInt8) == (2 as UInt8)) { Builtin.trap() }
+  if (2 as UInt8) == (3 as UInt8) { Builtin.trap() }
+
+  if (2 as UInt8) != (2 as UInt8) { Builtin.trap() }
+  if !((2 as UInt8) != (3 as UInt8)) { Builtin.trap() }
+
+  if !((2 as UInt8) < (3 as UInt8)) { Builtin.trap() }
+  if (3 as UInt8) < (2 as UInt8) { Builtin.trap() }
+
+  if !((3 as UInt8) > (2 as UInt8)) { Builtin.trap() }
+  if (2 as UInt8) > (3 as UInt8) { Builtin.trap() }
+
+  if !((2 as UInt8) <= (3 as UInt8)) { Builtin.trap() }
+  if !((3 as UInt8) <= (3 as UInt8)) { Builtin.trap() }
+  if (3 as UInt8) <= (2 as UInt8) { Builtin.trap() }
+
+  if !((3 as UInt8) >= (2 as UInt8)) { Builtin.trap() }
+  if !((3 as UInt8) >= (3 as UInt8)) { Builtin.trap() }
+  if (2 as UInt8) >= (3 as UInt8) { Builtin.trap() }
+
+  // UInt16
+  if !((2 as UInt16) == (2 as UInt16)) { Builtin.trap() }
+  if (2 as UInt16) == (3 as UInt16) { Builtin.trap() }
+
+  if (2 as UInt16) != (2 as UInt16) { Builtin.trap() }
+  if !((2 as UInt16) != (3 as UInt16)) { Builtin.trap() }
+
+  if !((2 as UInt16) < (3 as UInt16)) { Builtin.trap() }
+  if (3 as UInt16) < (2 as UInt16) { Builtin.trap() }
+
+  if !((3 as UInt16) > (2 as UInt16)) { Builtin.trap() }
+  if (2 as UInt16) > (3 as UInt16) { Builtin.trap() }
+
+  if !((2 as UInt16) <= (3 as UInt16)) { Builtin.trap() }
+  if !((3 as UInt16) <= (3 as UInt16)) { Builtin.trap() }
+  if (3 as UInt16) <= (2 as UInt16) { Builtin.trap() }
+
+  if !((3 as UInt16) >= (2 as UInt16)) { Builtin.trap() }
+  if !((3 as UInt16) >= (3 as UInt16)) { Builtin.trap() }
+  if (2 as UInt16) >= (3 as UInt16) { Builtin.trap() }
+
+  // UInt32
+  if !((2 as UInt32) == (2 as UInt32)) { Builtin.trap() }
+  if (2 as UInt32) == (3 as UInt32) { Builtin.trap() }
+
+  if (2 as UInt32) != (2 as UInt32) { Builtin.trap() }
+  if !((2 as UInt32) != (3 as UInt32)) { Builtin.trap() }
+
+  if !((2 as UInt32) < (3 as UInt32)) { Builtin.trap() }
+  if (3 as UInt32) < (2 as UInt32) { Builtin.trap() }
+
+  if !((3 as UInt32) > (2 as UInt32)) { Builtin.trap() }
+  if (2 as UInt32) > (3 as UInt32) { Builtin.trap() }
+
+  if !((2 as UInt32) <= (3 as UInt32)) { Builtin.trap() }
+  if !((3 as UInt32) <= (3 as UInt32)) { Builtin.trap() }
+  if (3 as UInt32) <= (2 as UInt32) { Builtin.trap() }
+
+  if !((3 as UInt32) >= (2 as UInt32)) { Builtin.trap() }
+  if !((3 as UInt32) >= (3 as UInt32)) { Builtin.trap() }
+  if (2 as UInt32) >= (3 as UInt32) { Builtin.trap() }
+
+  // UInt64
+  if !((2 as UInt64) == (2 as UInt64)) { Builtin.trap() }
+  if (2 as UInt64) == (3 as UInt64) { Builtin.trap() }
+
+  if (2 as UInt64) != (2 as UInt64) { Builtin.trap() }
+  if !((2 as UInt64) != (3 as UInt64)) { Builtin.trap() }
+
+  if !((2 as UInt64) < (3 as UInt64)) { Builtin.trap() }
+  if (3 as UInt64) < (2 as UInt64) { Builtin.trap() }
+
+  if !((3 as UInt64) > (2 as UInt64)) { Builtin.trap() }
+  if (2 as UInt64) > (3 as UInt64) { Builtin.trap() }
+
+  if !((2 as UInt64) <= (3 as UInt64)) { Builtin.trap() }
+  if !((3 as UInt64) <= (3 as UInt64)) { Builtin.trap() }
+  if (3 as UInt64) <= (2 as UInt64) { Builtin.trap() }
+
+  if !((3 as UInt64) >= (2 as UInt64)) { Builtin.trap() }
+  if !((3 as UInt64) >= (3 as UInt64)) { Builtin.trap() }
+  if (2 as UInt64) >= (3 as UInt64) { Builtin.trap() }
+  
+  // Int8
+  if !((-2 as Int8) == (-2 as Int8)) { Builtin.trap() }
+  if !((2 as Int8) == (2 as Int8)) { Builtin.trap() }
+  if (-2 as Int8) == (2 as Int8) { Builtin.trap() }
+  if (2 as Int8) == (-2 as Int8) { Builtin.trap() }
+
+  if (-2 as Int8) != (-2 as Int8) { Builtin.trap() }
+  if (2 as Int8) != (2 as Int8) { Builtin.trap() }
+  if !((-2 as Int8) != (2 as Int8)) { Builtin.trap() }
+  if !((2 as Int8) != (-2 as Int8)) { Builtin.trap() }
+
+  if !((2 as Int8) < (3 as Int8)) { Builtin.trap() }
+  if (3 as Int8) < (2 as Int8) { Builtin.trap() }
+  if !((-2 as Int8) < (3 as Int8)) { Builtin.trap() }
+  if (3 as Int8) < (-2 as Int8) { Builtin.trap() }
+  if !((-3 as Int8) < (-2 as Int8)) { Builtin.trap() }
+  if (-2 as Int8) < (-3 as Int8) { Builtin.trap() }
+
+  if !((2 as Int8) <= (3 as Int8)) { Builtin.trap() }
+  if (3 as Int8) <= (2 as Int8) { Builtin.trap() }
+  if !((-2 as Int8) <= (3 as Int8)) { Builtin.trap() }
+  if (3 as Int8) <= (-2 as Int8) { Builtin.trap() }
+  if !((-3 as Int8) <= (-2 as Int8)) { Builtin.trap() }
+  if (-2 as Int8) <= (-3 as Int8) { Builtin.trap() }
+  if !((2 as Int8) <= (2 as Int8)) { Builtin.trap() }
+  if !((-2 as Int8) <= (-2 as Int8)) { Builtin.trap() }
+
+  if (2 as Int8) > (3 as Int8) { Builtin.trap() }
+  if !((3 as Int8) > (2 as Int8)) { Builtin.trap() }
+  if (-2 as Int8) > (3 as Int8) { Builtin.trap() }
+  if !((3 as Int8) > (-2 as Int8)) { Builtin.trap() }
+  if (-3 as Int8) > (-2 as Int8) { Builtin.trap() }
+  if !((-2 as Int8) > (-3 as Int8)) { Builtin.trap() }
+
+  if (2 as Int8) >= (3 as Int8) { Builtin.trap() }
+  if !((3 as Int8) >= (2 as Int8)) { Builtin.trap() }
+  if (-2 as Int8) >= (3 as Int8) { Builtin.trap() }
+  if !((3 as Int8) >= (-2 as Int8)) { Builtin.trap() }
+  if (-3 as Int8) >= (-2 as Int8) { Builtin.trap() }
+  if !((-2 as Int8) >= (-3 as Int8)) { Builtin.trap() }
+  if !((2 as Int8) >= (2 as Int8)) { Builtin.trap() }
+  if !((-2 as Int8) >= (-2 as Int8)) { Builtin.trap() }
+  
+  // Int16
+  if !((-2 as Int16) == (-2 as Int16)) { Builtin.trap() }
+  if !((2 as Int16) == (2 as Int16)) { Builtin.trap() }
+  if (-2 as Int16) == (2 as Int16) { Builtin.trap() }
+  if (2 as Int16) == (-2 as Int16) { Builtin.trap() }
+
+  if (-2 as Int16) != (-2 as Int16) { Builtin.trap() }
+  if (2 as Int16) != (2 as Int16) { Builtin.trap() }
+  if !((-2 as Int16) != (2 as Int16)) { Builtin.trap() }
+  if !((2 as Int16) != (-2 as Int16)) { Builtin.trap() }
+
+  if !((2 as Int16) < (3 as Int16)) { Builtin.trap() }
+  if (3 as Int16) < (2 as Int16) { Builtin.trap() }
+  if !((-2 as Int16) < (3 as Int16)) { Builtin.trap() }
+  if (3 as Int16) < (-2 as Int16) { Builtin.trap() }
+  if !((-3 as Int16) < (-2 as Int16)) { Builtin.trap() }
+  if (-2 as Int16) < (-3 as Int16) { Builtin.trap() }
+
+  if !((2 as Int16) <= (3 as Int16)) { Builtin.trap() }
+  if (3 as Int16) <= (2 as Int16) { Builtin.trap() }
+  if !((-2 as Int16) <= (3 as Int16)) { Builtin.trap() }
+  if (3 as Int16) <= (-2 as Int16) { Builtin.trap() }
+  if !((-3 as Int16) <= (-2 as Int16)) { Builtin.trap() }
+  if (-2 as Int16) <= (-3 as Int16) { Builtin.trap() }
+  if !((2 as Int16) <= (2 as Int16)) { Builtin.trap() }
+  if !((-2 as Int16) <= (-2 as Int16)) { Builtin.trap() }
+
+  if (2 as Int16) > (3 as Int16) { Builtin.trap() }
+  if !((3 as Int16) > (2 as Int16)) { Builtin.trap() }
+  if (-2 as Int16) > (3 as Int16) { Builtin.trap() }
+  if !((3 as Int16) > (-2 as Int16)) { Builtin.trap() }
+  if (-3 as Int16) > (-2 as Int16) { Builtin.trap() }
+  if !((-2 as Int16) > (-3 as Int16)) { Builtin.trap() }
+
+  if (2 as Int16) >= (3 as Int16) { Builtin.trap() }
+  if !((3 as Int16) >= (2 as Int16)) { Builtin.trap() }
+  if (-2 as Int16) >= (3 as Int16) { Builtin.trap() }
+  if !((3 as Int16) >= (-2 as Int16)) { Builtin.trap() }
+  if (-3 as Int16) >= (-2 as Int16) { Builtin.trap() }
+  if !((-2 as Int16) >= (-3 as Int16)) { Builtin.trap() }
+  if !((2 as Int16) >= (2 as Int16)) { Builtin.trap() }
+  if !((-2 as Int16) >= (-2 as Int16)) { Builtin.trap() }
+  
+  // Int32
+  if !((-2 as Int32) == (-2 as Int32)) { Builtin.trap() }
+  if !((2 as Int32) == (2 as Int32)) { Builtin.trap() }
+  if (-2 as Int32) == (2 as Int32) { Builtin.trap() }
+  if (2 as Int32) == (-2 as Int32) { Builtin.trap() }
+
+  if (-2 as Int32) != (-2 as Int32) { Builtin.trap() }
+  if (2 as Int32) != (2 as Int32) { Builtin.trap() }
+  if !((-2 as Int32) != (2 as Int32)) { Builtin.trap() }
+  if !((2 as Int32) != (-2 as Int32)) { Builtin.trap() }
+
+  if !((2 as Int32) < (3 as Int32)) { Builtin.trap() }
+  if (3 as Int32) < (2 as Int32) { Builtin.trap() }
+  if !((-2 as Int32) < (3 as Int32)) { Builtin.trap() }
+  if (3 as Int32) < (-2 as Int32) { Builtin.trap() }
+  if !((-3 as Int32) < (-2 as Int32)) { Builtin.trap() }
+  if (-2 as Int32) < (-3 as Int32) { Builtin.trap() }
+
+  if !((2 as Int32) <= (3 as Int32)) { Builtin.trap() }
+  if (3 as Int32) <= (2 as Int32) { Builtin.trap() }
+  if !((-2 as Int32) <= (3 as Int32)) { Builtin.trap() }
+  if (3 as Int32) <= (-2 as Int32) { Builtin.trap() }
+  if !((-3 as Int32) <= (-2 as Int32)) { Builtin.trap() }
+  if (-2 as Int32) <= (-3 as Int32) { Builtin.trap() }
+  if !((2 as Int32) <= (2 as Int32)) { Builtin.trap() }
+  if !((-2 as Int32) <= (-2 as Int32)) { Builtin.trap() }
+
+  if (2 as Int32) > (3 as Int32) { Builtin.trap() }
+  if !((3 as Int32) > (2 as Int32)) { Builtin.trap() }
+  if (-2 as Int32) > (3 as Int32) { Builtin.trap() }
+  if !((3 as Int32) > (-2 as Int32)) { Builtin.trap() }
+  if (-3 as Int32) > (-2 as Int32) { Builtin.trap() }
+  if !((-2 as Int32) > (-3 as Int32)) { Builtin.trap() }
+
+  if (2 as Int32) >= (3 as Int32) { Builtin.trap() }
+  if !((3 as Int32) >= (2 as Int32)) { Builtin.trap() }
+  if (-2 as Int32) >= (3 as Int32) { Builtin.trap() }
+  if !((3 as Int32) >= (-2 as Int32)) { Builtin.trap() }
+  if (-3 as Int32) >= (-2 as Int32) { Builtin.trap() }
+  if !((-2 as Int32) >= (-3 as Int32)) { Builtin.trap() }
+  if !((2 as Int32) >= (2 as Int32)) { Builtin.trap() }
+  if !((-2 as Int32) >= (-2 as Int32)) { Builtin.trap() }
+  
+  // Int64
+  if !((-2 as Int64) == (-2 as Int64)) { Builtin.trap() }
+  if !((2 as Int64) == (2 as Int64)) { Builtin.trap() }
+  if (-2 as Int64) == (2 as Int64) { Builtin.trap() }
+  if (2 as Int64) == (-2 as Int64) { Builtin.trap() }
+
+  if (-2 as Int64) != (-2 as Int64) { Builtin.trap() }
+  if (2 as Int64) != (2 as Int64) { Builtin.trap() }
+  if !((-2 as Int64) != (2 as Int64)) { Builtin.trap() }
+  if !((2 as Int64) != (-2 as Int64)) { Builtin.trap() }
+
+  if !((2 as Int64) < (3 as Int64)) { Builtin.trap() }
+  if (3 as Int64) < (2 as Int64) { Builtin.trap() }
+  if !((-2 as Int64) < (3 as Int64)) { Builtin.trap() }
+  if (3 as Int64) < (-2 as Int64) { Builtin.trap() }
+  if !((-3 as Int64) < (-2 as Int64)) { Builtin.trap() }
+  if (-2 as Int64) < (-3 as Int64) { Builtin.trap() }
+
+  if !((2 as Int64) <= (3 as Int64)) { Builtin.trap() }
+  if (3 as Int64) <= (2 as Int64) { Builtin.trap() }
+  if !((-2 as Int64) <= (3 as Int64)) { Builtin.trap() }
+  if (3 as Int64) <= (-2 as Int64) { Builtin.trap() }
+  if !((-3 as Int64) <= (-2 as Int64)) { Builtin.trap() }
+  if (-2 as Int64) <= (-3 as Int64) { Builtin.trap() }
+  if !((2 as Int64) <= (2 as Int64)) { Builtin.trap() }
+  if !((-2 as Int64) <= (-2 as Int64)) { Builtin.trap() }
+
+  if (2 as Int64) > (3 as Int64) { Builtin.trap() }
+  if !((3 as Int64) > (2 as Int64)) { Builtin.trap() }
+  if (-2 as Int64) > (3 as Int64) { Builtin.trap() }
+  if !((3 as Int64) > (-2 as Int64)) { Builtin.trap() }
+  if (-3 as Int64) > (-2 as Int64) { Builtin.trap() }
+  if !((-2 as Int64) > (-3 as Int64)) { Builtin.trap() }
+
+  if (2 as Int64) >= (3 as Int64) { Builtin.trap() }
+  if !((3 as Int64) >= (2 as Int64)) { Builtin.trap() }
+  if (-2 as Int64) >= (3 as Int64) { Builtin.trap() }
+  if !((3 as Int64) >= (-2 as Int64)) { Builtin.trap() }
+  if (-3 as Int64) >= (-2 as Int64) { Builtin.trap() }
+  if !((-2 as Int64) >= (-3 as Int64)) { Builtin.trap() }
+  if !((2 as Int64) >= (2 as Int64)) { Builtin.trap() }
+  if !((-2 as Int64) >= (-2 as Int64)) { Builtin.trap() }
+
 }
