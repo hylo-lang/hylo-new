@@ -1,12 +1,9 @@
 import FrontEnd
 import Interpreter
-import Testing
 import XCTest
 
-@Suite
 final class InterpreterRunTests {
 
-  @Test
   func testPositiveTestProgramsRun() async throws {
     let u = Bundle.module.url(
       forResource: "InterpreterTestPrograms/PositiveTests", withExtension: nil)!
@@ -15,9 +12,6 @@ final class InterpreterRunTests {
       includingPropertiesForKeys: nil
     )
     for f in fs {
-      if !f.absoluteString.contains("Compar") {
-        continue
-      }
       print(f)  // TODO: kept for debugging and observability.
       let p = try await Program.loadForInterpretation(sourceRoot: f)
       try p.interpret()
