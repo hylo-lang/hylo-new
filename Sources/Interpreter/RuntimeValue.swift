@@ -44,7 +44,7 @@ extension RuntimeValue {
     let w = l.size * 8
     precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
-    self.init(integer: 1, bitWidth: w, alignment: l.alignment)
+    self.init(integer: b ? 1 : 0, bitWidth: w, alignment: l.alignment)
   }
 
   /// Returns the result of calling `body` on a pointer to the value's bytes
