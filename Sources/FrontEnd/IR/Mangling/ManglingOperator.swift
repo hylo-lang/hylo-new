@@ -60,6 +60,9 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts an existentialized function declaration symbol.
   case existentializedDeclaration = "eF"
 
+  /// Starts the declaration of a partially applied function symbol.
+  case appliedDeclaration = "aF"
+
   /// Starts a slide declaration symbol.
   case slideDeclaration = "lF"
 
@@ -235,6 +238,7 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
     .synthesizedFunctionDeclaration,
     .implementationDeclaration,
     .existentializedDeclaration,
+    .appliedDeclaration,
     .slideDeclaration,
     .plateauDeclaration,
     .genericParameterDeclaration,
