@@ -421,6 +421,14 @@ public struct Interpreter {
       let rhs = try self[arguments[1]]
       let r = p(lhs, rhs, bitWidth: w)
       return .init(r, havingLayout: memory.layout(.i(1)).whole)
+    case .zeroinitializer(let t):
+      let l = memory.layout(t)
+      let u = program.types[t]
+      return switch u {
+      case .i(_): .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
+      case .word: .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
+      default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
+      }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
     }
   }
