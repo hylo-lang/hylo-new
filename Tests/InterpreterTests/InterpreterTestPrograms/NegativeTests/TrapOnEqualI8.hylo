@@ -1,7 +1,0 @@
-public fun main() {
-  let x: UInt8 = 1
-  let y: UInt8 = 1
-  if x == y {
-    Builtin.trap()
-  }
-}

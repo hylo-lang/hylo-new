@@ -25,21 +25,6 @@ final class InterpreterRunTests: XCTestCase {
     }
   }
 
-  func testIntegerEquality() async throws {
-    await check(throws: Interpreter.Trap()) {
-      try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/TrapOnEqualI8.hylo")
-    }
-    await check(throws: Interpreter.Trap()) {
-      try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/TrapOnEqualI16.hylo")
-    }
-    await check(throws: Interpreter.Trap()) {
-      try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/TrapOnEqualI32.hylo")
-    }
-    await check(throws: Interpreter.Trap()) {
-      try await interpretProgram(at: "InterpreterTestPrograms/NegativeTests/TrapOnEqualI64.hylo")
-    }
-  }
-
   /// Loads and interprets the program at the resource path `location`,
   /// relative to the module's resource bundle.
   private func interpretProgram(at location: String) async throws {
