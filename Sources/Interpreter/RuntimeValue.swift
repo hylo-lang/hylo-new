@@ -41,10 +41,10 @@ extension RuntimeValue {
 
   /// Creates an instance of `MachineType.i(1)` having value `b` and layout `l`.
   public init(_ b: Bool, havingLayout l: TypeLayout.Bytes) {
-    let w = l.size
+    let w = l.size * 8
     precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
-    self.init(integer: 1, bitWidth: w * 8, alignment: l.alignment)
+    self.init(integer: 1, bitWidth: w, alignment: l.alignment)
   }
 
   /// Returns the result of calling `body` on a pointer to the value's bytes
@@ -67,22 +67,39 @@ extension RuntimeValue {
     withUnsafePointer(to: UInt8.self) { $0.pointee != 0 }
   }
 
-  /// Returns the unsigned interpretation of `t`.
+  /// The 8-bit unsigned value.
   ///
-  /// - Precondition: `self` is an instance of `t`.
-  public func unsignedIntValue(ofType t: MachineType) -> UInt128 {
-    if case .i(let n) = t {
-      return switch n {
-      case 8: UInt128(withUnsafePointer(to: UInt8.self) { $0.pointee })
-      case 16: UInt128(withUnsafePointer(to: UInt16.self) { $0.pointee })
-      case 32: UInt128(withUnsafePointer(to: UInt32.self) { $0.pointee })
-      case 64: UInt128(withUnsafePointer(to: UInt64.self) { $0.pointee })
-      case 128: UInt128(withUnsafePointer(to: UInt128.self) { $0.pointee })
-      default: fatalError("Unknown builtin integer size \(n).")
-      }
-    } else {
-      preconditionFailure("Unrecognized builtin integer type: \(t)")
-    }
+  /// - Precondition: `self` is an instance of `MachineType.i(8)`.
+  public var i8: UInt8 {
+    withUnsafePointer(to: UInt8.self) { $0.pointee }
+  }
+
+  /// The 16-bit unsigned value.
+  ///
+  /// - Precondition: `self` is an instance of `MachineType.i(16)`.
+  public var i16: UInt16 {
+    withUnsafePointer(to: UInt16.self) { $0.pointee }
+  }
+
+  /// The 32-bit unsigned value.
+  ///
+  /// - Precondition: `self` is an instance of `MachineType.i(32)`.
+  public var i32: UInt32 {
+    withUnsafePointer(to: UInt32.self) { $0.pointee }
+  }
+
+  /// The 64-bit unsigned value.
+  ///
+  /// - Precondition: `self` is an instance of `MachineType.i(64)`.
+  public var i64: UInt64 {
+    withUnsafePointer(to: UInt64.self) { $0.pointee }
+  }
+
+  /// The 128-bit unsigned value.
+  ///
+  /// - Precondition: `self` is an instance of `MachineType.i(128)`.
+  public var i128: UInt128 {
+    withUnsafePointer(to: UInt128.self) { $0.pointee }
   }
 
 }
