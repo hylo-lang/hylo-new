@@ -311,18 +311,14 @@ public struct TypeStore: Sendable {
   /// Returns the canonical representation of a tuple containing the given elements.
   ///
   /// The result is `.void` if `elements` is empty. Otherwise, it is an instance of `Tuple`.
-  public mutating func tuple<S: Sequence<AnyTypeIdentity>>(of elements: S) -> AnyTypeIdentity {
-    let xs = elements.reversed()
-
-    if xs.count == 0 {
-      return .void
-    } else {
-      var result = demand(Tuple.empty)
-      for e in elements.reversed() {
-        result = demand(Tuple.cons(head: e, tail: result.erased))
-      }
-      return result.erased
+  public mutating func tuple<S: Sequence>(
+    of elements: S
+  ) -> AnyTypeIdentity where S.Element: TypeIdentity{
+    var result = demand(Tuple.empty)
+    for e in elements.reversed() {
+      result = demand(Tuple.cons(head: e.erased, tail: result.erased))
     }
+    return result.erased
   }
 
   /// Returns the canonical representation of a tuple of `count` instances of `element`.
