@@ -1,0 +1,4 @@
+public fun main() {
+  let x = 2
+  if x == 2 {}
+}

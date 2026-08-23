@@ -305,6 +305,13 @@ extension Memory {
     return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
   }
 
+  /// Returns the address of `f` in `whole`.
+  public mutating func location(ofField f: String, in whole: TypedAddress) -> TypedAddress {
+    let (t, o) =
+      typeLayouts.typeAndOffset(ofField: f, within: whole.type, definedIn: &program)
+    return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
+  }
+
   /// Returns the value stored at `p`.
   private mutating func read(from p: Memory.TypedAddress) -> RuntimeValue {
     let l = layout(p.type)

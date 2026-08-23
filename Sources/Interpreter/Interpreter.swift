@@ -276,7 +276,8 @@ public struct Interpreter {
     case let x as IRRegionEnd<IRProject>:
       _ = x
     case let x as IRProperty:
-      _ = x
+      let l = x.record.location(ofField: x.property, in: &self)
+      return initializeRegister(to: l)
     case is IRReturn:
       for a in topOfStack.allocations.reversed() {
         try memory.deallocate(a)
@@ -418,6 +419,19 @@ extension IRValue {
   ) -> Memory.TypedAddress {
     let a = executor.address(of: self)
     return executor.memory.location(p, in: a)
+  }
+
+  /// Returns the address of field `f` in the address pointed by `self`, in
+  /// the current execution state of `executor`.
+  ///
+  /// - Precondition: `self` contains a place.
+  fileprivate func location(
+    ofField f: DeclarationIdentity,
+    in executor: inout Interpreter
+  ) -> Memory.TypedAddress {
+    let a = executor.address(of: self)
+    let n = executor.program.name(of: f)!.identifier
+    return executor.memory.location(ofField: n, in: a)
   }
 
 }
