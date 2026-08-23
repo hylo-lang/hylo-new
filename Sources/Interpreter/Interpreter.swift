@@ -343,7 +343,8 @@ public struct Interpreter {
 
   /// Returns the value corresponding to `v` in the current execution state.
   ///
-  /// - Precondition: `v` is a runtimve value.
+  /// - Precondition: `v` is a runtime value or a place obtained from an
+  ///   access instruction.
   private subscript(_ v: IRValue) -> RuntimeValue {
     mutating get throws {
       switch v {
@@ -357,6 +358,8 @@ public struct Interpreter {
         }
 
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
+      case .parameter(let i):
+        return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
         let l = memory.layout(t)
         return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
