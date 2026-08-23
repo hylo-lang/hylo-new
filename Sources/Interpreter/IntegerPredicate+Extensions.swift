@@ -88,7 +88,6 @@ extension IntegerPredicate {
     bitWidth w: Int
   ) -> Bool {
     switch w {
-    case 1: self(lhs.bool ? UInt8(1) : 0, rhs.bool ? UInt8(1) : 0)
     case 8: self(lhs.i8, rhs.i8)
     case 16: self(lhs.i16, rhs.i16)
     case 32: self(lhs.i32, rhs.i32)
