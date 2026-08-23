@@ -39,6 +39,14 @@ extension RuntimeValue {
     self.init(bytes: byteRepresentation(r, bitWidth: w), havingAlignment: a)
   }
 
+  /// Creates an instance of `MachineType.i(1)` having value `b` and layout `l`.
+  public init(_ b: Bool, havingLayout l: TypeLayout.Bytes) {
+    let w = l.size
+    precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
+
+    self.init(integer: 1, bitWidth: w * 8, alignment: l.alignment)
+  }
+
   /// Returns the result of calling `body` on a pointer to the value's bytes
   /// interpreted as a `T` instance.
   ///
@@ -57,6 +65,24 @@ extension RuntimeValue {
   /// - Precondition: `self` is an instance of `MachineType.i(1)`.
   public var bool: Bool {
     withUnsafePointer(to: UInt8.self) { $0.pointee != 0 }
+  }
+
+  /// Returns the unsigned interpretation of `t`.
+  ///
+  /// - Precondition: `self` is an instance of `t`.
+  public func unsignedIntValue(ofType t: MachineType) -> UInt128 {
+    if case .i(let n) = t {
+      return switch n {
+      case 8: UInt128(withUnsafePointer(to: UInt8.self) { $0.pointee })
+      case 16: UInt128(withUnsafePointer(to: UInt16.self) { $0.pointee })
+      case 32: UInt128(withUnsafePointer(to: UInt32.self) { $0.pointee })
+      case 64: UInt128(withUnsafePointer(to: UInt64.self) { $0.pointee })
+      case 128: UInt128(withUnsafePointer(to: UInt128.self) { $0.pointee })
+      default: fatalError("Unknown builtin integer size \(n).")
+      }
+    } else {
+      preconditionFailure("Unrecognized builtin integer type: \(t)")
+    }
   }
 
 }
