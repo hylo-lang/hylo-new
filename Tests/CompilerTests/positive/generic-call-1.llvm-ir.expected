@@ -26,3 +26,12 @@ define private i32 @"$hlPM6TestUggenericcall1F06mainlT01tR50sTR0UbGeneratedS7Int
   %8 = extractvalue [2 x ptr] %6, 1
   br label %9
 
+9:                                                ; preds = %4
+  %10 = getelementptr inbounds %"$hpTcTM6TestUggenericcall1C3P1gcTK20tR5$jJ5J", ptr %0, i32 0, i32 0
+  %11 = load ptr, ptr %10, align 8
+  %12 = load %"$hpTcTM6TestUggenericcall1C3P1gcTK20L4$jJ5J", ptr %0, align 8
+  %13 = call %"$hsTR0UbGeneratedS7Int32" %11(%"$hpTcTM6TestUggenericcall1C3P1gcTK20L4$jJ5J" %12, ptr %8)
+  store %"$hsTR0UbGeneratedS7Int32" %13, ptr %7, align 8
+  call void %2(ptr %3)
+  ret i32 0
+}
