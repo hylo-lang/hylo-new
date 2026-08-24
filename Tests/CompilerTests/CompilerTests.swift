@@ -31,9 +31,12 @@ struct CompilerTests {
     /// The manifest of the test.
     let manifest: Manifest
 
-    /// Creates an instance with the given properties.
-    init(_ path: String) throws {
-      self.root = URL(filePath: path)
+    /// Creates an instance for the program at `location`, given as an absolute file URL string.
+    init(_ location: String) throws {
+      guard let r = URL(string: location), r.isFileURL else {
+        throw TestFailure.invalidTestDescription("not a valid file URL: \(location)")
+      }
+      self.root = r
       self.manifest = try Manifest(contentsOf: root)
     }
 

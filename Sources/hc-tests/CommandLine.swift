@@ -112,7 +112,7 @@ import Foundation
       result += """
 
           @Test func negative_\(i)() async throws {
-            try await negative(.init("\(u.absoluteURL.path(percentEncoded: false))"))
+            try await negative(.init("\(u.absoluteURL.absoluteString)"))
           }
 
         """
@@ -123,7 +123,7 @@ import Foundation
       result += """
 
           @Test func positive_\(i)() async throws {
-            try await positive(.init("\(u.absoluteURL.path(percentEncoded: false))"))
+            try await positive(.init("\(u.absoluteURL.absoluteString)"))
           }
 
         """
