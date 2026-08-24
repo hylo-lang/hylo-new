@@ -40,7 +40,7 @@ extension RuntimeValue {
   }
 
   /// Creates an instance of `MachineType.i(1)` having value `b` and layout `l`.
-  public init(_ b: Bool, havingLayout l: TypeLayout.Bytes) {
+  public init(bool b: Bool, havingLayout l: TypeLayout.Bytes) {
     let w = l.size * 8
     precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 

@@ -39,6 +39,16 @@ final class RuntimeValueTests: XCTestCase {
       withUnsafeBytes(of: UInt128(1), Array.init)[...])
   }
 
+  func testRuntimeValueBoolInitializer() {
+    let f = RuntimeValue(bool: false, havingLayout: .init(alignment: 1, size: 1))
+    XCTAssertFalse(f.bool)
+    XCTAssertEqual(f.bytes, [0])
+
+    let t = RuntimeValue(bool: true, havingLayout: .init(alignment: 1, size: 1))
+    XCTAssertTrue(t.bool)
+    XCTAssertEqual(t.bytes, [1])
+  }
+
   func testRuntimeValueAlignment() {
     for i in 1...10 {
       let b = Array(repeating: UInt8(0), count: i)
