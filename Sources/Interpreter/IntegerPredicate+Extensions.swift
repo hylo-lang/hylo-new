@@ -2,7 +2,7 @@ import FrontEnd
 
 extension IntegerPredicate {
 
-  /// Returns the result of `self(lhs, rhs)`.
+  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
   public func callAsFunction(_ lhs: UInt128, _ rhs: UInt128) -> Bool {
     switch self {
     case .eq: lhs == rhs
@@ -18,7 +18,7 @@ extension IntegerPredicate {
     }
   }
 
-  /// Returns the result of `self(lhs, rhs)`.
+  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
   public func callAsFunction(_ lhs: UInt64, _ rhs: UInt64) -> Bool {
     switch self {
     case .eq: lhs == rhs
@@ -34,7 +34,7 @@ extension IntegerPredicate {
     }
   }
 
-  /// Returns the result of `self(lhs, rhs)`.
+  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
   public func callAsFunction(_ lhs: UInt32, _ rhs: UInt32) -> Bool {
     switch self {
     case .eq: lhs == rhs
@@ -50,7 +50,7 @@ extension IntegerPredicate {
     }
   }
 
-  /// Returns the result of `self(lhs, rhs)`.
+  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
   public func callAsFunction(_ lhs: UInt16, _ rhs: UInt16) -> Bool {
     switch self {
     case .eq: lhs == rhs
@@ -66,7 +66,7 @@ extension IntegerPredicate {
     }
   }
 
-  /// Returns the result of `self(lhs, rhs)`.
+  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
   public func callAsFunction(_ lhs: UInt8, _ rhs: UInt8) -> Bool {
     switch self {
     case .eq: lhs == rhs
@@ -82,7 +82,8 @@ extension IntegerPredicate {
     }
   }
 
-  /// Returns result of `self(lhs, rhs)`, where `lhs` and `rhs` are `w`-bit integers.
+  /// Returns whether `lhs` satisfies `self` with respect to `rhs` where `lhs`
+  /// and `rhs` are `w`-bit integers.
   internal func callAsFunction(
     _ lhs: RuntimeValue, _ rhs: RuntimeValue,
     bitWidth w: Int
