@@ -51,14 +51,14 @@ private func standardLibraryProgram() async throws -> Program {
 }
 
 /// Returns a stable folder for caching compilation artifacts, persistent across test runs
-/// with the same executable.
+/// with the same compiler.
 private func sharedModuleCachePath() throws -> URL {
   let root = URL(filePath: #filePath)
     .deletingLastPathComponent()
     .deletingLastPathComponent()
     .deletingLastPathComponent()  
     .appending(components: ".build", "hylo-test-module-cache")
-  let key = try currentBinaryFingerprint()
+  let key = try compilerFingerprint()
   let path = root.appending(component: key)
 
   let m = FileManager.default
@@ -74,22 +74,38 @@ private func sharedModuleCachePath() throws -> URL {
   return path
 }
 
-/// Returns a fingerprint of the binary containing the compiler code under test.
+/// Returns a fingerprint of the compiler under test, derived from the `hc` executable built
+/// alongside the test bundle.
 ///
-/// The fingerprint captures the last modification time and file size.
-private func currentBinaryFingerprint() throws -> String {
-  let binary = currentBinary()
-  var h = FNV1.native()
-  h.combine(binary.path)
+/// The fingerprint captures the executable's path, last modification time, and file size. Unlike
+/// the test binary—which all test targets link into—`hc` is relinked only when the compiler's
+/// code changes, so the fingerprint is stable across edits to test code.
+private func compilerFingerprint() throws -> String {
+  let binary = try compilerBinary()
   let a = try FileManager.default.attributesOfItem(atPath: binary.path)
-  if let d = a[.modificationDate] as? Date {
-    h.combine(d.timeIntervalSince1970.bitPattern)
-  }
-  if let s = a[.size] as? NSNumber {
-    h.combine(s.uint64Value)
+  guard let d = a[.modificationDate] as? Date, let s = a[.size] as? NSNumber else {
+    throw TestEnvironmentError("no modification date or size for '\(binary.path)'")
   }
 
+  var h = FNV1.native()
+  h.combine(binary.path)
+  h.combine(d.timeIntervalSince1970.bitPattern)
+  h.combine(s.uint64Value)
   return String(UInt(bitPattern: h.state), radix: 16)
+}
+
+/// Returns the path of the `hc` executable in the build folder containing the test bundle.
+private func compilerBinary() throws -> URL {
+  // On Linux the test binary sits directly in the build folder; on macOS it is nested inside an
+  // .xctest bundle, hence the upward search.
+  var d = currentBinary().deletingLastPathComponent()
+  for _ in 0 ..< 4 {
+    let c = d.appending(component: "hc")
+    if FileManager.default.isExecutableFile(atPath: c.path) { return c }
+    d = d.deletingLastPathComponent()
+  }
+  throw TestEnvironmentError(
+    "no 'hc' executable found next to '\(currentBinary().path)'; run the tests with 'swift test'")
 }
 
 /// Returns the path to the binary in which this code is running.
@@ -100,3 +116,16 @@ private func currentBinary() -> URL {
 
 /// A token used to locate the bundle containing the test.
 private final class BundleToken {}
+
+/// An error indicating that the environment running the tests is not set up as expected.
+private struct TestEnvironmentError: Error, CustomStringConvertible {
+
+  /// A description of the defect.
+  let description: String
+
+  /// Creates an instance with the given description.
+  init(_ description: String) {
+    self.description = description
+  }
+
+}

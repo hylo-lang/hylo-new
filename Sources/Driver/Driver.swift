@@ -223,7 +223,8 @@ public struct Driver {
         let hyloObjects = try emitObjectFiles(for: modulesToLink, into: d)
         var cObjects: [URL] = []
         for s in cSources {
-          cObjects.append(try await compileCToObject(source: s, destinationDirectory: d))
+          cObjects.append(
+            try await Self.compileCToObject(source: s, destinationDirectory: d, relocation))
         }
         if let o = shimObject {
           cObjects.append(o)
@@ -271,19 +272,26 @@ public struct Driver {
 
   /// Compiles `source` using `clang` to an object file.
   ///
-  /// Returns the path to the object file within `destinationDirectory`.
-  public func compileCToObject(source: URL, destinationDirectory: URL) async throws -> URL {
+  /// Returns the path to the object file within `d`.
+  public static func compileCToObject(
+    source: URL, destinationDirectory d: URL, _ relocation: RelocationModel
+  ) async throws -> URL {
     let uniquePrefix = source.hashValue
     let fileName = source.deletingPathExtension().appendingPathExtension("o").lastPathComponent
+    let o = d.appendingPathComponent("\(uniquePrefix)-\(fileName)", isDirectory: false)
 
-    let o = destinationDirectory.appendingPathComponent("\(uniquePrefix)-\(fileName)",
-      isDirectory: false)
+    try await Self.compileCToObject(source: source, to: o, relocation)
+    return o
+  }
 
+  /// Compiles `source` using `clang` to an object file.
+  public static func compileCToObject(
+    source: URL, to o: URL, _ relocation: RelocationModel
+  ) async throws {
     var a = ["-c", source.path, "-o", o.path]
     if let r = relocation.asClangArgument { a.append(r) }
 
     _ = try await subprocessOutput(of: .name("clang"), arguments: a)
-    return o
   }
 
   /// Loads `module`, whose sources are at `root`, into `program`.
@@ -631,13 +639,8 @@ public struct Driver {
       // same compilation instead of starting their own.
       let t = Task {
         let d = try FileManager.default.createUniqueTemporaryDirectory()
-        let s = Driver.standardLibraryCShim
         let o = d.appendingPathComponent("shims.o", isDirectory: false)
-
-        var a = ["-c", s.path, "-o", o.path]
-        if let r = relocation.asClangArgument { a.append(r) }
-
-        _ = try await subprocessOutput(of: .name("clang"), arguments: a)
+        try await Driver.compileCToObject(source: Driver.standardLibraryCShim, to: o, relocation)
         return o
       }
       objects[relocation] = t
