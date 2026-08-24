@@ -95,12 +95,14 @@ extension RuntimeValue {
     withUnsafePointer(to: UInt64.self) { $0.pointee }
   }
 
-  /// The 128-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(128)`.
-  public var i128: UInt128 {
-    withUnsafePointer(to: UInt128.self) { $0.pointee }
-  }
+  // TODO: uncomment when 128-bit integer is supported.
+  //
+  // /// The 128-bit unsigned value.
+  // ///
+  // /// - Precondition: `self` is an instance of `MachineType.i(128)`.
+  // public var i128: UInt128 {
+  //   withUnsafePointer(to: UInt128.self) { $0.pointee }
+  // }
 
 }
 

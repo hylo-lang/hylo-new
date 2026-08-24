@@ -3,7 +3,7 @@ import FrontEnd
 extension IntegerPredicate {
 
   /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
-  public func callAsFunction(_ lhs: UInt128, _ rhs: UInt128) -> Bool {
+  public func callAsFunction(_ lhs: UInt8, _ rhs: UInt8) -> Bool {
     switch self {
     case .eq: lhs == rhs
     case .ne: lhs != rhs
@@ -11,42 +11,10 @@ extension IntegerPredicate {
     case .uge: lhs >= rhs
     case .ult: lhs < rhs
     case .ule: lhs <= rhs
-    case .sgt: Int128(bitPattern: lhs) > Int128(bitPattern: rhs)
-    case .sge: Int128(bitPattern: lhs) >= Int128(bitPattern: rhs)
-    case .slt: Int128(bitPattern: lhs) < Int128(bitPattern: rhs)
-    case .sle: Int128(bitPattern: lhs) <= Int128(bitPattern: rhs)
-    }
-  }
-
-  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
-  public func callAsFunction(_ lhs: UInt64, _ rhs: UInt64) -> Bool {
-    switch self {
-    case .eq: lhs == rhs
-    case .ne: lhs != rhs
-    case .ugt: lhs > rhs
-    case .uge: lhs >= rhs
-    case .ult: lhs < rhs
-    case .ule: lhs <= rhs
-    case .sgt: Int64(bitPattern: lhs) > Int64(bitPattern: rhs)
-    case .sge: Int64(bitPattern: lhs) >= Int64(bitPattern: rhs)
-    case .slt: Int64(bitPattern: lhs) < Int64(bitPattern: rhs)
-    case .sle: Int64(bitPattern: lhs) <= Int64(bitPattern: rhs)
-    }
-  }
-
-  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
-  public func callAsFunction(_ lhs: UInt32, _ rhs: UInt32) -> Bool {
-    switch self {
-    case .eq: lhs == rhs
-    case .ne: lhs != rhs
-    case .ugt: lhs > rhs
-    case .uge: lhs >= rhs
-    case .ult: lhs < rhs
-    case .ule: lhs <= rhs
-    case .sgt: Int32(bitPattern: lhs) > Int32(bitPattern: rhs)
-    case .sge: Int32(bitPattern: lhs) >= Int32(bitPattern: rhs)
-    case .slt: Int32(bitPattern: lhs) < Int32(bitPattern: rhs)
-    case .sle: Int32(bitPattern: lhs) <= Int32(bitPattern: rhs)
+    case .sgt: Int8(bitPattern: lhs) > Int8(bitPattern: rhs)
+    case .sge: Int8(bitPattern: lhs) >= Int8(bitPattern: rhs)
+    case .slt: Int8(bitPattern: lhs) < Int8(bitPattern: rhs)
+    case .sle: Int8(bitPattern: lhs) <= Int8(bitPattern: rhs)
     }
   }
 
@@ -67,7 +35,7 @@ extension IntegerPredicate {
   }
 
   /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
-  public func callAsFunction(_ lhs: UInt8, _ rhs: UInt8) -> Bool {
+  public func callAsFunction(_ lhs: UInt32, _ rhs: UInt32) -> Bool {
     switch self {
     case .eq: lhs == rhs
     case .ne: lhs != rhs
@@ -75,12 +43,46 @@ extension IntegerPredicate {
     case .uge: lhs >= rhs
     case .ult: lhs < rhs
     case .ule: lhs <= rhs
-    case .sgt: Int8(bitPattern: lhs) > Int8(bitPattern: rhs)
-    case .sge: Int8(bitPattern: lhs) >= Int8(bitPattern: rhs)
-    case .slt: Int8(bitPattern: lhs) < Int8(bitPattern: rhs)
-    case .sle: Int8(bitPattern: lhs) <= Int8(bitPattern: rhs)
+    case .sgt: Int32(bitPattern: lhs) > Int32(bitPattern: rhs)
+    case .sge: Int32(bitPattern: lhs) >= Int32(bitPattern: rhs)
+    case .slt: Int32(bitPattern: lhs) < Int32(bitPattern: rhs)
+    case .sle: Int32(bitPattern: lhs) <= Int32(bitPattern: rhs)
     }
   }
+
+  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
+  public func callAsFunction(_ lhs: UInt64, _ rhs: UInt64) -> Bool {
+    switch self {
+    case .eq: lhs == rhs
+    case .ne: lhs != rhs
+    case .ugt: lhs > rhs
+    case .uge: lhs >= rhs
+    case .ult: lhs < rhs
+    case .ule: lhs <= rhs
+    case .sgt: Int64(bitPattern: lhs) > Int64(bitPattern: rhs)
+    case .sge: Int64(bitPattern: lhs) >= Int64(bitPattern: rhs)
+    case .slt: Int64(bitPattern: lhs) < Int64(bitPattern: rhs)
+    case .sle: Int64(bitPattern: lhs) <= Int64(bitPattern: rhs)
+    }
+  }
+
+  // TODO: Uncomment when 128-bit integer is supported.
+  //
+  // /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
+  // public func callAsFunction(_ lhs: UInt128, _ rhs: UInt128) -> Bool {
+  //   switch self {
+  //   case .eq: lhs == rhs
+  //   case .ne: lhs != rhs
+  //   case .ugt: lhs > rhs
+  //   case .uge: lhs >= rhs
+  //   case .ult: lhs < rhs
+  //   case .ule: lhs <= rhs
+  //   case .sgt: Int128(bitPattern: lhs) > Int128(bitPattern: rhs)
+  //   case .sge: Int128(bitPattern: lhs) >= Int128(bitPattern: rhs)
+  //   case .slt: Int128(bitPattern: lhs) < Int128(bitPattern: rhs)
+  //   case .sle: Int128(bitPattern: lhs) <= Int128(bitPattern: rhs)
+  //   }
+  // }
 
   /// Returns whether `lhs` satisfies `self` with respect to `rhs` where `lhs`
   /// and `rhs` are `w`-bit integers.
@@ -93,7 +95,9 @@ extension IntegerPredicate {
     case 16: self(lhs.i16, rhs.i16)
     case 32: self(lhs.i32, rhs.i32)
     case 64: self(lhs.i64, rhs.i64)
-    case 128: self(lhs.i128, rhs.i128)
+    // TODO: uncomment when 128-bit integer is supported.
+    //
+    // case 128: self(lhs.i128, rhs.i128)
     default: fatalError("Unknown builtin integer size \(w)")
     }
   }
