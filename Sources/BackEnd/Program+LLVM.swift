@@ -585,7 +585,7 @@ extension Program {
   ///
   /// Code dominated by `i` is compiled into a different function that is passed as a callback to
   /// the subscript. The call to this subscript returns the identifier of the basic block to which
-  /// control-flow should be transferred, if any.
+  /// control flow should be transferred, if any.
   ///
   /// This method extends `ctx.factoredOut` with the basic blocks that have been compiled into the
   /// callback. These basic blocks cannot have been visited yet, since they are dominated by `i`.
