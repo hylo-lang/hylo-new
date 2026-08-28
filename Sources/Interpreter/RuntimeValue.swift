@@ -63,35 +63,35 @@ extension RuntimeValue {
   /// The boolean value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(1)`.
-  public var bool: Bool {
+  public var asBool: Bool {
     withUnsafePointer(to: UInt8.self) { $0.pointee != 0 }
   }
 
   /// The 8-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(8)`.
-  public var i8: UInt8 {
+  public var asI8: UInt8 {
     withUnsafePointer(to: UInt8.self) { $0.pointee }
   }
 
   /// The 16-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(16)`.
-  public var i16: UInt16 {
+  public var asI16: UInt16 {
     withUnsafePointer(to: UInt16.self) { $0.pointee }
   }
 
   /// The 32-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(32)`.
-  public var i32: UInt32 {
+  public var asI32: UInt32 {
     withUnsafePointer(to: UInt32.self) { $0.pointee }
   }
 
   /// The 64-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(64)`.
-  public var i64: UInt64 {
+  public var asI64: UInt64 {
     withUnsafePointer(to: UInt64.self) { $0.pointee }
   }
 
@@ -100,7 +100,7 @@ extension RuntimeValue {
   // /// The 128-bit unsigned value.
   // ///
   // /// - Precondition: `self` is an instance of `MachineType.i(128)`.
-  // public var i128: UInt128 {
+  // public var asI128: UInt128 {
   //   withUnsafePointer(to: UInt128.self) { $0.pointee }
   // }
 

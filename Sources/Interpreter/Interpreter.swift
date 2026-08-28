@@ -252,7 +252,7 @@ public struct Interpreter {
     case let x as IRBranch:
       return .jump(to: start(x.target))
     case let x as IRConditionalBranch:
-      let c = try self[x.condition].bool
+      let c = try self[x.condition].asBool
       if c {
         return .jump(to: start(x.onSuccess))
       } else {

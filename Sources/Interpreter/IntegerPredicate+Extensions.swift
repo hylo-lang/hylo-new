@@ -28,10 +28,10 @@ extension IntegerPredicate {
     bitWidth w: Int
   ) -> Bool {
     switch w {
-    case 8: self(lhs.i8, rhs.i8)
-    case 16: self(lhs.i16, rhs.i16)
-    case 32: self(lhs.i32, rhs.i32)
-    case 64: self(lhs.i64, rhs.i64)
+    case 8: self(lhs.asI8, rhs.asI8)
+    case 16: self(lhs.asI16, rhs.asI16)
+    case 32: self(lhs.asI32, rhs.asI32)
+    case 64: self(lhs.asI64, rhs.asI64)
     // TODO: uncomment when 128-bit integer is supported.
     //
     // case 128: self(lhs.i128, rhs.i128)
