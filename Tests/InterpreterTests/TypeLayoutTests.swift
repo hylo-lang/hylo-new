@@ -503,6 +503,8 @@ final class TypeLayoutTests: XCTestCase {
     var m = Memory(forRunning: p, on: UnrealABI())
     let a = m.allocate(storageFor: t).asTypedAddress(t)
 
+    XCTAssertGreaterThan(m.layout(i16).alignment, m.layout(i8).alignment)
+
     XCTAssertEqual(
       m.location(ofField: "x", in: a),
       .init(allocation: a.allocation, offset: 2, type: .init(i8)))
