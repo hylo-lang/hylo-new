@@ -212,8 +212,6 @@ extension TypeLayoutCache {
 
   /// Returns the type and byte offset of the field `f` within `t`,
   /// where `t` is defined in `p`.
-  ///
-  /// - Precondition: There exists a field `f` in `t`.
   mutating func typeAndOffset(
     ofField f: String, within t: MonomorphicTypeIdentity,
     definedIn p: inout Program
