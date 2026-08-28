@@ -244,7 +244,7 @@ public struct Interpreter {
     case let x as IRApply:
       _ = x
     case let x as IRApplyBuiltin:
-      let v = try call(x.callee, with: x.arguments)
+      let v = try call(x.callee, passing: x.arguments)
       return initializeRegister(to: v)
     case is IRAssumeState:
       // TODO: add a real implementation, updating state of composed regions.
@@ -397,7 +397,7 @@ public struct Interpreter {
   }
 
   /// Returns the result of calling `f` with `arguments`.
-  private func call(_ f: BuiltinFunction, with arguments: [IRValue]) throws -> RuntimeValue {
+  private func call(_ f: BuiltinFunction, passing arguments: [IRValue]) throws -> RuntimeValue {
     switch f {
     case .trap: throw Trap()
     default: unimplemented("\(program.show(f)) is not implemented yet.")
@@ -450,15 +450,12 @@ extension IRAccess {
 
 extension Interpreter {
 
+  /// An error in `Interpreter`.
+  public protocol Error: Swift.Error, Regular {}
+
   /// A trap occurred during program execution.
-  public struct Trap: Error, Regular, CustomStringConvertible {
-
+  public struct Trap: Error {
     public init() {}
-
-    public var description: String {
-      "Encountered a trap during program execution."
-    }
-
   }
 
 }
