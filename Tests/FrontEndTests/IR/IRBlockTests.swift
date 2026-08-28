@@ -10,9 +10,10 @@ final class IRBlockTests: XCTestCase {
     var f = IRFunction(
       name: .lowered(.init(d)),
       anchor: p.anchor(at: p[d].site, in: p.parent(containing: d)),
-      output: .indirect,
-      typeParameters: [],
-      termParameters: [.init(type: .void, access: .set, declaration: nil)])
+      signature: .init(
+        typeParameters: [],
+        termParameters: [.init(type: .void, access: .set, declaration: nil)],
+        output: .indirect))
 
     let entry = f.addBlock()
     let s = IRAlloca(

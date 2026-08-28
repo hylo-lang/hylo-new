@@ -521,6 +521,8 @@ public struct Program: Sendable {
     switch tag(of: d) {
     case BindingDeclaration.self:
       return isPrivate(castUnchecked(d, to: BindingDeclaration.self), in: m)
+    case ConformanceDeclaration.self:
+      return isPrivate(castUnchecked(d, to: ConformanceDeclaration.self), in: m)
     case FunctionDeclaration.self:
       return isPrivate(castUnchecked(d, to: FunctionDeclaration.self), in: m)
     case FunctionBundleDeclaration.self:
@@ -550,9 +552,7 @@ public struct Program: Sendable {
       return isPrivate(d, in: m)
     case .existentialized(let g):
       return isPrivate(g, in: m)
-    case .slide:
-      return true
-    case .plateau:
+    case .applied, .slide, .plateau:
       return true
     }
   }

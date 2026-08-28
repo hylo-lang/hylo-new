@@ -24,7 +24,7 @@ final class TypeLayoutTests: XCTestCase {
   }
 
   func testTrivialTuples() throws {
-    let void = layout(p.types.tuple(of: []))
+    let void = layout(.void)
     XCTAssertEqual(void.size, 0)
     XCTAssertEqual(void.alignment, 1)
     XCTAssert(void.parts.isEmpty)

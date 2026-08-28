@@ -20,7 +20,7 @@ extension IRFunction {
     emittingInto m: Module.ID, using typer: inout Typer
   ) -> Bool {
     var initial = Transfer.Context()
-    for (i, t) in termParameters.enumerated() {
+    for (i, t) in signature.termParameters.enumerated() {
       addParameter(t, offset: i, to: &initial)
     }
 
@@ -638,7 +638,7 @@ private struct Transfer: AbstractTransferFunction {
   private mutating func interpret(
     _ i: IRYield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
-    let (k, _) = f.output.remote!
+    let (k, _) = f.signature.output.remote!
     passArgument(k, f.at(i).projectee, insertingDeinitializationBefore: i.erased, in: &f)
     return f.instruction(after: i.erased)
   }
@@ -783,7 +783,7 @@ private struct Transfer: AbstractTransferFunction {
   private func isBoundImmutably(_ v: IRValue, in f: IRFunction) -> Bool {
     switch v {
     case .parameter(let i):
-      return f.termParameters[i].access == .let
+      return f.signature.termParameters[i].access == .let
     case .register(let i):
       return isBoundImmutably(i, in: f)
     default:

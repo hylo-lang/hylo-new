@@ -109,25 +109,35 @@ public struct IRFunction: Sendable {
   }
 
   /// The types of an IR function's parameters and return value.
+  @Archivable
   public struct Signature: Equatable, Sendable {
 
-    /// The generic type parameters that the function accepts.
-    public let context: [GenericParameter.ID]
+    /// The generic type parameters that the function takes.
+    public let typeParameters: [GenericParameter.ID]
 
-    /// The types of the term parameters and return value.
-    public let head: Arrow
+    /// The term parameters that the function takes.
+    public let termParameters: [IRParameter]
 
-    /// Creates the signature of a function accepting the given parameters and returning results
-    /// as described by `output`.
-    public init(types: [GenericParameter.ID], terms: [IRParameter], output: Output) {
-      self.context = types
+    /// The way in which the function returns its result.
+    public let output: Output
 
-      let ps = terms.map({ (p) in Parameter(access: p.access, type: p.type) })
+    /// Creates an instance with the given properties.
+    public init(
+      typeParameters: [GenericParameter.ID], termParameters: [IRParameter], output: Output
+    ) {
+      self.typeParameters = typeParameters
+      self.termParameters = termParameters
+      self.output = output
+    }
+
+    /// Returns the types of the term parameters and return value.
+    public func head() -> Arrow {
+      let ps = termParameters.map({ (p) in Parameter(access: p.access, type: p.type) })
       switch output {
       case .indirect:
-        self.head = Arrow(style: .parenthesized, inputs: ps.dropLast(), output: ps.last!.type)
+        return Arrow(style: .parenthesized, inputs: ps.dropLast(), output: ps.last!.type)
       case .remote(let k, let o):
-        self.head = Arrow(style: .bracketed, effect: k, inputs: ps, output: o.erased)
+        return Arrow(style: .bracketed, effect: k, inputs: ps, output: o.erased)
       }
     }
 
@@ -140,13 +150,7 @@ public struct IRFunction: Sendable {
   public let anchor: Anchor
 
   /// The way in which the function returns its result.
-  public let output: Output
-
-  /// The generic type parameters of the function.
-  public let typeParameters: [GenericParameter.ID]
-
-  /// The parameters of the function.
-  public let termParameters: [IRParameter]
+  public let signature: Signature
 
   /// A mapping from a source declaration to their its lowered definition.
   private var bindings: BidirectionalDictionary<DeclarationIdentity, IRValue>
@@ -164,15 +168,10 @@ public struct IRFunction: Sendable {
   public private(set) var passedMandatoryInlining: Bool
 
   /// Creates an instance with the given properties.
-  public init(
-    name: Name, anchor: Anchor,
-    output: Output, typeParameters: [GenericParameter.ID], termParameters: [IRParameter],
-  ) {
+  public init(name: Name, anchor: Anchor, signature: Signature) {
     self.name = name
     self.anchor = anchor
-    self.output = output
-    self.typeParameters = typeParameters
-    self.termParameters = termParameters
+    self.signature = signature
     self.slots = []
     self.blocks = []
     self.uses = [:]
@@ -187,12 +186,12 @@ public struct IRFunction: Sendable {
 
   /// `true` iff the function has no generic type parameters.
   public var isMonomorphic: Bool {
-    typeParameters.isEmpty
+    signature.typeParameters.isEmpty
   }
 
   /// `true` iff the function is a subscript.
   public var isSubscript: Bool {
-    output != .indirect
+    signature.output != .indirect
   }
 
    /// `true` iff the function returns a unit value (i.e., an instance of `Hylo.Void`).
@@ -202,7 +201,7 @@ public struct IRFunction: Sendable {
 
   /// The register in which the function writes its result, if any.
   public var returnRegister: IRValue? {
-    (output == .indirect) ? .parameter(termParameters.count - 1) : nil
+    (signature.output == .indirect) ? .parameter(signature.termParameters.count - 1) : nil
   }
 
   /// The entry block of `self`.
@@ -313,11 +312,6 @@ public struct IRFunction: Sendable {
     } else {
       return nil
     }
-  }
-
-  /// Returns the type of `self`, computing it using `p`.
-  public func signature() -> Signature {
-    .init(types: typeParameters, terms: termParameters, output: output)
   }
 
   /// Returns the tag of `i`.
@@ -432,7 +426,7 @@ public struct IRFunction: Sendable {
   public func isParameter(_ v: IRValue, _ k: AccessEffect) -> Bool {
     switch v {
     case .parameter(let i):
-      return termParameters[i].access == k
+      return signature.termParameters[i].access == k
     default:
       return false
     }
@@ -444,7 +438,7 @@ public struct IRFunction: Sendable {
     case .register(let i):
       return tag(of: i) == IRAlloca.self
     case .parameter(let i):
-      return termParameters[i].access == .sink
+      return signature.termParameters[i].access == .sink
     default:
       return false
     }
@@ -456,7 +450,7 @@ public struct IRFunction: Sendable {
   public func result(of v: IRValue) -> (type: AnyTypeIdentity, isPlace: Bool)? {
     switch v {
     case .parameter(let i):
-      return resolved(.place(termParameters[i].type))
+      return resolved(.place(signature.termParameters[i].type))
     case .register(let i):
       return resolved(at(i).type)
     case .integer(_, let t):
@@ -840,9 +834,7 @@ public struct IRFunction: Sendable {
   /// its instructions) but leaving a valid function declaration behind. The moved definition can
   /// moved back into `self` using `take(definition:)`.
   public mutating func move() -> IRFunction {
-    var other = IRFunction(
-      name: name, anchor: anchor, output: output,
-      typeParameters: typeParameters, termParameters: termParameters)
+    var other = IRFunction(name: name, anchor: anchor, signature: signature)
 
     swap(&self.bindings, &other.bindings)
     swap(&self.slots, &other.slots)
@@ -880,18 +872,18 @@ extension IRFunction: Showable {
   public func show(using printer: inout TreePrinter) -> String {
     var result = "fun \(printer.show(name))"
 
-    if !typeParameters.isEmpty {
-      result.append("<\(printer.show(typeParameters))>")
+    if !signature.typeParameters.isEmpty {
+      result.append("<\(printer.show(signature.typeParameters))>")
     }
 
     result.append("(")
-    for (i, p) in termParameters.enumerated() {
+    for (i, p) in signature.termParameters.enumerated() {
       if (i != 0) { result.append(", ") }
       result.append("\(p.access) \(printer.show(IRValue.parameter(i))): \(printer.show(p.type))")
     }
     result.append(")")
 
-    if case .remote(let k, let t) = self.output {
+    if case .remote(let k, let t) = signature.output {
       result.append(" \(k) <: \(printer.show(t))")
     }
 
@@ -923,7 +915,7 @@ extension IRFunction.Name: Showable {
 
     case .initializer(let d):
       let n = printer.program.debugName(of: .init(d))
-      return "\(n)$initializer"
+      return "\(n).initializer"
 
     case .synthesized(let d, let a):
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
@@ -936,16 +928,16 @@ extension IRFunction.Name: Showable {
       return "$implementation[\(n) for \(list: xs)]"
 
     case .existentialized(let n):
-      return "\(printer.show(n))$existentialized"
+      return "\(printer.show(n)).existentialized"
 
     case .applied(let n, let i):
-      return "\(printer.show(n))$applied_\(i)"
+      return "\(printer.show(n)).applied_\(i)"
 
     case .slide(let n, let i):
-      return "\(printer.show(n))$slide_\(i)"
+      return "\(printer.show(n)).slide_\(i)"
 
     case .plateau(let n, let i):
-      return "\(printer.show(n))$plateau_\(i)"
+      return "\(printer.show(n)).plateau_\(i)"
     }
   }
 
@@ -1024,9 +1016,7 @@ extension IRFunction: Archivable {
   public init<A>(from archive: inout ReadableArchive<A>, in context: inout Any) throws {
     self.name = try archive.read(Name.self, in: &context)
     self.anchor = try archive.read(Anchor.self, in: &context)
-    self.output = try archive.read(Output.self, in: &context)
-    self.typeParameters = try archive.read([GenericParameter.ID].self, in: &context)
-    self.termParameters = try archive.read([IRParameter].self, in: &context)
+    self.signature = try archive.read(Signature.self, in: &context)
     self.passedMandatoryInlining = try archive.read(Bool.self)
     self.slots = []
     self.blocks = []
@@ -1063,9 +1053,7 @@ extension IRFunction: Archivable {
   public func write<A>(to archive: inout WriteableArchive<A>, in context: inout Any) throws {
     try archive.write(name, in: &context)
     try archive.write(anchor, in: &context)
-    try archive.write(output, in: &context)
-    try archive.write(typeParameters, in: &context)
-    try archive.write(termParameters, in: &context)
+    try archive.write(signature, in: &context)
     try archive.write(passedMandatoryInlining, in: &context)
 
     // Write the number of basic blocks in the function. Note that the function cannot contain any

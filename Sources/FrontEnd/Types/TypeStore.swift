@@ -97,8 +97,8 @@ public struct TypeStore: Sendable {
 
   /// Returns the unique type corresponding to the given signature, creating it if necessary.
   internal mutating func demand(_ s: IRFunction.Signature) -> AnyTypeIdentity {
-    let t = demand(s.head).erased
-    return introduce(parameters: s.context, into: t)
+    let t = demand(s.head()).erased
+    return introduce(parameters: s.typeParameters, into: t)
   }
 
   /// Returns the tag of `n`.
