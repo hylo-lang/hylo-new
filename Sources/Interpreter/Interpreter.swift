@@ -449,8 +449,8 @@ extension IRValue {
     return executor.memory.location(p, in: a)
   }
 
-  /// Returns the address of field `f` in the address pointed by `self`, in
-  /// the current execution state of `executor`.
+  /// Returns the address of field `f` in `self`, in the current execution
+  /// state of `executor`.
   ///
   /// - Precondition: `self` contains a place.
   fileprivate func location(

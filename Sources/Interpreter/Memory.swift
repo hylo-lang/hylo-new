@@ -310,7 +310,7 @@ extension Memory {
     return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
   }
 
-  /// Returns the address of `f` in `whole`.
+  /// Returns the address of the field `f` in `whole`.
   public mutating func location(ofField f: String, in whole: TypedAddress) -> TypedAddress {
     let (t, o) =
       typeLayouts.typeAndOffset(ofField: f, within: whole.type, definedIn: &program)

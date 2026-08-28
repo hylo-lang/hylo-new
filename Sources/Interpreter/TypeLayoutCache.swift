@@ -210,7 +210,7 @@ extension TypeLayoutCache {
     }
   }
 
-  /// Returns the type and byte offset of `f` within `t`,
+  /// Returns the type and byte offset of the field `f` within `t`,
   /// where `t` is defined in `p`.
   ///
   /// - Precondition: There exists a field `f` in `t`.
