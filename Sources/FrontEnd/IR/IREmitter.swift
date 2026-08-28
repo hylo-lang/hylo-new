@@ -942,7 +942,7 @@ internal struct IREmitter {
     ///   - typeArguments Type arguments partially instantiating the callee.
     ///   - usings Term arguments passed to the callee's contextual term parameters.
     ///   - receiver The value to which the callee is bound, if any.
-    ///   - result The argument to the calle's output parameter if it is an ordinary function.
+    ///   - result The argument to the callee's output parameter if it is an ordinary function.
     init(
       _ value: IRValue,
       instantiatedWith typeArguments: TypeArguments = [:],
@@ -3253,7 +3253,7 @@ internal struct IREmitter {
   }
 
   /// Returns the type arguments passed to the implementation `m` satisfying a trait requirement in
-  /// in the context of `d`, which declares a witness of tyoe `w`.
+  /// in the context of `d`, which declares a witness of type `w`.
   private mutating func argumentsInstantiating(
     implementation m: DeclarationIdentity,
     in d: ConformanceDeclaration.ID, declaring w: AnyTypeIdentity
