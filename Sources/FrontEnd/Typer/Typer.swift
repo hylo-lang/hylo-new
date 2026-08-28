@@ -440,7 +440,7 @@ public struct Typer {
 
   /// Type checks `d`.
   private mutating func check(_ d: ConformanceDeclaration.ID) {
-    let typeOfWitness = declaredType(of: d)
+    let declarationType = declaredType(of: d)
 
     check(program[d].contextParameters)
 
@@ -457,13 +457,13 @@ public struct Typer {
     // The type of the declaration has the form `<T...> A... ==> P<B...>` where `P<B...>` is the
     // type of the declared witness and the rest forms a context. Requirements are resolved as
     // members of the type `B` where type parameters occur as skolems.
-    let typeOfWitnessSansContext = program.types.contextAndHead(typeOfWitness).head
+    let typeOfWitnessSansContext = program.types.contextAndHead(declarationType).head
     guard let witness = program.types.seenAsTraitApplication(typeOfWitnessSansContext) else {
-      assert(typeOfWitness[.hasError])
+      assert(declarationType[.hasError])
       return
     }
 
-    let conformer = witness.arguments.values[0]
+    let conformer = program.types.dealiased(witness.arguments.values[0])
     let qualification = demand(Metatype(inhabitant: conformer)).erased
 
     // The expected types of implementations satisfying the concept's requirements are computed by

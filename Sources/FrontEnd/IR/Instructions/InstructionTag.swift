@@ -57,6 +57,7 @@ public struct InstructionTag: Sendable {
     IRTypeWitness.self,
     IRUnreachable.self,
     IRWitnessTable.self,
+    IRWitnessTableStash.self,
     IRYield.self,
   ]
 

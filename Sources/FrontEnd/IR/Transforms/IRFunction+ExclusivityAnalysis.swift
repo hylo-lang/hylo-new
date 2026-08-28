@@ -7,7 +7,7 @@ extension IRFunction {
     emittingInto m: Module.ID, using typer: inout Typer
   ) -> Bool {
     var initial = Transfer.Context()
-    for (i, t) in termParameters.enumerated() {
+    for (i, t) in signature.termParameters.enumerated() {
       addParameter(t, offset: i, to: &initial)
     }
 

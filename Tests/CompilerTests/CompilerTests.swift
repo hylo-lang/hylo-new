@@ -9,7 +9,7 @@ import Subprocess
 import Testing
 
 /// `true` iff intermediate compilation artifacts shall be saved for successful tests.
-private let alwaysSaveArtifacts: Bool = false
+private let alwaysSaveArtifacts: Bool = true
 
 /// The driver for generated compiler tests.
 ///
