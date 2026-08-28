@@ -21,7 +21,7 @@ extension Array {
   }
 
   /// Creates an array with the contents of `e`, if any.
-  public init(contentsOf e: Element?) {
+  public init(unwrapping e: Element?) {
     if let x = e {
       self = [x]
     } else {

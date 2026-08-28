@@ -15,9 +15,7 @@ public struct Base64VarUInt: Hashable {
   /// The numeric value, in the range `0 ..< UInt64.max`.
   public let rawValue: UInt64
 
-  /// Creates an instance representing `n`.
-  ///
-  /// - Requires: `n >= 0`
+  /// Creates an instance representing `n`, which is in the range `0 ..< UInt64.max`.
   public init<T: BinaryInteger>(_ n: T) {
     self.rawValue = UInt64.init(n)
   }

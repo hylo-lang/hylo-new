@@ -570,8 +570,8 @@ extension Program {
     // Other dominating definitions may have to be redefined as well.
     for v in prologue.definitions {
       guard let i = v.register else { continue }
-      switch ctx.ir.tag(of: i) {
-      case IRAlloca.self, IRProject.self:
+      switch ctx.ir.relevanceInSlideOrPlateau(i) {
+      case .captured:
         assert(ctx.value[v] != nil, "instruction should have been redefined")
       default:
         _ = incorporate(i, in: &ctx)
@@ -601,7 +601,7 @@ extension IRFunction {
   /// Returns the relevance of `i`, which is an instruction in the prologue of a slide or plateau.
   fileprivate func relevanceInSlideOrPlateau(_ i: AnyInstructionIdentity) -> InstructionRelevance {
     switch tag(of: i) {
-    case IRAlloca.self, IRProject.self:
+    case IRAlloca.self, IRProject.self, IRWitnessTable.self:
       return .captured
 
     case

@@ -16,6 +16,18 @@ public struct WitnessTable: Hashable, Sendable {
   private var associatedTypes: [Int: AnyTypeIdentity]
 
   /// A table from member requirement to its implementation.
+  ///
+  /// Each value describes how to refer to the implementation of the corresponding requirement in
+  /// the context of the conformance declaration for which this table is described. The following
+  /// cases are possible:
+  ///
+  /// - `.synthetic`: the implementation is synthesized by the compiler.
+  /// - `.direct`: the implementation is defined either in the conformance declaration directly or
+  ///   in the declaration of the conforming type.
+  /// - `.inherited`: the implementation is inherited by conformance or extension.
+  ///
+  /// In the latter case, the witness of the payload describes the qualification of the target,
+  /// which is referred to statically.
   private var members: [Int: DeclarationReference]
 
   /// Creates an empty instance.

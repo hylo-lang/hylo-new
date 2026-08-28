@@ -7,7 +7,7 @@ extension IRFunction {
   /// by another depolymorphized function.
   internal mutating func depolymorphize(emittingInto m: Module.ID, using typer: inout Typer) {
     assert(isDefined)
-    if !isMonomorphic { return }
+    guard isMonomorphic else { return }
 
     typer.program.withEmitter(insertingIn: m) { (emitter) in
       emitter.depolymorphize(&self)

@@ -1,0 +1,12 @@
+//! exit-status:42
+
+trait P {
+  fun f() -> Int32
+  fun g() -> Int32 { self.f() + (2 as Int32) }
+}
+
+given <T> => T is P { fun f() -> Int32 { 40 } }
+
+public fun main() -> Int32 {
+  ().g()
+}

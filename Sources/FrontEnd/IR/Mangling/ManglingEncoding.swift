@@ -138,9 +138,9 @@ internal struct ManglingEncoding: Sendable {
       case .extensionDeclaration:
         demangled = takeExtensionDeclaration(from: &source)
       case .functionDeclaration:
-        demangled = takeFunctionDeclaration(from: &source)
+        demangled = takeFunctionDeclaration(static: false, from: &source)
       case .staticFunctionDeclaration:
-        demangled = takeStaticFunctionDeclaration(from: &source)
+        demangled = takeFunctionDeclaration(static: true, from: &source)
       case .functionBundleDeclaration:
         demangled = takeFunctionBundleDeclaration(from: &source)
       case .initializerDeclaration:
@@ -151,6 +151,12 @@ internal struct ManglingEncoding: Sendable {
         demangled = takeImplementationDeclaration(from: &source)
       case .existentializedDeclaration:
         demangled = takeExistentializedDeclaration(from: &source)
+      case .appliedDeclaration:
+        demangled = takeTaggedEntity(from: &source, { (e, i) in .applied(e, i) })
+      case .slideDeclaration:
+        demangled = takeTaggedEntity(from: &source, { (e, i) in .slide(e, i) })
+      case .plateauDeclaration:
+        demangled = takeTaggedEntity(from: &source, { (e, i) in .plateau(e, i) })
       case .genericParameterDeclaration:
         demangled = takeUnqualifiedEntity(from: &source)
       case .importDeclaration:
@@ -436,35 +442,18 @@ internal struct ManglingEncoding: Sendable {
       return
     }
 
-    if program.isStatic(d) {
-      output.add(operator: .staticFunctionDeclaration)
-    } else {
-      output.add(operator: .functionDeclaration)
-    }
-
+    output.add(operator: program.isStatic(d) ? .staticFunctionDeclaration : .functionDeclaration)
     append(name: n, to: &output)
     append(typeOf: d, to: &output)
   }
 
   /// Demangles a function declaration from `source`.
   private static func takeFunctionDeclaration(
-    from source: inout DemanglingContext
+    static isStatic: Bool, from source: inout DemanglingContext
   ) -> DemangledEntity {
     if let n = takeName(from: &source) {
       let t = takeType(from: &source)
-      return .functionDeclaration(name: n, type: t, isStatic: false)
-    } else {
-      return .error
-    }
-  }
-
-  /// Demangles a static function declaration from `source`.
-  private static func takeStaticFunctionDeclaration(
-    from source: inout DemanglingContext
-  ) -> DemangledEntity {
-    if let n = takeName(from: &source) {
-      let t = takeType(from: &source)
-      return .functionDeclaration(name: n, type: t, isStatic: true)
+      return .functionDeclaration(name: n, type: t, isStatic: isStatic)
     } else {
       return .error
     }
@@ -567,15 +556,23 @@ internal struct ManglingEncoding: Sendable {
     case .existentialized(let s):
       output.add(operator: .existentializedDeclaration)
       append(function: s, to: &output)
+    case .applied(let s, let n):
+      append(.appliedDeclaration, tagging: s, with: n, to: &output)
     case .slide(let s, let n):
-      output.add(operator: .slideDeclaration)
-      append(function: s, to: &output)
-      output.add(integer: n)
+      append(.slideDeclaration, tagging: s, with: n, to: &output)
     case .plateau(let s, let n):
-      output.add(operator: .plateauDeclaration)
-      append(function: s, to: &output)
-      output.add(integer: n)
+      append(.plateauDeclaration, tagging: s, with: n, to: &output)
     }
+  }
+
+  /// Writes an application of `o` tagging `n` with `i` to `output`.
+  private mutating func append(
+    _ o: ManglingOperator, tagging n: IRFunction.Name, with i: Int,
+    to output: inout ManglingContext
+  ) {
+    output.add(operator: .plateauDeclaration)
+    append(function: n, to: &output)
+    output.add(integer: i)
   }
 
   /// Demangles an initializer declaration from `source`.
@@ -617,28 +614,12 @@ internal struct ManglingEncoding: Sendable {
     .existentialized(takeEntity(from: &source))
   }
 
-  /// Demangles a slide declaration from `source`.
-  private static func slideDeclaration(
-    from source: inout DemanglingContext
+  /// Returns the result of `make` applied to a demangled entity followed by a tag.
+  private static func takeTaggedEntity(
+    from source: inout DemanglingContext, _ make: (DemangledEntity, Int) -> DemangledEntity
   ) -> DemangledEntity {
     let e = takeEntity(from: &source)
-     if let i = source.takeInt() {
-       return .slide(e, i)
-     } else {
-       return .error
-     }
-  }
-
-  /// Demangles a plateau declaration from `source`.
-  private static func plateauDeclaration(
-    from source: inout DemanglingContext
-  ) -> DemangledEntity {
-    let e = takeEntity(from: &source)
-     if let i = source.takeInt() {
-       return .plateau(e, i)
-     } else {
-       return .error
-     }
+    return source.takeInt().map({ (i) in make(e, i) }) ?? .error
   }
 
   /// Writes the mangled representation of `s` to `output`.

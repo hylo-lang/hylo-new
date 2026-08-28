@@ -192,12 +192,10 @@ public struct Module: Sendable {
     internal mutating func declare(_ f: IRFunction) -> (inserted: Bool, identity: IRFunction.ID) {
       let inserted = modify(&functions[f.name]) { (slot) in
         if let g = slot {
-          assert(f.signature() == g.signature())
+          assert(f.signature == g.signature)
           return false
         } else {
-          let g = IRFunction(
-            name: f.name, anchor: f.anchor, output: f.output,
-            typeParameters: f.typeParameters, termParameters: f.termParameters)
+          let g = IRFunction(name: f.name, anchor: f.anchor, signature: f.signature)
           slot = .some(g)
           return true
         }

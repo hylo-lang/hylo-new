@@ -208,6 +208,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRUnreachable.self), in: &ctx)
     case IRWitnessTable.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRWitnessTable.self), in: &ctx)
+    case IRWitnessTableStash.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRWitnessTableStash.self), in: &ctx)
     case IRYield.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRYield.self), in: &ctx)
     case let s:
@@ -581,10 +583,9 @@ extension Program {
 
   /// Generates the LLVM IR code corresponding to `i`.
   ///
-  /// The instruction is compiled as a direct call iff the subscriptsubscript being applied is an
-  /// addressor. Otherwise, code dominated by `i` is compiled into a different function that is
-  /// passed as a callback to the subscript. The call to this subscript returns the identifier of
-  /// the basic block to which control-flow should be transferred, if any.
+  /// Code dominated by `i` is compiled into a different function that is passed as a callback to
+  /// the subscript. The call to this subscript returns the identifier of the basic block to which
+  /// control flow should be transferred, if any.
   ///
   /// This method extends `ctx.factoredOut` with the basic blocks that have been compiled into the
   /// callback. These basic blocks cannot have been visited yet, since they are dominated by `i`.
@@ -593,15 +594,6 @@ extension Program {
     _ i: IRProject.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
-
-    // Is the callee an addressor?
-    if let n = seenAsAddressor(s.callee, in: ctx) {
-      let f = demandFunction(named: n, in: &ctx.module)
-      let x = insertArguments(s.arguments, mappedWith: f.prototype.mapping, in: &ctx)
-      let y = ctx.module.llvm.insertCall(f.value, on: x, at: ctx.insertionPoint!)
-      _ = y
-      fatalError()
-    }
 
     // Otherwise, compile the plateau following the project instruction.
     let (plateau, captures, covered) = definePlateau(dominatedBy: i, in: &ctx)
@@ -774,26 +766,80 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
 
-    let entries = s.operands.map { (x) in
-      codegen(x, in: &ctx)
+    // A witness table is composed of a field for each requirement of the trait whose conformance
+    // is witnessed (i.e., the table's entries), followed by the table's captures.
+    let abstractTableType = metadata(of: s.witnessType, in: &ctx.module)
+    let entriesType = StructType.UnsafeReference(abstractTableType.llvm)!
+    let entriesSize = ctx.module.llvm.layout.storageSize(of: entriesType)
+
+    let storageAlignment = abstractTableType.layout.alignment
+    var storageSize = entriesSize
+
+    if !s.captures.isEmpty {
+      let p = types.demand(MachineType.ptr).erased
+      let r = record(fields: Array(repeating: p, count: s.captures.count), in: &ctx.module)
+
+      // Captures are represented as a sequence of pointers laid out contiguously in the order in
+      // which they appear in the instruction.
+      assert(r.propertyToField.elementsEqual(0 ..< s.captures.count))
+      assert(storageAlignment & (r.alignment - 1) == 0)
+      storageSize += r.size.fixed!
     }
 
-    let tableType = metadata(of: s.witnessType, in: &ctx.module)
+    // Allocate storage for the entire table.
+    let tableRawType = ctx.module.llvm.arrayType(storageSize, ctx.module.llvm.i8)
+    let storage = ctx.module.llvm.insertAlloca(tableRawType, atEntryOf: ctx.result.value)
+    ctx.module.llvm.setAlignment(storageAlignment, for: storage)
 
-    unimplemented(if: !entries.allSatisfy(\.unsafe[].isConstant),
-      """
-      Runtime-defined IRWitnessTable operand. https://github.com/hylo-lang/hylo-new/issues/342
+    // Store the entries.
+    let entries = s.entries.map({ (x) in codegen(x, in: &ctx) })
+    let requirements = ctx.module.llvm.structConstant(of: entriesType, aggregating: entries)
+    ctx.module.llvm.insertStore(
+      requirements, to: storage, alignedAt: storageAlignment,
+      at: ctx.insertionPoint!)
 
-      In:
-      \(show(ctx.ir))
+    let table = ctx.module.llvm.insertGetElementPointerInBounds(
+      of: storage, typed: tableRawType,
+      indices: [0], indexType: ctx.module.llvm.i32,
+      at: ctx.insertionPoint!)
 
-      """)
+    // Store the captures, if any.
+    if !s.captures.isEmpty {
+      // The computation of an individual capture's offset is justified by the assertions made
+      // during the computation of the storage's size and alignment.
+      let stride = ctx.module.llvm.layout.pointerSize
+      for (i, c) in s.captures.enumerated() {
+        let x0 = codegen(c, in: &ctx)
+        let x1 = ctx.module.llvm.insertGetElementPointerInBounds(
+          of: table, typed: tableRawType,
+          indices: [entriesSize + (i * stride)], indexType: ctx.module.llvm.i32,
+          at: ctx.insertionPoint!)
+        ctx.module.llvm.insertStore(x0, to: x1, at: ctx.insertionPoint!)
+      }
+    }
 
-    let table = ctx.module.llvm.structConstant(
-      of: StructType.UnsafeReference(tableType.llvm)!, aggregating: entries)
+    ctx.value[.register(i.erased)] = table.v
+    return ctx.ir.instruction(after: i.erased)
+  }
 
-    let v = IRValue.register(i.erased)
-    ctx.value[v] = table.v
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRWitnessTableStash.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+
+    let abstractTableTypeInHylo = ctx.ir.result(of: s.source)!.type
+    let abstractTableType = metadata(of: abstractTableTypeInHylo, in: &ctx.module)
+    let entriesType = StructType.UnsafeReference(abstractTableType.llvm)!
+    let entriesSize = ctx.module.llvm.layout.storageSize(of: entriesType)
+
+    let x0 = codegen(s.source, in: &ctx)
+    let x1 = ctx.module.llvm.insertGetElementPointerInBounds(
+      of: x0, typed: ctx.module.llvm.i8,
+      indices: [entriesSize], indexType: ctx.module.llvm.i32,
+      at: ctx.insertionPoint!)
+
+    ctx.value[.register(i.erased)] = x1.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -858,9 +904,7 @@ extension Program {
     }
 
     let name = llvmName(function: ir.name)
-    let signature = ir.signature()
-
-    let p = prototype(signature.head, in: &ctx)
+    let p = prototype(ir.signature.head(), in: &ctx)
     let v = ctx.llvm.declareFunction(name, p.signature)
     setupAttributes(of: v, compiledFrom: ir, in: &ctx)
 
@@ -1615,10 +1659,9 @@ extension Program {
         fs.append(ctx.llvm.functionPointer.t, count: rs.members.count)
 
         let v = ctx.llvm.structType(named: n, fs)
-        let s = ctx.llvm.layout.storageSize(of: v)
-        let a = ctx.llvm.layout.preferredAlignment(of: v)
+        let a = ctx.dynamicAllocationAlignment()
         let l = ConcreteLayout(
-          fields: [], propertyToField: Array(fs.indices), size: .fixed(s), alignment: a)
+          fields: [], propertyToField: Array(fs.indices), size: .dynamic, alignment: a)
         return TypeMetadata(llvm: v, layout: l)
       } else if let fields = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
         return program.metadata(record: n, fields: fields, in: &ctx)
@@ -1667,7 +1710,7 @@ extension Program {
   ) -> TypeMetadata {
     // Trivial if there are less than two cases.
     if cases.count <= 1 {
-      return metadata(record: name, fields: Array(contentsOf: cases.uniqueElement), in: &ctx)
+      return metadata(record: name, fields: Array(unwrapping: cases.uniqueElement), in: &ctx)
     }
 
     // Otherwise, construct a pair leading with the tag.
@@ -1753,23 +1796,6 @@ extension Program {
       return ctx.llvm.functionPointer.t
     } else {
       return metadata(of: t, in: &ctx).llvm
-    }
-  }
-
-  /// Returns `v` iff identifies a subscript known to have a slide that compiles to a no-op.
-  private func seenAsAddressor(
-    _ v: FrontEnd.IRValue, in ctx: borrowing FunctionGenerationContext
-  ) -> IRFunction.Name? {
-    switch v {
-    case .function(let f, _):
-      if case .remote(_, _, let b) = self[ctx.module.hylo].ir.functions[f]?.output {
-        return b ? f : nil
-      } else {
-        return nil
-      }
-
-    default:
-      return nil
     }
   }
 

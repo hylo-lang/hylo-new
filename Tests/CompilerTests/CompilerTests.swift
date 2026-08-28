@@ -8,7 +8,7 @@ import Subprocess
 import XCTest
 
 /// `true` iff intermediate compilation artifacts shall be saved for successful tests.
-private let alwaysSaveArtifacts: Bool = false
+private let alwaysSaveArtifacts: Bool = true
 
 /// The driver for generated compiler tests.
 ///
@@ -389,8 +389,7 @@ final class CompilerTests: XCTestCase {
     if t.containsError { return }
     let refinedIR = driver.program.show(driver.program[m].ir)
     artifacts.record(refinedIR, for: .refinedIR)
-    assertArtifact(.refinedIR, expected: expectedArtifacts[.refinedIR],
-      observed: refinedIR)
+    assertArtifact(.refinedIR, expected: expectedArtifacts[.refinedIR], observed: refinedIR)
     if stage == .lowering { return }
 
     // LLVM Lowering.
