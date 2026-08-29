@@ -113,7 +113,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Swift 6.3.2
-        uses: SwiftyLab/setup-swift@5825efd16e0e9f41c4e9b94658b7973e16410d5b # v1.9.1
+        uses: SwiftyLab/setup-swift@38f54a76b70d989321de9dc7c840618c08cf56e9 # v1.14.0
         with:
           swift-version: "6.3.2"
 

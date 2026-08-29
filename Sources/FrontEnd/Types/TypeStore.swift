@@ -91,7 +91,9 @@ public struct TypeStore: Sendable {
   /// Inserts `t` in `self` and returns its identity, assuming `t` is not present in `self`.
   private mutating func insert(_ t: any TypeTree) -> AnyTypeIdentity {
     let i = types.insert(.init(t)).position
-    assert(UInt64(i) < (UInt64(1) << 55), "too many types")  // 8 bits are reserved for the properties.
+
+    // 8 bits are reserved for the properties.
+    assert(UInt64(i) < (UInt64(1) << 55), "too many types")
     return .init(offset: i, properties: t.properties)
   }
 
