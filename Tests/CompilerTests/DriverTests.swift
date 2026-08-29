@@ -15,7 +15,7 @@ final class DriverTests: XCTestCase {
 
   func testNativeDriverCreation() throws {
     let driver = try Driver(targetSpecification: .native())
-    XCTAssertFalse(driver.target.cpu.isEmpty)
+    XCTAssertNotEqual(driver.target.cpu, "")
   }
 
   func testCreateDriverWithOptions() throws {
@@ -48,9 +48,10 @@ final class DriverTests: XCTestCase {
 
       var d = try Driver(targetSpecification: .host(), moduleSearchPath: [root])
       XCTAssertThrowsError(try d.loadArchivedModule("A")) { (e) in
-        XCTAssertEqual(
-          (e as? Driver.Error)?.message,
-          "circular dependency detected while loading module 'A'")
+        guard case .circularModuleDependency(let m) = e as? Driver.Error else {
+          return XCTFail("unexpected error: \(e)")
+        }
+        XCTAssertEqual(m, "A")
       }
     }
   }
@@ -143,9 +144,11 @@ final class DriverTests: XCTestCase {
       var d = try Driver(moduleCachePath: cacheRoot, targetSpecification: .host())
       XCTAssertNotNil(d.cachedArchive(of: "A"))
       XCTAssertThrowsError(try d.loadArchivedModule("A")) { (e) in
-        XCTAssertEqual(
-          (e as? Driver.Error)?.message,
-          "no archive found for module 'A' in module search paths []")
+        guard case .moduleArchiveNotFound(let m, let searchPaths) = e as? Driver.Error else {
+          return XCTFail("unexpected error: \(e)")
+        }
+        XCTAssertEqual(m, "A")
+        XCTAssert(searchPaths.isEmpty)
       }
     }
   }
@@ -158,8 +161,11 @@ final class DriverTests: XCTestCase {
 
       var d = try Driver(targetSpecification: .host(), moduleSearchPath: [root])
       XCTAssertThrowsError(try d.loadArchivedModule("A")) { (e) in
-        let m = (e as? Driver.Error)?.message ?? ""
-        XCTAssert(m.contains("cannot read module archive at"), "unexpected message: \(m)")
+        guard case .unreadableModuleArchive(let m, let location, _) = e as? Driver.Error else {
+          return XCTFail("unexpected error: \(e)")
+        }
+        XCTAssertEqual(m, "A")
+        XCTAssertEqual(location.path, root.appending(path: "A.hylomodule").path)
       }
     }
   }
@@ -171,10 +177,11 @@ final class DriverTests: XCTestCase {
 
       var d = try Driver(targetSpecification: .host(), moduleSearchPath: [root])
       XCTAssertThrowsError(try d.loadArchivedModule("A")) { (e) in
-        let m = (e as? Driver.Error)?.message ?? ""
-        XCTAssert(
-          m.contains("Failed to parse the module archive of 'A' at '\(f.path)'"),
-          "unexpected message: \(m)")
+        guard case .unreadableModuleArchive(let m, let location, _) = e as? Driver.Error else {
+          return XCTFail("unexpected error: \(e)")
+        }
+        XCTAssertEqual(m, "A")
+        XCTAssertEqual(location.path, f.path)
       }
     }
   }
