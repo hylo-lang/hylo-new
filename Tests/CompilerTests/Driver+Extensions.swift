@@ -100,7 +100,7 @@ private func compilerBinary() throws -> URL {
   // .xctest bundle, hence the upward search.
   var d = currentBinary().deletingLastPathComponent()
   for _ in 0 ..< 4 {
-    let c = d.appending(component: "hc")
+    let c = d.appending(component: "hc" + Host.binaryExecutableSuffix)
     if FileManager.default.isExecutableFile(atPath: c.path) { return c }
     d = d.deletingLastPathComponent()
   }
