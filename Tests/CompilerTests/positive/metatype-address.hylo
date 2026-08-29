@@ -18,7 +18,7 @@ public fun main() -> Int32 {
   let h = Builtin.address(of: Victim) as* (let Pointer<TypeWitnessHeader>)
 
   // Access as value (`.unsafe[]`).
-  let w = h.value as* (let TypeWitnessHeader)
+  let w = h.base as* (let TypeWitnessHeader)
 
   // `Victim` occupies 6 bytes, so this exits with 0.
   return Int32(value: w.size.value) - (6 as Int32)
