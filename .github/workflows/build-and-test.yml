@@ -111,6 +111,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Swifty-LLVM is not built for wasm32 but SwiftPM needs its manifest to resolve ours.
+          submodules: recursive
 
       - name: Set up Swift 6.3.2
         uses: SwiftyLab/setup-swift@38f54a76b70d989321de9dc7c840618c08cf56e9 # v1.14.0
