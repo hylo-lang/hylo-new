@@ -2,6 +2,7 @@ import ArgumentParser
 import Foundation
 import FrontEnd
 import Subprocess
+import HostUtilities
 import Utilities
 import XCTest
 

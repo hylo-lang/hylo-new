@@ -1,6 +1,7 @@
 import BackEnd
 import Driver
 import FrontEnd
+import HostUtilities
 import Utilities
 import XCTest
 

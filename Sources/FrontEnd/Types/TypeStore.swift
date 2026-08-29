@@ -91,7 +91,7 @@ public struct TypeStore: Sendable {
   /// Inserts `t` in `self` and returns its identity, assuming `t` is not present in `self`.
   private mutating func insert(_ t: any TypeTree) -> AnyTypeIdentity {
     let i = types.insert(.init(t)).position
-    assert(i < (1 << 55), "too many types")  // 8 bits are reserved for the properties.
+    assert(UInt64(i) < (UInt64(1) << 55), "too many types")  // 8 bits are reserved for the properties.
     return .init(offset: i, properties: t.properties)
   }
 
@@ -703,17 +703,17 @@ public struct TypeStore: Sendable {
   /// Projects the type identified by `n`.
   internal subscript(n: AnyTypeIdentity) -> any TypeTree {
     get {
-      switch n.offset {
-      case AnyTypeIdentity.error.offset:
+      switch n {
+      case AnyTypeIdentity.error:
         ErrorType()
-      case AnyTypeIdentity.void.offset:
+      case AnyTypeIdentity.void:
         Tuple.empty
-      case AnyTypeIdentity.never.offset:
+      case AnyTypeIdentity.never:
         UniversalType(parameters: [alpha], head: alpha.erased)
-      case let i where n.isVariable:
-        TypeVariable(identifier: Int(UInt64(i) & ((1 << 54) - 1)))
-      case let i:
-        types[i].wrapped
+      case _ where n.isVariable:
+        TypeVariable(identifier: Int(n.bits & ((1 << 54) - 1)))
+      default:
+        types[n.offset].wrapped
       }
     }
   }
