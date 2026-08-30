@@ -222,6 +222,33 @@ struct Memory {
       yield &allocation[i]!
     }
   }
+
+  /// Returns the result of calling `body` with raw buffer pointer to bytes in `p`.
+  ///
+  /// - Precondition: `p.type` has layout `l`.
+  private func withUnsafeBytes<R>(
+    _ p: TypedAddress, havingLayout l: TypeLayout, _ body: (UnsafeRawBufferPointer) -> R
+  ) -> R {
+    let o = self[p.allocation].baseOffset
+    return self[p.allocation].storage.withUnsafeBytes {
+      let s = $0.baseAddress!.advanced(by: o + p.offset)
+      return body(UnsafeRawBufferPointer(start: s, count: l.size))
+    }
+  }
+
+  /// Returns the result of calling `body` with mutable raw buffer pointer to bytes in `p`.
+  ///
+  /// - Precondition: `p.type` has layout `l`.
+  private mutating func withUnsafeMutableBytes<R>(
+    _ p: TypedAddress, havingLayout l: TypeLayout, _ body: (UnsafeMutableRawBufferPointer) -> R
+  ) -> R {
+    let o = self[p.allocation].baseOffset
+    return self[p.allocation].storage.withUnsafeMutableBytes {
+      let s = $0.baseAddress!.advanced(by: o + p.offset)
+      return body(UnsafeMutableRawBufferPointer(start: s, count: l.size))
+    }
+  }
+
 }
 
 extension Memory.Address {
@@ -348,6 +375,36 @@ extension Memory {
     // TODO: throw if it is illegal to write to `p` using its permissions.
     // TODO: throw if location pointed by `p` is not fully uninitialized.
     store(v, at: p.location)
+  }
+
+  /// Copies the bytes of object at `source` to `destination`.
+  ///
+  /// - Precondition: `source` and `destination` are non-overlapping.
+  private mutating func copy(
+    _ source: Memory.TypedAddress,
+    to destination: Memory.TypedAddress
+  ) {
+    precondition(source.type == destination.type)
+    let l = layout(source.type)
+    self.withUnsafeBytes(source, havingLayout: l) { a in
+      self.withUnsafeMutableBytes(destination, havingLayout: l) {
+        var b = $0
+        b.copyElements(from: a)
+      }
+    }
+  }
+
+  /// Copies the bytes of object at `source` to `destination`.
+  ///
+  /// - Precondition: `source` and `destination` are non-overlapping.
+  public mutating func copy(
+    _ source: Access<Memory.TypedAddress>,
+    to destination: Access<Memory.TypedAddress>
+  ) throws {
+    precondition(source.location.type == destination.location.type)
+    // TODO: throw if it is illegal to read form `source` using its permissions.
+    // TODO: throw if it is illegal to write to `destination` using its permissions.
+    copy(source.location, to: destination.location)
   }
 
 }
