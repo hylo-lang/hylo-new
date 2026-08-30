@@ -3,8 +3,35 @@ import FrontEnd
 /// Types that describe the ABI for which we might interpret code.
 protocol TargetABI {
 
+  /// Returns the ABI-required alignment of `t`.
+  ///
+  /// The alignment of `.i(1)` and `.i(8)` is required to be one byte.
+  func alignment(_ t: MachineType) -> Int
+
+  /// The size of a pointer in bytes.
+  var pointerSize: Int { get }
+
+}
+
+extension TargetABI {
+
+  /// Returns the size, in bytes, of `t` on `self`.
+  public func size(_ t: MachineType) -> Int {
+    switch t {
+    case .i(let w): Int((w + 7) / 8)
+    case .word: pointerSize
+    case .float16: 2
+    case .float32: 4
+    case .float64: 8
+    case .float128: 16
+    case .ptr: pointerSize
+    }
+  }
+
   /// Returns the layout of `t`.
-  func layout(_ t: MachineType) -> TypeLayout.Bytes
+  public func layout(_ t: MachineType) -> TypeLayout.Bytes {
+    .init(alignment: alignment(t), size: size(t))
+  }
 
 }
 
@@ -20,33 +47,13 @@ struct UnrealABI: TargetABI {
   /// The maximal alignment of a machine type in bytes.
   private let maxAlignment = 128 / 8
 
-  /// Returns the layout for a `bitWidth`-bit machine type.
+  /// Returns the ABI-required alignment of `t`.
   ///
-  /// - Precondition: `bitWidth` is a power of 2.
-  private func layout(bitWidth: Int) -> TypeLayout.Bytes {
-    precondition(
-      bitWidth > 0 && bitWidth.nonzeroBitCount == 1,
-      "bit width \(bitWidth) is not a power of 2.")
-    let sizeInBytes = (bitWidth + 7) / 8
-    return .init(
-      alignment: min(sizeInBytes, maxAlignment),
-      size: sizeInBytes)
-  }
+  /// The alignment of `.i(1)` and `.i(8)` is required to be one byte.
+  func alignment(_ t: MachineType) -> Int { min(size(t), maxAlignment) }
 
-  /// Returns the layout of `t`.
-  public func layout(_ t: MachineType) -> TypeLayout.Bytes {
-    let bitWidth =
-      switch t {
-      case .i(let w): Int(w)
-      case .word: bitsInAWord
-      case .float16: 16
-      case .float32: 32
-      case .float64: 64
-      case .float128: 128
-      case .ptr: bitsInAWord
-      }
-    return layout(bitWidth: bitWidth)
-  }
+  /// The size of a pointer in bytes.
+  var pointerSize: Int { bitsInAWord / 8 }
 
 }
 
