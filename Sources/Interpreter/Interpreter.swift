@@ -90,6 +90,9 @@ private enum InstructionEpilogue {
   /// Control is transferred to the given instruction.
   case jump(to: InstructionPointer)
 
+  /// Calls the given function with the given arguments, transferring control to callee.
+  case call(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
+
   /// Control is transferred back to the caller.
   case `return`
 
@@ -216,6 +219,7 @@ public struct Interpreter {
   public mutating func step() throws {
     switch try applyCurrentInstruction() {
     case .jump(let pc): programCounter = pc
+    case .call(let f, let xs): callStack.enter(f, definedIn: program, withParameters: xs)
     case .return: callStack.pop()
     case .initializeRegister(let v):
       topOfStack.registers[programCounter.position] = v
@@ -242,7 +246,7 @@ public struct Interpreter {
       let p = allocate(storageFor: x.storage)
       return initializeRegister(to: p)
     case let x as IRApply:
-      _ = x
+      return try call(x.callee, passing: x.arguments)
     case let x as IRApplyBuiltin:
       let v = try call(x.callee, passing: x.arguments)
       return initializeRegister(to: v)
@@ -398,6 +402,17 @@ public struct Interpreter {
     }
   }
 
+  /// Returns the function identified by `f`.
+  private func function(_ f: IRValue) -> GlobalFunctionIdentity {
+    switch f {
+    case .function(let n, _):
+      let currentModule = programCounter.container.module
+      let d = program.definition(of: n, visibleFrom: currentModule)!
+      return .init(module: d.0, function: d.1)
+    default: unimplemented("Closures are not supported in emitter yet.")
+    }
+  }
+
   /// Returns the pointer to the first instruction of `b`.
   ///
   /// - Precondition: `b` is a basic block in `programCounter.container`.
@@ -431,6 +446,16 @@ public struct Interpreter {
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
     }
+  }
+
+  /// Returns an epilogue that calls the function `f` with `arguments`.
+  private func call(
+    _ f: IRValue,
+    passing arguments: ArraySlice<IRValue>
+  ) throws -> InstructionEpilogue {
+    let g = function(f)
+    let xs = arguments.map { access(of: $0) }
+    return .call(g, passing: xs)
   }
 
 }
