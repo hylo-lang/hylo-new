@@ -4,14 +4,14 @@ public fun main() {
   if true {
     &r = 1
   } else {
-    &r = 2
+    Builtin.trap()
   }
 
   // TODO: uncomment when precondition gets implemented.
   // precondition(r == 1)
 
   if false {
-    &r = 3
+    Builtin.trap()
   } else {
     &r = 4
   }
