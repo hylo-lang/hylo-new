@@ -6,4 +6,12 @@ extension BinaryInteger {
     return (r == 0) ? self : self + (n - r)
   }
 
+  /// Returns the smallest `n` such that `n * divisor >= self`.
+  ///
+  /// - Requires: `self >= 0` and `divisor > 0`.
+  public func dividedRoundingUp(by divisor: Self) -> Self {
+    let (quotient, remainder) = self.quotientAndRemainder(dividingBy: divisor)
+    return quotient + (remainder > 0 ? 1 : 0)
+  }
+
 }

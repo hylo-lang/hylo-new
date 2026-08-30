@@ -18,7 +18,7 @@ extension TargetABI {
   /// Returns the size, in bytes, of `t` on `self`.
   public func size(_ t: MachineType) -> Int {
     switch t {
-    case .i(let w): Int((w + 7) / 8)
+    case .i(let w): Int(w.dividedRoundingUp(by: 8))
     case .word: pointerSize
     case .float16: 2
     case .float32: 4
