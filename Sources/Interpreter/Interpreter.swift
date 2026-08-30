@@ -219,7 +219,9 @@ public struct Interpreter {
   public mutating func step() throws {
     switch try applyCurrentInstruction() {
     case .jump(let pc): programCounter = pc
-    case .call(let f, let xs): callStack.enter(f, definedIn: program, withParameters: xs)
+    case .call(let f, let xs):
+      try advanceProgramCounter()
+      callStack.enter(f, definedIn: program, withParameters: xs)
     case .return: callStack.pop()
     case .initializeRegister(let v):
       topOfStack.registers[programCounter.position] = v
