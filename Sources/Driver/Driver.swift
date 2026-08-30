@@ -79,7 +79,7 @@ public struct Driver {
   ///
   /// Build systems linking Hylo objects must compile and link this except in freestanding mode.
   public static var standardLibraryCShim: URL {
-    standardLibraryRoot.appending(component: cShimSource)
+    standardLibraryRoot.appending(component: "Sources").appending(component: cShimSource)
   }
 
   /// Creates an instance with the given properties.
@@ -194,13 +194,7 @@ public struct Driver {
     do {
       try m.verifyInDebugBuilds()
     } catch let e as LLVMError {
-      throw Error(
-        message: """
-        LLVM verification failed with the following message: \(e.description)
-
-        Module contents:
-        \(m.description)
-        """)
+      throw Error.llvmVerificationFailure(message: e.description, contents: m.description)
     }
   }
 
@@ -213,23 +207,27 @@ public struct Driver {
     withCSources cSources: [URL] = [],
     writingTo output: URL
   ) async throws -> PhaseResult {
+    // FIXME: Enable this after we can lower the standard library
+    // modulesToLink.append(program.modules[.standardLibrary]!.identity)
+    let shimObject: URL? = if usesStandardLibrary {
+      try await StandardLibraryShimCache.shared.object(compiledWith: relocation)
+    } else {
+      nil
+    }
+
     let elapsed = try await ContinuousClock().measure {
       let modulesToLink = [module]
       // FIXME: link the dependencies of `module`.
-
-      var cSources = cSources
-
-      if usesStandardLibrary {
-        // FIXME: Enable this after we can lower the standard library
-        // modulesToLink.append(program.modules[.standardLibrary]!.identity)
-        cSources.append(Driver.standardLibraryCShim)
-      }
 
       try await FileManager.default.withUniqueTemporaryDirectory { (d) in
         let hyloObjects = try emitObjectFiles(for: modulesToLink, into: d)
         var cObjects: [URL] = []
         for s in cSources {
-          cObjects.append(try await compileCToObject(source: s, destinationDirectory: d))
+          cObjects.append(
+            try await Self.compileCToObject(source: s, destinationDirectory: d, relocation))
+        }
+        if let o = shimObject {
+          cObjects.append(o)
         }
         try await linkExecutable(from: hyloObjects + cObjects, writingTo: output)
       }
@@ -247,7 +245,7 @@ public struct Driver {
   /// - Requires: `module` has been lowered to LLVM.
   public func assembly(of module: Module.ID) throws -> String {
     try llvmModules[module]!.module.compile(.assembly).utf8Decoded
-      .unwrapOrThrow(Error(message: "Failed to decode assembly as an UTF8 string."))
+      .unwrapOrThrow(Error.invalidAssemblyEncoding)
   }
 
   /// Writes object files for `modules` into `destinationDirectory` and returns their paths.
@@ -274,19 +272,26 @@ public struct Driver {
 
   /// Compiles `source` using `clang` to an object file.
   ///
-  /// Returns the path to the object file within `destinationDirectory`.
-  public func compileCToObject(source: URL, destinationDirectory: URL) async throws -> URL {
+  /// Returns the path to the object file within `d`.
+  public static func compileCToObject(
+    source: URL, destinationDirectory d: URL, _ relocation: RelocationModel
+  ) async throws -> URL {
     let uniquePrefix = source.hashValue
     let fileName = source.deletingPathExtension().appendingPathExtension("o").lastPathComponent
+    let o = d.appendingPathComponent("\(uniquePrefix)-\(fileName)", isDirectory: false)
 
-    let o = destinationDirectory.appendingPathComponent("\(uniquePrefix)-\(fileName)",
-      isDirectory: false)
+    try await Self.compileCToObject(source: source, to: o, relocation)
+    return o
+  }
 
+  /// Compiles `source` using `clang` to an object file.
+  public static func compileCToObject(
+    source: URL, to o: URL, _ relocation: RelocationModel
+  ) async throws {
     var a = ["-c", source.path, "-o", o.path]
     if let r = relocation.asClangArgument { a.append(r) }
 
     _ = try await subprocessOutput(of: .name("clang"), arguments: a)
-    return o
   }
 
   /// Loads `module`, whose sources are at `root`, into `program`.
@@ -374,9 +379,27 @@ public struct Driver {
   /// Use the `USE_BUNDLED_STANDARD_LIBRARY` compiler flag to control whether the  bundled or local
   /// standard library is used. Defaults to local.
   public mutating func loadStandardLibrary() async throws {
+    #if USE_BUNDLED_STANDARD_LIBRARY
+      let additionalSources: [SourceFile] = []
+    #else
+      let additionalSources = [try SourceFile(contentsOf: generatedStandardLibrarySource)]
+    #endif
+
     try await load(
       Module.standardLibraryName, withSourcesAt: Driver.standardLibraryRoot,
-      additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
+      additionalSources: additionalSources)
+    usesStandardLibrary = true
+  }
+
+  /// Replaces the program of `self` with `p`, which contains an already loaded standard library,
+  /// and makes the standard library a dependency of modules loaded thereafter.
+  ///
+  /// - Requires: `self` hasn't compiled other modules yet.
+  public mutating func installStandardLibrary(from p: Program) {
+    precondition(p.modules[Module.standardLibraryName] != nil,
+      "program does not contain the standard library")
+    precondition(self.program.modules.isEmpty)
+    program = p
     usesStandardLibrary = true
   }
 
@@ -396,7 +419,7 @@ public struct Driver {
         do {
           return (u, try Data(contentsOf: u))
         } catch {
-          throw Error(message: "cannot read module archive at '\(u.path)': \(error)")
+          throw Error.unreadableModuleArchive(module: module, location: u, cause: error)
         }
       }
     }
@@ -405,6 +428,9 @@ public struct Driver {
 
   /// Loads `module` and its dependencies from archives found in `moduleSearchPath`, returning the
   /// identity of `module`.
+  ///
+  /// Unlike the module cache, which silently recompiles unusable entries, a malformed archive in a
+  /// module search path is reported as an `Error` naming the offending file.
   @discardableResult
   public mutating func loadArchivedModule(_ module: Module.Name) throws -> Module.ID {
     var ms = Set<Module.Name>()
@@ -421,12 +447,11 @@ public struct Driver {
     if let module = program.identity(module: module) { return module }
 
     if !modulesStartedLoading.insert(module).inserted {
-      throw Error(message: "circular dependency detected while loading module '\(module)'")
+      throw Error.circularModuleDependency(module: module)
     }
 
     guard let (source, data) = try importedArchive(of: module) else {
-      let ps = moduleSearchPath.map(\.path).joined(separator: ", ")
-      throw Error(message: "no archive found for module '\(module)' in module search paths [\(ps)]")
+      throw Error.moduleArchiveNotFound(module: module, searchPaths: moduleSearchPath)
     }
 
     // TODO: save fingerprint of dependencies and check that they match the version `module` was
@@ -437,12 +462,10 @@ public struct Driver {
 
     let h: (name: Module.Name, fingerprint: UInt64, dependencies: [Module.Name])
     do { h = try Module.headerAndDependencies(&a) }
-    catch { throw cannotParseArchive(of: module, at: source) }
+    catch { throw Error.unreadableModuleArchive(module: module, location: source, cause: error) }
 
     guard h.name == module else {
-      throw Error(message: """
-        archive for '\(module)' at '\(source.path)' declares a different module name '\(h.name)'
-        """)
+      throw Error.moduleNameMismatch(module: module, location: source, name: h.name)
     }
     for d in h.dependencies {
       try loadArchivedModule(d, modulesStartedLoading: &modulesStartedLoading)
@@ -451,18 +474,13 @@ public struct Driver {
     var body = ReadableArchive(data)
     do {
       return try program.load(module: module, from: &body).identity
-    } catch is ArchiveError {
-      throw cannotParseArchive(of: module, at: source)
+    } catch {
+      if error is ArchiveError {
+        throw Error.unreadableModuleArchive(module: module, location: source, cause: error)
+      } else {
+        throw error
+      }
     }
-  }
-
-  /// Returns an error reporting that the archive of `module` at `location` could not be parsed.
-  private func cannotParseArchive(of module: Module.Name, at location: URL) -> Error {
-    Error(message: """
-      Failed to parse the module archive of '\(module)' at '\(location.path)'.
-
-      Maybe the archive was compiled with a different version of the compiler.
-      """)
   }
 
   /// Writes the archive of `module` to `output`.
@@ -533,14 +551,50 @@ public struct Driver {
   }
 
   /// An error thrown by the driver.
-  public struct Error: Swift.Error, CustomStringConvertible {
+  public enum Error: Swift.Error, CustomStringConvertible {
 
-    /// The error message.
-    public let message: String
+    /// The `.hylomodule` archive of `module` at `location` could not be read because of `cause`.
+    case unreadableModuleArchive(module: Module.Name, location: URL, cause: Swift.Error)
 
-    /// The error message.
+    /// The `.hylomodule` archive of `module` at `location` declares another module named `name`.
+    case moduleNameMismatch(module: Module.Name, location: URL, name: Module.Name)
+
+    /// No `.hylomodule` archive of `module` was found in the directories `searchPaths`.
+    case moduleArchiveNotFound(module: Module.Name, searchPaths: [URL])
+
+    /// A circular dependency was detected while loading `module`.
+    case circularModuleDependency(module: Module.Name)
+
+    /// LLVM verification failed with `message` while processing a module with `contents`.
+    case llvmVerificationFailure(message: String, contents: String)
+
+    /// The assembly of a module could not be decoded as an UTF-8 string.
+    case invalidAssemblyEncoding
+
+    /// A textual description of the error.
     public var description: String {
-      message
+      switch self {
+      case .unreadableModuleArchive(let module, let location, let cause):
+        "Failed to read module archive of '\(module)' at '\(location.path)': \(cause)"
+      case .moduleNameMismatch(let module, let location, let name):
+        "Archive of '\(module)' at '\(location.path)' declares a module named '\(name)'."
+      case .moduleArchiveNotFound(let module, let searchPaths):
+        """
+        No archive found for module '\(module)' in module search paths \
+        [\(searchPaths.map(\.path).joined(separator: ", "))].
+        """
+      case .circularModuleDependency(let module):
+        "Circular dependency detected while loading module '\(module)'."
+      case .llvmVerificationFailure(let message, let contents):
+        """
+        LLVM verification failed with the following message: \(message)
+
+        Module contents:
+        \(contents)
+        """
+      case .invalidAssemblyEncoding:
+        "Failed to decode assembly as an UTF8 string."
+      }
     }
 
   }
@@ -560,6 +614,37 @@ public struct Driver {
     public init(elapsed: Duration, containsError: Bool) {
       self.elapsed = elapsed
       self.containsError = containsError
+    }
+
+  }
+
+  /// A process-wide cache of object files compiled from the standard library's C shim, keyed by the
+  /// relocation model with which they were compiled.
+  private actor StandardLibraryShimCache {
+
+    /// The shared instance.
+    static let shared = StandardLibraryShimCache()
+
+    /// The compilation of the shim for each relocation model, resulting in the location of the
+    /// compiled object file.
+    private var objects: [RelocationModel: Task<URL, any Swift.Error>] = [:]
+
+    /// Returns an object file compiled from the standard library's C shim with `relocation`,
+    /// compiling it at most once per process into a temporary directory that lives until the
+    /// process exits.
+    func object(compiledWith relocation: RelocationModel) async throws -> URL {
+      if let t = objects[relocation] { return try await t.value }
+
+      // The task is registered before this method suspends so that concurrent callers await the
+      // same compilation instead of starting their own.
+      let t = Task {
+        let d = try FileManager.default.createUniqueTemporaryDirectory()
+        let o = d.appendingPathComponent("shims.o", isDirectory: false)
+        try await Driver.compileCToObject(source: Driver.standardLibraryCShim, to: o, relocation)
+        return o
+      }
+      objects[relocation] = t
+      return try await t.value
     }
 
   }

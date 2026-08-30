@@ -13,8 +13,7 @@ final class StandardLibraryLoadingTests: XCTestCase {
   func testStandardLibraryLoadingBundled() async throws {
     var driver = try Driver(targetSpecification: .native())
     try await driver.load(
-      Module.standardLibraryName, withSourcesAt: bundledStandardLibrarySources,
-      additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
+      Module.standardLibraryName, withSourcesAt: bundledStandardLibrarySources)
   }
 
   func testStandardLibraryLoadingLocal() async throws {
