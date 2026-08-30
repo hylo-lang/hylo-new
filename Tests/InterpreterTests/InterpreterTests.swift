@@ -25,6 +25,13 @@ final class InterpreterRunTests: XCTestCase {
     }
   }
 
+  func testTrapOnMonomorphicFunctionCall() async throws {
+    await check(throws: Interpreter.Trap()) {
+      try await interpretProgram(
+        at: "InterpreterTestPrograms/NegativeTests/TrapOnMonomorphicFunctionCall.hylo")
+    }
+  }
+
   /// Loads and interprets the program at the resource path `location`,
   /// relative to the module's resource bundle.
   private func interpretProgram(at location: String) async throws {
