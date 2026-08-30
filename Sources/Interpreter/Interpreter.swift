@@ -246,7 +246,7 @@ public struct Interpreter {
       let p = allocate(storageFor: x.storage)
       return initializeRegister(to: p)
     case let x as IRApply:
-      return try call(x.callee, passing: x.arguments)
+      return try call(x.callee, passing: x.callArguments)
     case let x as IRApplyBuiltin:
       let v = try call(x.callee, passing: x.arguments)
       return initializeRegister(to: v)
@@ -511,6 +511,15 @@ extension IRAccess {
     // Because IR analysis should ensure single effect.
     // See: Sources/FrontEnd/IR/Instructions/IRAccess.swift.
     capabilities.uniqueElement!
+  }
+
+}
+
+extension IRApply {
+
+  /// The arguments passed to the call, including the return register.
+  public var callArguments: ArraySlice<IRValue> {
+    operands.dropFirst()
   }
 
 }
