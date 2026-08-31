@@ -63,8 +63,7 @@ struct TypeLayout: Regular {
 
 extension UnsignedInteger {
 
-  /// Returns the least multiple of `n` greater than or equal to
-  /// `self`.
+  /// Returns the least multiple of `n` greater than or equal to `self`.
   ///
   /// - Precondition: `n > 0`.
   internal func roundedUp(toNearestMultipleOf n: Self) -> Self {
