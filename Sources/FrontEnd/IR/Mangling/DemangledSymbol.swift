@@ -149,7 +149,7 @@ internal indirect enum DemangledEntity: Hashable, Sendable {
   case existentialized(DemangledEntity)
 
   /// An IRFunction with `name == .applied`.
-   case applied(DemangledEntity, Int)
+  case applied(DemangledEntity, Int)
 
   /// An IRFunction with `name == .slide`.
    case slide(DemangledEntity, Int)
