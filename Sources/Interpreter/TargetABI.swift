@@ -3,8 +3,8 @@ import FrontEnd
 /// Types that describe the ABI for which we might interpret code.
 protocol TargetABI {
 
-  /// Returns the layout of `t`.
-  func layout(_ t: MachineType) -> TypeLayout.Bytes
+  /// Returns the size and alignment of `t` instances.
+  func footprint(_ t: MachineType) -> TypeLayout.StorageRequirements
 
 }
 
@@ -20,10 +20,10 @@ struct UnrealABI: TargetABI {
   /// The maximal alignment of a machine type in bytes.
   private let maxAlignment = 128 / 8
 
-  /// Returns the layout for a `bitWidth`-bit machine type.
+  /// Returns the size and alignment of `bitWidth`-bit machine types.
   ///
   /// - Precondition: `bitWidth` is a power of 2.
-  private func layout(bitWidth: Int) -> TypeLayout.Bytes {
+  private func machineTypeFootprint(bitWidth: Int) -> TypeLayout.StorageRequirements {
     precondition(
       bitWidth > 0 && bitWidth.nonzeroBitCount == 1,
       "bit width \(bitWidth) is not a power of 2.")
@@ -33,8 +33,8 @@ struct UnrealABI: TargetABI {
       size: sizeInBytes)
   }
 
-  /// Returns the layout of `t`.
-  public func layout(_ t: MachineType) -> TypeLayout.Bytes {
+  /// Returns the size and alignment of `t` instances.
+  public func footprint(_ t: MachineType) -> TypeLayout.StorageRequirements {
     let bitWidth =
       switch t {
       case .i(let w): Int(w)
@@ -45,7 +45,7 @@ struct UnrealABI: TargetABI {
       case .float128: 128
       case .ptr: bitsInAWord
       }
-    return layout(bitWidth: bitWidth)
+    return machineTypeFootprint(bitWidth: bitWidth)
   }
 
 }
