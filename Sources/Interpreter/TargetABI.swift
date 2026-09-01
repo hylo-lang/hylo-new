@@ -19,7 +19,7 @@ extension TargetABI {
   public func size(_ t: MachineType) -> Int {
     switch t {
     case .i(let w): Int(w.dividedRoundingUp(by: 8))
-    case .word: bitsInAPointer
+    case .word: bitsInAPointer / 8
     case .float16: 2
     case .float32: 4
     case .float64: 8
@@ -47,10 +47,11 @@ struct UnrealABI: TargetABI {
   /// The maximal alignment of a machine type in bytes.
   private let maxAlignment = 128 / 8
 
-  /// Returns the ABI-required alignment of `t`.
+  /// Returns the ABI-required alignment of t, guaranteeing one-byte alignment for
+  /// .i(1) and .i(8).
   func alignment(_ t: MachineType) -> Int { min(size(t), maxAlignment) }
 
-  /// The size of a pointer in bytes.
+  /// The number of bits in a pointer type.
   var bitsInAPointer: Int { bitsInAWord }
 
 }
