@@ -3,9 +3,7 @@ import FrontEnd
 /// Types that describe the ABI for which we might interpret code.
 protocol TargetABI {
 
-  /// Returns the ABI-required alignment of `t`.
-  ///
-  /// The alignment of `.i(1)` and `.i(8)` is required to be one byte.
+  /// Returns the alignment of `t`, which is 1 for `.i(1)` and `.i(8)`.
   func alignment(_ t: MachineType) -> Int
 
   /// The number of bits in a pointer type.
@@ -47,8 +45,7 @@ struct UnrealABI: TargetABI {
   /// The maximal alignment of a machine type in bytes.
   private let maxAlignment = 128 / 8
 
-  /// Returns the ABI-required alignment of t, guaranteeing one-byte alignment for
-  /// .i(1) and .i(8).
+  /// Returns the alignment of `t`, which is 1 for `.i(1)` and `.i(8)`.
   func alignment(_ t: MachineType) -> Int { min(size(t), maxAlignment) }
 
   /// The number of bits in a pointer type.
