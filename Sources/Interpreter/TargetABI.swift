@@ -8,8 +8,8 @@ protocol TargetABI {
   /// The alignment of `.i(1)` and `.i(8)` is required to be one byte.
   func alignment(_ t: MachineType) -> Int
 
-  /// The size of a pointer in bytes.
-  var pointerSize: Int { get }
+  /// The number of bits in a pointer type.
+  var bitsInAPointer: Int { get }
 
 }
 
@@ -19,12 +19,12 @@ extension TargetABI {
   public func size(_ t: MachineType) -> Int {
     switch t {
     case .i(let w): Int(w.dividedRoundingUp(by: 8))
-    case .word: pointerSize
+    case .word: bitsInAPointer
     case .float16: 2
     case .float32: 4
     case .float64: 8
     case .float128: 16
-    case .ptr: pointerSize
+    case .ptr: bitsInAPointer / 8
     }
   }
 
@@ -51,7 +51,7 @@ struct UnrealABI: TargetABI {
   func alignment(_ t: MachineType) -> Int { min(size(t), maxAlignment) }
 
   /// The size of a pointer in bytes.
-  var pointerSize: Int { bitsInAWord / 8 }
+  var bitsInAPointer: Int { bitsInAWord }
 
 }
 
