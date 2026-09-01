@@ -2,6 +2,7 @@ import Driver
 import Foundation
 import FrontEnd
 import StandardLibrary
+import HostUtilities
 import Utilities
 import StableCollections
 import Subprocess
@@ -20,7 +21,7 @@ private let alwaysSaveArtifacts: Bool = false
 @Suite
 struct CompilerTests {
 
-  private typealias Host = Utilities.Host
+  private typealias Host = HostUtilities.Host
 
   /// The input of a compiler test.
   struct TestDescription {
