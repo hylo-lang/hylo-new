@@ -458,20 +458,29 @@ final class TypeLayoutTests: XCTestCase {
 
     for _ in 0..<3 {
       let a = (0..<1).map { _ in
-        TypeLayout.StorageRequirements(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+        TypeLayout.StorageRequirements(
+          alignment: Int.random(in: 1..<10),
+          size: Int.random(in: 0..<10)
+        )
       }
       check_offsets(members: a)
     }
     for _ in 0..<100 {
       let a = (0..<2).map { _ in
-        TypeLayout.StorageRequirements(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+        TypeLayout.StorageRequirements(
+          alignment: Int.random(in: 1..<10),
+          size: Int.random(in: 0..<10)
+        )
       }
       check_offsets(members: a)
     }
 
     for _ in 0..<2000 {
       let a = (0..<10).map { _ in
-        TypeLayout.StorageRequirements(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+        TypeLayout.StorageRequirements(
+          alignment: Int.random(in: 1..<10),
+          size: Int.random(in: 0..<10)
+        )
       }
       check_offsets(members: a)
     }
