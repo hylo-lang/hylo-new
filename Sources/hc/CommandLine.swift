@@ -3,6 +3,7 @@ import Driver
 import Foundation
 import FrontEnd
 import SwiftyLLVM
+import HostUtilities
 import Utilities
 import StandardLibrary
 

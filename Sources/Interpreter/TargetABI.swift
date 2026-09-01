@@ -28,8 +28,8 @@ extension TargetABI {
     }
   }
 
-  /// Returns the layout of `t`.
-  public func layout(_ t: MachineType) -> TypeLayout.Bytes {
+  /// Returns the size and alignment of `t` instances.
+  public func footprint(_ t: MachineType) -> TypeLayout.StorageRequirements {
     .init(alignment: alignment(t), size: size(t))
   }
 
@@ -48,8 +48,6 @@ struct UnrealABI: TargetABI {
   private let maxAlignment = 128 / 8
 
   /// Returns the ABI-required alignment of `t`.
-  ///
-  /// The alignment of `.i(1)` and `.i(8)` is required to be one byte.
   func alignment(_ t: MachineType) -> Int { min(size(t), maxAlignment) }
 
   /// The size of a pointer in bytes.
