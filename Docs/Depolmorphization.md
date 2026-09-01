@@ -8,7 +8,7 @@ Both monomorphization and existentialization essentially consist of creating a c
 In the former case, type arguments are simply substituted for their corresponding parameters.
 In the latter case, the type parameters are transformed into term parameters accepting type witnesses at run-time.
 
-This document describes how Hylo implements depolymorphization.
+The rest of this document describes how Hylo implements existentialization.
 
 > Disclaimer:
 > The syntax of Hylo IR is far from final.
@@ -16,7 +16,7 @@ This document describes how Hylo implements depolymorphization.
 
 ## Existentialization
 
-In a nutshell, existentialization consists of replacing type parameters with term parameters while abstracting over any information that cannot be determined at compile-time.
+Existentialization replaces type parameters with term parameters that provide any information that cannot be determined at compile-time.
 Consider the following example to illustrate this concept:
 
 ```hylo
@@ -26,8 +26,7 @@ fun swap<T is Movable>(a: inout T, b: inout T) {
 ```
 
 The first step to compile this function is to lower it to Hylo IR.
-Recall a conformance constraint such as `T is Movable` is always compiled to term parameter accepting a conformance witness.
-As a result, the signature of the lowered form of `swap(_:_:)` is as follows:
+Because the IR cannot represent constraints directly, Hylo replaces each constraint such as `T is Movable` with a conformance witness parameter:
 
 ```hylo
 fun swap(_:_:)<T>(
@@ -36,11 +35,11 @@ fun swap(_:_:)<T>(
 ```
 
 The function is still polymorphic at this stage, taking a type parameter `T`.
-`%p0` accepts a witness of `T`'s conformance to movable.
+`%p0` accepts a witness of `T`'s conformance to `Movable`.
 `%p1` and `%p2`, correspond to `a` and `b`, respectively.
 Finally, `%p3` denotes the output register of the function, i.e., the place to which its result is written.
 
-Existentialization will produce a copy of this function in which the type parameter `T` is replaced with a term parameters:
+Existentialization then replaces the unconstrained type parameter `T` with a term parameter, `T`'s **type witness**:
 
 ```hylo
 fun swap(_:_:).existentialized(
@@ -48,17 +47,16 @@ fun swap(_:_:).existentialized(
 )
 ```
 
-Rather than taking a type parameter, this function accepts a *type witness* as its first parameter `%p0`.
-This type witness will be used to obtain information about the layout of `T`, as we shall see later.
+The type witness supplies information about `T` not given by conformances, such as its layout.
 The following parameters are the same as those of the polymorphic version, just renamed.
 Finally, occurrences of `T` have been replaced with `?0`, which denotes a *skolem* representing some type unknown at compile time.
 
-> From a more formal perspective, existentialization relies on the observation that a term of type `∀⍺.τ`, where `⍺` is a type variable that may occur in `τ`, can be transformed into a term of type `∃⍺.ω → τ` in which the extra parameter witnesses `⍺`'s properties at runtime.
-> One can then [skolemize](https://en.wikipedia.org/wiki/Skolem_normal_form) existentially quantified variable to get rid of the quantifier, resulting in a term of type `ω → τ` in which each occurrence of `⍺` has been replaced with a skolem (aka rigid variable).
+> Formally, existentialization transforms a term of type `∀⍺.τ`, where `⍺` is a type variable that may occur in `τ`, into a term of type `∃⍺.ω → τ` in which the extra parameter witnesses `⍺`'s properties at runtime.
+> It then [skolemizes](https://en.wikipedia.org/wiki/Skolem_normal_form) the existentially quantified variable to get rid of the quantifier, resulting in a term of type `ω → τ` in which each occurrence of `⍺` has been replaced with a skolem (aka rigid variable).
 >
-> For example, given a function of type `∀⍺.⍺ → ⍺`, we first construct a function `∃⍺.ω → ⍺ → ⍺` before applying skolemization to replace occurrences of `⍺` by some unique skolem `κ` and end up with a term of type `ω → κ → κ`, which is a monomorphic function.
+> For example, given a function of type `∀⍺.⍺ → ⍺`, we construct a function `∃⍺.ω → ⍺ → ⍺`, we then skolemize it, replacing occurrences of `⍺` by with a unique skolem `κ`, and end up with a monomorphic function of type `ω → κ → κ`.
 >
-> Note that nothing in the type system that links `ω` to neither `⍺` nor `κ`.
+> Note that nothing in the type system links `ω` to either `⍺` or `κ`.
 > As a consequence, the compiler cannot verify the type safety of a function after it has been existentialized.
 > This issue is inconvenient but does not invalidate the safety of the source language, since existentialization preserves semantics.
 > Hence, a showing the well-typedness of a polymorphic function provides guarantees about the behavior of its existentialized form, at least in principle.
