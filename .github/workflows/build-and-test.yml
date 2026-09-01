@@ -133,6 +133,10 @@ jobs:
       - name: Build the front-end for wasm32
         run: swift build --swift-sdk swift-6.3.2-RELEASE_wasm --target FrontEnd
 
+      - name: Build the interpreter for wasm32
+        # Out-of-tree tools query type layouts through this target.
+        run: swift build --swift-sdk swift-6.3.2-RELEASE_wasm --target Interpreter
+
       - name: Build the smoke test for wasm32
         run: swift build --swift-sdk swift-6.3.2-RELEASE_wasm --product frontend-smoke-test
 

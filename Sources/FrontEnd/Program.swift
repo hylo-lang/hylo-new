@@ -84,6 +84,14 @@ public struct Program: Sendable {
     await Scoper().visit(m, of: &self)
   }
 
+  /// Computes the scoping relationships in `m` on the calling thread.
+  ///
+  /// This method is meant for hosts that cannot run Swift's cooperative executor; see
+  /// `Scoper.visitSerially(_:of:)`.
+  public mutating func assignScopesSerially(_ m: Module.ID) {
+    Scoper().visitSerially(m, of: &self)
+  }
+
   /// Re-compute the scoping relationships of `n`'s immediate children.
   public mutating func reassignScopes<T: SyntaxIdentity>(childrenOf n: T) {
     for c in children(n) {

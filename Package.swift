@@ -22,6 +22,7 @@ let package = Package(
     .executable(name: "hylo-demangle", targets: ["hylo-demangle"]),
     .library(name: "HyloStandardLibrary", targets: ["StandardLibrary"]),
     .library(name: "HyloFrontEnd", targets: ["FrontEnd"]),
+    .library(name: "HyloInterpreter", targets: ["Interpreter"]),
   ],
   dependencies: [
     .package(
