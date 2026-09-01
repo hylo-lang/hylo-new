@@ -65,10 +65,19 @@ public struct LayoutDescription: Regular, Codable {
     /// Where the part was declared, or `nil` if it was not declared in the queried module.
     public let site: SourceRegion?
 
+    /// The parts of this part's own type, empty if it has none.
+    ///
+    /// Their offsets are relative to the same instance this part belongs to, not to this part, so
+    /// that a client drawing an instance's bytes can read every offset the same way.
+    public let parts: [Part]
+
+    /// `true` iff this part's type is an enum, whose own parts overlap.
+    public let isEnum: Bool
+
     /// Creates an instance with the given properties.
     public init(
       name: String, type: String, offset: Int, size: Int, alignment: Int,
-      site: SourceRegion? = nil
+      site: SourceRegion? = nil, parts: [Part] = [], isEnum: Bool = false
     ) {
       self.name = name
       self.type = type
@@ -76,6 +85,8 @@ public struct LayoutDescription: Regular, Codable {
       self.size = size
       self.alignment = alignment
       self.site = site
+      self.parts = parts
+      self.isEnum = isEnum
     }
 
   }
@@ -203,20 +214,33 @@ public struct LayoutQuery {
   private mutating func description(
     of l: TypeLayout, declaredIn m: Module.ID, of p: inout Program
   ) -> LayoutDescription {
+    .init(
+      type: p.show(l.type.underlying), size: l.size, alignment: l.alignment,
+      isEnum: l.isEnumLayout, parts: parts(of: l, at: 0, declaredIn: m, of: &p),
+      site: declarationSite(of: l.type.underlying, declaredIn: m, of: &p))
+  }
+
+  /// Returns the parts of `l`, and of their types in turn, as offsets from `base`.
+  ///
+  /// The nesting is reported rather than flattened because it is what a client draws: a member
+  /// whose type is a record is one member holding two, not two members side by side, and nothing
+  /// downstream can tell the difference from a list of offsets. Working it out here costs nothing,
+  /// since laying a part out already lays out its type.
+  private mutating func parts(
+    of l: TypeLayout, at base: Int, declaredIn m: Module.ID, of p: inout Program
+  ) -> [LayoutDescription.Part] {
     let sites = partSites(of: l, declaredIn: m, of: &p)
-    var parts: [LayoutDescription.Part] = []
+    var result: [LayoutDescription.Part] = []
     for (i, q) in l.parts.enumerated() {
       let r = cache.layout(q.type, in: &p)
-      parts.append(
+      let at = base + q.offset
+      result.append(
         .init(
-          name: q.name ?? "", type: p.show(q.type.underlying), offset: q.offset,
-          size: r.size, alignment: r.alignment, site: i < sites.count ? sites[i] : nil))
+          name: q.name ?? "", type: p.show(q.type.underlying), offset: at,
+          size: r.size, alignment: r.alignment, site: i < sites.count ? sites[i] : nil,
+          parts: parts(of: r, at: at, declaredIn: m, of: &p), isEnum: r.isEnumLayout))
     }
-
-    return .init(
-      type: p.show(l.type.underlying), size: l.size, alignment: l.alignment,
-      isEnum: l.isEnumLayout, parts: parts,
-      site: declarationSite(of: l.type.underlying, declaredIn: m, of: &p))
+    return result
   }
 
   /// Returns where each part of `l` was declared, using `nil` for the parts that `m` does not

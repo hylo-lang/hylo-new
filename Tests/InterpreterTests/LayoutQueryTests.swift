@@ -99,6 +99,56 @@ final class LayoutQueryTests: XCTestCase {
     XCTAssert(q.layoutsOfTypesDeclared(in: m, of: &p).isEmpty)
   }
 
+  func testNestedPartsAreReported() async throws {
+    let (m, _) = await add(
+      """
+      public struct Inner {
+        let a: Builtin.i32
+        let b: Builtin.i32
+      }
+      public struct Outer {
+        let x: Inner
+        let y: Inner
+      }
+      """)
+
+    var q = LayoutQuery()
+    let outer = q.layoutsOfTypesDeclared(in: m, of: &p).first(where: { $0.type == "Outer" })!
+
+    // A member whose type is a record is one member holding two, not two beside
+    // each other: what contains what cannot be recovered from a list of offsets.
+    XCTAssertEqual(outer.parts.map(\.name), ["x", "y"])
+    XCTAssertEqual(outer.parts.map(\.offset), [0, 8])
+    XCTAssertEqual(outer.parts[0].parts.map(\.name), ["a", "b"])
+
+    // Nested offsets are from the same instance, so every one reads alike.
+    XCTAssertEqual(outer.parts[0].parts.map(\.offset), [0, 4])
+    XCTAssertEqual(outer.parts[1].parts.map(\.offset), [8, 12])
+
+    // A part with no parts of its own stops the recursion.
+    XCTAssertEqual(outer.parts[0].parts[0].parts, [])
+    XCTAssertEqual(outer.parts[0].isEnum, false)
+  }
+
+  func testNestedEnumIsMarked() async throws {
+    let (m, _) = await add(
+      """
+      public enum Choice {
+        case some(wrapped: Builtin.i16)
+        case none
+      }
+      public struct Holder {
+        let c: Choice
+      }
+      """)
+
+    var q = LayoutQuery()
+    let holder = q.layoutsOfTypesDeclared(in: m, of: &p).first(where: { $0.type == "Holder" })!
+    // The cases of a nested enum overlap, which a client has to be told.
+    XCTAssertEqual(holder.parts[0].isEnum, true)
+    XCTAssertEqual(holder.parts[0].parts.map(\.name), ["some", "none", "discriminator"])
+  }
+
   func testSerialScopingAgreesWithConcurrentScoping() async throws {
     let source = """
       public struct Pair {
