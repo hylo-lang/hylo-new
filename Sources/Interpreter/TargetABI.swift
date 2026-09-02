@@ -34,6 +34,9 @@ extension TargetABI {
 }
 
 /// An ABI we can use to interpret code when matching some real ABI doesn't matter.
+///
+/// The alignment is the size of `t`, capped at `maxAlignment`. In particular,
+/// `.i(1)` and `.i(8)` have one-byte alignment.
 struct UnrealABI: TargetABI {
 
   /// An instance.
