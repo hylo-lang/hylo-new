@@ -38,7 +38,7 @@ public struct Driver {
   /// The linker's library search path.
   public var librarySearchPath: [URL]
 
-  /// The directories in which imported module archives (`.hylomodule` files) are searched.
+  /// The search path for imported module archives (`.hylomodule` files).
   public var moduleSearchPath: [URL]
 
   /// The names of the native libraries to link (in addition to any imported Hylo dependencies).
