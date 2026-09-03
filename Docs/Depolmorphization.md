@@ -1,4 +1,4 @@
-# Deploymorphization
+# Depolymorphization
 
 A function (or type) is polymorphic iff it accepts type parameters and monomorphic otherwise.
 The implementation (aka definition) of a monomorphic function may feature uses of polymorphic constructs that have to be either *monomorphized* or *existentialized* before IR can be compiled to machine code.
