@@ -298,10 +298,22 @@ extension Memory {
     layout(t.erased)
   }
 
+  /// Returns the layout of `t`.
+  public mutating func layout(_ t: MachineType) -> TypeLayout {
+    layout(program.types.demand(t).erased)
+  }
+
   /// Returns the address of `subPart` in `whole`.
   public mutating func location(_ subPart: IndexPath, in whole: TypedAddress) -> TypedAddress {
     let (t, o) =
       typeLayouts.typeAndOffset(subPart, within: whole.type, definedIn: &program)
+    return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
+  }
+
+  /// Returns the address of the field `f` in `whole`.
+  public mutating func location(ofField f: String, in whole: TypedAddress) -> TypedAddress {
+    let (t, o) =
+      typeLayouts.typeAndOffset(ofField: f, within: whole.type, definedIn: &program)
     return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
   }
 

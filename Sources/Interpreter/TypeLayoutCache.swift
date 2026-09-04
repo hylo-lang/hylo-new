@@ -209,4 +209,15 @@ extension TypeLayoutCache {
       c.type = p.type
     }
   }
+
+  /// Returns the type and byte offset of the field `f` within `t`,
+  /// where `t` is defined in `p`.
+  mutating func typeAndOffset(
+    ofField f: String, within t: MonomorphicTypeIdentity,
+    definedIn p: inout Program
+  ) -> (type: MonomorphicTypeIdentity, offset: Int) {
+    let p = layout(t, in: &p).parts.first { $0.name == f }!
+    return (type: p.type, offset: p.offset)
+  }
+
 }

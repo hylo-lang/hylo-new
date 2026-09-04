@@ -252,7 +252,7 @@ public struct Interpreter {
     case let x as IRBranch:
       return .jump(to: start(x.target))
     case let x as IRConditionalBranch:
-      let c = self[x.condition].bool
+      let c = try self[x.condition].asBool
       if c {
         return .jump(to: start(x.onSuccess))
       } else {
@@ -276,7 +276,8 @@ public struct Interpreter {
     case let x as IRRegionEnd<IRProject>:
       _ = x
     case let x as IRProperty:
-      _ = x
+      let l = x.record.location(ofField: x.property, in: &self)
+      return initializeRegister(to: l)
     case is IRReturn:
       for a in topOfStack.allocations.reversed() {
         try memory.deallocate(a)
@@ -342,12 +343,23 @@ public struct Interpreter {
 
   /// Returns the value corresponding to `v` in the current execution state.
   ///
-  /// - Precondition: `v` is a runtimve value.
+  /// - Precondition: `v` is a runtime value or a place obtained from an
+  ///   access instruction.
   private subscript(_ v: IRValue) -> RuntimeValue {
-    mutating get {
+    mutating get throws {
       switch v {
       case .register(let r):
-        return topOfStack.registers[r]!(as: RuntimeValue.self)!
+        if let v = topOfStack.registers[r]!(as: RuntimeValue.self) {
+          return v
+        }
+
+        if let p = topOfStack.registers[r]!(as: Access<Memory.TypedAddress>.self) {
+          return try memory.read(from: p)
+        }
+
+        preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
+      case .parameter(let i):
+        return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
         let l = memory.layout(t)
         return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
@@ -397,9 +409,26 @@ public struct Interpreter {
   }
 
   /// Returns the result of calling `f` with `arguments`.
-  private func call(_ f: BuiltinFunction, passing arguments: [IRValue]) throws -> RuntimeValue {
+  private mutating func call(
+    _ f: BuiltinFunction,
+    passing arguments: [IRValue]
+  ) throws -> RuntimeValue {
     switch f {
     case .trap: throw Trap()
+    case .icmp(let p, let t):
+      let w = memory.layout(t).size * 8
+      let lhs = try self[arguments[0]]
+      let rhs = try self[arguments[1]]
+      let r = p(lhs, rhs, bitWidth: w)
+      return .init(bool: r)
+    case .zeroinitializer(let t):
+      let l = memory.layout(t)
+      let u = program.types[t]
+      return switch u {
+      case .i(_): .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
+      case .word: .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
+      default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
+      }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
     }
   }
@@ -418,6 +447,19 @@ extension IRValue {
   ) -> Memory.TypedAddress {
     let a = executor.address(of: self)
     return executor.memory.location(p, in: a)
+  }
+
+  /// Returns the address of field `f` in `self`, in the current execution
+  /// state of `executor`.
+  ///
+  /// - Precondition: `self` contains a place.
+  fileprivate func location(
+    ofField f: DeclarationIdentity,
+    in executor: inout Interpreter
+  ) -> Memory.TypedAddress {
+    let a = executor.address(of: self)
+    let n = executor.program.name(of: f)!.identifier
+    return executor.memory.location(ofField: n, in: a)
   }
 
 }

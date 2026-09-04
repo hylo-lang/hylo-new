@@ -495,4 +495,31 @@ final class TypeLayoutTests: XCTestCase {
       .init(alignment: 18, size: 14)
     )
   }
+
+  func testLocationOfField() async throws {
+    let t = await type(
+      named: "I8I16Struct",
+      in: """
+        public struct I8I16Struct {
+          let x: Builtin.i8
+          let y: Builtin.i16
+        }
+        """
+    )
+    let i8 = id(MachineType.i(8))
+    let i16 = id(MachineType.i(16))
+
+    var m = Memory(forRunning: p, on: UnrealABI())
+    let a = m.allocate(storageFor: t).asTypedAddress(t)
+
+    XCTAssertGreaterThan(m.layout(i16).alignment, m.layout(i8).alignment)
+
+    XCTAssertEqual(
+      m.location(ofField: "x", in: a),
+      .init(allocation: a.allocation, offset: 2, type: .init(i8)))
+
+    XCTAssertEqual(
+      m.location(ofField: "y", in: a),
+      .init(allocation: a.allocation, offset: 0, type: .init(i16)))
+  }
 }
