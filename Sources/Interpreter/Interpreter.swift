@@ -342,7 +342,7 @@ public struct Interpreter {
     try memory.store(self[v], at: access(of: p))
   }
 
-  /// Copies the bytes of object at address `source` to `destination`.
+  /// Copies the bytes of object at address `source` to address `destination`.
   ///
   /// - Precondition: `source` and `destination` are non-overlapping.
   private mutating func copy(_ source: IRValue, to destination: IRValue) throws {
