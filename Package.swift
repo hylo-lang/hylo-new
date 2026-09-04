@@ -26,7 +26,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/attaswift/BigInt.git",
-      from: "5.7.0"),
+      from: "6.0.1"),
     .package(
       url: "https://github.com/kyouko-taiga/Archivist.git",
       from: "1.0.0"),
@@ -50,6 +50,7 @@ let package = Package(
       dependencies: [
         .target(name: "Driver"),
         .target(name: "FrontEnd"),
+        .target(name: "HostUtilities"),
         .target(name: "Utilities"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "SwiftyLLVM", package: "Swifty-LLVM"),
@@ -72,10 +73,19 @@ let package = Package(
       swiftSettings: commonSwiftSettings),
 
     .executableTarget(
+      name: "frontend-smoke-test",
+      dependencies: [
+        .target(name: "FrontEnd"),
+        .target(name: "StandardLibrary"),
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .executableTarget(
       name: "hc-generate-stdlib",
       dependencies: [
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
-        .target(name: "Utilities")
+        .target(name: "HostUtilities"),
+        .target(name: "Utilities"),
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -84,6 +94,7 @@ let package = Package(
       dependencies: [
         .target(name: "BackEnd"),
         .target(name: "FrontEnd"),
+        .target(name: "HostUtilities"),
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
         .product(name: "Archivist", package: "archivist"),
@@ -133,7 +144,13 @@ let package = Package(
       dependencies: [
         .product(name: "Algorithms", package: "swift-algorithms"),
         .product(name: "Collections", package: "swift-collections"),
-        .product(name: "Subprocess", package: "swift-subprocess"),
+      ],
+      swiftSettings: commonSwiftSettings),
+
+    .target(
+      name: "HostUtilities",
+      dependencies: [
+        .product(name: "Subprocess", package: "swift-subprocess")
       ],
       swiftSettings: commonSwiftSettings),
 
@@ -150,6 +167,7 @@ let package = Package(
       dependencies: [
         .target(name: "Driver"),
         .target(name: "FrontEnd"),
+        .target(name: "HostUtilities"),
         .target(name: "StandardLibrary"),
         .target(name: "Utilities"),
         .product(name: "Subprocess", package: "swift-subprocess"),
@@ -163,6 +181,7 @@ let package = Package(
       dependencies: [
         .target(name: "hc"),
         .target(name: "FrontEnd"),
+        .target(name: "HostUtilities"),
         .target(name: "Utilities"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Subprocess", package: "swift-subprocess"),
@@ -182,6 +201,7 @@ let package = Package(
       dependencies: [
         .target(name: "BackEnd"),
         .target(name: "Driver"),
+        .target(name: "HostUtilities"),
         .target(name: "Utilities"),
       ],
       swiftSettings: commonSwiftSettings),
@@ -200,6 +220,7 @@ let package = Package(
     .testTarget(
       name: "UtilitiesTests",
       dependencies: [
+        .target(name: "HostUtilities"),
         .target(name: "Utilities"),
         .product(name: "Subprocess", package: "swift-subprocess"),
       ],

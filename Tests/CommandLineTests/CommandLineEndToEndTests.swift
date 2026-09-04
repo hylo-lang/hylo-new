@@ -2,6 +2,7 @@ import ArgumentParser
 import Foundation
 import FrontEnd
 import Subprocess
+import HostUtilities
 import Utilities
 import XCTest
 
@@ -122,7 +123,7 @@ final class CommandLineEndToEndTests: XCTestCase {
 
       XCTAssertNotEqual(r.exitCode, 0)
       XCTAssert(
-        r.standardError.contains("no archive found for module 'Util' in module search paths []"),
+        r.standardError.contains("No archive found for module 'Util' in module search paths []."),
         r.standardError)
     }
   }
@@ -140,7 +141,7 @@ final class CommandLineEndToEndTests: XCTestCase {
 
       XCTAssertNotEqual(r.exitCode, 0)
       XCTAssert(
-        r.standardError.contains("Failed to parse the module archive of 'A' at '"),
+        r.standardError.contains("Failed to read module archive of 'A' at '"),
         r.standardError)
     }
   }

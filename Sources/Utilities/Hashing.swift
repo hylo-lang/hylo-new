@@ -44,7 +44,7 @@ public enum FNV1 {
 #if arch(x86_64) || arch(arm64)
     let basis = Int(bitPattern: 0xcbf29ce484222325)
     let prime = Int(bitPattern: 0x100000001b3)
-#elseif arch(i386) || arch(arm)
+#elseif arch(i386) || arch(arm) || arch(wasm32)
     let basis = Int(bitPattern: 0x811c9dc5)
     let prime = Int(bitPattern: 0x1000193)
 #endif

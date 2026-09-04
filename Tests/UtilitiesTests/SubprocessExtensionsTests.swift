@@ -1,5 +1,6 @@
 import Foundation
 import Subprocess
+import HostUtilities
 import Utilities
 import XCTest
 

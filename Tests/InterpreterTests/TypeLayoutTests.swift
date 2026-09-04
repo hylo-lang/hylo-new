@@ -40,9 +40,9 @@ final class TypeLayoutTests: XCTestCase {
     let i8 = id(MachineType.i(8))
     let i64 = id(MachineType.i(64))
     let i8i64 = layout(p.types.tuple(of: [i8, i64]))
-    XCTAssertEqual(i8i64.whole, .init(alignment: 8, size: 9))
+    XCTAssertEqual(i8i64.footprint, .init(alignment: 8, size: 9))
     let i64i8 = layout(p.types.tuple(of: [i64, i8]))
-    XCTAssertEqual(i64i8.whole, .init(alignment: 8, size: 9))
+    XCTAssertEqual(i64i8.footprint, .init(alignment: 8, size: 9))
 
     XCTAssertEqual(
       i8i64.parts,
@@ -65,7 +65,7 @@ final class TypeLayoutTests: XCTestCase {
     let i32 = id(MachineType.i(32))
 
     let i8i16i32 = layout(p.types.tuple(of: [i8, i16, i32]))
-    XCTAssertEqual(i8i16i32.whole, .init(alignment: 4, size: 7))
+    XCTAssertEqual(i8i16i32.footprint, .init(alignment: 4, size: 7))
 
     XCTAssertEqual(
       i8i16i32.parts,
@@ -379,7 +379,7 @@ final class TypeLayoutTests: XCTestCase {
     l.layout(.init(t), in: &p)
   }
 
-  private func check_offsets(members sa: [TypeLayout.Bytes]) {
+  private func check_offsets(members sa: [TypeLayout.StorageRequirements]) {
     if sa.count == 0 { return }
     let offsets = storageLayoutOfRecord(havingMembers: sa).partOffsets
 
@@ -458,20 +458,29 @@ final class TypeLayoutTests: XCTestCase {
 
     for _ in 0..<3 {
       let a = (0..<1).map { _ in
-        TypeLayout.Bytes(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+        TypeLayout.StorageRequirements(
+          alignment: Int.random(in: 1..<10),
+          size: Int.random(in: 0..<10)
+        )
       }
       check_offsets(members: a)
     }
     for _ in 0..<100 {
       let a = (0..<2).map { _ in
-        TypeLayout.Bytes(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+        TypeLayout.StorageRequirements(
+          alignment: Int.random(in: 1..<10),
+          size: Int.random(in: 0..<10)
+        )
       }
       check_offsets(members: a)
     }
 
     for _ in 0..<2000 {
       let a = (0..<10).map { _ in
-        TypeLayout.Bytes(alignment: Int.random(in: 1..<10), size: Int.random(in: 0..<10))
+        TypeLayout.StorageRequirements(
+          alignment: Int.random(in: 1..<10),
+          size: Int.random(in: 0..<10)
+        )
       }
       check_offsets(members: a)
     }
@@ -481,7 +490,7 @@ final class TypeLayoutTests: XCTestCase {
     XCTAssertEqual(
       storageLayoutOfRecord(havingMembers: [
         .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 9, size: 5),
-      ]).bytes,
+      ]).footprint,
 
       .init(alignment: 18, size: 14)
     )

@@ -35,7 +35,7 @@ struct TypeLayoutCache {
     let s = p.tag(u)
     if s == MachineType.self {
       let v = p.type(u, as: MachineType.self)
-      return TypeLayout(whole: abi.layout(v), type: t, parts: [], isEnumLayout: false)
+      return TypeLayout(footprint: abi.footprint(v), type: t, parts: [], isEnumLayout: false)
     } else if s == Struct.self || s == Tuple.self {
       return computeLayout(recordType: t, in: &p)
     } else if s == Enum.self {
@@ -68,7 +68,7 @@ struct TypeLayoutCache {
     in p: inout Program
   ) -> TypeLayout {
     let l = storageLayoutOfRecord(
-      havingMembers: ms.map { layout($0.type, in: &p).whole })
+      havingMembers: ms.map { layout($0.type, in: &p).footprint })
 
     let parts = zip(ms, l.partOffsets).enumerated().map { i, x in
       let (m, o) = x
@@ -79,7 +79,7 @@ struct TypeLayoutCache {
       )
     }
 
-    return .init(whole: l.bytes, type: t, parts: parts, isEnumLayout: false)
+    return .init(footprint: l.footprint, type: t, parts: parts, isEnumLayout: false)
   }
 
   /// Returns the layout for an enum `t`, defined in `p`.
@@ -96,7 +96,7 @@ struct TypeLayoutCache {
 
     let d = layout(abi.enumDiscriminator(count: cases.count, in: &p), in: &p)
 
-    let payload = TypeLayout.Bytes(
+    let payload = TypeLayout.StorageRequirements(
       alignment: Int(cases.map(\.alignment).lcm() ?? 1),
       size: cases.map(\.size).max() ?? 0)
 
@@ -109,7 +109,7 @@ struct TypeLayoutCache {
       zip(cases, ns).map { TypeLayout.Part(name: $0.1, type: $0.0.type, offset: l.partOffsets[0]) }
       + [.init(name: "discriminator", type: d.type, offset: l.partOffsets[1])]
 
-    return .init(whole: l.bytes, type: t, parts: parts, isEnumLayout: true)
+    return .init(footprint: l.footprint, type: t, parts: parts, isEnumLayout: true)
   }
 
   /// Returns the layout for a raw value enum `t`, defined in `p`.
@@ -121,7 +121,7 @@ struct TypeLayoutCache {
       storage(nominal: t.underlying, in: &p).first!)
     let discriminatorLayout = layout(discriminator, in: &p)
     return TypeLayout(
-      whole: discriminatorLayout.whole,
+      footprint: discriminatorLayout.footprint,
       type: t,
       parts: [.init(name: "discriminator", type: discriminator, offset: 0)],
       isEnumLayout: true
@@ -180,13 +180,13 @@ struct TypeLayoutCache {
 /// Returns the storage layout and part offsets of a record having members
 /// with layouts `ms` in declaration order.
 func storageLayoutOfRecord(
-  havingMembers ms: [TypeLayout.Bytes]
-) -> (bytes: TypeLayout.Bytes, partOffsets: [Int]) {
+  havingMembers ms: [TypeLayout.StorageRequirements]
+) -> (footprint: TypeLayout.StorageRequirements, partOffsets: [Int]) {
   let storageOrder = ms.enumerated().sorted {
     return $0.element.alignment > $1.element.alignment
   }
 
-  var b = TypeLayout.Bytes(alignment: 1, size: 0)
+  var b = TypeLayout.StorageRequirements(alignment: 1, size: 0)
   var offsets = [Int](repeating: 0, count: ms.count)
   for (i, m) in storageOrder {
     b = b.appending(m)

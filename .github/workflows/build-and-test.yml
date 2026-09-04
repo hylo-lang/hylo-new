@@ -105,3 +105,40 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
     runs-on: ${{ matrix.os }}
+
+  test-wasm:
+    name: "Front-end on WebAssembly"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Swifty-LLVM is not built for wasm32 but SwiftPM needs its manifest to resolve ours.
+          submodules: recursive
+
+      - name: Set up Swift 6.3.2
+        uses: SwiftyLab/setup-swift@38f54a76b70d989321de9dc7c840618c08cf56e9 # v1.14.0
+        with:
+          swift-version: "6.3.2"
+
+      - name: Install the Swift SDK for WebAssembly
+        # The URL and checksum are published at https://www.swift.org/install/linux/
+        run: >
+          swift sdk install
+          https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz
+          --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
+
+      - name: Set up wasmtime
+        uses: bytecodealliance/actions/wasmtime/setup@9152e710e9f7182e4c29ad218e4f335a7b203613 # v1.1.3
+
+      - name: Build the front-end for wasm32
+        run: swift build --swift-sdk swift-6.3.2-RELEASE_wasm --target FrontEnd
+
+      - name: Build the smoke test for wasm32
+        run: swift build --swift-sdk swift-6.3.2-RELEASE_wasm --product frontend-smoke-test
+
+      - name: Run the smoke test
+        # The path of the resource bundle containing the standard library's sources is baked into
+        # the binary as an absolute path, so it is mapped into the wasm guest as-is.
+        run: |
+          BIN=$(swift build --swift-sdk swift-6.3.2-RELEASE_wasm --show-bin-path)
+          wasmtime run --dir "$BIN::$BIN" "$BIN/frontend-smoke-test.wasm"

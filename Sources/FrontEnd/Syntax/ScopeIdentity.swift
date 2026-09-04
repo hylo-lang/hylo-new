@@ -34,7 +34,7 @@ public struct ScopeIdentity: Hashable, Sendable {
 
   /// `true` iff `self` represents a file.
   public var isFile: Bool {
-    representation.offset == UInt32.max
+    (representation.bits >> 32) == UInt64(UInt32.max)
   }
 
   /// The syntax tree that `self` represents, or `nil` if `self` represents a file.

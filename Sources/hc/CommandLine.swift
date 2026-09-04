@@ -3,7 +3,9 @@ import Driver
 import Foundation
 import FrontEnd
 import SwiftyLLVM
+import HostUtilities
 import Utilities
+import StandardLibrary
 
 /// Disambiguate FrontEnd.Module from SwiftyLLVM.Module.
 private typealias Module = FrontEnd.Module
@@ -225,7 +227,7 @@ private typealias Module = FrontEnd.Module
   /// Executes the command.
   public mutating func run() async throws {
     if printStandardLibraryRoot {
-      print(Driver.standardLibraryRoot.path)
+      print(bundledStandardLibrarySources.path)
       return
     }
 

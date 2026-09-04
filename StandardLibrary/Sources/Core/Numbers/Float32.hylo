@@ -1,15 +1,104 @@
+/// A 32-bit floating point number.
 @_symbol("Float32")
-struct Float32 is Deinitializable {
-  
+public struct Float32 is Deinitializable {
+
   /// The raw value of this instance.
   module var value: Builtin.float32
 
   /// Creates an instance with its raw value.
+  @inline(always)
   module memberwise init
 
-  /// Creates an instance with value 0.
+  /// Creates an instance with value `0`.
+  @inline(always)
   public init() {
     &self.value = Builtin.zeroinitializer_float32()
+  }
+
+  // MARK: Equatable conformance
+
+  /// Returns `true` iff `self` is equal to `other`.
+  @inline(always)
+  public fun infix== (other: Self) -> Bool {
+    .new(value: Builtin.fcmp_ueq_float32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is not equal to `other`.
+  @inline(always)
+  public fun infix!= (other: Self) -> Bool {
+    .new(value: Builtin.fcmp_une_float32(self.value, other.value))
+  }
+
+  // MARK: Comparable conformance
+
+  /// Returns `true` iff `self` is less than `other`.
+  @inline(always)
+  public fun infix< (other: Self) -> Bool {
+    .new(value: Builtin.fcmp_ult_float32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is less than or equal to `other`.
+  @inline(always)
+  public fun infix<= (other: Self) -> Bool {
+    .new(value: Builtin.fcmp_ule_float32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than `other`.
+  @inline(always)
+  public fun infix> (other: Self) -> Bool {
+    .new(value: Builtin.fcmp_ugt_float32(self.value, other.value))
+  }
+
+  /// Returns `true` iff `self` is greater than or equal to `other`.
+  @inline(always)
+  public fun infix>= (other: Self) -> Bool {
+    .new(value: Builtin.fcmp_uge_float32(self.value, other.value))
+  }
+
+  // MARK: AdditiveArithmetic conformance
+
+  /// Returns `self` added to `other`.
+  @inline(always)
+  public fun infix+ (other: Self) -> Self {
+    .new(value: Builtin.fadd_float32(self.value, other.value))
+  }
+
+  /// Increments `self` by `other`.
+  @inline(always)
+  public fun infix+= (other: Self) inout {
+    &self.value = Builtin.fadd_float32(self.value, other.value)
+  }
+
+  /// Returns `other` subtracted from `self`.
+  @inline(always)
+  public fun infix- (other: Self) -> Self {
+    .new(value: Builtin.fsub_float32(self.value, other.value))
+  }
+
+  /// Decrements `self` by `other`.
+  @inline(always)
+  public fun infix-= (other: Self) inout {
+    &self.value = Builtin.fsub_float32(self.value, other.value)
+  }
+
+  /// Returns `0`.
+  @inline(always)
+  public static fun zero() -> Self {
+    .new()
+  }
+
+  // MARK: Numeric conformance
+
+  /// Returns `self` multiplied by `other`.
+  @inline(always)
+  public fun infix* (other: Self) -> Self {
+    .new(value: Builtin.fmul_float32(self.value, other.value))
+  }
+
+  /// Multiplies `self` by `other`.
+  @inline(always)
+  public fun infix*= (other: Self) inout {
+    &self.value = Builtin.fmul_float32(self.value, other.value)
   }
 
 }
@@ -20,70 +109,10 @@ public given Float32 is Movable {}
 
 public given Float32 is Copyable {}
 
-public given Float32 is Equatable {
+public given Float32 is Equatable {}
 
-  public fun infix== (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_ueq_float32(self.value, other.value))
-  }
+public given Float32 is Comparable {}
 
-  public fun infix!= (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_une_float32(self.value, other.value))
-  }
+public given Float32 is AdditiveArithmetic {}
 
-}
-
-public given Float32 is Comparable {
-
-  public fun infix< (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_ult_float32(self.value, other.value))
-  }
-
-  public fun infix<= (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_ule_float32(self.value, other.value))
-  }
-
-  public fun infix> (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_ugt_float32(self.value, other.value))
-  }
-
-  public fun infix>= (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_uge_float32(self.value, other.value))
-  }
-
-}
-
-public given Float32 is AdditiveArithmetic {
-
-  public fun infix+ (other: Self) -> Self {
-    Self(value: Builtin.fadd_float32(self.value, other.value))
-  }
-
-  public fun infix+= (other: Self) inout {
-    &self.value = Builtin.fadd_float32(self.value, other.value)
-  }
-
-  public fun infix- (other: Self) -> Self {
-    Self(value: Builtin.fsub_float32(self.value, other.value))
-  }
-
-  public fun infix-= (other: Self) inout {
-    &self.value = Builtin.fsub_float32(self.value, other.value)
-  }
-
-  public static fun zero() -> Self {
-    .new()
-  }
-
-}
-
-public given Float32 is Numeric {
-
-  public fun infix* (other: Self) -> Self {
-    .new(value: Builtin.fmul_float32(self.value, other.value))
-  }
-
-  public fun infix*= (other: Self) inout {
-    &self.value = Builtin.fmul_float32(self.value, other.value)
-  }
-
-}
+public given Float32 is Numeric {}
