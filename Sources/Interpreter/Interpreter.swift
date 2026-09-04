@@ -262,9 +262,10 @@ public struct Interpreter {
       _ = x
     case let x as IRLoad:
       let v = try load(from: x.source)
-      return .initializeRegister(to: .init(v))
+      return initializeRegister(to: v)
     case let x as IRMemoryCopy:
-      _ = x
+      try copy(x.source, to: x.target)
+      return initializeRegister(to: ())
     case let x as IRMove:
       _ = x
     case let x as IRPartialApply:
@@ -339,6 +340,15 @@ public struct Interpreter {
   /// Stores `v` at the address `p`.
   private mutating func store(_ v: IRValue, at p: IRValue) throws {
     try memory.store(self[v], at: access(of: p))
+  }
+
+  /// Copies the bytes of object at address `source` to address `destination`.
+  ///
+  /// - Precondition: `source` and `destination` are non-overlapping.
+  private mutating func copy(_ source: IRValue, to destination: IRValue) throws {
+    let s = access(of: source)
+    let d = access(of: destination)
+    try memory.copy(s, to: d)
   }
 
   /// Returns the value corresponding to `v` in the current execution state.
