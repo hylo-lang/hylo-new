@@ -9,6 +9,10 @@ protocol TargetABI {
   /// The number of bits in a pointer type.
   var bitsInAPointer: Int { get }
 
+  /// The order in which the bytes of values of multi-byte machine types are
+  /// arranged.
+  var byteOrder: Endianness { get }
+
 }
 
 extension TargetABI {
@@ -53,6 +57,10 @@ struct UnrealABI: TargetABI {
 
   /// The number of bits in a pointer type.
   var bitsInAPointer: Int { bitsInAWord }
+
+  /// The order in which the bytes of values of multi-byte machine types are
+  /// arranged.
+  var byteOrder: Endianness { .little }
 
 }
 
