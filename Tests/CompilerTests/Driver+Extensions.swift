@@ -2,6 +2,7 @@ import Driver
 import Foundation
 import FrontEnd
 import Testing
+import HostUtilities
 import Utilities
 
 /// The program containing the standard library, initialized exactly once per process.

@@ -5,10 +5,11 @@ import FrontEnd
 import StandardLibrary
 import Subprocess
 import SwiftyLLVM
+import HostUtilities
 import Utilities
 
 /// Utilities and constants related to the host machine.
-private typealias Host = Utilities.Host
+private typealias Host = HostUtilities.Host
 
 /// A SwiftyLLVM module.
 private typealias LLVMModule = SwiftyLLVM.Module
@@ -37,7 +38,7 @@ public struct Driver {
   /// The linker's library search path.
   public var librarySearchPath: [URL]
 
-  /// The directories in which imported module archives (`.hylomodule` files) are searched.
+  /// The search path for imported module archives (`.hylomodule` files).
   public var moduleSearchPath: [URL]
 
   /// The names of the native libraries to link (in addition to any imported Hylo dependencies).
