@@ -430,7 +430,7 @@ public struct Interpreter {
       let lhs = try self[arguments[0]]
       let rhs = try self[arguments[1]]
       let r = p(lhs, rhs, bitWidth: w)
-      return .init(bool: r, havingLayout: memory.layout(.i(1)).whole)
+      return .init(bool: r)
     case .zeroinitializer(let t):
       let l = memory.layout(t)
       let u = program.types[t]

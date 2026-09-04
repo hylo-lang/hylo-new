@@ -5,7 +5,7 @@ import Utilities
 struct TypeLayout: Regular {
 
   /// Memory layout of a type, without any detail about parts.
-  public struct Bytes: Regular {
+  public struct StorageRequirements: Regular {
     /// The minimum alignment of an instance.
     let alignment: Int
 
@@ -37,13 +37,13 @@ struct TypeLayout: Regular {
   }
 
   /// Aggregate properties of this layout.
-  public let whole: Bytes
+  public let footprint: StorageRequirements
 
   /// The minimum alignment of an instance.
-  public var alignment: Int { whole.alignment }
+  public var alignment: Int { footprint.alignment }
 
   /// The number of bytes occupied by an instance.
-  public var size: Int { whole.size }
+  public var size: Int { footprint.size }
 
   /// The type whose layout is described by `self`.
   public let type: MonomorphicTypeIdentity
@@ -63,7 +63,7 @@ struct TypeLayout: Regular {
 
 extension UnsignedInteger {
 
-  /// Returns `self` rounded up to the nearest multiple of `n`.
+  /// Returns the least multiple of `n` greater than or equal to `self`.
   ///
   /// - Precondition: `n > 0`.
   internal func roundedUp(toNearestMultipleOf n: Self) -> Self {
@@ -73,7 +73,7 @@ extension UnsignedInteger {
 
 }
 
-extension TypeLayout.Bytes {
+extension TypeLayout.StorageRequirements {
 
   /// Returns the layout of the tuple `(S, T)`, where `S` and `T` are types whose layout is
   /// represented by `self` and `t` respectively.

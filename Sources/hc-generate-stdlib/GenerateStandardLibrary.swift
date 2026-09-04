@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import HostUtilities
 import Utilities
 
 /// The top-level command of `hc-generate-stdlib`.
