@@ -1,7 +1,7 @@
 import FrontEnd
 
 /// Types that describe the ABI for which we might interpret code.
-protocol TargetABI {
+public protocol TargetABI {
 
   /// Returns the alignment of `t`, which is 1 for `.i(1)` and `.i(8)`.
   func alignment(_ t: MachineType) -> Int

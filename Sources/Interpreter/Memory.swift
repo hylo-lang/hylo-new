@@ -10,6 +10,9 @@ struct Memory {
   /// The type layouts computed so far.
   internal var typeLayouts: TypeLayoutCache
 
+  /// The ABI for which the types will be laid out.
+  public var abi: any TargetABI { typeLayouts.abi }
+
   /// The ID of the next block to be allocated.
   private var nextAllocation = 0
 
@@ -222,6 +225,21 @@ struct Memory {
       yield &allocation[i]!
     }
   }
+
+  /// The value stored at `p`.
+  fileprivate subscript(_ p: Memory.TypedAddress) -> RuntimeValue {
+    mutating get {
+      let l = layout(p.type)
+      let bs = self[p.allocation].storage[p.offset..<p.offset + l.size]
+      return RuntimeValue(bytes: bs)
+    }
+    set {
+      let l = layout(p.type)
+      precondition(newValue.bytes.count == l.size)
+      self[p.allocation].storage[p.offset..<p.offset + l.size]
+        .copyElements(from: newValue.bytes)
+    }
+  }
 }
 
 extension Memory.Address {
@@ -317,28 +335,12 @@ extension Memory {
     return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
   }
 
-  /// Returns the value stored at `p`.
-  private mutating func read(from p: Memory.TypedAddress) -> RuntimeValue {
-    let l = layout(p.type)
-    let bs = self[p.allocation].storage[p.offset..<p.offset + l.size]
-    return RuntimeValue(bytes: Array(bs), havingAlignment: l.alignment)
-  }
-
   /// Returns the value stored at `p`, using the permissions and obligations
   /// associated with `p`.
   public mutating func read(from p: Access<Memory.TypedAddress>) throws -> RuntimeValue {
     // TODO: throw if it is illegal to read from `p` using its permissions.
     // TODO: throw if location pointed by `p` is uninitialized.
-    read(from: p.location)
-  }
-
-  /// Stores `v` at `p`.
-  ///
-  /// - Precondition: `v` is an instance of type `p.type`.
-  private mutating func store(_ v: RuntimeValue, at p: Memory.TypedAddress) {
-    let n = v.bytes.count
-    let o = p.offset
-    self[p.allocation].storage[o..<o + n] = v.bytes
+    self[p.location]
   }
 
   /// Stores `v` at `p`.
@@ -347,7 +349,7 @@ extension Memory {
   public mutating func store(_ v: RuntimeValue, at p: Access<Memory.TypedAddress>) throws {
     // TODO: throw if it is illegal to write to `p` using its permissions.
     // TODO: throw if location pointed by `p` is not fully uninitialized.
-    store(v, at: p.location)
+    self[p.location] = v
   }
 
 }
