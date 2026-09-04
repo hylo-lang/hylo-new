@@ -202,7 +202,9 @@ struct Memory {
   }
 
   /// The value of integer type `t` stored at `p`.
-  private subscript(_ p: Memory.Address, ofIntegerType t: MachineType) -> RuntimeValue {
+  ///
+  /// - Precondition `t` is a builtin integer type.
+  public subscript(_ p: Memory.Address, ofIntegerType t: MachineType) -> RuntimeValue {
     get {
       let n = abi.size(t)
       let bs = self[p.allocation].storage[p.offset..<p.offset + n]
