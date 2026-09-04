@@ -74,6 +74,27 @@ final class InterpreterMemoryTests: XCTestCase {
       .init(allocation: a.allocation, offset: a.offset + 4, type: .init(i32)))
   }
 
+  func testUnsignnedIntValue() throws {
+    let i8 = id(MachineType.i(8))
+    let i16 = id(MachineType.i(16))
+    let i32 = id(MachineType.i(32))
+    let i64 = id(MachineType.i(64))
+
+    let a = m.allocate(storageFor: i8, count: 64)
+
+    m[a.asTypedAddress(i8)] = .init(integer: 8, bitWidth: 8, byteOrder: .little)
+    XCTAssertEqual(m.unsignedIntValue(at: a, ofType: .i(8)), 8)
+
+    m[a.asTypedAddress(i16)] = .init(integer: 16, bitWidth: 16, byteOrder: .little)
+    XCTAssertEqual(m.unsignedIntValue(at: a, ofType: .i(16)), 16)
+
+    m[a.asTypedAddress(i32)] = .init(integer: 32, bitWidth: 32, byteOrder: .little)
+    XCTAssertEqual(m.unsignedIntValue(at: a, ofType: .i(32)), 32)
+
+    m[a.asTypedAddress(i64)] = .init(integer: 64, bitWidth: 64, byteOrder: .little)
+    XCTAssertEqual(m.unsignedIntValue(at: a, ofType: .i(64)), 64)
+  }
+
   /// Returns the type erased identity of `t`.
   private func id<T: TypeTree>(_ t: T) -> AnyTypeIdentity {
     m.program.id(t)

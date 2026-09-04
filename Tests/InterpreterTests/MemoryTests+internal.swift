@@ -5,25 +5,18 @@ import XCTest
 
 final class InterpreterMemoryInternalTests: XCTestCase {
 
-  func testFormingPointerToLastByteOfAllocation() throws {
+  func testReadingAndWritingToMemory() throws {
     var m = Memory(forRunning: .init(forTesting: true), on: UnrealABI())
-    let a = m.allocate(.init(m.program.id(MachineType.i(8))))
 
-    m[a.allocation].withUnsafeMutablePointer(to: UInt8.self, at: 0) { p in
-      p.pointee = 2
-    }
-    m[a.allocation].withUnsafePointer(to: UInt8.self, at: 0) { p in
-      XCTAssertEqual(p.pointee, 2)
-    }
+    let i1 = m.program.id(MachineType.i(1))
+    var a = m.allocate(storageFor: i1).asTypedAddress(i1)
+    m[a] = RuntimeValue(bool: true)
+    XCTAssertEqual(m[a].asBool, true)
 
-  }
-
-  func testFormingPointerToOneByteLaterThanLastByteOfAllocation() throws {
-    var m = Memory(forRunning: .init(forTesting: true), on: UnrealABI())
-    let a = m.allocate(.init(m.program.id(MachineType.i(8))))
-
-    m[a.allocation].withUnsafeMutablePointer(to: Void.self, at: 1) { _ = $0 }
-    m[a.allocation].withUnsafePointer(to: Void.self, at: 1) { _ = $0 }
+    let i16 = m.program.id(MachineType.i(16))
+    a = m.allocate(storageFor: i16).asTypedAddress(i16)
+    m[a] = RuntimeValue(integer: 16, bitWidth: 16, byteOrder: .little)
+    XCTAssertEqual(m[a].asI16(assumingByteOrder: .little), 16)
   }
 
   func testCheckAlignmentAndAllocationBounds() throws {
@@ -39,30 +32,6 @@ final class InterpreterMemoryInternalTests: XCTestCase {
     check(throws: Memory.Error.bounds(a + 30, for: l, allocationSize: 31)) {
       try m[a.allocation].checkAlignmentAndAllocationBounds(at: 30, for: l)
     }
-  }
-
-  func testUnsignnedIntValue() throws {
-    var m = Memory(forRunning: .init(forTesting: true), on: UnrealABI())
-    let a = m.allocate(.init(m.program.id(MachineType.i(8))), count: 64)
-    m[a.allocation].withUnsafeMutablePointer(to: UInt8.self, at: 0) { p in
-      p.pointee = 8
-    }
-    XCTAssertEqual(m[a.allocation].unsignedIntValue(at: 0, ofType: .i(8)), 8)
-
-    m[a.allocation].withUnsafeMutablePointer(to: UInt16.self, at: 0) { p in
-      p.pointee = 16
-    }
-    XCTAssertEqual(m[a.allocation].unsignedIntValue(at: 0, ofType: .i(16)), 16)
-
-    m[a.allocation].withUnsafeMutablePointer(to: UInt32.self, at: 0) { p in
-      p.pointee = 32
-    }
-    XCTAssertEqual(m[a.allocation].unsignedIntValue(at: 0, ofType: .i(32)), 32)
-
-    m[a.allocation].withUnsafeMutablePointer(to: UInt64.self, at: 0) { p in
-      p.pointee = 64
-    }
-    XCTAssertEqual(m[a.allocation].unsignedIntValue(at: 0, ofType: .i(64)), 64)
   }
 
 }
