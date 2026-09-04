@@ -40,11 +40,11 @@ final class RuntimeValueTests: XCTestCase {
   }
 
   func testRuntimeValueBoolInitializer() {
-    let f = RuntimeValue(bool: false, havingLayout: .init(alignment: 1, size: 1))
+    let f = RuntimeValue(bool: false)
     XCTAssertFalse(f.asBool)
     XCTAssertEqual(f.bytes, [0])
 
-    let t = RuntimeValue(bool: true, havingLayout: .init(alignment: 1, size: 1))
+    let t = RuntimeValue(bool: true)
     XCTAssertTrue(t.asBool)
     XCTAssertEqual(t.bytes, [1])
   }
