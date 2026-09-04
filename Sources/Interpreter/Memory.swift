@@ -10,6 +10,9 @@ struct Memory {
   /// The type layouts computed so far.
   internal var typeLayouts: TypeLayoutCache
 
+  /// The ABI for which the types will be laid out.
+  public var abi: any TargetABI { typeLayouts.abi }
+
   /// The ID of the next block to be allocated.
   private var nextAllocation = 0
 
@@ -98,46 +101,6 @@ struct Memory {
       }
     }
 
-    /// Returns the result of calling `body` on the storage for a `T` instance at `a`.
-    ///
-    /// - Precondition: the storage exists and is properly aligned.
-    internal mutating func withUnsafeMutablePointer<T, R>(
-      to _: T.Type, at a: Offset, _ body: (UnsafeMutablePointer<T>) -> R
-    ) -> R {
-      precondition(a + MemoryLayout<T>.size <= size)
-      precondition(offset(a, hasAlignment: MemoryLayout<T>.alignment))
-      return storage.withUnsafeMutableBytes { p in
-        body((p.baseAddress! + baseOffset + a).assumingMemoryBound(to: T.self))
-      }
-    }
-
-    /// Returns the result of calling `body` on the storage for a `T` instance at `a`.
-    ///
-    /// - Precondition: the storage exists and is properly aligned.
-    internal func withUnsafePointer<T, R>(
-      to _: T.Type, at a: Offset, _ body: (UnsafePointer<T>) -> R
-    ) -> R {
-      precondition(a + MemoryLayout<T>.size <= size)
-      return storage.withUnsafeBytes { p in
-        body((p.baseAddress! + baseOffset + a).assumingMemoryBound(to: T.self))
-      }
-    }
-
-    /// Returns the unsigned interpretation of `t` at `a`.
-    internal func unsignedIntValue(at a: Offset, ofType t: MachineType) -> UInt {
-      if case .i(let n) = t {
-        return switch n {
-        case 8: UInt(withUnsafePointer(to: UInt8.self, at: a) { $0.pointee })
-        case 16: UInt(withUnsafePointer(to: UInt16.self, at: a) { $0.pointee })
-        case 32: UInt(withUnsafePointer(to: UInt32.self, at: a) { $0.pointee })
-        case 64: UInt(withUnsafePointer(to: UInt64.self, at: a) { $0.pointee })
-        default: fatalError("Unknown builtin integer size \(n)")
-        }
-      } else {
-        preconditionFailure("Unrecognized builtin integer type \(t)")
-      }
-    }
-
     /// Returns `true` iff `o` is aligned to an `n` byte boundary.
     public func offset(_ o: Offset, hasAlignment n: Int) -> Bool {
       storage.withUnsafeBytes {
@@ -220,6 +183,54 @@ struct Memory {
     }
     _modify {
       yield &allocation[i]!
+    }
+  }
+
+  /// The value stored at `p`.
+  public subscript(_ p: Memory.TypedAddress) -> RuntimeValue {
+    mutating get {
+      let l = layout(p.type)
+      let bs = self[p.allocation].storage[p.offset..<p.offset + l.size]
+      return RuntimeValue(bytes: bs)
+    }
+    set {
+      let l = layout(p.type)
+      precondition(newValue.bytes.count == l.size)
+      self[p.allocation].storage[p.offset..<p.offset + l.size]
+        .copyElements(from: newValue.bytes)
+    }
+  }
+
+  /// The value of integer type `t` stored at `p`.
+  ///
+  /// - Precondition `t` is a builtin integer type.
+  public subscript(_ p: Memory.Address, ofIntegerType t: MachineType) -> RuntimeValue {
+    get {
+      let n = abi.size(t)
+      let bs = self[p.allocation].storage[p.offset..<p.offset + n]
+      return RuntimeValue(bytes: bs)
+    }
+    set {
+      let n = abi.size(t)
+      precondition(newValue.bytes.count == n)
+      self[p.allocation].storage[p.offset..<p.offset + n]
+        .copyElements(from: newValue.bytes)
+    }
+  }
+
+  /// Returns the unsigned interpretation of `t` at `a`.
+  public func unsignedIntValue(at a: Memory.Address, ofType t: MachineType) -> UInt {
+    if case .i(let n) = t {
+      let o = abi.byteOrder
+      return switch n {
+      case 8: UInt(self[a, ofIntegerType: .i(8)].asI8)
+      case 16: UInt(self[a, ofIntegerType: .i(16)].asI16(assumingByteOrder: o))
+      case 32: UInt(self[a, ofIntegerType: .i(32)].asI32(assumingByteOrder: o))
+      case 64: UInt(self[a, ofIntegerType: .i(64)].asI64(assumingByteOrder: o))
+      default: fatalError("Unknown builtin integer size \(n)")
+      }
+    } else {
+      preconditionFailure("Unrecognized builtin integer type \(t)")
     }
   }
 }
@@ -317,28 +328,12 @@ extension Memory {
     return .init(allocation: whole.allocation, offset: o + whole.offset, type: t)
   }
 
-  /// Returns the value stored at `p`.
-  private mutating func read(from p: Memory.TypedAddress) -> RuntimeValue {
-    let l = layout(p.type)
-    let bs = self[p.allocation].storage[p.offset..<p.offset + l.size]
-    return RuntimeValue(bytes: Array(bs), havingAlignment: l.alignment)
-  }
-
   /// Returns the value stored at `p`, using the permissions and obligations
   /// associated with `p`.
   public mutating func read(from p: Access<Memory.TypedAddress>) throws -> RuntimeValue {
     // TODO: throw if it is illegal to read from `p` using its permissions.
     // TODO: throw if location pointed by `p` is uninitialized.
-    read(from: p.location)
-  }
-
-  /// Stores `v` at `p`.
-  ///
-  /// - Precondition: `v` is an instance of type `p.type`.
-  private mutating func store(_ v: RuntimeValue, at p: Memory.TypedAddress) {
-    let n = v.bytes.count
-    let o = p.offset
-    self[p.allocation].storage[o..<o + n] = v.bytes
+    self[p.location]
   }
 
   /// Stores `v` at `p`.
@@ -347,7 +342,7 @@ extension Memory {
   public mutating func store(_ v: RuntimeValue, at p: Access<Memory.TypedAddress>) throws {
     // TODO: throw if it is illegal to write to `p` using its permissions.
     // TODO: throw if location pointed by `p` is not fully uninitialized.
-    store(v, at: p.location)
+    self[p.location] = v
   }
 
 }
