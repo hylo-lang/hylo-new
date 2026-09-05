@@ -1,3 +1,13 @@
+/// Tests `__hylo_offset_of_member`, `__hylo_size_of_record` and `__hylo_alignment_of_record`
+/// against the cases of `test-cases.txt`, each of which describes a record on 3 lines.
+/// A record has up to 10 members. Unused member slots are padded with `0 0`.
+///
+///     5 1  3 2  5 9  0 0  0 0  0 0  0 0  0 0  0 0  0 0 <- [size] [alignment] of each member
+///     9    6    0    0    0    0    0    0    0    0   <- [expected offset]  of each member
+///     14   9                                           <- [size] [alignment] of the record
+///
+/// A leading `-1` indicates the end of the input.
+
 type Size = UInt32
 type Alignment = UInt16
 
@@ -87,19 +97,25 @@ extension TypeWitnessHeader {
 
 type H = TypeWitnessHeader
 
+/// A witness that header tuples can be destroyed, so that they may be bound to locals.
+given TypeWitnessHeader is Deinitializable {}
+
+/// Returns an array of pointers to the elements of `headers`.
+fun witnesses(of headers: H[10]) -> Pointer<TypeWitnessHeader>[10] {
+  let p = Pointer<H>(value: Builtin.address(of: headers))
+  return (p + 0, p + 1, p + 2, p + 3, p + 4, p + 5, p + 6, p + 7, p + 8, p + 9)
+}
+
 fun verify_offset(
   i: Int,
   in headers: H[10],
   of_length l: Int,
   to_be x: Int
 ) {
-  let p = Pointer<H>(value: Builtin.address(of: headers))
-  var witnesses: Pointer<TypeWitnessHeader>[10] = (
-    p + 0, p + 1, p + 2, p + 3, p + 4, p + 5, p + 6, p + 7, p + 8, p + 9)
-
+  var w = witnesses(of: headers)
   let o = __hylo_offset_of_member(
     .new(truncating: i),
-    in: .new(value: Builtin.address(of: witnesses)),
+    in: .new(value: Builtin.address(of: w)),
     of_length: .new(truncating: l))
 
   precondition(o == UInt32(truncating: x))
@@ -133,25 +149,49 @@ fun verify_offsets(
   verify_offset(9, in: record_declaration, of_length: n, to_be: o9)
 }
 
+/// Traps unless `__hylo_size_of_record` and `__hylo_alignment_of_record` applied to the first `l`
+/// members of `headers` yield `expected_size` and `expected_alignment`, respectively.
+fun verify_size_and_alignment(
+  in headers: H[10], of_length l: Int,
+  to_be expected_size: Int, expected_alignment: Int
+) {
+  var w = witnesses(of: headers)
+  let m = Pointer<RecordMemberType>(value: Builtin.address(of: w))
+  let n = UInt32(truncating: l)
+
+  precondition(__hylo_alignment_of_record(in: m, of_length: n) == UInt16(truncating: expected_alignment))
+  precondition(__hylo_size_of_record(in: m, of_length: n) == UInt32(truncating: expected_size))
+  // The size is idempotent w.r.t. the mutation of the array.
+  precondition(__hylo_size_of_record(in: m, of_length: n) == UInt32(truncating: expected_size))
+}
+
 @extern_c_indirect("hylo_open_test_cases_file_for_reading_indirect")
 fun open_test_cases_file_for_reading() -> Pointer<Never>
 
 @extern_c_indirect("hylo_read_test_case_indirect")
 fun read_test_case(
   file: Pointer<Never>,
-  sizes: inout Int[10], alignments: inout Int[10], offsets: inout Int[10]) -> Int
+  sizes: inout Int[10], alignments: inout Int[10], offsets: inout Int[10],
+  size_and_alignment: inout Int[2]) -> Int
 
 fun main() -> Int32 {
   TypeWitnessHeader.check_layout_assumptions()
   // TODO: check for null.  Currently
   // https://github.com/hylo-new/issues/450 stands in the way.
+
+  // The empty record.
+  verify_size_and_alignment(
+    in: (H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
+    of_length: 0, to_be: 0, 1)
+
   let f = open_test_cases_file_for_reading()
   while true {
     var sizes: Int[10] = (0,0,0,0,0,0,0,0,0,0)
     var alignments: Int[10] = (0,0,0,0,0,0,0,0,0,0)
     var offsets: Int[10] = (0,0,0,0,0,0,0,0,0,0)
+    var size_and_alignment: Int[2] = (0,0)
 
-    let l = read_test_case(f, &sizes, &alignments, &offsets)
+    let l = read_test_case(f, &sizes, &alignments, &offsets, &size_and_alignment)
 
     if l <= 0 {
       if l == -1 {return 0}
@@ -160,6 +200,7 @@ fun main() -> Int32 {
       if l == -4 {return -4}
       if l == -5 {return -5}
       if l == 0 {return -6}
+      if l == -9 {return -9}
       return -7
     }
     if l > 10 { return -8 }
@@ -167,21 +208,25 @@ fun main() -> Int32 {
     let s = Pointer<Int>(value: Builtin.address(of: sizes))
     let a = Pointer<Int>(value: Builtin.address(of: alignments))
     let o = Pointer<Int>(value: Builtin.address(of: offsets))
+    let headers: H[10] = (
+      H(s.at(0), a.at(0)),
+      H(s.at(1), a.at(1)),
+      H(s.at(2), a.at(2)),
+      H(s.at(3), a.at(3)),
+      H(s.at(4), a.at(4)),
+      H(s.at(5), a.at(5)),
+      H(s.at(6), a.at(6)),
+      H(s.at(7), a.at(7)),
+      H(s.at(8), a.at(8)),
+      H(s.at(9), a.at(9)))
+
     verify_offsets(
-      in: (
-        H(s.at(0), a.at(0)),
-        H(s.at(1), a.at(1)),
-        H(s.at(2), a.at(2)),
-        H(s.at(3), a.at(3)),
-        H(s.at(4), a.at(4)),
-        H(s.at(5), a.at(5)),
-        H(s.at(6), a.at(6)),
-        H(s.at(7), a.at(7)),
-        H(s.at(8), a.at(8)),
-        H(s.at(9), a.at(9))),
-      of_length: l,
+      in: headers, of_length: l,
       to_be: o.at(0), o.at(1), o.at(2), o.at(3), o.at(4), o.at(5),
              o.at(6), o.at(7), o.at(8), o.at(9))
+
+    let e = Pointer<Int>(value: Builtin.address(of: size_and_alignment))
+    verify_size_and_alignment(in: headers, of_length: l, to_be: e.at(0), e.at(1))
   }
   return 0
 }
