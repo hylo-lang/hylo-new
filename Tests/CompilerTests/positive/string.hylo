@@ -1,0 +1,127 @@
+@extern_c_indirect("c_fdopen_indirect")
+public fun fdopen(descriptor: Int, mode: Pointer<UInt8>) -> Pointer<Never>
+
+@extern_c_indirect("c_fwrite_indirect")
+public fun fwrite(data: Pointer<UInt8>, size: Int, count: Int, stream: Pointer<Never>) -> Int
+
+extension Int {
+
+  public fun infix&>> (other: Int) -> Self {
+    .new(value: Builtin.lshr_word(self.value, other.value))
+  }
+
+  @inline
+  public fun infix^ (other: Self) -> Self {
+    .new(value: Builtin.xor_word(self.value, other.value))
+  }
+
+  @inline
+  public fun prefix~ () -> Self {
+    self ^ -1
+  }
+
+}
+
+extension UInt8 {
+
+  public init(truncating other: Int) {
+    &self.value = Builtin.trunc_word_i8(other.value)
+  }
+
+}
+
+extension Pointer<String.Buffer> {
+
+  /// Creates an instance with the same memory representation as `address`.
+  @inline
+  init(bit_pattern address: Int) {
+    &self.value = Builtin.inttoptr_word(address.value)
+  }
+
+}
+
+@extern_c_indirect("c_free_indirect")
+public fun unsafe_free(pointer: Pointer<Never>) // TODO use MemoryAddress
+
+extension String {
+
+  /// The out-of-line buffer of a string.
+  struct Buffer {
+
+    /// The number of elements in the buffer.
+    var count: Int
+
+    /// The capacity of the buffer.
+    var capacity: Int
+
+  }
+
+  /// Returns `true` if the payload of `self` is stored inline.
+  fun is_inline() -> Bool {
+    (self.units & 0b10) == 0
+  }
+
+  /// Returns `true` if `self` does not own its payload.
+  fun is_unowned() -> Bool {
+    (self.units & 0b01) != 0
+  }
+
+  /// Returns the number of elements in `self`.
+  fun count() -> Int {
+    if self.is_inline() {
+      return (self.units & 0xff) &>> 2
+    } else {
+      let p = Pointer<String.Buffer>(bit_pattern: self.units & ~0b11)
+      let b = p.value as* let String.Buffer
+      return b.count + 0
+    }
+  }
+
+  subscript null_terminated() -> Pointer<UInt8> {
+    // If the contents is inline, then copy the code units into a local buffer and project it.
+    if self.is_inline() {
+      var buffer = 0
+      let b = Builtin.address(of: buffer)
+      let n = self.count()
+      var i = 0
+
+      while i < n {
+        let byte = Builtin.advanced_by_bytes_word(b, i.value)
+        set x = byte as* set UInt8
+        &i += 1
+        &x = UInt8(truncating: self.units &>> (i * 8))
+      }
+
+      let result = Pointer<UInt8>(value: b)
+      yield result
+      _ = buffer
+    }
+
+    // Otherwise, projects the out-of-line buffer.
+    else {
+      let p = Pointer<String.Buffer>(bit_pattern: self.units & ~0b11)
+      let b = Builtin.advanced_by_bytes_word(p.value, 16.value) // TODO: read memory layout
+      let result = Pointer<UInt8>(value: b)
+      yield result
+    }
+  }
+
+}
+
+fun print(s: String) {
+  let stdout = fdopen(1, "w".null_terminated[])
+  let length = s.count()
+  _ = fwrite(s.null_terminated[], 1, length, stdout)
+  _ = fwrite("\n".null_terminated[], 1, 1, stdout)
+}
+
+public fun main() {
+  let short = "abc"
+  precondition(short.is_inline())
+  precondition(short.count() == 3)
+
+  let large = "abcdefghijklmnop"
+  precondition(large.count() == 16)
+
+  print("Hello, World!")
+}

@@ -1846,6 +1846,9 @@ extension Program {
     /// `Hylo.Float64`.
     case float64 = "Float64"
 
+    /// `Hylo.String`.
+    case string = "String"
+
     /// `Hylo.Deinitializable`.
     case deinitializable = "Deinitializable"
 

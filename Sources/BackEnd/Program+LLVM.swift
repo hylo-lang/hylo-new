@@ -180,6 +180,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IREnumTag.self), in: &ctx)
     case IRConditionalBranch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRConditionalBranch.self), in: &ctx)
+    case IRConstantString.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRConstantString.self), in: &ctx)
     case IRGlobalAccess.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRGlobalAccess.self), in: &ctx)
     case IRLoad.self:
@@ -288,12 +290,16 @@ extension Program {
     switch s.callee {
     case .trap:
       insertTrap(in: &ctx)
+
     case .addressOf:
       ctx.value[v] = ctx.value[s.arguments[0]]!
+
     case .zeroinitializer(let t):
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
+
     case .advancedByBytes(let t):
-      let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
+      let u = types.demand(MachineType.ptr)
+      let p = insertLoad([s.arguments[0]], of: u, in: &ctx)[0]
       let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
         of: p, typed: ctx.module.llvm.i8, indices: offsets , at: ctx.insertionPoint!).v
@@ -359,6 +365,10 @@ extension Program {
       let i = ctx.module.llvm.insertFDiv(xs[0], xs[1], at: ctx.insertionPoint!)
       ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
       ctx.value[v] = i.v
+
+    case .lshr(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertLShr(xs[0], xs[1], at: ctx.insertionPoint!).v
 
     case .urem(let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
@@ -437,6 +447,15 @@ extension Program {
       ctx.value[v] = ctx.module.llvm.insertSIToFP(
         xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
 
+    case .inttoptr(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertIntToPtr(xs[0], at: ctx.insertionPoint!).v
+
+    case .ptrtoint(let t):
+      let u = types.demand(MachineType.ptr)
+      let xs = insertLoad(s.arguments, of: u, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertPtrToInt(
+        xs[0], to: metadata(of: t, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
     }
 
     return ctx.ir.instruction(after: i.erased)
@@ -507,6 +526,15 @@ extension Program {
     ctx.module.llvm.insertCondBr(
       if: ctx.value[s.condition]!, then: a, else: b, at: ctx.insertionPoint!)
     return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
+    _ i: IRConstantString.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+    ctx.value[.register(i.erased)] = demandGlobalString(s.contents, in: &ctx.module)
+    return ctx.ir.instruction(after: i.erased)
   }
 
   /// Generates the LLVM IR code corresponding to `i`.
@@ -1085,32 +1113,34 @@ extension Program {
     return symbol
   }
 
+  /// Returns the internal representation of a Hylo string (i.e., an instance of `Hylo.String`)
+  /// equal to `value` and whose contents are allocated statically.
   private func demandGlobalString(
-    _ s: String, in ctx: inout ModuleGenerationContext
+    _ value: String, in ctx: inout ModuleGenerationContext
   ) -> LLVMValue {
     // Did we compute the representation already?
-    if let v = ctx.strings[s] { return v }
+    if let v = ctx.strings[value] { return v }
 
     let iptr = ctx.llvm.iptr
-    let payloadSize = s.utf8.count
+    let payloadSize = value.utf8.count
     let pointerSize = ctx.llvm.layout.pointerSize
 
     // Do the contents fit inline storage?
     if (payloadSize < pointerSize) && (pointerSize <= 8) {
       var units = UInt64(truncatingIfNeeded: payloadSize) << 2
-      for (i, u) in s.utf8.enumerated() {
-        units |= UInt64(u) << (i + 1) * 8
+      for (i, u) in value.utf8.enumerated() {
+        units |= UInt64(u) << ((i + 1) * 8)
       }
       let v = iptr.unsafe[].constant(units).v
-      ctx.strings[s] = v
+      ctx.strings[value] = v
       return v
     }
 
     // Contents must be allocated in static memory.
-    let name = String(FNV1.hash(s.utf8, into: FNV1.u128()).state, radix: 36)
-    let payload = ctx.llvm.arrayConstant(bytes: s.utf8)
+    let name = String(FNV1.hash(value.utf8, into: FNV1.u128()).state, radix: 36)
+    let payload = ctx.llvm.arrayConstant(bytes: Array(value.utf8, terminatedBy: 0))
     let storage = ctx.llvm.structType([iptr.t, iptr.t, payload.unsafe[].type])
-    let symbol = ctx.llvm.declareGlobalVariable("str_\(name)", storage)
+    let symbol = ctx.llvm.declareGlobalVariable("$hstr\(name)", storage)
     ctx.llvm.setLinkage(.private, for: symbol)
 
     // Guarantee minimum alignment of 4 so that we can reserve low bits for tagging.
@@ -1125,7 +1155,7 @@ extension Program {
 
     let v = ctx.llvm.constantPointerToInteger(bitPattern: symbol)
     let w = ctx.llvm.constantAdd(v, iptr.unsafe[].constant(0b11))
-    ctx.strings[s] = w
+    ctx.strings[value] = w
     return w
   }
 
