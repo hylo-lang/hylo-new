@@ -388,8 +388,7 @@ extension Memory {
     let l = layout(source.type)
     self.withUnsafeBytes(source, havingLayout: l) { a in
       self.withUnsafeMutableBytes(destination, havingLayout: l) {
-        var b = $0
-        b.copyElements(from: a)
+        $0.copyMemory(from: a)
       }
     }
   }
