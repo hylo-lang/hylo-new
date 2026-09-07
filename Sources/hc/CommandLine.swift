@@ -199,6 +199,9 @@ private typealias Module = FrontEnd.Module
 
   /// Checks that the parsed arguments form a consistent configuration.
   public func validate() throws {
+    if (inputs.isEmpty) {
+      throw ValidationError("Expected argument")
+    }
     if (moduleArchiveURL != nil) && !outputType.supportsModuleEmission {
       throw ValidationError(
         "'--emit-module-to' cannot be used with '--emit \(outputType.rawValue)'")
