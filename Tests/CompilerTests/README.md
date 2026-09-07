@@ -69,3 +69,31 @@ Intermediate compilation artifacts are saved on test failure as `*.observed` fil
 Test cases are generated automatically as part of SPM's build sequence.
 You can also use `hc-tests` to generate test cases manually.
 The tool goes over each file or sub-directory under `negative` and `positive` and create a corresponding method to invoke `CompilerTests.compile(_:)`.
+
+## Testing Cross-Compilation
+
+> Note: Due to our current qemu setup, this only works on Linux, and requires a target with Linux ABI (not freestanding).
+
+To run the tests for another target under qemu's user-mode emulator:
+
+- Install qemu's user-mode emulators and the cross toolchain of the target.
+  On Ubuntu those are the `qemu-user` package, which provides the `qemu-<arch>` emulators, and the
+  `gcc-<target>` package (e.g. `gcc-arm-linux-gnueabihf`), which provides the target's headers,
+  libc and crt objects.
+- Build with `-Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED`.
+- Set the following environment variables before running the tests:
+  - `HYLO_TEST_TARGET`: the LLVM target triple (default: host)
+  - `HYLO_TEST_RUNNER`: the emulator for that target, e.g. `qemu-arm`. This can be a binary name on `PATH` or an absolute path. (default: no emulator)
+  - `QEMU_LD_PREFIX`: the absolute path to the directory holding the target's dynamic linker and shared libraries.
+
+For instance, to run the tests on 32-bit ARM:
+
+```bash
+swift build --build-tests -Xswiftc -enable-testing \
+  -Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED
+
+HYLO_TEST_TARGET=armv7-unknown-linux-gnueabihf \
+  HYLO_TEST_RUNNER=qemu-arm \
+  QEMU_LD_PREFIX=/usr/arm-linux-gnueabihf \
+  swift test --skip-build -Xswiftc -enable-testing -Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED  --filter 'CompilerTests\.CompilerTests/'
+```

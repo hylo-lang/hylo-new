@@ -83,10 +83,10 @@ jobs:
           addToPath: true
 
       - name: Build Swift project
-        run: swift build --build-tests -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+        run: swift build --build-tests -Xswiftc -enable-testing -Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Run tests
-        run: swift test --skip-build -Xswiftc -enable-testing -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
+        run: swift test --skip-build -Xswiftc -enable-testing -Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}
@@ -97,6 +97,20 @@ jobs:
           BIN_PATH=$(swift build --show-bin-path)
           llvm-profdata merge -sparse $BIN_PATH/codecov/*.profraw -o $BIN_PATH/codecov/merged.profdata
           llvm-cov export $BIN_PATH/HyloPackageTests.xctest -object $BIN_PATH/hc --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
+
+      - name: Install qemu and the cross toolchains
+        if: ${{ runner.os == 'Linux' && runner.arch == 'X64' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user gcc-arm-linux-gnueabihf
+
+      - name: Cross-compile and run the compiler tests under qemu
+        if: ${{ runner.os == 'Linux' && runner.arch == 'X64' }}
+        env:
+          HYLO_TEST_TARGET: armv7-unknown-linux-gnueabihf
+          HYLO_TEST_RUNNER: qemu-arm
+          QEMU_LD_PREFIX: /usr/arm-linux-gnueabihf
+        run: swift test --skip-build -Xswiftc -enable-testing -Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED -c ${{ matrix.config }} --filter 'CompilerTests\.CompilerTests/'
 
       - name: Upload coverage report to Codecov
         if: ${{ matrix.export-coverage }}
