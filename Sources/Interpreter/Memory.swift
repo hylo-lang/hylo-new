@@ -223,7 +223,7 @@ struct Memory {
     }
   }
 
-  /// Returns the result of calling `body` with raw buffer pointer to bytes in `p`.
+  /// Returns the result of calling `body` on the bytes in `p`.
   ///
   /// - Precondition: `p.type` has layout `l`.
   private func withUnsafeBytes<R>(
@@ -236,7 +236,7 @@ struct Memory {
     }
   }
 
-  /// Returns the result of calling `body` with mutable raw buffer pointer to bytes in `p`.
+  /// Returns the result of calling `body` on the bytes in `p`.
   ///
   /// - Precondition: `p.type` has layout `l`.
   private mutating func withUnsafeMutableBytes<R>(
@@ -377,7 +377,7 @@ extension Memory {
     store(v, at: p.location)
   }
 
-  /// Copies the bytes of object at `source` to `destination`.
+  /// Copies the bytes of the object at `source` to `destination`.
   ///
   /// - Precondition: `source` and `destination` are non-overlapping.
   private mutating func copy(
@@ -394,7 +394,7 @@ extension Memory {
     }
   }
 
-  /// Copies the bytes of object at `source` to `destination`.
+  /// Copies the bytes of the object at `source` to `destination`.
   ///
   /// - Precondition: `source` and `destination` are non-overlapping.
   public mutating func copy(
