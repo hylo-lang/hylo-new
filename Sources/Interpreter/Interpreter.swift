@@ -84,7 +84,7 @@ private struct Value {
 /// to another instruction.
 private enum InstructionEpilogue {
 
-  /// Initialize instruction register with the given value.
+  /// Initialize instruction register to the given value.
   case result(Value)
 
   /// Control is transferred to the given instruction.
