@@ -24,7 +24,7 @@ struct CompilerTests {
   private typealias Host = HostUtilities.Host
 
   /// The target to cross-compile test programs for, if applicable.
-  private static let testTarget = Host.environment["HYLO_TEST_TARGET"]
+  private static let crossCompilationTarget = Host.environment["HYLO_TEST_TARGET"]
 
   /// The qemu executable running the compiled test programs, if applicable.
   ///
@@ -349,7 +349,7 @@ struct CompilerTests {
     _ input: TestDescription, withOptimizations optimized: Bool,
     reportingFailuresTo log: inout FailureLog
   ) async throws -> CompilationResult {
-    var driver = if let t = CompilerTests.testTarget {
+    var driver = if let t = CompilerTests.crossCompilationTarget {
       try Driver(targetSpecification: .init(target: .init(t), cpu: "", features: ""))
     } else {
       try Driver(targetSpecification: .native())
@@ -459,8 +459,12 @@ struct CompilerTests {
     if (try driver.compileToLLVM(m)).containsError { return }
     let llvmIR = driver.llvmIR(of: m)!
     artifacts.record(llvmIR, for: .llvmIR)
-    assertArtifact(.llvmIR, expected: expectedArtifacts[.llvmIR], observed: llvmIR,
-      reportingFailuresTo: &log)
+
+    // Don't assert during cross-compilation due to target-dependent sizes.
+    if Self.crossCompilationTarget == nil {
+      assertArtifact(.llvmIR, expected: expectedArtifacts[.llvmIR], observed: llvmIR,
+        reportingFailuresTo: &log)
+    }
     if stage == .llvm { return }
 
     // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
