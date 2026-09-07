@@ -543,18 +543,11 @@ extension Program {
     let t = metadata(of: ctx.ir.result(of: s.source)!.type, in: &ctx.module)
     let n = t.layout.size.fixed ?? fatalError("unexpected dynamic size")
 
-    let ptr = ctx.module.llvm.ptr
-    let i32 = ctx.module.llvm.i32
-    let memcpy = ctx.module.llvm.intrinsic(
-      named: IntrinsicFunction.llvm.memcpy, for: [ptr.t, ptr.t, i32.t])!
-
     let x0 = codegen(s.target, in: &ctx).v
     let x1 = codegen(s.source, in: &ctx).v
-    let x2 = i32.unsafe[].constant(n).v
-    let x3 = ctx.module.llvm.i1.unsafe[].constant(0).v
-    _ = ctx.module.llvm.insertCall(
-      memcpy, on: [x0, x1, x2, x3],
-      at: ctx.insertionPoint!)
+    let x2 = ctx.module.llvm.i32.unsafe[].constant(n).v
+    _ = ctx.module.llvm.insertMemcpy(
+      to: x0, from: x1, count: x2, alignedAt: t.layout.alignment, at: ctx.insertionPoint!)
 
     return ctx.ir.instruction(after: i.erased)
   }
