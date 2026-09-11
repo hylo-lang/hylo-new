@@ -31,9 +31,9 @@ struct CompilerTests {
   /// The program's path is appended to this command. For instance, setting it to "qemu-arm" runs
   /// the test programs under qemu's user-mode emulator for 32-bit ARM.
   private static var testRunner: Executable? {
-    Host.environment["HYLO_TEST_RUNNER"].map({ (r) in
+    Host.environment["HYLO_TEST_RUNNER"].map { (r) in
       r.contains("/") ? .path(.init(r)) : .name(r)
-    })
+    }
   }
 
   /// The input of a compiler test.
