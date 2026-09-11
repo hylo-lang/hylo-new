@@ -21,3 +21,7 @@ olt = "olt"               # Abbreviation for "ordered less than"
 # Title of a cited paper by Odersky et al. (2017):
 # "Simplicitly: Foundations and applications of implicit function types."
 Simplicitly = "Simplicitly"
+
+# Standard Hylo term.
+implicits = "implicits"
+Implicits = "Implicits"
