@@ -14,29 +14,42 @@ final class RuntimeValueTests: XCTestCase {
   }
 
   func testRuntimeValueIntegerInitializer() {
-    XCTAssertEqual(RuntimeValue(integer: 0, bitWidth: 8, alignment: 1).bytes, [0])
-    XCTAssertEqual(RuntimeValue(integer: 1, bitWidth: 8, alignment: 1).bytes, [1])
-    XCTAssertEqual(RuntimeValue(integer: -1, bitWidth: 8, alignment: 1).bytes, [255])
-    XCTAssertEqual(RuntimeValue(integer: -2, bitWidth: 8, alignment: 1).bytes, [254])
+    for b in [.little, .big] as [Endianness] {
+      XCTAssertEqual(RuntimeValue(integer: 0, bitWidth: 8, byteOrder: b).asI8, 0)
+      XCTAssertEqual(RuntimeValue(integer: 1, bitWidth: 8, byteOrder: b).asI8, 1)
+      XCTAssertEqual(RuntimeValue(integer: -1, bitWidth: 8, byteOrder: b).asI8, 255)
+      XCTAssertEqual(RuntimeValue(integer: -2, bitWidth: 8, byteOrder: b).asI8, 254)
+
+      XCTAssertEqual(
+        RuntimeValue(integer: 1, bitWidth: 16, byteOrder: b)
+          .asI16(assumingByteOrder: b), 1)
+      XCTAssertEqual(
+        RuntimeValue(integer: -1, bitWidth: 16, byteOrder: b)
+          .asI16(assumingByteOrder: b), UInt16.max)
+
+      XCTAssertEqual(
+        RuntimeValue(integer: 1, bitWidth: 32, byteOrder: b)
+          .asI32(assumingByteOrder: b), 1)
+      XCTAssertEqual(
+        RuntimeValue(integer: -1, bitWidth: 32, byteOrder: b)
+          .asI32(assumingByteOrder: b), UInt32.max)
+
+      XCTAssertEqual(
+        RuntimeValue(integer: 1, bitWidth: 64, byteOrder: b)
+          .asI64(assumingByteOrder: b), 1)
+      XCTAssertEqual(
+        RuntimeValue(integer: -1, bitWidth: 64, byteOrder: b)
+          .asI64(assumingByteOrder: b), UInt64.max)
+    }
+  }
+
+  func testRuntimeValueInitializerFollowsByteOrder() {
+    XCTAssertEqual(RuntimeValue(integer: 0, bitWidth: 8, byteOrder: .little).bytes, [0])
 
     XCTAssertEqual(
-      RuntimeValue(integer: 1, bitWidth: 16, alignment: 2).bytes,
-      withUnsafeBytes(of: UInt16(1), Array.init)[...])
+      RuntimeValue(integer: 0xff01, bitWidth: 16, byteOrder: .little).bytes, [0x01, 0xff])
     XCTAssertEqual(
-      RuntimeValue(integer: -1, bitWidth: 16, alignment: 2).bytes,
-      withUnsafeBytes(of: UInt16(65535), Array.init)[...])
-
-    XCTAssertEqual(
-      RuntimeValue(integer: 1, bitWidth: 32, alignment: 4).bytes,
-      withUnsafeBytes(of: UInt32(1), Array.init)[...])
-
-    XCTAssertEqual(
-      RuntimeValue(integer: 1, bitWidth: 64, alignment: 8).bytes,
-      withUnsafeBytes(of: UInt64(1), Array.init)[...])
-
-    XCTAssertEqual(
-      RuntimeValue(integer: 1, bitWidth: 128, alignment: 8).bytes,
-      withUnsafeBytes(of: UInt128(1), Array.init)[...])
+      RuntimeValue(integer: 0xff01, bitWidth: 16, byteOrder: .big).bytes, [0xff, 0x01])
   }
 
   func testRuntimeValueBoolInitializer() {
@@ -47,16 +60,6 @@ final class RuntimeValueTests: XCTestCase {
     let t = RuntimeValue(bool: true)
     XCTAssertTrue(t.asBool)
     XCTAssertEqual(t.bytes, [1])
-  }
-
-  func testRuntimeValueAlignment() {
-    for i in 1...10 {
-      let b = Array(repeating: UInt8(0), count: i)
-      let a = UInt(
-        bitPattern: RuntimeValue(bytes: b, havingAlignment: i).bytes.withUnsafeBytes(\.baseAddress)!
-      )
-      XCTAssert(a % UInt(i) == 0)
-    }
   }
 
 }

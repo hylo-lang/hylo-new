@@ -177,6 +177,9 @@ public struct Interpreter {
   /// `true` iff the program is still running.
   public var isRunning: Bool { !callStack.isEmpty }
 
+  /// The ABI for which the types will be laid out.
+  public var abi: any TargetABI { memory.abi }
+
   /// Local variables, parameters and return address.
   private var callStack = Stack()
 
@@ -362,7 +365,7 @@ public struct Interpreter {
         return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
         let l = memory.layout(t)
-        return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
+        return .init(integer: n, bitWidth: l.size * 8, byteOrder: abi.byteOrder)
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
@@ -419,14 +422,14 @@ public struct Interpreter {
       let w = memory.layout(t).size * 8
       let lhs = try self[arguments[0]]
       let rhs = try self[arguments[1]]
-      let r = p(lhs, rhs, bitWidth: w)
+      let r = p(lhs, rhs, bitWidth: w, inByteOrder: abi.byteOrder)
       return .init(bool: r)
     case .zeroinitializer(let t):
       let l = memory.layout(t)
       let u = program.types[t]
       return switch u {
-      case .i(_): .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
-      case .word: .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
+      case .i(_): .init(integer: 0, bitWidth: l.size * 8, byteOrder: abi.byteOrder)
+      case .word: .init(integer: 0, bitWidth: l.size * 8, byteOrder: abi.byteOrder)
       default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
