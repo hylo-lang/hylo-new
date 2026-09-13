@@ -1,0 +1,5 @@
+public fun main() {
+  sink let x = 2
+  var y = x
+  if !(y == 2) { Builtin.trap() }
+}
