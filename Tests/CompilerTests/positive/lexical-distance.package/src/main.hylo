@@ -1,0 +1,45 @@
+fun check<T>(x: T) {}
+
+// File-scoped extensions.
+extension S { static fun f() -> A { A() } }
+
+fun m0() {
+  // File-scoped definition has priority.
+  let x0 = S.f()
+  check<A>(x0)
+}
+
+fun m1() {
+  // Local-scoped extension.
+  extension S { static fun f() -> B { B() } }
+  extension <T> T { static fun f() -> C { C() } }
+
+  // Local-scoped definitions have priority. There is no ambiguity because matching the generic one
+  // is more expensive than matching the non-generic one.
+  let x0 = S.f()    // From local-scoped extension
+  check<B>(x0)
+
+  // Other definitions are still accessible.
+  let _: S = S.f()  // From type declaration
+  let _: A = S.f()  // From file-scoped extension
+  let _: C = S.f()  // From generic local-scoped extension
+}
+
+fun m2() {
+  // All definitions are in different files, at equal lexical distance. There is no ambiguity
+  // because resolving the ones declared in the extensions has an elaboration costs.
+  let x0 = S.g()    // From S.hylo
+  check<S>(x0)
+
+  // Other definitions are still accessible.
+  let _: A = S.g()  // From S.hylo
+  let _: B = S.g()  // From E.hylo
+}
+
+fun h() -> A { A() }
+
+fun h() -> B {
+  // There is no ambiguity because the use is nested into one of the definitions.
+  sink let x0 = h()
+  return x0
+}
