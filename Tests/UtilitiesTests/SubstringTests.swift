@@ -27,4 +27,8 @@ final class SubstringTests: XCTestCase {
     XCTAssertEqual(t, "vdlm")
   }
 
+  func testUnescaped() {
+    XCTAssertEqual("one\\ntwo".unescaped, "one\ntwo")
+  }
+
 }

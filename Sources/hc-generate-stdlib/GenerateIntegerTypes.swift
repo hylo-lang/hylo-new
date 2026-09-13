@@ -205,6 +205,11 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
         \(maximumValue) as Self
       }
 
+      @inline(always)
+      public fun infix& (other: Self) -> Self {
+        .new(value: Builtin.and_\(builtinType)(self.value, other.value))
+      }
+
       // MARK: Equatable conformance
 
       /// Returns `true` iff `self` is equal to `other`.
