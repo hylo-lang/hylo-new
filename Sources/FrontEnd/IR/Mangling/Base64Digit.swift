@@ -17,7 +17,7 @@ public struct Base64Digit: Hashable {
   /// The value of the digit, in the range `0 ..< 64`.
   public let rawValue: UInt8
 
-  /// Creates an instance from its raw value `n` or returns `nil` if `n >= 64`.
+  /// Creates an instance from its raw value `n` or returns `nil` if `n` is not in [0, 64).
   public init?<T: BinaryInteger>(_ n: T) {
     if (n >= 0) && (n < 64) {
       self.rawValue = UInt8(n)
