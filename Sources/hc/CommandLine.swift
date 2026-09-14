@@ -199,6 +199,9 @@ private typealias Module = FrontEnd.Module
 
   /// Checks that the parsed arguments form a consistent configuration.
   public func validate() throws {
+    if (inputs.isEmpty && !printStandardLibraryRoot){
+        throw ValidationError("expected argument")
+    }
     if (moduleArchiveURL != nil) && !outputType.supportsModuleEmission {
       throw ValidationError(
         "'--emit-module-to' cannot be used with '--emit \(outputType.rawValue)'")
@@ -230,7 +233,7 @@ private typealias Module = FrontEnd.Module
       print(bundledStandardLibrarySources.path)
       return
     }
-
+ 
     var driver = try Driver(
       moduleCachePath: noCaching ? nil : (moduleCachePath ?? defaultCachePath()),
       targetSpecification: try resolveTarget(),
