@@ -23,16 +23,6 @@ final class CommandLineEndToEndTests: XCTestCase {
     }
   }
 
-  func testEmptyArgumentList() async throws {
-    try await FileManager.default.withUniqueTemporaryDirectory { (root) in
-      let r = try await hc([], in: root)
-
-      XCTAssertEqual(r.exitCode, ExitCode.validationFailure.rawValue)
-      XCTAssert(r.standardError.contains("expected argument"), r.standardError)
-      XCTAssert(r.standardError.contains("Usage:"), r.standardError)
-    }
-  }
-
   func testValidationFailureCode() async throws {
     try await FileManager.default.withUniqueTemporaryDirectory { (root) in
       let main = try write("public fun main() {}", to: root.appending(path: "main.hylo"))

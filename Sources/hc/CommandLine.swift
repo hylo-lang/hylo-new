@@ -200,7 +200,7 @@ private typealias Module = FrontEnd.Module
   /// Checks that the parsed arguments form a consistent configuration.
   public func validate() throws {
     if (inputs.isEmpty && !printStandardLibraryRoot){
-        throw ValidationError("expected argument")
+      throw ValidationError("expected argument")
     }
     if (moduleArchiveURL != nil) && !outputType.supportsModuleEmission {
       throw ValidationError(
