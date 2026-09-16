@@ -3,15 +3,21 @@ import XCTest
 
 final class CommandLineValidationTests: XCTestCase {
 
+  func testEmptyFileList() {
+    // Compilation requires at least one file to compile.
+    assertRejects([], withMessageContaining: "expected argument")
+    assertAccepts(["--print-stdlib-root"])
+  }
+
   func testModuleEmission() {
     // '--emit-module-to' requires an output type that produces transformed IR.
     for emit in ["ast", "typed-ast", "raw-ir"] {
       assertRejects(
-        ["--emit", emit, "--emit-module-to", "M.hylomodule"],
+        ["a.hylo", "--emit", emit, "--emit-module-to", "M.hylomodule"],
         withMessageContaining: "'--emit-module-to' cannot be used with '--emit \(emit)'")
     }
     for emit in ["ir", "llvm", "asm", "object", "binary"] {
-      assertAccepts(["--emit", emit, "--emit-module-to", "M.hylomodule"])
+      assertAccepts(["a.hylo", "--emit", emit, "--emit-module-to", "M.hylomodule"])
     }
   }
 
@@ -19,38 +25,35 @@ final class CommandLineValidationTests: XCTestCase {
     // '--emit-module-interface-hash-to' requires an output type that produces transformed IR.
     for emit in ["ast", "typed-ast", "raw-ir"] {
       assertRejects(
-        ["--emit", emit, "--emit-module-interface-hash-to", "M.hash"],
+        ["a.hylo", "--emit", emit, "--emit-module-interface-hash-to", "M.hash"],
         withMessageContaining:
           "'--emit-module-interface-hash-to' cannot be used with '--emit \(emit)'")
     }
-    assertAccepts(["--emit", "object", "--emit-module-interface-hash-to", "M.hash"])
+    assertAccepts(["a.hylo", "--emit", "object", "--emit-module-interface-hash-to", "M.hash"])
   }
 
   func testImportAndLinking() {
     // '--import' is not yet supported when the compiler links the output.
     assertRejects(
-      ["--emit", "binary", "--import", "Foo"],
+      ["a.hylo", "--emit", "binary", "--import", "Foo"],
       withMessageContaining: "'--import' is not yet supported with '--emit binary'")
 
     // `binary` is the default output type.
     assertRejects(
-      ["--import", "Foo"],
+      ["a.hylo", "--import", "Foo"],
       withMessageContaining: "'--import' is not yet supported with '--emit binary'")
 
-    assertAccepts(["--emit", "object", "--import", "Foo"])
+    assertAccepts(["a.hylo", "--emit", "object", "--import", "Foo"])
   }
 
   func testSelfImport() {
     assertRejects(
-      ["--emit", "object", "--module-name", "A", "--import", "A"],
+      ["a.hylo", "--emit", "object", "--module-name", "A", "--import", "A"],
       withMessageContaining: "module 'A' cannot import itself")
 
     // The default module name is 'Main' unless a single source file is given.
     assertRejects(
-      ["--emit", "object", "--import", "Main"],
-      withMessageContaining: "module 'Main' cannot import itself")
-    assertRejects(
-      ["--emit", "object", "--import", "Main", "src/"],
+      ["src/", "--emit", "object", "--import", "Main"],
       withMessageContaining: "module 'Main' cannot import itself")
     assertRejects(
       ["--emit", "object", "--import", "Main", "a.hylo", "b.hylo"],
@@ -63,27 +66,27 @@ final class CommandLineValidationTests: XCTestCase {
     assertAccepts(["--emit", "object", "--import", "Main", "path/to/foo.hylo"])
     assertAccepts(["--emit", "object", "--import", "foo", "src/"])
 
-    assertAccepts(["--emit", "object", "--module-name", "A", "--import", "B"])
+    assertAccepts(["Main.hylo", "--emit", "object", "--module-name", "A", "--import", "B"])
   }
 
   func testObjectToStandardOutput() {
     // Object files cannot be written to the standard output.
     assertRejects(
-      ["--emit", "object", "-o", "-"],
+      ["a.hylo", "--emit", "object", "-o", "-"],
       withMessageContaining: "object cannot be written to the standard output")
 
-    assertAccepts(["--emit", "object", "-o", "out.o"])
-    assertAccepts(["--emit", "asm", "-o", "-"])
+    assertAccepts(["a.hylo", "--emit", "object", "-o", "out.o"])
+    assertAccepts(["a.hylo", "--emit", "asm", "-o", "-"])
   }
 
   func testCachingOptions() {
     // '--no-caching' and '--module-cache' are mutually exclusive.
     assertRejects(
-      ["--no-caching", "--module-cache", "cache/"],
+      ["a.hylo", "--no-caching", "--module-cache", "cache/"],
       withMessageContaining: "'--no-caching' and '--module-cache' are mutually exclusive")
 
-    assertAccepts(["--no-caching"])
-    assertAccepts(["--module-cache", "cache/"])
+    assertAccepts(["a.hylo", "--no-caching"])
+    assertAccepts(["a.hylo", "--module-cache", "cache/"])
   }
 
   /// Asserts that parsing `arguments` fails with a message containing `expected`.
