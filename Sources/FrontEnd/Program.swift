@@ -852,6 +852,32 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns (`lhs`, `rhs`, `common`) where `common` is the deepest common scope containing both
+  /// `m` and `n`, and `lhs` (respectively `rhs`) are scopes containing `m` (respectively `n`) and
+  /// its ancestors up to `common`.
+  ///
+  /// - Requires: The module containing `n` is scoped.
+  public func commonAncestry<T: SyntaxIdentity, U: SyntaxIdentity>(
+    _ m: T, _ n: U
+  ) -> ([ScopeIdentity], [ScopeIdentity], ScopeIdentity?) {
+    var lhs = Array(scopes(from: parent(containing: m)))
+    var rhs = Array(scopes(from: parent(containing: n)))
+
+    var l = lhs[...]
+    var r = rhs[...]
+    while l.count > r.count { l.removeFirst() }
+    while r.count > l.count { r.removeFirst() }
+    while !l.isEmpty && (l.first != r.first) {
+      l.removeFirst()
+      r.removeFirst()
+    }
+
+    let lca = lhs[l.startIndex...].first
+    lhs.removeLast(l.count)
+    rhs.removeLast(r.count)
+    return (lhs, rhs, lca)
+  }
+
   /// Returns the type assigned to `n`.
   ///
   /// You cannot make strong assumptions about the exact shape of the returned type in general, as
@@ -1049,50 +1075,84 @@ public struct Program: Sendable {
     }
   }
 
+  /// Returns `true` iff `m` and `n` are in the same file.
+  public func inSameFile<T: SyntaxIdentity, U: SyntaxIdentity>(_ m: T, _ n: U) -> Bool {
+    (m.module == n.module) && (m.file == n.file)
+  }
+
+  /// Returns `true` iff `m` and `n` are in the same file.
+  public func inSameFile<T: SyntaxIdentity>(_ m: T, _ n: ScopeIdentity) -> Bool {
+    (m.module == n.module) && (m.file == n.file)
+  }
+
+  /// Returns `true` iff `m` and `n` are in the same file.
+  public func inSameFile(_ m: ScopeIdentity, _ n: ScopeIdentity) -> Bool {
+    (m.module == n.module) && (m.file == n.file)
+  }
+
+  public func depth<T: SyntaxIdentity>(_ n: T) -> Int {
+    scopes(from: parent(containing: n)).count(where: { _ in true })
+  }
+
   /// Returns whether `m` or `n` is lexically closer to `s`.
+  ///
+  /// The result is:
+  /// - `.ascending` iff `m` is considered closer to `s` than `n`;
+  /// - `.descending` iff `m` is considered father from `s` than `n`;
+  /// - `.equal` otherwise.
   ///
   /// - Requires: The module containing `s` is scoped.
   public func compareLexicalDistances<T: SyntaxIdentity, U: SyntaxIdentity>(
     _ m: T, _ n: U, relativeTo s: ScopeIdentity
   ) -> StrictOrdering {
-    // Is `m` in the same module as `s`?
-    if m.module == s.module {
-      // `m` is closer if it has more ancestors or `n` is in another module.
-      if n.module == s.module {
-        return compareAncestors(m, n)
-      } else {
+    // Are `m` and `n` the same tree.
+    if m == n { return .equal }
+
+    // Are `m` and `n` in separate files?
+    if !inSameFile(m, n) {
+      if inSameFile(m, s) {
         return .ascending
-      }
-    }
-
-    // Is `n` in the same module as `s`?
-    else if n.module == s.module {
-      return .descending
-    }
-
-    // Otherwise, they have the same distance.
-    else { return .equal }
-  }
-
-  /// Returns the result of the three-way comparison of the number of ancestors of `m` and `n`.
-  ///
-  /// - Requires: `m` and `n` are in the same module, which is scoped.
-  public func compareAncestors<T: SyntaxIdentity, U: SyntaxIdentity>(
-    _ m: T, _ n: U
-  ) -> StrictOrdering {
-    assert(m.module == n.module)
-
-    var p = parent(containing: m)
-    var q = parent(containing: n)
-    while let a = p.node {
-      if let b = q.node {
-        p = parent(containing: a)
-        q = parent(containing: b)
-      } else {
+      } else if inSameFile(n, s) {
         return .descending
+      } else {
+        return .init(between: depth(m), and: depth(n))
       }
     }
-    return q.node == nil ? .equal : .ascending
+
+    // `m` and `n` are in the same file and `lca` is their deepest common scope.
+    let (xs, ys, lca) = commonAncestry(m, n)
+
+    // Are `m`/`n` and `s` in separate files?
+    if !inSameFile(lca!, s) {
+      return .init(between: xs.count, and: ys.count)
+    }
+
+    // Are `m` and `n` contained in `s`?
+    if scopes(from: lca!).contains(s) {
+      return .init(between: xs.count, and: ys.count)
+    }
+
+    // Is `m` contained in `s`.
+    if let i = xs.firstIndex(of: s) {
+      return .init(between: i, and: (xs.count - i) + ys.count)
+    }
+
+    // Is `n` contained in `s`.
+    if let i = ys.firstIndex(of: s) {
+      return .init(between: (ys.count - i) + xs.count, and: i)
+    }
+
+    // `s` is nested in the innermost scope containing either `m` or `n`, or it does not share a
+    // common ancestor with neither `m` nor `n`.
+    let p = castToScope(m) ?? parent(containing: m)
+    let q = castToScope(n) ?? parent(containing: n)
+    var origin = s
+    while let o = origin.node {
+      if origin == p { return .ascending }
+      if origin == q { return .descending }
+      origin = parent(containing: o)
+    }
+    return .init(between: xs.count, and: ys.count)
   }
 
   /// Returns the declarations directly contained in `s`.
@@ -2076,6 +2136,30 @@ public indirect enum SyntaxFilter {
     case .satisfies(let p):
       return p(n)
     }
+  }
+
+}
+
+/// The scopes preceding the deepest common ancestor of two syntax trees.
+public struct CommonAncestry {
+
+  /// An array with all the scopes containing the left tree.
+  fileprivate let leftAndShared: [ScopeIdentity]
+
+  /// The position of the deepest common ancestor of the two trees.
+  fileprivate let deepestCommonAncestor: Int
+
+  /// The scopes containing the right tree up to `shared`.
+  public let right: [ScopeIdentity]
+
+  /// The scopes containing the left tree up to `shared`.
+  public var left: ArraySlice<ScopeIdentity> {
+    leftAndShared[..<deepestCommonAncestor]
+  }
+
+  /// The deepest common ancestor of the two trees, if any.
+  public var shared: ArraySlice<ScopeIdentity> {
+    leftAndShared[deepestCommonAncestor...]
   }
 
 }
