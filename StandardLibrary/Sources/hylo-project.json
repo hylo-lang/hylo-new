@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "generator": "cmake/HyloProjectManifest.cmake",
+  "stdlibRoot": "/home/ambrus/CMake/hylo-new/StandardLibrary/Sources",
+  "target": "",
+  "modules": [
+    {
+      "name": "Hylo",
+      "imports": [],
+      "sourceRoot": "Core"
+    }
+  ]
+}

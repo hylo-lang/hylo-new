@@ -1,0 +1,25 @@
+fun test_pointers() {
+  var x: Int = 3
+  let p: Pointer<Int> = pointer_[to: x]
+  precondition(p.unsafe[] == (3 as Int))
+
+  let r: PointerToMutable<Int> = pointer_[to_mutable: &x]
+  precondition(r.unsafe[] == (3 as Int))
+
+  r.unsafe_deinitialize_pointee()
+  r.unsafe_initialize_pointee(42 as Int)
+  
+  precondition(x == (42 as Int))
+}
+
+subscript pointer_<T>(to x: T) -> Pointer<T> {
+  yield Pointer(base: Builtin.address(of: x))
+}
+
+subscript pointer_<T>(to_mutable x: inout T) -> PointerToMutable<T> {
+  yield PointerToMutable(base: Builtin.address(of: x))
+}
+
+public fun main() {
+  test_pointers()
+}
