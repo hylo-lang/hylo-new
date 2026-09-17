@@ -35,6 +35,7 @@ public struct InstructionTag: Sendable {
     IRAssumeState.self,
     IRCase.self,
     IRCase.End.self,
+    IRConstantString.self,
     IRBranch.self,
     IRConditionalBranch.self,
     IREnumTag.self,

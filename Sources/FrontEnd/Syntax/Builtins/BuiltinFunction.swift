@@ -66,8 +66,8 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case sdiv(exact: Bool, MachineType.ID)
 
-  //  case lshr(exact: Bool, MachineType.ID)
-  //
+  case lshr(MachineType.ID)
+
   //  case ashr(exact: Bool, MachineType.ID)
 
   case urem(MachineType.ID)
@@ -110,9 +110,9 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case sitofp(MachineType.ID, MachineType.ID)
 
-//  case inttoptr(MachineType.ID)
-//
-//  case ptrtoint(MachineType.ID)
+  case inttoptr(MachineType.ID)
+
+  case ptrtoint(MachineType.ID)
 
   /// In LLVM: `fadd`.
   case fadd(MathFlags, MachineType.ID)
@@ -399,6 +399,7 @@ extension BuiltinFunction {
 
   /// Returns the type of the function, using `s` to create unique type identities.
   public func type(uniquingTypesWith s: inout TypeStore) -> AnyTypeIdentity {
+    let ptr = s.demand(MachineType.ptr)
     let i1 = s.demand(MachineType.i(1))
 
     switch self {
@@ -433,8 +434,8 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: t)).erased
     case .sdiv(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
-    //    case .lshr(_, let t):
-    //      return .init(^t, ^t, to: ^t)
+    case .lshr(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
     //    case .ashr(_, let t):
     //      return .init(^t, ^t, to: ^t)
     case .urem(let t):
@@ -477,10 +478,10 @@ extension BuiltinFunction {
       return s.demand(Arrow(f, to: d)).erased
     case .sitofp(let f, let d):
       return s.demand(Arrow(f, to: d)).erased
-    //    case .inttoptr(let t):
-    //      return .init(^t, to: .builtin(.ptr))
-    //    case .ptrtoint(let t):
-    //      return .init(.builtin(.ptr), to: ^t)
+    case .inttoptr(let t):
+      return s.demand(Arrow(t, to: ptr)).erased
+    case .ptrtoint(let t):
+      return s.demand(Arrow(ptr, to: t)).erased
     case .fadd(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .fsub(_, let t):
@@ -784,8 +785,8 @@ extension BuiltinFunction: Showable {
       return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
     case .sdiv(let e, let t):
       return printer.format(e ? "sdiv_exact_%T" : "sdiv_%T", [t.erased])
-    //    case .lshr(let e, let t):
-    //      return e ? "lshr_exact_\(t)" : "lshr_\(t)"
+    case .lshr(let t):
+      return printer.format("lshr_%T", [t.erased])
     //    case .ashr(let e, let t):
     //      return e ? "ashr_exact_\(t)" : "ashr_\(t)"
     case .urem(let t):
@@ -822,10 +823,10 @@ extension BuiltinFunction: Showable {
       return printer.format("uitofp_%T_%T", [l.erased, r.erased])
     case .sitofp(let l, let r):
       return printer.format("sitofp_%T_%T", [l.erased, r.erased])
-    //    case .inttoptr(let t):
-    //      return "inttoptr_\(t)"
-    //    case .ptrtoint(let t):
-    //      return "ptrtoint_\(t)"
+    case .inttoptr(let t):
+      return printer.format("inttoptr_%T", [t.erased])
+    case .ptrtoint(let t):
+      return printer.format("ptrtoint_%T", [t.erased])
     case .fadd(let f, let t):
       return f.isEmpty ? "fadd_\(t)" : "fadd_\(f)_\(t)"
     case .fsub(let f, let t):
@@ -1143,11 +1144,10 @@ extension BuiltinFunction {
     case "sdiv":
       guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
       self = .sdiv(exact: p != nil, s.demand(t))
+    case "lshr":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .lshr(s.demand(t))
 
-    //    case "lshr":
-    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
-    //      self = .lshr(exact: p != nil, t)
-    //
     //    case "ashr":
     //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .ashr(exact: p != nil, t)
@@ -1210,14 +1210,13 @@ extension BuiltinFunction {
       guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
       self = .sitofp(s.demand(f), s.demand(d))
 
-    //    case "inttoptr":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .inttoptr(t)
-    //
-    //    case "ptrtoint":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .ptrtoint(t)
-    //
+    case "inttoptr":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .inttoptr(s.demand(t))
+    case "ptrtoint":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .ptrtoint(s.demand(t))
+
     case "fadd":
       guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
       self = .fadd(p, s.demand(t))
