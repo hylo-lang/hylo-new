@@ -4,7 +4,12 @@
 ///
 ///     5 1  3 2  5 9  0 0  0 0  0 0  0 0  0 0  0 0  0 0 <- [size] [alignment] of each member
 ///     9    6    0    0    0    0    0    0    0    0   <- [expected offset]  of each member
-///     14   9                                           <- [size] [alignment] of the record
+///     14   18                                          <- [size] [alignment] of the record
+///
+/// The record's `[alignment]` is the least common multiple of its members' alignments.
+/// `power-of-two-test-cases.txt` has the same format but only contains records whose member
+/// alignments are all powers of two, on which `__hylo_alignment_of_record_power_of_two` is also
+/// tested.
 ///
 /// A leading `-1` indicates the end of the input.
 
@@ -150,23 +155,36 @@ fun verify_offsets(
 }
 
 /// Traps unless `__hylo_size_of_record` and `__hylo_alignment_of_record` applied to the first `l`
-/// members of `headers` yield `expected_size` and `expected_alignment`, respectively.
+/// members of `headers` yield `expected_size` and `expected_alignment`, respectively, and, if
+/// `p`, unless `__hylo_alignment_of_record_power_of_two` also yields `expected_alignment`.
 fun verify_size_and_alignment(
   in headers: H[10], of_length l: Int,
-  to_be expected_size: Int, expected_alignment: Int
+  to_be expected_size: Int, expected_alignment: Int,
+  members_are_power_of_two_aligned p: Bool
 ) {
   var w = witnesses(of: headers)
   let m = Pointer<RecordMemberType>(value: Builtin.address(of: w))
   let n = UInt32(truncating: l)
 
+  // Computing the size mutates the array.
   precondition(__hylo_alignment_of_record(in: m, of_length: n) == UInt16(truncating: expected_alignment))
+  if p {
+    precondition(
+      __hylo_alignment_of_record_power_of_two(in: m, of_length: n)
+        == UInt16(truncating: expected_alignment))
+  }
   precondition(__hylo_size_of_record(in: m, of_length: n) == UInt32(truncating: expected_size))
   // The size is idempotent w.r.t. the mutation of the array.
   precondition(__hylo_size_of_record(in: m, of_length: n) == UInt32(truncating: expected_size))
 }
 
+/// Returns a handle on `test-cases.txt`, opened for reading.
 @extern_c_indirect("hylo_open_test_cases_file_for_reading_indirect")
 fun open_test_cases_file_for_reading() -> Pointer<Never>
+
+/// Returns a handle on `power-of-two-test-cases.txt`, opened for reading.
+@extern_c_indirect("hylo_open_power_of_two_test_cases_file_for_reading_indirect")
+fun open_power_of_two_test_cases_file_for_reading() -> Pointer<Never>
 
 @extern_c_indirect("hylo_read_test_case_indirect")
 fun read_test_case(
@@ -174,17 +192,11 @@ fun read_test_case(
   sizes: inout Int[10], alignments: inout Int[10], offsets: inout Int[10],
   size_and_alignment: inout Int[2]) -> Int
 
-fun main() -> Int32 {
-  TypeWitnessHeader.check_layout_assumptions()
-  // TODO: check for null.  Currently
-  // https://github.com/hylo-new/issues/450 stands in the way.
-
-  // The empty record.
-  verify_size_and_alignment(
-    in: (H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
-    of_length: 0, to_be: 0, 1)
-
-  let f = open_test_cases_file_for_reading()
+/// Verifies every test case in `f`, whose records' members are all power-of-two aligned iff `p`,
+/// returning `0` on success or a negative value indicating where reading the input stopped.
+fun verify_test_cases(
+  in f: Pointer<Never>, members_are_power_of_two_aligned p: Bool
+) -> Int32 {
   while true {
     var sizes: Int[10] = (0,0,0,0,0,0,0,0,0,0)
     var alignments: Int[10] = (0,0,0,0,0,0,0,0,0,0)
@@ -226,7 +238,27 @@ fun main() -> Int32 {
              o.at(6), o.at(7), o.at(8), o.at(9))
 
     let e = Pointer<Int>(value: Builtin.address(of: size_and_alignment))
-    verify_size_and_alignment(in: headers, of_length: l, to_be: e.at(0), e.at(1))
+    verify_size_and_alignment(
+      in: headers, of_length: l, to_be: e.at(0), e.at(1),
+      members_are_power_of_two_aligned: p)
   }
   return 0
+}
+
+fun main() -> Int32 {
+  TypeWitnessHeader.check_layout_assumptions()
+  // TODO: check for null.  Currently
+  // https://github.com/hylo-new/issues/450 stands in the way.
+
+  // The empty record, whose members are vacuously power-of-two aligned.
+  verify_size_and_alignment(
+    in: (H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
+    of_length: 0, to_be: 0, 1, members_are_power_of_two_aligned: true)
+
+  sink let r = verify_test_cases(
+    in: open_test_cases_file_for_reading(), members_are_power_of_two_aligned: false)
+  if r != (0 as Int32) { return r }
+
+  return verify_test_cases(
+    in: open_power_of_two_test_cases_file_for_reading(), members_are_power_of_two_aligned: true)
 }

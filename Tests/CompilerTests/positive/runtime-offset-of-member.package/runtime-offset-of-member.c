@@ -10,6 +10,13 @@ void hylo_open_test_cases_file_for_reading_indirect(FILE** result) {
   *result = fopen("test-cases.txt", "r");
 }
 
+/// Opens the file of test cases whose member alignments are all
+/// powers of two for reading, returning the file handle, or 0 if
+/// opening failed.
+void hylo_open_power_of_two_test_cases_file_for_reading_indirect(FILE** result) {
+  *result = fopen("power-of-two-test-cases.txt", "r");
+}
+
 /// Reads a test case from `f` into `s` representing the sizes of
 /// members, `a` representing their alignments, `o` representing
 /// their expected offsets, and `e` representing the expected size and

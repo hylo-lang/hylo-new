@@ -83,6 +83,9 @@ private extension BinaryInteger {
 }
 // ===================================================
 
+/// The members of a record, in declaration order.
+fileprivate typealias Members = [(size: Size, alignment: Alignment)]
+
 /// Returns the first element `x` of `start..<end` such that
 /// `p(x.pointee())` is true.
 private func first_position(
@@ -272,6 +275,23 @@ private func __hylo_offset_of_member(
 // =================== TESTING UTILITIES ===============
 //
 
+/// Returns the greatest common divisor of `x` and `y`.
+///
+/// - Requires: `x` and `y` are not both `0`.
+private func gcd(_ x: Int, _ y: Int) -> Int {
+  var (a, b) = (x, y)
+  while b != 0 { (a, b) = (b, a % b) }
+  return a
+}
+
+/// Returns the least common multiple of the alignments of `members`, or `1` if there are none.
+private func leastCommonMultipleOfAlignments(_ members: Members) -> Int {
+  members.reduce(1) { (l, m) in
+    let a = Int(m.alignment)
+    return l / gcd(l, a) * a
+  }
+}
+
 private struct RecordLayout {
   let start: UnsafeMutablePointer<RecordMemberType>
   let count: UInt32
@@ -317,6 +337,7 @@ private extension RecordLayout {
 
 final class LayoutTests: XCTestCase {
 
+  /// Returns a witness of a type having the given `size` and `alignment`.
   fileprivate func w(size: Size, alignment: Alignment) -> TypeWitnessHeader {
     .init(
       description: nil,
@@ -324,7 +345,8 @@ final class LayoutTests: XCTestCase {
       type_argument_or_parameter_count: 0)
   }
 
-  fileprivate func offsets(members: [(size: Size, alignment: Alignment)]) -> [UInt32] {
+  /// Returns the offset of each of `members` in a record having them.
+  fileprivate func offsets(members: Members) -> [UInt32] {
     let witnesses = members.map { (s, a) in w(size: s, alignment: a) }
     return witnesses.withUnsafeBufferPointer { headers in
       let witnessPointers = headers.indices.map { headers.baseAddress! + $0 }
@@ -338,27 +360,25 @@ final class LayoutTests: XCTestCase {
     }
   }
 
-  /// Fragments of the Hylo test input file.
-  var hyloTestCases: [String] = []
-
   /// Returns the size of a record having `members` at corresponding `offsets`.
-  private func size(
-    members: [(size: Size, alignment: Alignment)], offsets: [UInt32]
-  ) -> Size {
+  private func size(members: Members, offsets: [UInt32]) -> Size {
     zip(members, offsets).map { (m, o) in m.size + o }.max() ?? 0
   }
 
-  /// Returns the alignment of a record having `members`.
-  private func alignment(members: [(size: Size, alignment: Alignment)]) -> Alignment {
+  /// Returns the alignment of a record having `members`, i.e. the least common multiple of their
+  /// alignments.
+  private func alignment(members: Members) -> Alignment {
+    Alignment(leastCommonMultipleOfAlignments(members))
+  }
+
+  /// Returns the alignment of a record having `members`, whose alignments are all powers of two.
+  private func powerOfTwoAlignment(members: Members) -> Alignment {
     members.map(\.alignment).max() ?? 1
   }
 
   /// Returns a the test case formatted for the Hylo test
   /// input file.
-  private func hyloTestCase(
-    members sas: [(size: Size, alignment: Alignment)],
-    offsets os: [UInt32]
-  ) -> String {
+  private func hyloTestCase(members sas: Members, offsets os: [UInt32]) -> String {
     func field<T>(_ x: T, width: Int) -> String {
       let s = "\(x)"
       return s + repeatElement(" ", count: max(0, width - s.count))
@@ -376,16 +396,10 @@ final class LayoutTests: XCTestCase {
       """
   }
 
-  /// Returns the contents of the Hylo test file.
-  private func writeHyloTestFile() throws {
-    try (hyloTestCases.joined(separator: "\n") + "\n-1\n")
-      .write(toFile: "test-cases.txt", atomically: true, encoding: .utf8)
-  }
-
-  private func checkOffsets(members sa: [(size: Size, alignment: Alignment)]) {
+  /// Checks that the offsets of `sa` in a record having them are a valid layout.
+  private func checkOffsets(members sa: Members) {
     if sa.count == 0 { return }
     let offsets = offsets(members: sa)
-    // hyloTestCases.append(hyloTestCase(members: sa, offsets: offsets))
 
     let memberOrder = sa.indices.sorted { (i, j) in
       offsets[i] < offsets[j]
@@ -450,17 +464,31 @@ final class LayoutTests: XCTestCase {
     }
   }
 
+  /// Returns the path of this source file.
   func pathToThisFile(p: String = #filePath) -> String { p }
 
-  func testOffsetOfMember() throws {
-
-    let testDataFile = URL(filePath: pathToThisFile())
+  /// Returns the file named `n` in the package of the Hylo test program.
+  private func testDataFile(_ n: String) -> URL {
+    URL(filePath: pathToThisFile())
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appending(
-        path: "CompilerTests/positive/runtime-offset-of-member.package/test-cases.txt")
+      .appending(path: "CompilerTests/positive/runtime-offset-of-member.package/\(n)")
+  }
 
-    var input = try String(contentsOf: testDataFile, encoding: .utf8)[...]
+  /// The file of test cases shared with the Hylo test program.
+  private var testDataFile: URL { testDataFile("test-cases.txt") }
+
+  /// The file of test cases whose member alignments are all powers of two, on which the Hylo test
+  /// program additionally exercises `__hylo_alignment_of_record_power_of_two`.
+  private var powerOfTwoTestDataFile: URL { testDataFile("power-of-two-test-cases.txt") }
+
+  /// The members of a record, together with the expectations recorded for it.
+  fileprivate typealias TestCase = (
+    members: Members, offsets: [UInt32], size: Size, alignment: Alignment)
+
+  /// Returns the test cases in `file`.
+  private func readTestCases(from file: URL) throws -> [TestCase] {
+    var input = try String(contentsOf: file, encoding: .utf8)[...]
 
     func read1() -> Int? {
       let i = input.drop { $0.isWhitespace }
@@ -481,7 +509,7 @@ final class LayoutTests: XCTestCase {
       return r
     }
 
-    var testCount = 0
+    var result: [TestCase] = []
     while !input.isEmpty {
       guard let first = read1() else {
         fatalError("invalid test file format; missing next line")
@@ -493,7 +521,6 @@ final class LayoutTests: XCTestCase {
       let p = (0..<memberCount).map {
         (size: Size(m[$0 * 2]), alignment: Alignment(m[$0 * 2 + 1]))
       }
-      checkOffsets(members: p)
 
       let x = read(10)
       if x.count != 10 {
@@ -503,12 +530,102 @@ final class LayoutTests: XCTestCase {
       if y.count != 2 {
         fatalError("incomplete size and alignment expectations of length \(y.count)")
       }
-      XCTAssertEqual(
-        Size(y[0]), size(members: p, offsets: x.prefix(memberCount).map { UInt32($0) }))
-      XCTAssertEqual(Alignment(y[1]), alignment(members: p))
-      testCount += 1
+      result.append(
+        (members: p, offsets: x.prefix(memberCount).map { UInt32($0) },
+         size: Size(y[0]), alignment: Alignment(y[1])))
     }
-    XCTAssertGreaterThan(testCount, 100, "Not much testing happened")
+    return result
+  }
+
+  /// Checks the cases in `f`, whose member alignments are required to be powers of two iff
+  /// `powersOfTwo` is `true`.
+  private func checkTestCases(in f: URL, powersOfTwo: Bool) throws {
+    let cases = try readTestCases(from: f)
+    XCTAssertGreaterThan(cases.count, 100, "Not much testing happened")
+
+    for c in cases {
+      checkOffsets(members: c.members)
+      XCTAssertEqual(c.size, size(members: c.members, offsets: c.offsets))
+      XCTAssertEqual(c.alignment, alignment(members: c.members))
+
+      if powersOfTwo {
+        XCTAssert(
+          c.members.allSatisfy { $0.alignment.nonzeroBitCount == 1 },
+          "member alignments \(c.members.map(\.alignment)) are not all powers of two")
+        XCTAssertEqual(c.alignment, powerOfTwoAlignment(members: c.members))
+      }
+    }
+  }
+
+  /// Checks the cases in `test-cases.txt`.
+  func testOffsetOfMember() throws {
+    try checkTestCases(in: testDataFile, powersOfTwo: false)
+  }
+
+  /// Checks the cases in `power-of-two-test-cases.txt`.
+  func testOffsetOfMemberWithPowerOfTwoAlignments() throws {
+    try checkTestCases(in: powerOfTwoTestDataFile, powersOfTwo: true)
+  }
+
+  /// Rewrites the test case files, keeping the cases already in `test-cases.txt` and appending
+  /// generated ones, if the environment variable `HYLO_REGENERATE_LAYOUT_TEST_CASES` is set.
+  func testRegenerateTestCases() throws {
+    guard ProcessInfo.processInfo.environment["HYLO_REGENERATE_LAYOUT_TEST_CASES"] != nil else {
+      return
+    }
+
+    var g = SplitMix64(seed: 0x1234_5678_9abc_def0)
+
+    var records = try readTestCases(from: testDataFile).map(\.members)
+    records += randomRecords(200, alignments: Array(1...12), using: &g)
+    try write(records, to: testDataFile)
+
+    try write(
+      randomRecords(400, alignments: [1, 2, 4, 8, 16, 32], using: &g),
+      to: powerOfTwoTestDataFile)
+  }
+
+  /// Writes `records` and their expectations to `destination` in the format expected by the Hylo
+  /// test program.
+  private func write(_ records: [Members], to destination: URL) throws {
+    let cases = records.map { hyloTestCase(members: $0, offsets: offsets(members: $0)) }
+    try (cases.joined(separator: "\n") + "\n-1\n")
+      .write(to: destination, atomically: true, encoding: .utf8)
+  }
+
+  /// Returns `n` records of 1 to 10 members whose alignments are drawn from `alignments`, whose
+  /// sizes are at most 16, and whose alignment is representable as an `Alignment`.
+  private func randomRecords(
+    _ n: Int, alignments: [Alignment], using g: inout SplitMix64
+  ) -> [Members] {
+    var result: [Members] = []
+    while result.count < n {
+      let r: Members = (0..<Int.random(in: 1...10, using: &g)).map { _ in
+        (size: Size.random(in: 0...16, using: &g), alignment: alignments.randomElement(using: &g)!)
+      }
+      if leastCommonMultipleOfAlignments(r) <= Int(Alignment.max) { result.append(r) }
+    }
+    return result
+  }
+
+}
+
+/// A seedable random number generator, so that generated test cases are reproducible.
+fileprivate struct SplitMix64: RandomNumberGenerator {
+
+  /// The state of the generator.
+  private var state: UInt64
+
+  /// Creates an instance generating the sequence identified by `seed`.
+  init(seed: UInt64) { self.state = seed }
+
+  /// Returns the next value in the sequence.
+  mutating func next() -> UInt64 {
+    state &+= 0x9e37_79b9_7f4a_7c15
+    var z = state
+    z = (z ^ (z >> 30)) &* 0xbf58_476d_1ce4_e5b9
+    z = (z ^ (z >> 27)) &* 0x94d0_49bb_1331_11eb
+    return z ^ (z >> 31)
   }
 
 }

@@ -46,6 +46,14 @@ extension UInt16 {
     &self.value = Builtin.trunc_word_i16(x.value)
   }
 
+  /// Returns the remainder of dividing `self` by `other`.
+  ///
+  /// - Requires: `other` is not `0`.
+  @inline(always)
+  public fun infix% (other: Self) -> Self {
+    .new(value: Builtin.urem_i16(self.value, other.value))
+  }
+
 }
 
 extension Pointer<UInt8> {
@@ -584,12 +592,53 @@ public fun __hylo_size_of_record(
   return size_of_record_having_ordered_members(in_the_range_from: start, until: end)
 }
 
+/// Returns the greatest common divisor of `x` and `y`.
+///
+/// - Requires: `x` and `y` are not both `0`.
+@inline(always)
+public fun gcd(x: Alignment, y: Alignment) -> Alignment {
+  var a = x.copy()
+  var b = y.copy()
+  while b != (0 as Alignment) {
+    sink let r = a % b
+    &a = b.copy()
+    &b = r
+  }
+  return a
+}
+
 /// Returns the alignment of a record type having members given by the
 /// array of length `member_count` at `member_array`.
 ///
-/// The result is the maximal alignment of any member, or `1` if there are no members.
+/// The result is the least common multiple of the alignments of the members, or `1` if there are
+/// no members.
+///
+/// - Note: traps if the result is not representable as an `Alignment`.
 @inline(always)
 public fun __hylo_alignment_of_record(
+  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
+) -> Alignment {
+  var r = 1 as Alignment
+  var p = member_array.copy()
+  let end = member_array + member_count
+  while p < end {
+    sink let a = p.pointee().alignment()
+    // With `a` first, Euclid's first step is `a % r`, which is `0` in the common case.
+    &r = (r / gcd(a, r)) * a
+    &p += 1
+  }
+  return r
+}
+
+/// Returns the alignment of a record type having members given by the
+/// array of length `member_count` at `member_array`, whose alignments are all powers of two.
+///
+/// The result is the greatest alignment of any member, or `1` if there are no members, which is
+/// the least common multiple of the alignments under the precondition.
+///
+/// - Requires: the alignment of every member is a power of two.
+@inline(always)
+public fun __hylo_alignment_of_record_power_of_two(
   in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
 ) -> Alignment {
   var largest = 1 as Alignment
