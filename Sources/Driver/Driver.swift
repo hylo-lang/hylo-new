@@ -286,6 +286,18 @@ public struct Driver {
     return o
   }
 
+  #if os(macOS)
+  /// The path of the macOS SDK, which `clang` needs to locate the system headers and libraries.
+  ///
+  /// The toolchain's own `clang` does not infer the SDK the way Xcode's driver does, so it must be
+  /// told explicitly; its bundled headers `#include_next` their system counterparts.
+  private static func macOSSDKPath() async throws -> String {
+    try await subprocessOutput(
+      of: .name("xcrun"), arguments: ["--sdk", "macosx", "--show-sdk-path"])
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+  #endif
+
   /// Compiles `source` using `clang` to an object file.
   public static func compileCToObject(
     source: URL, to o: URL, _ relocation: RelocationModel, _ target: TargetSpecification
@@ -297,6 +309,11 @@ public struct Driver {
     ]
 
     if let r = relocation.asClangArgument { a.append(r) }
+
+    #if os(macOS)
+    let sdk = try await macOSSDKPath()
+    a += ["-isysroot", sdk]
+    #endif
 
     _ = try await subprocessOutput(of: .name("clang"), arguments: a)
   }
@@ -524,9 +541,7 @@ public struct Driver {
     arguments += objectFiles.map(\.path)
 
     #if os(macOS)
-    let sdk = try await subprocessOutput(
-      of: .name("xcrun"), arguments: ["--sdk", "macosx", "--show-sdk-path"])
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let sdk = try await Self.macOSSDKPath()
     arguments += ["-isysroot", sdk, "-lSystem"]
     #endif
     #if os(Linux)

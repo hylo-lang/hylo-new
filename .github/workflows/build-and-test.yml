@@ -96,10 +96,23 @@ jobs:
         # The merge picks up the .profraw files written by 'hc' subprocesses spawned from the
         # end-to-end command-line tests.
         # '-object' includes the 'hc' binary's coverage mapping in the export.
+        # Swift Build, the default build system since 6.4, does not name the test bundle after the
+        # package nor place it beside the other products, so it is located rather than assumed.
         run: |
           BIN_PATH=$(swift build --show-bin-path)
           llvm-profdata merge -sparse $BIN_PATH/codecov/*.profraw -o $BIN_PATH/codecov/merged.profdata
-          llvm-cov export $BIN_PATH/HyloPackageTests.xctest -object $BIN_PATH/hc --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
+          XCTEST=$(find "$BIN_PATH" "$BIN_PATH/.." -maxdepth 1 -name '*.xctest' | head -1)
+          if [ -z "$XCTEST" ]; then
+            echo "::error::no .xctest found under $BIN_PATH or its parent"
+            ls -la "$BIN_PATH" "$BIN_PATH/.."
+            exit 1
+          fi
+          # On Apple platforms the bundle is a directory; elsewhere it is the executable itself.
+          if [ -d "$XCTEST" ]; then
+            XCTEST=$(find "$XCTEST" -type f -perm -u+x ! -name '*.so' | head -1)
+          fi
+          echo "Test binary: $XCTEST"
+          llvm-cov export "$XCTEST" -object $BIN_PATH/hc --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
 
       - name: Install qemu and the cross toolchains
         if: ${{ runner.os == 'Linux' && runner.arch == 'X64' }}
@@ -156,8 +169,16 @@ jobs:
         run: swift build --swift-sdk swift-6.4.0-RELEASE_wasm --product frontend-smoke-test
 
       - name: Run the smoke test
-        # The path of the resource bundle containing the standard library's sources is baked into
-        # the binary as an absolute path, so it is mapped into the wasm guest as-is.
+        # 'Bundle.module' reaches 'Bundle.main', whose initialization traps on WASI, so the
+        # standard library's resource bundle is located here and its path handed to the guest,
+        # mapped at the same path so that the absolute path is valid on both sides.
         run: |
           BIN=$(swift build --swift-sdk swift-6.4.0-RELEASE_wasm --show-bin-path)
-          wasmtime run --dir "$BIN::$BIN" "$BIN/frontend-smoke-test.wasm"
+          BUNDLE=$(find "$BIN" -maxdepth 1 -name '*StandardLibrary*.bundle' | head -1)
+          if [ -z "$BUNDLE" ]; then
+            echo "::error::no standard library resource bundle found in $BIN"
+            ls -la "$BIN"
+            exit 1
+          fi
+          echo "Standard library bundle: $BUNDLE"
+          wasmtime run --dir "$BUNDLE::$BUNDLE" "$BIN/frontend-smoke-test.wasm" "$BUNDLE"
