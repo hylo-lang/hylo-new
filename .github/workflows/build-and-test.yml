@@ -31,7 +31,10 @@ jobs:
       matrix:
         # Note: all combinations of the following will be run independently
         os: [macos-26, ubuntu-24.04, windows-2025]
-        swift: ["6.4.0"]
+        # Note: "6.4" rather than "6.4.0". setup-swift maps a requested X.Y.0 onto the toolchain
+        #       prefix "swift-X.Y-", which no longer matches: Swift tags this release
+        #       "swift-6.4.0-RELEASE", not "swift-6.4-RELEASE". "6.4" means the latest 6.4.x.
+        swift: ["6.4"]
         config: [release, debug]
 
         include:
@@ -129,13 +132,15 @@ jobs:
           # Swifty-LLVM is not built for wasm32 but SwiftPM needs its manifest to resolve ours.
           submodules: recursive
 
-      - name: Set up Swift 6.4.0
+      - name: Set up Swift 6.4
         uses: SwiftyLab/setup-swift@38f54a76b70d989321de9dc7c840618c08cf56e9 # v1.14.0
         with:
-          swift-version: "6.4.0"
+          swift-version: "6.4"
 
       - name: Install the Swift SDK for WebAssembly
         # The URL and checksum are published at https://www.swift.org/install/linux/
+        # Note: this pins 6.4.0 exactly, while the toolchain above tracks the latest 6.4.x.
+        #       A 6.4.1 release will need this bumped to match.
         run: >
           swift sdk install
           https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz
