@@ -370,6 +370,93 @@ final class ManglingTests: XCTestCase {
     }
   }
 
+  /// Tests the mangling and demangling of the names of IR functions.
+  func testIRFunctionNames() async {
+    var p = await Program.withMinimalStandardLibrary()
+    let m0 = p.addUserModule(named: "M0", source: """
+      struct Robot { public memberwise init }
+      trait Greeter { fun greet() }
+      given Robot is Greeter { fun greet() {} }
+      let origin = Robot()
+      """)
+
+    p = await p.typeChecked()
+    failIfContainsError(p)
+
+    let greet = findDeclaration(
+      FunctionDeclaration.self, named: "Greeter.greet", in: m0, of: p)!
+    let conformance = ConformanceDeclaration.ID(
+      uncheckedFrom: findDeclaration(
+        ConformanceDeclaration.self, in: m0, of: p, nameMatching: { _ in true })!.erased)
+    let origin = BindingDeclaration.ID(
+      uncheckedFrom: findDeclaration(
+        BindingDeclaration.self, in: m0, of: p, nameMatching: { _ in true })!.erased)
+
+    let names: [IRFunction.Name] = [
+      .lowered(greet),
+      .initializer(origin),
+      .synthesized(greet, TypeArguments()),
+      .implementation(greet, conformance, TypeArguments()),
+      .existentialized(.lowered(greet)),
+      .slide(.lowered(greet), 0),
+      .plateau(.lowered(greet), 0),
+    ]
+
+    for n in names {
+      assertDemanglingIsOk(mangled: p.mangled(n), of: "IRFunction.Name.\(n)")
+    }
+  }
+
+  /// Tests the mangling and demangling of the names of IR globals.
+  func testIRGlobalNames() async {
+    var p = await Program.withMinimalStandardLibrary()
+    let m0 = p.addUserModule(named: "M0", source: """
+      struct Robot { public memberwise init }
+      trait Greeter { fun greet() }
+      given Robot is Greeter { fun greet() {} }
+      let origin = Robot()
+      """)
+
+    p = await p.typeChecked()
+    failIfContainsError(p)
+
+    let robot = findDeclaration(StructDeclaration.self, named: "Robot", in: m0, of: p)!
+    let origin = BindingDeclaration.ID(
+      uncheckedFrom: findDeclaration(
+        BindingDeclaration.self, in: m0, of: p, nameMatching: { _ in true })!.erased)
+
+    let names: [IRGlobal.Name] = [
+      .lowered(origin),
+      .witness(p.type(assignedTo: robot)),
+    ]
+
+    for n in names {
+      assertDemanglingIsOk(mangled: p.mangled(n), of: "IRGlobal.Name.\(n)")
+    }
+  }
+
+  /// Tests that a declaration written immediately before a parameter label is demangled as a
+  /// complete declaration.
+  func testParameterLabelFollowingDeclaration() async {
+    // Labels start with an uppercase letter so that, whenever the length prefix is a lowercase
+    // digit, the two characters together are as likely as possible to form an operator.
+    let labels = (1 ... 24).map({ (n) in "F" + String(repeating: "x", count: n - 1) })
+
+    var source = "struct Robot { public memberwise init }\n"
+    for (i, l) in labels.enumerated() {
+      source += "fun f\(i)(a: Robot, \(l) b: Robot) {}\n"
+    }
+
+    var p = await Program.withMinimalStandardLibrary()
+    let m0 = p.addUserModule(named: "M0", source: .init(contents: source))
+    p = await p.typeChecked()
+    failIfContainsError(p)
+
+    for d in p[m0].topLevelDeclarations {
+      assertDemanglingIsOk(mangled: p.mangled(d), of: p.debugName(of: d))
+    }
+  }
+
   /// Tests the mangling and demangling of reserved types in `program`.
   private func testReservedTypesMangling(program: inout Program) {
     assertManglingOf(type: .never, in: program, is: "Never")
@@ -645,9 +732,27 @@ final class ManglingTests: XCTestCase {
   }
 
   /// Asserts that the mangling of `t` in `p` equals `expected`.
-  private func assertDemanglingIsOk(mangled m: String) {
+  private func assertDemanglingIsOk(
+    mangled m: String, file: StaticString = #file, line: UInt = #line
+  ) {
     let demangled = DemangledSymbol(m).description
-    XCTAssertFalse(demangled.contains("#!"), "demangling of \(m) contains errors: \(demangled)")
+    XCTAssertFalse(
+      demangled.contains("#!"), "demangling of \(m) contains errors: \(demangled)", 
+      file: file, line: line)
+  }
+
+  /// Asserts that `m`, which is the mangling of the symbol described by `subject`, demangles
+  /// without error.
+  private func assertDemanglingIsOk(
+    mangled m: String, of subject: String, file: StaticString = #file, line: UInt = #line
+  ) {
+    let demangled = DemangledSymbol(m).description
+    XCTAssertFalse(
+      demangled.contains("#!"),
+      "demangling of \(subject) contains errors: \(demangled)\n(mangled: \(m))",
+      file: file,
+      line: line
+    )
   }
 
   /// Finds the first top-level declaration of `m` named `n`, returning its identity, or `nil` if

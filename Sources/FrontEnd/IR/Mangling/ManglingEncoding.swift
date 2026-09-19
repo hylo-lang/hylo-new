@@ -602,6 +602,7 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     let e = takeEntity(from: &source)
+    if source.takeOperator() != .conformanceDeclaration { return .error }
     let c = takeConformanceDeclaration(from: &source)
     if let a = takeTypeArguments(from: &source) {
       return .implementation(e, c, a)
