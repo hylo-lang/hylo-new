@@ -31,9 +31,8 @@ jobs:
       matrix:
         # Note: all combinations of the following will be run independently
         os: [macos-26, ubuntu-24.04, windows-2025]
-        # Note: "6.4" rather than "6.4.0". setup-swift maps a requested X.Y.0 onto the toolchain
-        #       prefix "swift-X.Y-", which no longer matches: Swift tags this release
-        #       "swift-6.4.0-RELEASE", not "swift-6.4-RELEASE". "6.4" means the latest 6.4.x.
+        # Note: "6.4", not "6.4.0", which setup-swift resolves to the prefix "swift-6.4-" and so
+        #       fails to match this release's "swift-6.4.0-RELEASE" tag.
         swift: ["6.4"]
         config: [release, debug]
 
@@ -94,27 +93,13 @@ jobs:
       - name: Export code coverage
         if: ${{ matrix.export-coverage }}
         # The merge picks up the .profraw files written by 'hc' subprocesses spawned from the
-        # end-to-end command-line tests.
-        # '-object' includes the 'hc' binary's coverage mapping in the export.
-        # Swift Build, the default build system since 6.4, emits one shared library per test
-        # target instead of the single 'HyloPackageTests.xctest' bundle the legacy build system
-        # produced, so each of them has to be handed to 'llvm-cov' for its coverage to count.
+        # end-to-end command-line tests. Swift Build emits one shared library per test target
+        # rather than a single bundle, so every one of them is exported alongside 'hc'.
         run: |
           BIN_PATH=$(swift build --show-bin-path)
           llvm-profdata merge -sparse $BIN_PATH/codecov/*.profraw -o $BIN_PATH/codecov/merged.profdata
-          TESTS=()
-          for t in "$BIN_PATH"/*Tests.so; do
-            [ -e "$t" ] || continue
-            TESTS+=("$t")
-          done
-          if [ ${#TESTS[@]} -eq 0 ]; then
-            echo "::error::no test binaries found in $BIN_PATH"
-            ls -la "$BIN_PATH"
-            exit 1
-          fi
           OBJECTS=()
-          for t in "${TESTS[@]}"; do OBJECTS+=(-object "$t"); done
-          echo "Exporting coverage over ${#TESTS[@]} test binaries and hc."
+          for t in "$BIN_PATH"/*Tests.so; do OBJECTS+=(-object "$t"); done
           llvm-cov export "$BIN_PATH/hc" "${OBJECTS[@]}" --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
 
       - name: Install qemu and the cross toolchains
@@ -155,8 +140,7 @@ jobs:
 
       - name: Install the Swift SDK for WebAssembly
         # The URL and checksum are published at https://www.swift.org/install/linux/
-        # Note: this pins 6.4.0 exactly, while the toolchain above tracks the latest 6.4.x.
-        #       A 6.4.1 release will need this bumped to match.
+        # Note: unlike the toolchain above, this pins one patch release and must be bumped with it.
         run: >
           swift sdk install
           https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz
@@ -172,16 +156,9 @@ jobs:
         run: swift build --swift-sdk swift-6.4.0-RELEASE_wasm --product frontend-smoke-test
 
       - name: Run the smoke test
-        # 'Bundle.module' reaches 'Bundle.main', whose initialization traps on WASI, so the
-        # standard library's resource bundle is located here and its path handed to the guest,
-        # mapped at the same path so that the absolute path is valid on both sides.
+        # The standard library's path is passed explicitly because deriving it from
+        # 'Bundle.module' traps on WASI. The build directory is mapped into the guest as-is, so
+        # the path is valid on both sides.
         run: |
           BIN=$(swift build --swift-sdk swift-6.4.0-RELEASE_wasm --show-bin-path)
-          BUNDLE=$(find "$BIN" -maxdepth 1 -name '*StandardLibrary*.bundle' | head -1)
-          if [ -z "$BUNDLE" ]; then
-            echo "::error::no standard library resource bundle found in $BIN"
-            ls -la "$BIN"
-            exit 1
-          fi
-          echo "Standard library bundle: $BUNDLE"
-          wasmtime run --dir "$BUNDLE::$BUNDLE" "$BIN/frontend-smoke-test.wasm" "$BUNDLE"
+          wasmtime run --dir "$BIN::$BIN" "$BIN/frontend-smoke-test.wasm" "$BIN/Hylo_StandardLibrary.bundle"

@@ -8,17 +8,11 @@ import StandardLibrary
 @main
 struct FrontEndSmokeTest {
 
-  /// The root folder of the standard library's sources.
-  ///
-  /// `Bundle.module` reaches `Bundle.main`, whose initialization traps on WASI, so the root is
-  /// taken from the command line when one is given and only falls back to the resource bundle on
-  /// platforms where reading it is safe.
+  /// The root folder of the standard library's sources, given as the first command line argument
+  /// on platforms like WASI, where reading it from `Bundle.module` traps.
   static var standardLibraryRoot: URL {
-    if let p = CommandLine.arguments.dropFirst().first {
-      return URL(fileURLWithPath: p)
-    } else {
-      return bundledStandardLibrarySources
-    }
+    CommandLine.arguments.dropFirst().first.map({ URL(fileURLWithPath: $0) })
+      ?? bundledStandardLibrarySources
   }
 
   static func main() async throws {

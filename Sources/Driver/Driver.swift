@@ -287,10 +287,8 @@ public struct Driver {
   }
 
   #if os(macOS)
-  /// The path of the macOS SDK, which `clang` needs to locate the system headers and libraries.
-  ///
-  /// The toolchain's own `clang` does not infer the SDK the way Xcode's driver does, so it must be
-  /// told explicitly; its bundled headers `#include_next` their system counterparts.
+  /// The path of the macOS SDK, which `clang` must be given explicitly because, unlike Xcode's
+  /// driver, it does not infer one.
   private static func macOSSDKPath() async throws -> String {
     try await subprocessOutput(
       of: .name("xcrun"), arguments: ["--sdk", "macosx", "--show-sdk-path"])
