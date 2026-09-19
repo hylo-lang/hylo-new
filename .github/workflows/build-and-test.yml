@@ -31,26 +31,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Note: all combinations of the following will be run independently
-        # TEMP: macos-26 and ubuntu-24.04 removed to isolate the Windows Defender-exclusion
-        #       speedup measurement. Restore to [macos-26, ubuntu-24.04, windows-2025] afterwards.
+        # TEMP: variance study for the Windows Defender-exclusion speedup. Windows/debug only,
+        #       run as a control arm (arm=baseline, exclusion NOT applied) vs a treatment arm
+        #       (arm=exclude, exclusion applied), each repeated 5x. All 10 jobs run in parallel
+        #       (fail-fast disabled). Before merge, restore:
+        #         os: [macos-26, ubuntu-24.04, windows-2025]
+        #         config: [release, debug]
+        #       drop the arm/rep dimensions, and re-add the release + ubuntu-coverage includes.
         os: [windows-2025]
         swift: ["6.3.2"]
-        config: [release, debug]
+        config: [debug]
+        arm: [baseline, exclude]
+        rep: ["1", "2", "3", "4", "5"]
 
         include:
-          # Disable exporting code coverage by default.
+          # Disable exporting code coverage (the study measures build/setup time only).
           - export-coverage: false
-
-          # TEMP: coverage runs only on ubuntu-24.04/debug, which is disabled above. Re-including
-          #       it here would re-add an ubuntu job as a new matrix combination, so it is dropped
-          #       for now. Restore alongside the os list.
-          # - os: "ubuntu-24.04"
-          #   config: debug
-          #   export-coverage: true
-
-          - config: release
-            llvm-build-type: MinSizeRel
 
           - config: debug
             llvm-build-type: Debug
@@ -61,7 +57,8 @@ jobs:
           submodules: recursive
 
       - name: Exclude CI paths from Windows Defender
-        if: runner.os == 'Windows'
+        # TEMP: gated on the treatment arm so the baseline arm measures un-excluded times.
+        if: runner.os == 'Windows' && matrix.arm == 'exclude'
         shell: pwsh
         # Real-time antivirus scanning of every unpacked toolchain file, object file, and
         # .swiftmodule dominates build time on the Windows runners. Excluding the paths the
