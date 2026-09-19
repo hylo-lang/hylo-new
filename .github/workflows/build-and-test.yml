@@ -102,17 +102,19 @@ jobs:
         run: |
           BIN_PATH=$(swift build --show-bin-path)
           llvm-profdata merge -sparse $BIN_PATH/codecov/*.profraw -o $BIN_PATH/codecov/merged.profdata
-          OBJECTS=()
+          TESTS=()
           for t in "$BIN_PATH"/*Tests.so; do
             [ -e "$t" ] || continue
-            OBJECTS+=(-object "$t")
+            TESTS+=("$t")
           done
-          if [ ${#OBJECTS[@]} -eq 0 ]; then
+          if [ ${#TESTS[@]} -eq 0 ]; then
             echo "::error::no test binaries found in $BIN_PATH"
             ls -la "$BIN_PATH"
             exit 1
           fi
-          echo "Exporting coverage over ${#OBJECTS[@]} test binaries and hc."
+          OBJECTS=()
+          for t in "${TESTS[@]}"; do OBJECTS+=(-object "$t"); done
+          echo "Exporting coverage over ${#TESTS[@]} test binaries and hc."
           llvm-cov export "$BIN_PATH/hc" "${OBJECTS[@]}" --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
 
       - name: Install qemu and the cross toolchains
