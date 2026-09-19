@@ -96,23 +96,24 @@ jobs:
         # The merge picks up the .profraw files written by 'hc' subprocesses spawned from the
         # end-to-end command-line tests.
         # '-object' includes the 'hc' binary's coverage mapping in the export.
-        # Swift Build, the default build system since 6.4, does not name the test bundle after the
-        # package nor place it beside the other products, so it is located rather than assumed.
+        # Swift Build, the default build system since 6.4, emits one shared library per test
+        # target instead of the single 'HyloPackageTests.xctest' bundle the legacy build system
+        # produced, so each of them has to be handed to 'llvm-cov' for its coverage to count.
         run: |
           BIN_PATH=$(swift build --show-bin-path)
           llvm-profdata merge -sparse $BIN_PATH/codecov/*.profraw -o $BIN_PATH/codecov/merged.profdata
-          XCTEST=$(find "$BIN_PATH" "$BIN_PATH/.." -maxdepth 1 -name '*.xctest' | head -1)
-          if [ -z "$XCTEST" ]; then
-            echo "::error::no .xctest found under $BIN_PATH or its parent"
-            ls -la "$BIN_PATH" "$BIN_PATH/.."
+          OBJECTS=()
+          for t in "$BIN_PATH"/*Tests.so; do
+            [ -e "$t" ] || continue
+            OBJECTS+=(-object "$t")
+          done
+          if [ ${#OBJECTS[@]} -eq 0 ]; then
+            echo "::error::no test binaries found in $BIN_PATH"
+            ls -la "$BIN_PATH"
             exit 1
           fi
-          # On Apple platforms the bundle is a directory; elsewhere it is the executable itself.
-          if [ -d "$XCTEST" ]; then
-            XCTEST=$(find "$XCTEST" -type f -perm -u+x ! -name '*.so' | head -1)
-          fi
-          echo "Test binary: $XCTEST"
-          llvm-cov export "$XCTEST" -object $BIN_PATH/hc --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
+          echo "Exporting coverage over ${#OBJECTS[@]} test binaries and hc."
+          llvm-cov export "$BIN_PATH/hc" "${OBJECTS[@]}" --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
 
       - name: Install qemu and the cross toolchains
         if: ${{ runner.os == 'Linux' && runner.arch == 'X64' }}
