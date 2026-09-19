@@ -15,6 +15,8 @@ env:
 jobs:
   line-length:
     name: "Line length"
+    # TEMP: disabled to isolate the Windows Defender-exclusion speedup measurement.
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -30,7 +32,9 @@ jobs:
       fail-fast: false
       matrix:
         # Note: all combinations of the following will be run independently
-        os: [macos-26, ubuntu-24.04, windows-2025]
+        # TEMP: macos-26 and ubuntu-24.04 removed to isolate the Windows Defender-exclusion
+        #       speedup measurement. Restore to [macos-26, ubuntu-24.04, windows-2025] afterwards.
+        os: [windows-2025]
         swift: ["6.3.2"]
         config: [release, debug]
 
@@ -38,10 +42,12 @@ jobs:
           # Disable exporting code coverage by default.
           - export-coverage: false
 
-          # Enable exporting code coverage in a single configuration.
-          - os: "ubuntu-24.04"
-            config: debug
-            export-coverage: true
+          # TEMP: coverage runs only on ubuntu-24.04/debug, which is disabled above. Re-including
+          #       it here would re-add an ubuntu job as a new matrix combination, so it is dropped
+          #       for now. Restore alongside the os list.
+          # - os: "ubuntu-24.04"
+          #   config: debug
+          #   export-coverage: true
 
           - config: release
             llvm-build-type: MinSizeRel
@@ -53,6 +59,26 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - name: Exclude CI paths from Windows Defender
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # Real-time antivirus scanning of every unpacked toolchain file, object file, and
+        # .swiftmodule dominates build time on the Windows runners. Excluding the paths the
+        # build touches (and the compiler processes) stops Defender from scanning them. This
+        # runs before the Swift/LLVM setup steps so their file-heavy unpacking benefits too.
+        run: |
+          $paths = @(
+            "${{ github.workspace }}",
+            $env:RUNNER_TEMP,
+            $env:RUNNER_TOOL_CACHE,
+            "$env:LOCALAPPDATA\Programs\Swift",
+            "$env:LOCALAPPDATA\Temp"
+          )
+          foreach ($p in $paths) { Add-MpPreference -ExclusionPath $p -ErrorAction SilentlyContinue }
+          foreach ($proc in @("swift.exe","swiftc.exe","clang.exe","clang++.exe","link.exe","lld-link.exe","ld.exe")) {
+            Add-MpPreference -ExclusionProcess $proc -ErrorAction SilentlyContinue
+          }
 
       - name: Set up Swift ${{ matrix.swift }} on ${{ matrix.os }}
         uses: SwiftyLab/setup-swift@latest
@@ -122,6 +148,8 @@ jobs:
 
   test-wasm:
     name: "Front-end on WebAssembly"
+    # TEMP: disabled to isolate the Windows Defender-exclusion speedup measurement.
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
