@@ -31,8 +31,6 @@ jobs:
       matrix:
         # Note: all combinations of the following will be run independently
         os: [macos-26, ubuntu-24.04, windows-2025]
-        # Note: "6.4", not "6.4.0", which setup-swift resolves to the prefix "swift-6.4-" and so
-        #       fails to match this release's "swift-6.4.0-RELEASE" tag.
         swift: ["6.4"]
         config: [release, debug]
 
@@ -140,7 +138,6 @@ jobs:
 
       - name: Install the Swift SDK for WebAssembly
         # The URL and checksum are published at https://www.swift.org/install/linux/
-        # Note: unlike the toolchain above, this pins one patch release and must be bumped with it.
         run: >
           swift sdk install
           https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz
@@ -157,8 +154,7 @@ jobs:
 
       - name: Run the smoke test
         # The standard library's path is passed explicitly because deriving it from
-        # 'Bundle.module' traps on WASI. The build directory is mapped into the guest as-is, so
-        # the path is valid on both sides.
+        # 'Bundle.module' traps on WASI.
         run: |
           BIN=$(swift build --swift-sdk swift-6.4.0-RELEASE_wasm --show-bin-path)
           wasmtime run --dir "$BIN::$BIN" "$BIN/frontend-smoke-test.wasm" "$BIN/Hylo_StandardLibrary.bundle"
