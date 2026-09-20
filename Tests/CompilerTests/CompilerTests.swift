@@ -495,7 +495,9 @@ struct CompilerTests {
         continue
       }
 
-      log.expectEqual(o, c.expected, "\(tag) did not meet expectations.")
+      log.expectEqual(
+        o, c.expected,
+        "\(tag) did not meet expectations (function-local names renumbered by first appearance).")
     }
   }
 
