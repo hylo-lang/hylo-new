@@ -76,13 +76,17 @@ internal struct ManglingEncoding: Sendable {
 
   /// Writes the mangled representation of `d` to `output`.
   private mutating func append(decl d: DeclarationIdentity, to output: inout ManglingContext) {
-    if output.addIf(reservedOrRecorded: .node(.init(d))) { return }
+    if output.addIf(reservedOrRecorded: .node(.init(d))) {
+      output.endDeclaration()
+      return
+    }
 
     // First add the qualification of the declaration.
     appendQualification(of: d, to: &output)
     // If this is a scope, then just add it as a scope and finish.
     if let s = program.castToScope(d) {
       append(scope: s, to: &output)
+      output.endDeclaration()
       return
     }
 
@@ -107,6 +111,7 @@ internal struct ManglingEncoding: Sendable {
     }
 
     output.record(symbol: .node(AnySyntaxIdentity(d)))
+    output.endDeclaration()
   }
 
   /// Demangles a (possibly qualified) entity from `source`.
@@ -199,6 +204,10 @@ internal struct ManglingEncoding: Sendable {
       // Stop if we cannot continue, or if we need to continue with something that cannot be a
       // scope or a declaration. Also consider the case that we start another declaration.
       guard let n = source.peekOperator() else { break }
+      if n == .declarationEnd {
+        _ = source.takeOperator()
+        break
+      }
       if n == .reserved || n == .module || n == .lookupRelative || !n.isEntityOperator {
         break
       }

@@ -40,7 +40,7 @@ final class ManglingOperatorTests: XCTestCase {
   /// Tests that each operator is classified as an entity or type operator, except for the
   /// witness-table operator which is intentionally treated as a special case.
   func testOperatorKinds() {
-    let specialOperators: [ManglingOperator] = [.witnessTable]
+    let specialOperators: [ManglingOperator] = [.declarationEnd, .witnessTable]
     for op in ManglingOperator.allCases {
       XCTAssert(
         op.isEntityOperator || op.isTypeOperator || specialOperators.contains(op),
