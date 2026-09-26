@@ -388,6 +388,17 @@ public struct Interpreter {
     }
   }
 
+  /// Returns the function corresponding to `f`.
+  private subscript(function f: IRValue) -> GlobalFunctionIdentity {
+    switch f {
+    case .function(let n, _):
+      let currentModule = programCounter.container.module
+      let d = program.definition(of: n, visibleFrom: currentModule)!
+      return .init(module: d.0, function: d.1)
+    default: unimplemented("Closures are not supported in emitter yet.")
+    }
+  }
+
   /// Returns the memory location pointed to by `v` in the current execution context.
   ///
   /// - Precondition: `v` is a place.
@@ -414,17 +425,6 @@ public struct Interpreter {
       topOfStack.registers[r]!(as: Access<Memory.TypedAddress>.self)!
     default:
       preconditionFailure("\(program.show(v)) is not an Access<Memory.TypedAddress>.")
-    }
-  }
-
-  /// Returns the function identified by `f`.
-  private func function(_ f: IRValue) -> GlobalFunctionIdentity {
-    switch f {
-    case .function(let n, _):
-      let currentModule = programCounter.container.module
-      let d = program.definition(of: n, visibleFrom: currentModule)!
-      return .init(module: d.0, function: d.1)
-    default: unimplemented("Closures are not supported in emitter yet.")
     }
   }
 
@@ -463,12 +463,12 @@ public struct Interpreter {
     }
   }
 
-  /// Returns an epilogue that calls the function `f` with `arguments`.
+  /// Returns an epilogue that calls the function `f` passing `arguments`.
   private func call(
     _ f: IRValue,
     passing arguments: ArraySlice<IRValue>
   ) throws -> InstructionEpilogue {
-    let g = function(f)
+    let g = self[function: f]
     let xs = arguments.map { access(of: $0) }
     return .call(g, passing: xs)
   }
