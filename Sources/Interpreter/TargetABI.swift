@@ -1,13 +1,17 @@
 import FrontEnd
 
 /// Types that describe the ABI for which we might interpret code.
-protocol TargetABI {
+public protocol TargetABI {
 
   /// Returns the alignment of `t`, which is 1 for `.i(1)` and `.i(8)`.
   func alignment(_ t: MachineType) -> Int
 
   /// The number of bits in a pointer type.
   var bitsInAPointer: Int { get }
+
+  /// The order in which the bytes of values of multi-byte machine types are
+  /// arranged.
+  var byteOrder: Endianness { get }
 
 }
 
@@ -53,6 +57,10 @@ struct UnrealABI: TargetABI {
 
   /// The number of bits in a pointer type.
   var bitsInAPointer: Int { bitsInAWord }
+
+  /// The order in which the bytes of values of multi-byte machine types are
+  /// arranged.
+  var byteOrder: Endianness { .little }
 
 }
 
