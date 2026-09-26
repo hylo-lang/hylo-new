@@ -12,7 +12,7 @@ struct RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Creates a `w`-bit integer with value `n`, storing its bytes in `byteOrder`.
+  /// Creates a `w`-bit integer having value `n`, storing its bytes in `byteOrder`.
   public init(integer n: BigInt, bitWidth w: Int, byteOrder: Endianness) {
     precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
