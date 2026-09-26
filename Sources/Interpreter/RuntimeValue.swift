@@ -67,7 +67,7 @@ extension RuntimeValue {
   // ///
   // /// - Precondition: `self` is an instance of `MachineType.i(128)`.
   // public func asI128(inByteOrder o: Endianness) -> UInt128 {
-  //   integerValue(as: UInt128.self, assumingByteOrder: o)
+  //   integerValue(as: UInt128.self, inByteOrder: o)
   // }
 
   /// Returns the bytes of `self` interpreted as an integer of type `t`, with
