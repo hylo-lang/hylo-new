@@ -12,7 +12,7 @@ struct RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Creates a `w`-bit integer having value `n` and the given byte order.
+  /// Creates a `w`-bit integer with value `n`, storing its bytes in `byteOrder`.
   public init(integer n: BigInt, bitWidth w: Int, byteOrder: Endianness) {
     precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
@@ -40,40 +40,40 @@ extension RuntimeValue {
     bytes.first!
   }
 
-  /// The 16-bit unsigned value, assuming byte order `o`.
+  /// The 16-bit unsigned value, interpreting its bytes in the byte order `o`.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(16)`.
-  public func asI16(assumingByteOrder o: Endianness) -> UInt16 {
-    integerValue(as: UInt16.self, assumingByteOrder: o)
+  public func asI16(inByteOrder o: Endianness) -> UInt16 {
+    integerValue(as: UInt16.self, inByteOrder: o)
   }
 
-  /// The 32-bit unsigned value, assuming byte order `o`.
+  /// The 32-bit unsigned value, interpreting its bytes in the byte order `o`.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(32)`.
-  public func asI32(assumingByteOrder o: Endianness) -> UInt32 {
-    integerValue(as: UInt32.self, assumingByteOrder: o)
+  public func asI32(inByteOrder o: Endianness) -> UInt32 {
+    integerValue(as: UInt32.self, inByteOrder: o)
   }
 
-  /// The 64-bit unsigned value, assuming byte order `o`.
+  /// The 64-bit unsigned value, interpreting its bytes in the byte order `o`.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(64)`.
-  public func asI64(assumingByteOrder o: Endianness) -> UInt64 {
-    integerValue(as: UInt64.self, assumingByteOrder: o)
+  public func asI64(inByteOrder o: Endianness) -> UInt64 {
+    integerValue(as: UInt64.self, inByteOrder: o)
   }
 
   // TODO: uncomment when 128-bit integer is supported.
   //
-  // /// The 128-bit unsigned value, assuming byte order `o`.
+  // /// The 128-bit unsigned value, interpreting its bytes in the byte order `o`.
   // ///
   // /// - Precondition: `self` is an instance of `MachineType.i(128)`.
-  // public func asI128(assumingByteOrder o: Endianness) -> UInt128 {
+  // public func asI128(inByteOrder o: Endianness) -> UInt128 {
   //   integerValue(as: UInt128.self, assumingByteOrder: o)
   // }
 
-  /// Returns the bytes of `self` interpreted as an integer of type `t`, assuming
-  /// they are arranged in byte order `o`.
+  /// Returns the bytes of `self` interpreted as an integer of type `t`, with
+  /// the `bytes` interpreted in byte order `o`.
   private func integerValue<T: FixedWidthInteger>(
-    as t: T.Type, assumingByteOrder o: Endianness
+    as t: T.Type, inByteOrder o: Endianness
   ) -> T {
     precondition(bytes.count == T.bitWidth / 8)
 
@@ -119,13 +119,13 @@ internal func byteRepresentation(
 }
 
 /// Returns the index at which the `i`th least-significant byte is arranged in
-/// `byteOrder`.
+/// byte order `o`.
 private func byteIndex(
   forLeastSignificantByte i: Int,
   byteCount: Int,
-  inByteOrder byteOrder: Endianness
+  inByteOrder o: Endianness
 ) -> Int {
-  switch byteOrder {
+  switch o {
   case .little:
     return i
   case .big:
