@@ -35,7 +35,8 @@
             },
             // Add the IDs of extensions you want installed when the container is created.
             "extensions": [
-                "swiftlang.swift-vscode"
+                "swiftlang.swift-vscode",
+                "hylo-lang.hylo"
             ]
         }
     },

@@ -64,8 +64,8 @@ jobs:
         uses: hylo-lang/get-llvm@6a49368ad6b8b735b444d4b9840b0bc466e7875a # v0.4.0
         id: get-llvm
         with:
-          llvmVersion: "20.1.6"
-          llvmBuildRelease: "20260521-114955"
+          llvmVersion: "23.1.0"
+          llvmBuildRelease: "20260905-220739"
           llvmBuildConfig: MinSizeRel
           addToPkgConfigPath: true
           addToPath: true

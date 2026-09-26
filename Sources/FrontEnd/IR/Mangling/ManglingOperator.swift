@@ -193,10 +193,11 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
   internal init?(prefixing s: Substring) {
     if s.isEmpty { return nil }
 
+    // Short-circuiting optimization to ignore `s` when not matching the "[a-z]*[A-Z]" convention.
     var i = s.startIndex
     while s[i].isASCII && s[i].isLowercase {
       i = s.index(after: i)
-      if i == s.endIndex { return nil }
+      if i == s.endIndex { return nil } // Uppercase letter required before end.
     }
 
     if let o = ManglingOperator(rawValue: String(s[...i])) {

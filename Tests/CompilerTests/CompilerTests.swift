@@ -23,6 +23,19 @@ struct CompilerTests {
 
   private typealias Host = HostUtilities.Host
 
+  /// The target to cross-compile test programs for, if applicable.
+  private static let crossCompilationTarget = Host.environment["HYLO_TEST_TARGET"]
+
+  /// The qemu executable running the compiled test programs, if applicable.
+  ///
+  /// The program's path is appended to this command. For instance, setting it to "qemu-arm" runs
+  /// the test programs under qemu's user-mode emulator for 32-bit ARM.
+  private static var testRunner: Executable? {
+    Host.environment["HYLO_TEST_RUNNER"].map { (r) in
+      r.contains("/") ? .path(.init(r)) : .name(r)
+    }
+  }
+
   /// The input of a compiler test.
   struct TestDescription {
 
@@ -282,11 +295,17 @@ struct CompilerTests {
       // Should an executable be tested?
       if input.manifest.stage == .execution {
         let e = try #require(r.artifacts.executable)
-        let x = try await executeSubprocess(.path(e), workingDirectory: input.workingDirectory)
-        if input.manifest.shouldTrap {
-          log.expect(x.isAbnormalFailure, "program did not trap")
+
+        let execution = if let q = Self.testRunner {
+          try await executeSubprocess(
+            q, arguments: [e.path], workingDirectory: input.workingDirectory)
         } else {
-          assertExitStatus(x, describedBy: input, reportingFailuresTo: &log)
+          try await executeSubprocess(.path(e), workingDirectory: input.workingDirectory)
+        }
+        if input.manifest.shouldTrap {
+          log.expect(execution.isAbnormalFailure, "program did not trap")
+        } else {
+          assertExitStatus(execution, describedBy: input, reportingFailuresTo: &log)
         }
       }
 
@@ -330,7 +349,11 @@ struct CompilerTests {
     _ input: TestDescription, withOptimizations optimized: Bool,
     reportingFailuresTo log: inout FailureLog
   ) async throws -> CompilationResult {
-    var driver = try Driver(targetSpecification: .native())
+    var driver = if let t = CompilerTests.crossCompilationTarget {
+      try Driver(targetSpecification: .init(target: .init(t), cpu: "", features: ""))
+    } else {
+      try Driver(targetSpecification: .native())
+    }
 
     if input.manifest.requiresStandardLibrary {
       try await driver.installCachedStandardLibrary()
@@ -436,8 +459,12 @@ struct CompilerTests {
     if (try driver.compileToLLVM(m)).containsError { return }
     let llvmIR = driver.llvmIR(of: m)!
     artifacts.record(llvmIR, for: .llvmIR)
-    assertArtifact(.llvmIR, expected: expectedArtifacts[.llvmIR], observed: llvmIR,
-      reportingFailuresTo: &log)
+
+    // Don't assert during cross-compilation due to target-dependent sizes.
+    if Self.crossCompilationTarget == nil {
+      assertArtifact(.llvmIR, expected: expectedArtifacts[.llvmIR], observed: llvmIR,
+        reportingFailuresTo: &log)
+    }
     if stage == .llvm { return }
 
     // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.

@@ -84,8 +84,8 @@ private struct Value {
 /// to another instruction.
 private enum InstructionEpilogue {
 
-  /// Store
-  case initializeRegister(to: Value)
+  /// Initialize instruction register to the given value.
+  case register(Value)
 
   /// Control is transferred to the given instruction.
   case jump(to: InstructionPointer)
@@ -180,6 +180,9 @@ public struct Interpreter {
   /// `true` iff the program is still running.
   public var isRunning: Bool { !callStack.isEmpty }
 
+  /// The ABI for which the types will be laid out.
+  public var abi: any TargetABI { memory.abi }
+
   /// Local variables, parameters and return address.
   private var callStack = Stack()
 
@@ -223,7 +226,7 @@ public struct Interpreter {
       try advanceProgramCounter()
       callStack.enter(f, definedIn: program, withParameters: xs)
     case .return: callStack.pop()
-    case .initializeRegister(let v):
+    case .register(let v):
       topOfStack.registers[programCounter.position] = v
       try advanceProgramCounter()
     }
@@ -237,24 +240,24 @@ public struct Interpreter {
       // storing the access into register.
       let p = address(of: x.source)
       let a = Access(to: p, effect: x.finalCapability)
-      return initializeRegister(to: a)
+      return register(a)
     case is IRRegionEnd<IRAccess>:
       // TODO: add a real implementation, validating if it is safe to end the access.
-      return initializeRegister(to: ())
+      return register(())
     case let x as IRAlloca:
       if x.witness != nil {
         unimplemented("dynamically sized stack allocation is not supported yet.")
       }
       let p = allocate(storageFor: x.storage)
-      return initializeRegister(to: p)
+      return register(p)
     case let x as IRApply:
       return try call(x.callee, passing: x.callArguments)
     case let x as IRApplyBuiltin:
       let v = try call(x.callee, passing: x.arguments)
-      return initializeRegister(to: v)
+      return register(v)
     case is IRAssumeState:
       // TODO: add a real implementation, updating state of composed regions.
-      return initializeRegister(to: ())
+      return register(())
     case let x as IRBranch:
       return .jump(to: start(x.target))
     case let x as IRConditionalBranch:
@@ -268,9 +271,10 @@ public struct Interpreter {
       _ = x
     case let x as IRLoad:
       let v = try load(from: x.source)
-      return .initializeRegister(to: .init(v))
+      return register(v)
     case let x as IRMemoryCopy:
-      _ = x
+      try copy(x.source, to: x.target)
+      return register(())
     case let x as IRMove:
       _ = x
     case let x as IRPartialApply:
@@ -283,7 +287,7 @@ public struct Interpreter {
       _ = x
     case let x as IRProperty:
       let l = x.record.location(ofField: x.property, in: &self)
-      return initializeRegister(to: l)
+      return register(l)
     case is IRReturn:
       for a in topOfStack.allocations.reversed() {
         try memory.deallocate(a)
@@ -291,10 +295,10 @@ public struct Interpreter {
       return .return
     case let x as IRStore:
       try store(x.value, at: x.target)
-      return initializeRegister(to: ())
+      return register(())
     case let x as IRSubfield:
       let l = x.base.location(ofPart: x.path, in: &self)
-      return initializeRegister(to: l)
+      return register(l)
     case let x as IRTypeApply:
       _ = x
     case let x as IRTypeWitness:
@@ -323,8 +327,8 @@ public struct Interpreter {
   }
 
   /// Returns an epilogue that initializes the instruction's register to `v`.
-  private func initializeRegister(to v: Any) -> InstructionEpilogue {
-    return .initializeRegister(to: .init(v))
+  private func register(_ v: Any) -> InstructionEpilogue {
+    return .register(.init(v))
   }
 
   /// Allocates storage on `callStack` for a value of type `t`, ready to be initialized,
@@ -345,6 +349,15 @@ public struct Interpreter {
   /// Stores `v` at the address `p`.
   private mutating func store(_ v: IRValue, at p: IRValue) throws {
     try memory.store(self[v], at: access(of: p))
+  }
+
+  /// Copies the bytes of the object at `source` to `destination`.
+  ///
+  /// - Precondition: `source` and `destination` are non-overlapping places.
+  private mutating func copy(_ source: IRValue, to destination: IRValue) throws {
+    let s = access(of: source)
+    let d = access(of: destination)
+    try memory.copy(s, to: d)
   }
 
   /// Returns the value corresponding to `v` in the current execution state.
@@ -368,7 +381,7 @@ public struct Interpreter {
         return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
         let l = memory.layout(t)
-        return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
+        return .init(integer: n, bitWidth: l.size * 8, byteOrder: abi.byteOrder)
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
@@ -436,14 +449,14 @@ public struct Interpreter {
       let w = memory.layout(t).size * 8
       let lhs = try self[arguments[0]]
       let rhs = try self[arguments[1]]
-      let r = p(lhs, rhs, bitWidth: w)
+      let r = p(lhs, rhs, bitWidth: w, inByteOrder: abi.byteOrder)
       return .init(bool: r)
     case .zeroinitializer(let t):
       let l = memory.layout(t)
       let u = program.types[t]
       return switch u {
-      case .i(_): .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
-      case .word: .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
+      case .i(_): .init(integer: 0, bitWidth: l.size * 8, byteOrder: abi.byteOrder)
+      case .word: .init(integer: 0, bitWidth: l.size * 8, byteOrder: abi.byteOrder)
       default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
