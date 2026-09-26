@@ -24,25 +24,25 @@ public struct Driver {
   public let moduleCachePath: URL?
 
   /// The target specification (triple + CPU + features).
-  public var target: TargetSpecification
+  public let target: TargetSpecification
 
   /// The optimization level for code generation.
-  public var optimization: OptimizationLevel
+  public let optimization: OptimizationLevel
 
   /// The relocation model for code generation.
-  public var relocation: RelocationModel
+  public let relocation: RelocationModel
 
   /// The code model for code generation.
-  public var codeModel: CodeModel
+  public let codeModel: CodeModel
 
   /// The linker's library search path.
-  public var librarySearchPath: [URL]
+  public let librarySearchPath: [URL]
 
   /// The search path for imported module archives (`.hylomodule` files).
-  public var moduleSearchPath: [URL]
+  public let moduleSearchPath: [URL]
 
   /// The names of the native libraries to link (in addition to any imported Hylo dependencies).
-  public var librariesToLink: [String]
+  public let librariesToLink: [String]
 
   /// `true` iff compilation and linking depend on the standard library and its shim.
   public private(set) var usesStandardLibrary: Bool = false
@@ -211,7 +211,7 @@ public struct Driver {
     // FIXME: Enable this after we can lower the standard library
     // modulesToLink.append(program.modules[.standardLibrary]!.identity)
     let shimObject: URL? = if usesStandardLibrary {
-      try await StandardLibraryShimCache.shared.object(compiledWith: relocation)
+      try await StandardLibraryShimCache.shared.object(compiledWith: relocation, for: target)
     } else {
       nil
     }
@@ -225,7 +225,7 @@ public struct Driver {
         var cObjects: [URL] = []
         for s in cSources {
           cObjects.append(
-            try await Self.compileCToObject(source: s, destinationDirectory: d, relocation))
+            try await Self.compileCToObject(source: s, destinationDirectory: d, relocation, target))
         }
         if let o = shimObject {
           cObjects.append(o)
@@ -275,21 +275,27 @@ public struct Driver {
   ///
   /// Returns the path to the object file within `d`.
   public static func compileCToObject(
-    source: URL, destinationDirectory d: URL, _ relocation: RelocationModel
+    source: URL, destinationDirectory d: URL, _ relocation: RelocationModel,
+    _ target: TargetSpecification
   ) async throws -> URL {
     let uniquePrefix = source.hashValue
     let fileName = source.deletingPathExtension().appendingPathExtension("o").lastPathComponent
     let o = d.appendingPathComponent("\(uniquePrefix)-\(fileName)", isDirectory: false)
 
-    try await Self.compileCToObject(source: source, to: o, relocation)
+    try await Self.compileCToObject(source: source, to: o, relocation, target)
     return o
   }
 
   /// Compiles `source` using `clang` to an object file.
   public static func compileCToObject(
-    source: URL, to o: URL, _ relocation: RelocationModel
+    source: URL, to o: URL, _ relocation: RelocationModel, _ target: TargetSpecification
   ) async throws {
-    var a = ["-c", source.path, "-o", o.path]
+    var a = [
+      "-c", source.path,
+      "-o", o.path,
+      "-target", target.target.triple
+    ]
+
     if let r = relocation.asClangArgument { a.append(r) }
 
     _ = try await subprocessOutput(of: .name("clang"), arguments: a)
@@ -512,7 +518,7 @@ public struct Driver {
   ///
   /// - Throws: if the parent folder of `output` doesn't exist.
   private func linkExecutable(from objectFiles: [URL], writingTo output: URL) async throws {
-    var arguments = ["-o", output.path]
+    var arguments = ["-o", output.path, "-target", target.target.triple]
     arguments += librarySearchPath.map({ "-L\($0.path)" })
     arguments += librariesToLink.map({ "-l\($0)" })
     arguments += objectFiles.map(\.path)
@@ -626,25 +632,32 @@ public struct Driver {
     /// The shared instance.
     static let shared = StandardLibraryShimCache()
 
+    /// The cache's key.
+    private typealias Key = Pair<RelocationModel, TargetSpecification>
+
     /// The compilation of the shim for each relocation model, resulting in the location of the
     /// compiled object file.
-    private var objects: [RelocationModel: Task<URL, any Swift.Error>] = [:]
+    private var objects: [Key: Task<URL, any Swift.Error>] = [:]
 
     /// Returns an object file compiled from the standard library's C shim with `relocation`,
     /// compiling it at most once per process into a temporary directory that lives until the
     /// process exits.
-    func object(compiledWith relocation: RelocationModel) async throws -> URL {
-      if let t = objects[relocation] { return try await t.value }
+    func object(
+      compiledWith relocation: RelocationModel, for target: TargetSpecification
+    ) async throws -> URL {
+      let k = Key(relocation, target)
+      if let t = objects[k] { return try await t.value }
 
       // The task is registered before this method suspends so that concurrent callers await the
       // same compilation instead of starting their own.
       let t = Task {
         let d = try FileManager.default.createUniqueTemporaryDirectory()
         let o = d.appendingPathComponent("shims.o", isDirectory: false)
-        try await Driver.compileCToObject(source: Driver.standardLibraryCShim, to: o, relocation)
+        try await Driver.compileCToObject(
+          source: Driver.standardLibraryCShim, to: o, relocation, target)
         return o
       }
-      objects[relocation] = t
+      objects[k] = t
       return try await t.value
     }
 
