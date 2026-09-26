@@ -90,6 +90,9 @@ private enum InstructionEpilogue {
   /// Control is transferred to the given instruction.
   case jump(to: InstructionPointer)
 
+  /// Calls the given function with the given arguments, transferring control to callee.
+  case call(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
+
   /// Control is transferred back to the caller.
   case `return`
 
@@ -219,6 +222,9 @@ public struct Interpreter {
   public mutating func step() throws {
     switch try applyCurrentInstruction() {
     case .jump(let pc): programCounter = pc
+    case .call(let f, let xs):
+      try advanceProgramCounter()
+      callStack.enter(f, definedIn: program, withParameters: xs)
     case .return: callStack.pop()
     case .register(let v):
       topOfStack.registers[programCounter.position] = v
@@ -245,7 +251,7 @@ public struct Interpreter {
       let p = allocate(storageFor: x.storage)
       return register(p)
     case let x as IRApply:
-      _ = x
+      return try call(x.callee, passing: x.callArguments)
     case let x as IRApplyBuiltin:
       let v = try call(x.callee, passing: x.arguments)
       return register(v)
@@ -382,6 +388,17 @@ public struct Interpreter {
     }
   }
 
+  /// Returns the function corresponding to `f`.
+  private subscript(function f: IRValue) -> GlobalFunctionIdentity {
+    switch f {
+    case .function(let n, _):
+      let currentModule = programCounter.container.module
+      let d = program.definition(of: n, visibleFrom: currentModule)!
+      return .init(module: d.0, function: d.1)
+    default: unimplemented("Closures are not supported in emitter yet.")
+    }
+  }
+
   /// Returns the memory location pointed to by `v` in the current execution context.
   ///
   /// - Precondition: `v` is a place.
@@ -446,6 +463,16 @@ public struct Interpreter {
     }
   }
 
+  /// Returns an epilogue that calls the function `f` passing `arguments`.
+  private func call(
+    _ f: IRValue,
+    passing arguments: ArraySlice<IRValue>
+  ) throws -> InstructionEpilogue {
+    let g = self[function: f]
+    let xs = arguments.map { access(of: $0) }
+    return .call(g, passing: xs)
+  }
+
 }
 
 extension IRValue {
@@ -499,6 +526,15 @@ extension IRAccess {
     // Because IR analysis should ensure single effect.
     // See: Sources/FrontEnd/IR/Instructions/IRAccess.swift.
     capabilities.uniqueElement!
+  }
+
+}
+
+extension IRApply {
+
+  /// The arguments passed to the call, including the return register.
+  public var callArguments: ArraySlice<IRValue> {
+    operands.dropFirst()
   }
 
 }
