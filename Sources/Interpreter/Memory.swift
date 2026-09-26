@@ -226,7 +226,7 @@ struct Memory {
       case 8: UInt(self[a, ofIntegerType: .i(8)].asI8)
       case 16: UInt(self[a, ofIntegerType: .i(16)].asI16(inByteOrder: o))
       case 32: UInt(self[a, ofIntegerType: .i(32)].asI32(inByteOrder: o))
-      case 64: UInt(self[a, ofIntegerType: .i(64)].inByteOrder(assumingByteOrder: o))
+      case 64: UInt(self[a, ofIntegerType: .i(64)].asI64(inByteOrder: o))
       default: fatalError("Unknown builtin integer size \(n)")
       }
     } else {

@@ -16,7 +16,7 @@ final class InterpreterMemoryInternalTests: XCTestCase {
     let i16 = m.program.id(MachineType.i(16))
     a = m.allocate(storageFor: i16).asTypedAddress(i16)
     m[a] = RuntimeValue(integer: 16, bitWidth: 16, byteOrder: .little)
-    XCTAssertEqual(m[a].asI16(assumingByteOrder: .little), 16)
+    XCTAssertEqual(m[a].asI16(inByteOrder: .little), 16)
   }
 
   func testCheckAlignmentAndAllocationBounds() throws {

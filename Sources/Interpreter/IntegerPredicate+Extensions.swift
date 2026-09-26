@@ -34,7 +34,7 @@ extension IntegerPredicate {
     case 64: self(lhs.asI64(inByteOrder: o), rhs.asI64(inByteOrder: o))
     // TODO: uncomment when 128-bit integer is supported.
     //
-    // case 128: self(lhs.i128(assumingByteOrder: o), rhs.i128(assumingByteOrder: o))
+    // case 128: self(lhs.i128(inByteOrder: o), rhs.i128(inByteOrder: o))
     default: fatalError("Unknown builtin integer size \(w)")
     }
   }

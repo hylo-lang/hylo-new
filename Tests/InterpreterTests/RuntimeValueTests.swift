@@ -22,24 +22,24 @@ final class RuntimeValueTests: XCTestCase {
 
       XCTAssertEqual(
         RuntimeValue(integer: 1, bitWidth: 16, byteOrder: b)
-          .asI16(assumingByteOrder: b), 1)
+          .asI16(inByteOrder: b), 1)
       XCTAssertEqual(
         RuntimeValue(integer: -1, bitWidth: 16, byteOrder: b)
-          .asI16(assumingByteOrder: b), UInt16.max)
+          .asI16(inByteOrder: b), UInt16.max)
 
       XCTAssertEqual(
         RuntimeValue(integer: 1, bitWidth: 32, byteOrder: b)
-          .asI32(assumingByteOrder: b), 1)
+          .asI32(inByteOrder: b), 1)
       XCTAssertEqual(
         RuntimeValue(integer: -1, bitWidth: 32, byteOrder: b)
-          .asI32(assumingByteOrder: b), UInt32.max)
+          .asI32(inByteOrder: b), UInt32.max)
 
       XCTAssertEqual(
         RuntimeValue(integer: 1, bitWidth: 64, byteOrder: b)
-          .asI64(assumingByteOrder: b), 1)
+          .asI64(inByteOrder: b), 1)
       XCTAssertEqual(
         RuntimeValue(integer: -1, bitWidth: 64, byteOrder: b)
-          .asI64(assumingByteOrder: b), UInt64.max)
+          .asI64(inByteOrder: b), UInt64.max)
     }
   }
 
