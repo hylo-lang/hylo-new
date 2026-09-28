@@ -395,7 +395,9 @@ public struct Interpreter {
       let currentModule = programCounter.container.module
       let d = program.definition(of: name, visibleFrom: currentModule)!
       return .init(module: d.0, function: d.1)
-    default: unimplemented("Closures are not supported in emitter yet.")
+    case .parameter(_), .register(_):
+      unimplemented("Closures are not supported in emitter yet.")
+    default: fatalError("\(program.show(f)) is not a function.")
     }
   }
 
