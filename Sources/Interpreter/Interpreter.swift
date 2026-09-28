@@ -532,7 +532,7 @@ extension IRAccess {
 
 extension IRApply {
 
-  /// The arguments passed to the call, including the return register.
+  /// The addresses of passed arguments and return value.
   public var callArguments: ArraySlice<IRValue> {
     operands.dropFirst()
   }
