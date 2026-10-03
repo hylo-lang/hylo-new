@@ -1,0 +1,15 @@
+public struct S {
+
+  public memberwise init
+
+  public static fun f() -> S { S() }
+
+  public static fun g() -> S { S() }
+
+}
+
+extension S {
+
+  public static fun g() -> A { A() }
+
+}

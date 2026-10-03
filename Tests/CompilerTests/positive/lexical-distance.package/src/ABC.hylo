@@ -1,0 +1,3 @@
+public struct A { public memberwise init }
+public struct B { public memberwise init }
+public struct C { public memberwise init }

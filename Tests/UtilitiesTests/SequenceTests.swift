@@ -9,41 +9,18 @@ final class SequenceTests: XCTestCase {
   }
 
   func testLeast() {
-    let x0: [E] = []
-    XCTAssertNil(x0.least(by: E.areInIncreasingOrder(_:_:)))
-    let x1: [E] = [.d, .b, .c]
-    XCTAssertNil(x1.least(by: E.areInIncreasingOrder(_:_:)))
-    let x2: [E] = [.d, .b, .e, .f]
-    XCTAssertEqual(x2.least(by: E.areInIncreasingOrder(_:_:)), .f)
+    let x0: [Int] = []
+    XCTAssertNil(x0.least(by: StrictOrdering.comparing(\.self)))
+    let x1: [Int] = [1, 2, 1, 3]
+    XCTAssertNil(x1.least(by: StrictOrdering.comparing(\.self)))
+    let x2: [Int] = [1, 2, 0, 3]
+    XCTAssertEqual(x2.least(by: StrictOrdering.comparing(\.self)), 0)
   }
 
   func testMin() {
     let xs = [1, 2, 3, 4]
     XCTAssertEqual(xs.min(measuredBy: { (x) in x }), 1)
     XCTAssertEqual(xs.min(measuredBy: { (x) in -x }), 4)
-  }
-
-}
-
-private enum E: Equatable {
-
-  case a, b, c, d, e, f
-
-  static func areInIncreasingOrder(_ lhs: E, _ rhs: E) -> Bool {
-    switch (lhs, rhs) {
-    case (_, .a):
-      return lhs != .a
-    case (_, .b):
-      return (lhs == .d) || (lhs == .e) || (lhs == .f)
-    case (_, .c):
-      return false
-    case (_, .d):
-      return lhs == .f
-    case (_, .e):
-      return lhs == .f
-    case (_, .f):
-      return false
-    }
   }
 
 }

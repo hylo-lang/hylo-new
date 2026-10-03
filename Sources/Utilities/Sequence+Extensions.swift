@@ -14,36 +14,38 @@ extension Sequence {
   }
 
   /// Returns the set of elements in `self` that are not greater than any other element in `self`
-  /// according to `areInIncreasingOrder`.
-  public func minimalElements(by areInIncreasingOrder: (Element, Element) -> Bool) -> [Element] {
+  /// according to `compare`.
+  public func minimalElements(by compare: (Element, Element) -> StrictOrdering) -> [Element] {
     var it = makeIterator()
     var leaves: [Element] = []
-    var hasLeast = false
 
     while let x = it.next() {
-      if hasLeast {
-        if areInIncreasingOrder(leaves[0], x) {
+      if let e = leaves.uniqueElement {
+        switch compare(e, x) {
+        case .ascending:
           continue
-        } else if !areInIncreasingOrder(x, leaves[0]) {
+        case .equal:
           leaves.append(x)
-          hasLeast = false
           continue
+        case .descending:
+          break
         }
       }
 
-      if leaves.allSatisfy({ (y) in areInIncreasingOrder(x, y) }) {
+      if leaves.allSatisfy({ (y) in compare(x, y) == .ascending }) {
         leaves = [x]
-        hasLeast = true
+      } else {
+        leaves.append(x)
       }
     }
 
     return leaves
   }
 
-  /// Returns the least element in `self` according to `areInIncreasingOrder`, or `nil` if `self`
-  /// contains no such element.
-  public func least(by areInIncreasingOrder: (Element, Element) -> Bool) -> Element? {
-    minimalElements(by: areInIncreasingOrder).uniqueElement
+  /// Returns the least element in `self` according to `compare`, or `nil` if `self` contains no
+  /// such element.
+  public func least(by compare: (Element, Element) -> StrictOrdering) -> Element? {
+    minimalElements(by: compare).uniqueElement
   }
 
   /// Returns the result of applying `transform` to each element in `self`, joined by the given
