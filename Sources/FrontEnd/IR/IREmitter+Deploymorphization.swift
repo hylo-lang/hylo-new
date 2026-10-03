@@ -18,6 +18,8 @@ extension IREmitter {
       switch f.tag(of: i) {
       case IRTypeApply.self:
         depolymorphize(f.castUnchecked(i, to: IRTypeApply.self), in: &f, reusing: &witnesses)
+      case IRWitnessTable.self:
+        depolymorphize(f.castUnchecked(i, to: IRWitnessTable.self), in: &f, reusing: &witnesses)
       default:
         continue
       }
@@ -52,7 +54,42 @@ extension IREmitter {
       unimplemented("first class function deploymorphization")
     }
   }
-  
+
+  /// Replaces uses of `i` its existentialized form.
+  private mutating func depolymorphize(
+    _ i: IRWitnessTable.ID, in f: inout IRFunction,
+    reusing witnesses: inout [AnyTypeIdentity: IRValue]
+  ) {
+    // Nothing to do if the witness table isn't generic.
+    let s = f.at(i)
+    if s.arguments.isEmpty { return }
+    unimplemented(if: !s.captures.isEmpty, "captures in generic witness table")
+
+    let ws = lowering(before: i.erased, in: &f) { (me) in
+      me._emitAccessTypeWitnesses(for: s.arguments, reusing: &witnesses)
+    }
+
+    let entries = s.entries.map { (e) in
+      // Is the entry implementing a function requirement?
+      guard case .function(let n, _) = e else { return e }
+
+      // Is the entry polymorphic?
+      let maybePoly = program[module].ir[program[module].ir.identity(function: n)!]
+      if !maybePoly.isMonomorphic {
+        let p = definePartialApplicationExistentializing(maybePoly)
+        return functionReference(to: p)
+      } else {
+        return e
+      }
+    }
+
+    let new = IRWitnessTable(
+      instantiatedWith: [:], aggregating: entries, capturing: ws,
+      as: s.witnessType,
+      at: s.anchor)
+    f.replace(i.erased, with: new)
+  }
+
   /// Replaces uses of `i`, which is a type application of the polymorphic function `c`, with their
   /// existentialized forms.
   private mutating func depolymorphize(
@@ -69,10 +106,8 @@ extension IREmitter {
     // Create an array with a type witness for each of the type argument passed to `i`. These
     // witnesses will be concatenated with the term arguments of each use application of `c`
     // instantiated by `i`.
-    let witnesses = lowering(before: i.erased, in: &f) { (e) in
-      application.arguments.values.map { (a) in
-        e._emitTypeWitness(of: a.erased, reusing: &witnesses)
-      }
+    let ws = lowering(before: i.erased, in: &f) { (me) in
+      me._emitAccessTypeWitnesses(for: application.arguments, reusing: &witnesses)
     }
 
     // Update the uses of the type application.
@@ -82,12 +117,12 @@ extension IREmitter {
         // `i` is used as a callee in an ordinary function application.
         depolymorphize(
           polymorphicApplyUser: u.user, with: mono,
-          passing: witnesses, to: poly.termParameters, in: &f)
+          passing: ws, to: poly.signature.termParameters, in: &f)
 
       case IRProject.self where u.index == 0:
         depolymorphize(
           polymorphicProjectUser: u.user, with: mono,
-          passing: witnesses, to: poly.termParameters, in: &f)
+          passing: ws, to: poly.signature.termParameters, in: &f)
 
       default:
         unimplemented()
@@ -184,17 +219,71 @@ extension IREmitter {
     // The existentialized form of the function takes the generic parameter as type witnesses
     // before the term parameters of the polymorphic form.
     var ps: [IRParameter] = .init(
-      minimumCapacity: poly.typeParameters.count + poly.termParameters.count)
-    for p in poly.typeParameters {
-      let t = program.types.demand(TypeWitness()).erased
+      minimumCapacity: poly.signature.typeParameters.count + poly.signature.termParameters.count)
+    let t = program.types.demand(TypeWitness()).erased
+    for p in poly.signature.typeParameters {
       let d = program.types[p].declaration.map(DeclarationIdentity.init(_:))
       ps.append(.init(type: t, access: .let, declaration: d))
     }
 
-    ps.append(contentsOf: poly.termParameters)
-    let mono = IRFunction(
-      name: n, anchor: poly.anchor, output: poly.output, typeParameters: [], termParameters: ps)
+    ps.append(contentsOf: poly.signature.termParameters)
+    let s = IRFunction.Signature(
+      typeParameters: [], termParameters: ps, output: poly.signature.output)
+    let mono = IRFunction(name: n, anchor: poly.anchor, signature: s)
     return program[module].ir.addFunction(mono)
+  }
+
+  /// Returns a partial application of `poly`, which is the generic interface of an implementation
+  /// stored in a witness table, to the type arguments captured by that witness table.
+  ///
+  /// When a generic conformance declaration is existentialized, the entries stored in the witness
+  /// table that is projected must be partially applied to the existentialized arguments to present
+  /// the right interface. Consider the following to illustrate:
+  ///
+  ///     trait P { fun f() }
+  ///     given w: <T> => T is P { fun f() {} }
+  ///
+  /// The implementation of `f` defined in `w` is generic over `T`, meaning that it has to be
+  /// existentialized along with `w`. However, the resulting existentialized form takes one more
+  /// term parameter than the signature of `f` advertises. Hence, we have to construct another
+  /// function reading the argument to this parameter from the captures of the existentialized
+  /// witness table, which is passed as the first argument.
+  private mutating func definePartialApplicationExistentializing(
+    _ poly: IRFunction
+  ) -> IRFunction.ID {
+    // Existentialize the polymorphic function.
+    let mono = demandExistentialized(poly)
+
+    // Declare the function forwarding the call to the existentialized function.
+    let types = poly.signature.typeParameters
+    let terms = poly.signature.termParameters
+    var applied = IRFunction(
+      name: .applied(program[module].ir[mono].name, 0), // TODO compute a discriminator
+      anchor: poly.anchor,
+      signature: .init(typeParameters: [], termParameters: terms, output: poly.signature.output))
+
+    // Define the body of that function.
+    let entry = applied.addBlock()
+    lowering(.end(of: entry), anchoredTo: poly.anchor, in: &applied) { (me) in
+      let t = me.program.types.demand(TypeWitness()).erased
+      let u = me.program.types.tuple(of: Array(repeating: t, count: types.count))
+      let stash = me._witness_table_stash(of: .parameter(0), as: u)
+
+      let callee = me.functionReference(to: mono)
+      var arguments: [IRValue] = []
+      for i in 0 ..< types.count { arguments.append(me._subfield(stash, at: [i])) }
+      for i in 0 ..< terms.count { arguments.append(.parameter(i)) }
+
+      if poly.isSubscript {
+        unimplemented()
+      } else {
+        let r = arguments.removeLast()
+        me._apply(callee, arguments, into: r, argumentAccesses: .formAndClose)
+      }
+      me._return()
+    }
+
+    return program[module].ir.addFunction(applied)
   }
 
   /// Emits the existentialized definition of `poly` into its existentialized form, adding the
@@ -203,8 +292,8 @@ extension IREmitter {
   /// `poly` is a polymorphic function whose implementation is defined in the current module. Its
   /// existentialized form has not been defined yet, although it may have been declared.
   internal mutating func existentialize(_ poly: IRFunction) {
-    let m = demandExistentialized(poly)
-    existentialize(poly, into: m)
+    let mono = demandExistentialized(poly)
+    existentialize(poly, into: mono)
   }
 
   /// Emits the existentialized definition of `poly` into `m`.
@@ -216,7 +305,7 @@ extension IREmitter {
     assert(poly.isDefined && !target.isDefined, "existentialization already completed")
 
     /// The type parameters of the function being existentialized.
-    let parameters = poly.typeParameters
+    let parameters = poly.signature.typeParameters
 
     /// A table mapping type parameters from the source to their corresponding term parameters in
     /// the existentialized translation.
@@ -228,7 +317,7 @@ extension IREmitter {
     for b in poly.blocks.addresses {
       properties[b] = target.addBlock()
     }
-    for i in poly.termParameters.indices {
+    for i in poly.signature.termParameters.indices {
       properties[IRValue.parameter(i)] = .parameter(i + parameters.count)
     }
 
@@ -253,7 +342,7 @@ extension IREmitter {
             if ps.isEmpty {
               properties[.register(i)] = me.insert(s)!
             } else {
-              let w = me._emitTypeWitness(of: s.storage, reusing: &witnesses)
+              let w = me._emitAccessTypeWitness(of: s.storage, reusing: &witnesses)
               properties[.register(i)] = me._alloca(w, as: s.storage, alignment: s.alignment)
             }
           }

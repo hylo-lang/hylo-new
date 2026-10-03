@@ -2,7 +2,7 @@ import Archivist
 
 /// A parameter in a Hylo IR function.
 @Archivable
-public struct IRParameter: Sendable {
+public struct IRParameter: Equatable, Sendable {
 
   /// The type of the parameter.
   public let type: AnyTypeIdentity

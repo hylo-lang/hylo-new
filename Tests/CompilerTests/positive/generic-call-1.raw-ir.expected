@@ -29,4 +29,3 @@ fun main(set %p0: Int32) {
   %r9 = apply %r5(%r6, %r7) => %r8
   %r10 = return
 }
-

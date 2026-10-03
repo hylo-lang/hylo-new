@@ -7,7 +7,7 @@ fun $<ConformanceDeclaration at generic-call-1:7.1>.f(let %p0: Void, set %p1: In
   %r3 = access [set] %r0
   %r17 = place_cast %r2 as let T
   %r18 = access [set] %r3
-  %r4 = apply use(_:)$existentialized(%r16, %r17) => %r18
+  %r4 = apply use(_:).existentialized(%r16, %r17) => %r18
   %r1 = end %r16
   %r14 = end %r3
   %r13 = end %r2
@@ -42,4 +42,3 @@ fun main(set %p0: Int32) {
   %r17 = end %r15
   %r10 = return
 }
-
