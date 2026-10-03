@@ -103,7 +103,7 @@ Because `%p0` is a witness of `T` (i.e., `?0` in the existentialized signature) 
 ```hylo
 %r3 = access [let] %p0
 %r2 = type_witness (<T> T[2])(%r3)
-%r1 = access [let] %r2
+%r1 = access [let] %r0
 %r0 = alloca %r1 as ?0, #preferred
 ```
 
@@ -268,7 +268,7 @@ fun wa.bar(let %p0: Bool, set %p1: Int) { ... }
 ```
 
 The instruction `witness_table` creates a witness table gathering the functions implementing the trait's requirements.
-Notice that these functions, which are called *implementation interfaces*, have a signature slightly different from those statisfying the trait requirements in the original source.
+Notice that these functions, which are called *implementation interfaces*, have a signature slightly different from those satisfying the trait requirements in the original source.
 Specifically, they accept an additional parameter of type `P<Bool>`, which denotes the witness itself.
 The reason for this mechanism will become more obvious later.
 For now, one can think of an implementation as a method of the witness that forwards calls to some other function.
