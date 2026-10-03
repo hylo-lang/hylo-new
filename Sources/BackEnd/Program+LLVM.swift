@@ -785,11 +785,12 @@ extension Program {
     ctx.module.llvm.setAlignment(storageAlignment, for: storage)
 
     // Store the entries.
-    let entries = s.entries.map({ (x) in codegen(x, in: &ctx) })
-    let requirements = ctx.module.llvm.structConstant(of: entriesType, aggregating: entries)
-    ctx.module.llvm.insertStore(
-      requirements, to: storage, alignedAt: storageAlignment,
-      at: ctx.insertionPoint!)
+    for (i, e) in s.entries.enumerated() {
+      let v = codegen(e, in: &ctx)
+      let p = ctx.module.llvm.insertGetStructElementPointer(
+        of: storage, typed: entriesType, index: i, at: ctx.insertionPoint!)
+      ctx.module.llvm.insertStore(v, to: p, at: ctx.insertionPoint!)
+    }
 
     let table = ctx.module.llvm.insertGetElementPointerInBounds(
       of: storage, typed: tableRawType,
