@@ -570,7 +570,7 @@ internal struct ManglingEncoding: Sendable {
     _ o: ManglingOperator, tagging n: IRFunction.Name, with i: Int,
     to output: inout ManglingContext
   ) {
-    output.add(operator: .plateauDeclaration)
+    output.add(operator: o)
     append(function: n, to: &output)
     output.add(integer: i)
   }

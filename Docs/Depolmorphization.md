@@ -1,12 +1,12 @@
 # Depolymorphization
 
 A function (or type) is polymorphic iff it accepts type parameters and monomorphic otherwise.
-The implementation (aka definition) of a monomorphic function may feature uses of polymorphic constructs that have to be either *monomorphized* or *existentialized* before IR can be compiled to machine code.
-These transformations are referred to as *depolymorphization*.
+A polymorphic function cannot be lowered directly to LLVM or machine code.
+First, it must be **depolymorphized**, transforming it into functions with the same essential structure as the original function, but no type parameters.  The two methods of depolymorphization are called *monomorphization* and *existentialization*.
 
-Both monomorphization and existentialization essentially consist of creating a copy of the polymorphic function.
-In the former case, type arguments are simply substituted for their corresponding parameters.
-In the latter case, the type parameters are transformed into term parameters accepting type witnesses at run-time.
+**Monomorphization** creates a new function for each set of type arguments passed to the polymorphic function, substituting those arguments for the corresponding parameters.  It is simple and efficient, but is not applicable to all generic code and is incompatible with resilience, since the each new function must be compiled into the module of its caller.
+
+**Existentialization** replaces each type parameter with one or more term parameters representing type and conformance witnesses.  These ordinary function parameters allow the transformed function to be compiled into the module of the callee, with polymorphism supplied by dynamic witness values.
 
 The rest of this document describes how Hylo implements existentialization.
 
@@ -37,7 +37,7 @@ fun swap(_:_:)<T>(
 The function is still polymorphic at this stage, taking a type parameter `T`.
 `%p0` accepts a witness of `T`'s conformance to `Movable`.
 `%p1` and `%p2`, correspond to `a` and `b`, respectively.
-Finally, `%p3` denotes the output register of the function, i.e., the place to which its result is written.
+(Hylo IR also does not directly represent return values; they are instead transformed into `set` parameters like `%p3`)
 
 Existentialization then replaces the unconstrained type parameter `T` with a term parameter, `T`'s **type witness**:
 
@@ -55,12 +55,6 @@ Finally, occurrences of `T` have been replaced with `?0`, which denotes a *skole
 > It then [skolemizes](https://en.wikipedia.org/wiki/Skolem_normal_form) the existentially quantified variable to get rid of the quantifier, resulting in a term of type `ω → τ` in which each occurrence of `⍺` has been replaced with a skolem (aka rigid variable).
 >
 > For example, given a function of type `∀⍺.⍺ → ⍺`, we construct a function `∃⍺.ω → ⍺ → ⍺`, we then skolemize it, replacing occurrences of `⍺` by with a unique skolem `κ`, and end up with a monomorphic function of type `ω → κ → κ`.
->
-> Note that nothing in the type system links `ω` to either `⍺` or `κ`.
-> As a consequence, the compiler cannot verify the type safety of a function after it has been existentialized.
-> This issue is inconvenient but does not invalidate the safety of the source language, since existentialization preserves semantics.
-> Hence, a showing the well-typedness of a polymorphic function provides guarantees about the behavior of its existentialized form, at least in principle.
-> No formal theorem has been proven at the time of this writing.
 
 ### Existentializing definitions
 
