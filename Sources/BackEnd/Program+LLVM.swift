@@ -1654,8 +1654,7 @@ extension Program {
 
         let v = ctx.llvm.structType(named: n, fs)
         let a = ctx.dynamicAllocationAlignment()
-        let l = ConcreteLayout(
-          fields: [], propertyToField: Array(fs.indices), size: .dynamic, alignment: a)
+        let l = ConcreteLayout(fields: [], propertyToField: [], size: .dynamic, alignment: a)
         return TypeMetadata(llvm: v, layout: l)
       } else if let fields = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
         return program.metadata(record: n, fields: fields, in: &ctx)
