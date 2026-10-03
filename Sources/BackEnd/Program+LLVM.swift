@@ -673,7 +673,7 @@ extension Program {
         indices: [0, index], indexType: ctx.module.llvm.i32,
         at: ctx.insertionPoint!)
 
-      let p = llvmType(property: s.property, usedAsInstanceOf: s.propertyType, in: &ctx.module)
+      let p = typeOfProperty(s.property, usedAsInstanceOf: s.propertyType, in: &ctx.module)
       let a = ctx.module.llvm.insertLoad(p, from: part, at: ctx.insertionPoint!).v
       ctx.value[.register(i.erased)] = a
     }
@@ -785,11 +785,12 @@ extension Program {
     ctx.module.llvm.setAlignment(storageAlignment, for: storage)
 
     // Store the entries.
-    let entries = s.entries.map({ (x) in codegen(x, in: &ctx) })
-    let requirements = ctx.module.llvm.structConstant(of: entriesType, aggregating: entries)
-    ctx.module.llvm.insertStore(
-      requirements, to: storage, alignedAt: storageAlignment,
-      at: ctx.insertionPoint!)
+    for (i, e) in s.entries.enumerated() {
+      let v = codegen(e, in: &ctx)
+      let p = ctx.module.llvm.insertGetStructElementPointer(
+        of: storage, typed: entriesType, index: i, at: ctx.insertionPoint!)
+      ctx.module.llvm.insertStore(v, to: p, at: ctx.insertionPoint!)
+    }
 
     let table = ctx.module.llvm.insertGetElementPointerInBounds(
       of: storage, typed: tableRawType,
@@ -1653,8 +1654,7 @@ extension Program {
 
         let v = ctx.llvm.structType(named: n, fs)
         let a = ctx.dynamicAllocationAlignment()
-        let l = ConcreteLayout(
-          fields: [], propertyToField: Array(fs.indices), size: .dynamic, alignment: a)
+        let l = ConcreteLayout(fields: [], propertyToField: [], size: .dynamic, alignment: a)
         return TypeMetadata(llvm: v, layout: l)
       } else if let fields = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
         return program.metadata(record: n, fields: fields, in: &ctx)
@@ -1781,13 +1781,16 @@ extension Program {
 
   /// Returns the LLVM IR type of the entity declared by `d`, which is a property of a record, used
   /// as an instance of `t`.
-  private mutating func llvmType(
-    property d: DeclarationIdentity, usedAsInstanceOf t: AnyTypeIdentity,
+  private mutating func typeOfProperty(
+    _ d: DeclarationIdentity, usedAsInstanceOf t: AnyTypeIdentity,
     in ctx: inout ModuleGenerationContext
   ) -> LLVMType {
-    if isFunctionOrVariantDeclaration(d) {
+    switch tag(of: d) {
+    case FunctionDeclaration.self, VariantDeclaration.self:
       return ctx.llvm.functionPointer.t
-    } else {
+    case ConformanceDeclaration.self:
+      return ctx.llvm.ptr.t
+    default:
       return metadata(of: t, in: &ctx).llvm
     }
   }

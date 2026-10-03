@@ -1,0 +1,19 @@
+//! exit-status:2
+
+public trait P {
+  fun one() -> Int32 { 1 }
+  fun two() -> Int32 { 2 }
+}
+
+public trait Q refines P {
+  fun three() -> Int32 { 3 }
+}
+
+given w1: Void is P {}
+given w2: Void is Q {}
+
+fun g<T is Q>(x: T) -> Int32 { x.two() }
+
+fun main() -> Int32 {
+  g(())
+}
