@@ -811,7 +811,7 @@ extension Program {
       for (i, c) in s.captures.enumerated() {
         let x0 = codegen(c, in: &ctx)
         let x1 = ctx.module.llvm.insertGetElementPointerInBounds(
-          of: table, typed: tableRawType,
+          of: table, typed: ctx.module.llvm.i8,
           indices: [entriesSize + (i * stride)], indexType: ctx.module.llvm.i32,
           at: ctx.insertionPoint!)
         ctx.module.llvm.insertStore(x0, to: x1, at: ctx.insertionPoint!)
