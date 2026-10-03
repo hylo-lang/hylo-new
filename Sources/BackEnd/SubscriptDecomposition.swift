@@ -613,8 +613,7 @@ extension IRFunction {
       IRPlaceCast.self,
       IRPointerToPlace.self,
       IRProperty.self,
-      IRSubfield.self,
-      IRWitnessTable.self:
+      IRSubfield.self:
       return .redefined
 
     default:

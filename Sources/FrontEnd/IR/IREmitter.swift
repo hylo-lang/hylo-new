@@ -928,8 +928,7 @@ internal struct IREmitter {
     /// The IR values in the representation of `self.`
     private let operands: [IRValue]
 
-    /// If `self` is bound, the index of the value in `operands` denoting its receiver; otherwise,
-    /// the length of `operands`.
+    /// The value to which the callee is bound, if any.
     let receiver: IRValue?
 
     /// The type arguments notionally applied to the callee.

@@ -7,7 +7,7 @@ import Archivist
 ///       ['[' <captures... : value> ']']
 ///       (<entries... : value>) as <witness : type>
 ///
-/// `witness_table` assembles an object witnessing of the conformance of a type to some trait by
+/// `witness_table` assembles an object witnessing the conformance of a type to some trait by
 /// gathering `entries`, `arguments`, and `captures`, which list the implementations the trait's
 /// requirements, the type arguments instantiating generic entries, and the values copied into the
 /// table's stash, respectively.
