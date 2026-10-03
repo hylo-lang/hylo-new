@@ -673,7 +673,7 @@ extension Program {
         indices: [0, index], indexType: ctx.module.llvm.i32,
         at: ctx.insertionPoint!)
 
-      let p = llvmType(property: s.property, usedAsInstanceOf: s.propertyType, in: &ctx.module)
+      let p = typeOfProperty(s.property, usedAsInstanceOf: s.propertyType, in: &ctx.module)
       let a = ctx.module.llvm.insertLoad(p, from: part, at: ctx.insertionPoint!).v
       ctx.value[.register(i.erased)] = a
     }
@@ -1781,13 +1781,16 @@ extension Program {
 
   /// Returns the LLVM IR type of the entity declared by `d`, which is a property of a record, used
   /// as an instance of `t`.
-  private mutating func llvmType(
-    property d: DeclarationIdentity, usedAsInstanceOf t: AnyTypeIdentity,
+  private mutating func typeOfProperty(
+    _ d: DeclarationIdentity, usedAsInstanceOf t: AnyTypeIdentity,
     in ctx: inout ModuleGenerationContext
   ) -> LLVMType {
-    if isFunctionOrVariantDeclaration(d) {
+    switch tag(of: d) {
+    case FunctionDeclaration.self, VariantDeclaration.self:
       return ctx.llvm.functionPointer.t
-    } else {
+    case ConformanceDeclaration.self:
+      return ctx.llvm.ptr.t
+    default:
       return metadata(of: t, in: &ctx).llvm
     }
   }
