@@ -20,4 +20,20 @@ final class MutableCollectionTests: XCTestCase {
     }
   }
 
+  func testCopyElements() {
+    let source = Array(0..<10)
+
+    var destination = Array(10..<20)
+    destination.copyElements(from: source)
+    XCTAssertEqual(destination, Array(0..<10))
+
+    destination = Array(10..<15)
+    destination.copyElements(from: source)
+    XCTAssertEqual(destination, Array(0..<5))
+
+    destination = Array(10..<30)
+    destination.copyElements(from: source)
+    XCTAssertEqual(destination, Array(0..<10) + Array(20..<30))
+  }
+
 }

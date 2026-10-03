@@ -5,7 +5,7 @@ import Utilities
 struct TypeLayoutCache {
 
   /// The ABI for which the types will be laid out.
-  let abi: any TargetABI
+  public let abi: any TargetABI
 
   /// The memo of layouts computed so far.
   private var storage: [MonomorphicTypeIdentity: TypeLayout] = [:]
