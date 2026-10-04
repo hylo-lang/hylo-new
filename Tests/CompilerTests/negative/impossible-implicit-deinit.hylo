@@ -1,0 +1,10 @@
+struct S {
+  var x: Void
+  fun destroy() sink { _ = self.x }
+  memberwise init
+}
+
+public fun main() {
+  var s = S(x: ())
+  if true { s.destroy() }
+}
