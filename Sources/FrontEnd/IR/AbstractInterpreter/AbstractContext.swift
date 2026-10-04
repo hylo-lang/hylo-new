@@ -74,6 +74,13 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
       }
     }
 
+    /// Removes the key/value pair the specified position.
+    ///
+    /// - Complexity: O(n) where n is the length of `self`.
+    internal mutating func remove(at index: Int) {
+      contents.remove(at: index)
+    }
+
     /// Removes all key/value pairs satisfying `predicate`.
     internal mutating func removeAll(where predicate: (IRValue, AbstractValue<Domain>) -> Bool) {
       contents.removeAll(where: { (k, v) in predicate(k.value, v) })
