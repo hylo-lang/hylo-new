@@ -189,7 +189,7 @@ private struct Transfer: AbstractTransferFunction {
       default:
         // We get here when `v` refers to a place that has been removed after interpreting the
         // instruction that terminates its lifetime in a predecessor. The entry can be removed
-        // since it depends on the liftime of a place that is dead in the current context.
+        // since it depends on the lifetime of a place that is dead in the current context.
         context.locals.remove(at: i)
       }
     }
