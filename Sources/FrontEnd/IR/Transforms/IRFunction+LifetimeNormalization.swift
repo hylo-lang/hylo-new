@@ -941,19 +941,12 @@ private struct Transfer: AbstractTransferFunction {
     _ parts: [IndexPath], at place: IRValue,
     before i: AnyInstructionIdentity, in f: inout IRFunction
   ) -> Bool {
-    // Ignore built-in values.
-    let whole = f.result(of: place)!.type
-    let partsSansBuiltin = parts.filter { (p) in
-      let t = typer.field(of: whole, at: p)!
-      return !program.types.isBuiltin(t)
-    }
-
     // Nothing to do if there are no parts to deinitialize.
     if parts.isEmpty { return true }
 
     // Otherwise, construct an emitter to insert deinitialization.
     return program.withEmitter(insertingIn: module) { (emitter) in
-      for p in partsSansBuiltin {
+      for p in parts {
         // Attempt to resolve and apply a witness of `Deinitializable`.
         let success = emitter.lowering(before: i, in: &f) { (e) in
           let x = e._subfield(place, at: p)
