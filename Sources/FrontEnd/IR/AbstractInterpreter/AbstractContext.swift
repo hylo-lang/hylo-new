@@ -10,65 +10,46 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
   /// instances and the conformance of `Locals` to `Collection` yields deterministic iterations.
   internal struct Locals: Hashable, Sendable {
 
-    /// A key/value pair in an abstract context.
-    private struct Slot: Hashable, Sendable {
+    /// A parameter or register in the IR.
+    private struct Key: Hashable, Comparable, Sendable {
 
-      /// An orderable representation of `key`.
-      let rank: Int
+      /// The value of this key.
+      let value: IRValue
 
-      /// The key of the pair.
-      let key: IRValue
-
-      /// The value of the pair.
-      var value: AbstractValue<Domain>
+      static func < (l: Key, r: Key) -> Bool {
+        switch (l.value, r.value) {
+        case (.parameter(let i), .parameter(let j)):
+          return i < j
+        case (.parameter, .register):
+          return true
+        case (.register, .parameter):
+          return false
+        case (.register(let i), .register(let j)):
+          return i < j
+        default:
+          fatalError("incomparable keys")
+        }
+      }
 
     }
 
-    /// The contents of the context.
-    private var contents: ContiguousArray<Slot> = []
+    /// The contents of this mapping.
+    private var contents: SortedDictionary<Key, AbstractValue<Domain>>
 
     /// Creates an empty context.
-    fileprivate init() {}
+    fileprivate init() {
+      self.contents = [:]
+    }
 
     /// Accesses the value at assigned to `key`, which is either a register or a parameter.
     ///
     /// - Complexity: O(log n) where n is the number en key/value pairs in `self`.
     internal subscript(key: IRValue) -> AbstractValue<Domain>? {
       get {
-        let r = Self.rank(key)
-        let i = contents.partitioningIndex(where: { (s) in s.rank >= r })
-        if (i < contents.count) && (contents[i].rank == r) {
-          return contents[i].value
-        } else {
-          return nil
-        }
+        contents[.init(value: key)]
       }
       _modify {
-        let r = Self.rank(key)
-        let i = contents.partitioningIndex(where: { (s) in s.rank >= r })
-        var out: AbstractValue<Domain>?
-
-        // Define a slide for processing the value that will be stored in `out`.
-        defer {
-          if let o = out {
-            if (i < contents.count) && (contents[i].rank == r) {
-              contents[i].value = o
-            } else {
-              contents.insert(.init(rank: r, key: key, value: o), at: i)
-            }
-          } else if (i < contents.count) && (contents[i].rank == r) {
-            contents.remove(at: i)
-          }
-        }
-
-        // Determine the initial value of `out`.
-        if (i < contents.count) && (contents[i].rank == r) {
-          out = contents[i].value
-        } else {
-          out = nil
-        }
-
-        yield &out
+        yield &contents[.init(value: key)]
       }
     }
 
@@ -81,12 +62,12 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
         if r >= other.contents.count {
           self.contents.removeLast(self.contents.count - l)
           break
-        } else if self.contents[l].rank < other.contents[r].rank {
+        } else if self.contents[l].key < other.contents[r].key {
           self.contents.remove(at: l)
-        } else if self.contents[l].rank > other.contents[r].rank {
+        } else if self.contents[l].key > other.contents[r].key {
           r += 1
         } else {
-          self.contents[l].value = self.contents[l].value && other.contents[r].value
+          self.contents.updateValue(self.contents[l].value && other.contents[r].value, at: l)
           l += 1
           r += 1
         }
@@ -95,19 +76,7 @@ internal struct AbstractContext<Domain: AbstractDomain>: Hashable, Sendable {
 
     /// Removes all key/value pairs satisfying `predicate`.
     internal mutating func removeAll(where predicate: (IRValue, AbstractValue<Domain>) -> Bool) {
-      contents.removeAll(where: { (slot) in predicate(slot.key, slot.value) })
-    }
-
-    /// Returns a representation of `v` suitable to sort the internal storage of a context.
-    private static func rank(_ v: IRValue) -> Int {
-      switch v {
-      case .parameter(let i):
-        return i | 1 << (Int.bitWidth - 1)
-      case .register(let i):
-        return i.address.rawValue
-      default:
-        fatalError("invalid key")
-      }
+      contents.removeAll(where: { (k, v) in predicate(k.value, v) })
     }
 
   }
@@ -205,7 +174,7 @@ extension AbstractContext.Locals: RandomAccessCollection {
   internal func index(before p: Index) -> Index { p - 1 }
 
   internal subscript(p: Int) -> (key: IRValue, value: AbstractValue<Domain>) {
-    (contents[p].key, contents[p].value)
+    (contents[p].key.value, contents[p].value)
   }
 
 }
