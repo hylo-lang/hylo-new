@@ -36,6 +36,13 @@ public struct SortedDictionary<Key: Comparable, Value> {
     values.reserveCapacity(minimumCapacity)
   }
 
+  /// Exchanges the value the pair at position `p` with `v` and returns that value.
+  @discardableResult
+  public mutating func updateValue(_ v: consuming Value, at p: Int) -> Value {
+    swap(&v, &values[p])
+    return v
+  }
+
   /// Accesses the value associated to `key`, if any.
   ///
   /// Complexity: O(n log n) where n is the number of key/value pairs in `self`.
@@ -145,6 +152,29 @@ public struct SortedDictionary<Key: Comparable, Value> {
     result.keys = .init(sorted: keys)
     result.values = values
     return result
+  }
+
+  /// Removes the key/value pair at position `p`.
+  public mutating func remove(at p: Int) {
+    keys.remove(at: p)
+    values.remove(at: p)
+  }
+
+  /// Removes all key/value pairs satisfying `predicate`.
+  public mutating func removeAll(where predicate: (Key, Value) -> Bool) {
+    let pairsToRemove = RangeSet(
+      keys.indices.filter({ (i) in predicate(keys[i], values[i]) }),
+      within: keys.indices)
+    keys.removeSubranges(pairsToRemove)
+    values.removeSubranges(pairsToRemove)
+   }
+
+  /// Removes the last `k` key/value pairs.
+  ///
+  /// - Requires: `k >= 0` and `k <= self.count`.
+  public mutating func removeLast(_ k: Int) {
+    keys.removeLast(k)
+    values.removeLast(k)
   }
 
 }

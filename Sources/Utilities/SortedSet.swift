@@ -110,6 +110,23 @@ public struct SortedSet<Element: Comparable>: Equatable {
     for o in other { self.insert(o) }
   }
 
+  /// Removes all the elements that satisfy the given predicate.
+  public mutating func removeAll(where predicate: (Element) -> Bool) {
+    elements.removeAll(where: predicate)
+  }
+
+  /// Removes the last `k` elements.
+  ///
+  /// - Requires: `k >= 0` and `k <= self.count`.
+  public mutating func removeLast(_ k: Int) {
+    elements.removeLast(k)
+  }
+
+  /// Removes the elements at the given indices.
+  public mutating func removeSubranges(_ xs: RangeSet<Int>) {
+    elements.removeSubranges(xs)
+  }
+
 }
 
 extension SortedSet: ExpressibleByArrayLiteral {

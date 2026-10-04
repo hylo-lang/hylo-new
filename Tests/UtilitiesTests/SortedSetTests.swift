@@ -317,6 +317,24 @@ final class SortedSetTests: XCTestCase {
     XCTAssertEqual(s.map(\.payload), ["z", "b", "c"])
   }
 
+  func testRemoveAllWhere() {
+    var s = SortedSet(0 ..< 10)
+    s.removeAll(where: { (i) in (i & 1) != 0 })
+    XCTAssert(s.elementsEqual(stride(from: 0, to: 10, by: 2)))
+  }
+
+  func testRemoveLast() {
+    var s = SortedSet(0 ..< 10)
+    s.removeLast(5)
+    XCTAssert(s.elementsEqual(0 ..< 5))
+  }
+
+  func testRemoveSubranges() {
+    var s = SortedSet(0 ..< 10)
+    s.removeSubranges(RangeSet(stride(from: 1, to: 10, by: 2), within: s))
+    XCTAssert(s.elementsEqual(stride(from: 0, to: 10, by: 2)))
+  }
+
   /// An element whose equality and ordering are defined by `key` alone, ignoring `payload`.
   ///
   /// Used for distinguishing between which instance is returned upon updates.
