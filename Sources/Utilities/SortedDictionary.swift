@@ -154,10 +154,14 @@ public struct SortedDictionary<Key: Comparable, Value> {
     return result
   }
 
-  /// Removes the key/value pair at position `p`.
-  public mutating func remove(at p: Int) {
-    keys.remove(at: p)
-    values.remove(at: p)
+  /// Removes and returns the key/value pair at the specified position.
+  ///
+  /// - Complexity: O(n) where n is the length of `self`.
+  @discardableResult
+  public mutating func remove(at index: Int) -> (Key, Value) {
+    let k = keys.remove(at: index)
+    let v = values.remove(at: index)
+    return (k, v)
   }
 
   /// Removes all key/value pairs satisfying `predicate`.
