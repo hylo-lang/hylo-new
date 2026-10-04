@@ -139,9 +139,7 @@ internal struct ManglingContext {
 
   /// Records `q` as the innermost scope being mangled, and returns the previous recorded value.
   internal mutating func record(qualification q: ScopeIdentity?) -> ScopeIdentity? {
-    let previous = qualification
-    qualification = q
-    return previous
+    exchange(&qualification, with: q)
   }
 
   /// Writes a lookup reference to `s` iff `s` is reserved or has already been inserted in the
@@ -188,6 +186,14 @@ internal struct ManglingContext {
     } else {
       return false
     }
+  }
+
+  /// If `q` is a scope that is reserved, recorded, or is the latest recorded qualification,
+  /// writes a lookup reference to it.
+  internal mutating func addIf(reservedOrRecordedOrCurrentQualification q: ScopeIdentity) -> Bool {
+    (q.node != nil && addIf(reservedOrRecorded: .node(q.node!))) || 
+      addIf(reservedOrRecorded: q.asSymbol) ||
+      addIf(qualification: q) // todo see why we don't addIf(qualification: q.asSymbol)
   }
 
 }

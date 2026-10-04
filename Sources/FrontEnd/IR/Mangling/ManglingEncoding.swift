@@ -191,25 +191,21 @@ internal struct ManglingEncoding: Sendable {
         break
       }
 
-      if qualifiedEntity != nil {
-        qualifiedEntity = .qualified(head: demangled, previous: qualifiedEntity!)
-      } else {
-        qualifiedEntity = demangled
-      }
+      qualifiedEntity = 
+        if let q = qualifiedEntity {
+          .qualified(head: demangled, previous: q)
+        } else {
+          demangled
+        }
 
       // Record that we've seen `demangled`.
       if o != .lookup && o != .lookupRelative && o != .reserved {
         source.record(symbol: .entity(qualifiedEntity!))
       }
 
-      // Stop if we've encountered an error or reached the end.
-      if demangled == .error || source.isComplete {
-        break
-      }
-
       // Stop if we cannot continue, or if we need to continue with something that cannot be a
       // scope or a declaration. Also consider the case that we start another declaration.
-      guard let n = source.peekOperator() else { break }
+      guard demangled != .error, let n = source.peekOperator() else { break }
       if n == .declarationEnd {
         _ = source.takeOperator()
         break
@@ -227,26 +223,21 @@ internal struct ManglingEncoding: Sendable {
     of n: T, to output: inout ManglingContext
   ) {
     // Find the prefix of the qualification that should be mangled as a reference.
-    var qs: [ScopeIdentity] = []
-    var earlyExit = false
     let p = program.parent(containing: n)
+
+    var qs: [ScopeIdentity] = []
+    var rootedAtExisting = false
     for s in program.scopes(from: p) {
-      if s.node != nil, output.addIf(reservedOrRecorded: .node(s.node!)) {
-        earlyExit = true
+      if output.addIf(reservedOrRecordedOrCurrentQualification: s) { 
+        rootedAtExisting = true
         break
-      } else if output.addIf(reservedOrRecorded: s.asSymbol) {
-        earlyExit = true
-        break
-      } else if output.addIf(qualification: s) {
-        precondition(qs.isEmpty)
-        return
-      } else {
-        qs.append(s)
       }
+      qs.append(s)
     }
 
     // Write the mangled representation of the qualification's suffix.
-    if !earlyExit {
+    if !rootedAtExisting {
+      // Modules aren't scopes in the AST, so add it manually.
       append(module: p.module, to: &output)
       output.record(symbol: .module(p.module))
     }
@@ -291,7 +282,7 @@ internal struct ManglingEncoding: Sendable {
   private static func takeUnqualifiedEntity(
     from source: inout DemanglingContext
   ) -> DemangledEntity {
-    source.takeString().map({ (s) in .scope(s) }) ?? .error
+    source.takeString().map { .scope($0) } ?? .error
   }
 
   /// Writes the mangled representation of `d` sans qualification to `output`.
@@ -1308,7 +1299,7 @@ extension ManglingEncoding {
 extension ScopeIdentity {
 
   /// The mangling symbol corresponding to `self`.
-  fileprivate var asSymbol: MangledSymbol {
+  internal var asSymbol: MangledSymbol {
     isFile ? .fileScope(self) : .node(node!)
   }
 }
