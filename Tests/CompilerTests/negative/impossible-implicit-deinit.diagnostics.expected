@@ -1,0 +1,3 @@
+negative/impossible-implicit-deinit.hylo:9.26: error: no given instance of 'Deinitializable<S>' in this scope
+  if true { s.destroy() }
+                         ^

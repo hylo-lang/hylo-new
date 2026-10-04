@@ -41,13 +41,22 @@ final class SortedDictionaryTests: XCTestCase {
 
   func testRemoveAt() {
     var s: SortedDictionary = [1: "a", 2: "b", 3: "c", 4: "d"]
-    s.remove(at: 1)
+
+    let (k0, v0) = s.remove(at: 1)
+    XCTAssertEqual(k0, 2)
+    XCTAssertEqual(v0, "b")
     XCTAssert(s.keys.elementsEqual([1, 3, 4]))
     XCTAssert(s.values.elementsEqual(["a", "c", "d"]))
-    s.remove(at: 2)
+
+    let (k1, v1) = s.remove(at: 2)
+    XCTAssertEqual(k1, 4)
+    XCTAssertEqual(v1, "d")
     XCTAssert(s.keys.elementsEqual([1, 3]))
     XCTAssert(s.values.elementsEqual(["a", "c"]))
-    s.remove(at: 0)
+
+    let (k2, v2) = s.remove(at: 0)
+    XCTAssertEqual(k2, 1)
+    XCTAssertEqual(v2, "a")
     XCTAssert(s.keys.elementsEqual([3]))
     XCTAssert(s.values.elementsEqual(["c"]))
   }

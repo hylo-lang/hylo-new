@@ -162,25 +162,38 @@ private struct Transfer: AbstractTransferFunction {
     predecessors: SortedDictionary<IRBlock.ID, Context>, from f: inout IRFunction
   ) -> IRBlockSet {
     var changed: IRBlockSet = []
-    for (k, v) in context.locals {
+
+    var i = context.locals.startIndex
+    while i < context.locals.endIndex {
+      let (k, v) = context.locals[i]
       switch v {
       case .object(let o):
+        i = context.locals.index(after: i)
         assert(unstableParts(o.value).isEmpty)
 
-      case .place(let a):
+      case .place(let a) where context.memory[a.location.root] != nil:
+        i = context.locals.index(after: i)
+
+        // Are there unstable parts that need deinitialization in the predecessors?
         let o = context.withObject(at: a, computingLayoutWith: &self.typer, { (o, _) in o })
         let parts = unstableParts(o.value)
-        if !parts.isEmpty {
-          for (p, c) in predecessors {
-            inContext(c) { (me) in
-              if me.ensureDeinitialized(parts, at: k, before: f.blocks[p].last!, in: &f) {
-                changed.insert(p)
-              }
+        if parts.isEmpty { continue }
+        for (p, c) in predecessors {
+          inContext(c) { (me) in
+            if me.ensureDeinitialized(parts, at: k, atEndOf: p, in: &f) {
+              changed.insert(p)
             }
           }
         }
+
+      default:
+        // We get here when `v` refers to a place that has been removed after interpreting the
+        // instruction that terminates its lifetime in a predecessor. The entry can be removed
+        // since it depends on the lifetime of a place that is dead in the current context.
+        context.locals.remove(at: i)
       }
     }
+
     return changed
   }
 
@@ -619,6 +632,7 @@ private struct Transfer: AbstractTransferFunction {
     context.declare(i.erased, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
   }
+
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
     _ i: IRUnreachable.ID, from f: inout IRFunction
@@ -927,7 +941,7 @@ private struct Transfer: AbstractTransferFunction {
     _ parts: [IndexPath], at place: IRValue,
     before i: AnyInstructionIdentity, in f: inout IRFunction
   ) -> Bool {
-    // Nothing to do if `parts` is empty.
+    // Nothing to do if there are no parts to deinitialize.
     if parts.isEmpty { return true }
 
     // Otherwise, construct an emitter to insert deinitialization.
@@ -946,30 +960,32 @@ private struct Transfer: AbstractTransferFunction {
     }
   }
 
-  /// Ensures that the objects identified by `parts` relative to `place` are deinitialized,
-  /// inserting deinitialization before `i`, which is in `f`, is necessary.
+  /// Ensures that the objects identified by `parts` relative to `place` are deinitialized at the
+  /// end of `b`, which is in `f`, returning `true` if `b` was successfully modified.
+  ///
+  /// Parts of `place` that are not initialized are ignored. New instructions are inserted before
+  /// `b`'s last instruction, which is a terminator.
   private mutating func ensureDeinitialized(
     _ parts: [IndexPath], at place: IRValue,
-    before i: AnyInstructionIdentity, in f: inout IRFunction
+    atEndOf b: IRBlock.ID, in f: inout IRFunction
   ) -> Bool {
     let a = context.locals[place]!.place!
     let o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
     let initialized = parts.filter(initializedParts(o.value).contains(_:))
 
-    if !initialized.isEmpty {
-      let success = deinitialize(initialized, at: place, before: i, in: &f)
-      if !success { context.setError() }
-      return success
+    if deinitialize(initialized, at: place, before: f.blocks[b].last!, in: &f) {
+      return !initialized.isEmpty
     } else {
+      context.setError()
       return false
     }
   }
 
-  /// Ensures that place `v`, which is in `f`, is fully deinitialized, inserting deinitialization
-  /// before `i` if necessary.
+  /// Ensures that place `v`, which is in `f`, is fully deinitialized, updating the context and
+  /// inserting deinitialization before `i` if necessary.
   private mutating func ensureDeinitialized(
-    place v: IRValue, before i: AnyInstructionIdentity,
-    in f: inout IRFunction
+    place v: IRValue,
+    before i: AnyInstructionIdentity, in f: inout IRFunction
   ) {
     let a = context.locals[v]!.place!
     var o = context.withObject(at: a, computingLayoutWith: &typer, { (o, _) in o })
