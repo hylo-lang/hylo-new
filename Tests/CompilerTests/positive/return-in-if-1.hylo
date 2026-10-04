@@ -1,0 +1,24 @@
+//! exit-status:22
+
+fun f() -> Int32 {
+  if true {
+     return 1
+  } else {
+     return 0
+  }
+}
+
+fun g() -> Int32 {
+  let offset = 1 as Int32
+  if true {
+    let a = 20 as Int32
+    return a + offset
+  } else {
+    let b = 40 as Int32
+    return b + offset
+  }
+}
+
+public fun main() -> Int32 {
+  f() + g()
+}

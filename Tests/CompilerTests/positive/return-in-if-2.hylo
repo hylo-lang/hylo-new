@@ -1,0 +1,16 @@
+//! exit-status:2
+
+public struct Result is Deinitializable {
+  public var status: Int32
+  public memberwise init
+}
+
+fun compute() -> Result {
+  .new(status: 1 as Int32)
+}
+
+public fun main() -> Int32 {
+  let r = compute()
+  if r.status != (0 as Int32) { return 2 }
+  return 0
+}
