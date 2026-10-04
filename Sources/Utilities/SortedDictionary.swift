@@ -162,12 +162,26 @@ public struct SortedDictionary<Key: Comparable, Value> {
 
   /// Removes all key/value pairs satisfying `predicate`.
   public mutating func removeAll(where predicate: (Key, Value) -> Bool) {
-    let pairsToRemove = RangeSet(
-      keys.indices.filter({ (i) in predicate(keys[i], values[i]) }),
-      within: keys.indices)
+    var pairsToRemove = RangeSet<Int>()
+    var rangeStart: Int? = nil
+
+    for i in keys.indices {
+      if predicate(keys[i], values[i]) {
+        rangeStart ??= i
+      } else if let start = rangeStart {
+        // Append the range after the predicate no longer matches.
+        pairsToRemove.insert(contentsOf: start..<i)
+        rangeStart = nil
+      }
+    }
+    // Append the range if it didn't end by the end.
+    if let start = rangeStart {
+      pairsToRemove.insert(contentsOf: start..<keys.count)
+    }
+
     keys.removeSubranges(pairsToRemove)
     values.removeSubranges(pairsToRemove)
-   }
+  }
 
   /// Removes the last `k` key/value pairs.
   ///
