@@ -394,6 +394,7 @@ final class ManglingTests: XCTestCase {
       .existentialized(.lowered(greet)),
       .slide(.lowered(greet), 0),
       .plateau(.lowered(greet), 0),
+      .applied(.lowered(greet), 0)
     ]
 
     XCTAssertEqual(
@@ -403,6 +404,11 @@ final class ManglingTests: XCTestCase {
     for n in names {
       assertDemanglingIsOk(mangled: p.mangled(n), of: "IRFunction.Name.\(n.kind)")
     }
+  }
+
+  func testDemangling() {
+    let d = DemangledSymbol("$hmFM4M0vUqvirtual15k4fk1dd2zcrC9GreeterF07greetlT01tR516selfgcTK20tR5cDpTcTK21L3sTK1S7Robot00$gP71L1L1L")
+    XCTAssertNotEqual(d.description, "#!")
   }
 
   /// Tests the mangling and demangling of the names of IR globals.
@@ -816,7 +822,7 @@ extension IRFunction.Name {
   /// A case of `IRFunction.Name`.
   internal enum Kind: CaseIterable {
 
-    case lowered, initializer, synthesized, implementation, existentialized, slide, plateau
+    case lowered, initializer, synthesized, implementation, existentialized, slide, plateau, applied
 
   }
 
@@ -825,13 +831,14 @@ extension IRFunction.Name {
   /// Ensures exhaustive testing.
   internal var kind: Kind {
     switch self {
-    case .lowered: return .lowered
-    case .initializer: return .initializer
-    case .synthesized: return .synthesized
-    case .implementation: return .implementation
-    case .existentialized: return .existentialized
-    case .slide: return .slide
-    case .plateau: return .plateau
+    case .lowered: .lowered
+    case .initializer: .initializer
+    case .synthesized: .synthesized
+    case .implementation: .implementation
+    case .existentialized: .existentialized
+    case .slide: .slide
+    case .plateau: .plateau
+    case .applied: .applied
     }
   }
 
@@ -851,8 +858,8 @@ extension IRGlobal.Name {
   /// Ensures exhaustive testing.
   internal var kind: Kind {
     switch self {
-    case .lowered: return .lowered
-    case .witness: return .witness
+    case .lowered: .lowered
+    case .witness: .witness
     }
   }
 
