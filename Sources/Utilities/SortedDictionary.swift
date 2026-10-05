@@ -176,7 +176,7 @@ public struct SortedDictionary<Key: Comparable, Value> {
     }
     // Append the range if it didn't end by the end.
     if let start = rangeStart {
-      pairsToRemove.insert(contentsOf: start..<keys.count)
+      pairsToRemove.insert(contentsOf: start ..< keys.count)
     }
 
     keys.removeSubranges(pairsToRemove)
