@@ -22,9 +22,11 @@ internal struct ManglingContext {
   /// A table mapping known symbols to their reserved mangled identifier.
   private var reserved: [MangledSymbol: ReservedSymbol] = [:]
 
-  /// `true` iff the last symbol added to `output` was a declaration.
-  /// todo
-  private var pendingDeclarationEnds: UInt8 = 0
+  /// The number of declaration chains that ended with the last symbol added to `output`.
+  ///
+  /// A `declarationEnd` operator is written for each of these chains before the next symbol unless
+  /// that symbol can't be read as a continuation of a declaration chain.
+  private var declarationChainsToDisambiguate: UInt8 = 0
 
   /// Creates an instance for mangling symbols in `program`.
   internal init(_ program: Program) {
@@ -59,9 +61,11 @@ internal struct ManglingContext {
     x.write(to: &output)
   }
 
+  /// Writes a `declarationEnd` operator for each declaration chain that ended with the last symbol
+  /// added to `output`.
   @inline(__always)
   private mutating func ensureDeclarationEndDisambiguation() {
-    let e = exchange(&pendingDeclarationEnds, with: 0)
+    let e = exchange(&declarationChainsToDisambiguate, with: 0)
     for _ in 0..<e {
       add(operator: .declarationEnd)
     }
@@ -84,14 +88,17 @@ internal struct ManglingContext {
     }
   }
 
+  /// Prepares `output` for writing `v` encoded as a variable-length integer.
+  ///
+  /// Integers less than 10 are encoded with a decimal digit, which can't start an operator.
   private mutating func ensureIntegerDisambiguation<T: BinaryInteger>(for v: T) {
     if v >= 10 {
       ensureDeclarationEndDisambiguation()
     }
-    pendingDeclarationEnds = 0
+    declarationChainsToDisambiguate = 0
   }
 
-  /// Writes non-negative`v` encoded as a variable-length integer to `output`.
+  /// Writes non-negative `v` encoded as a variable-length integer to `output`.
   internal mutating func add(integer v: Int) {
     ensureIntegerDisambiguation(for: v)
     Base64VarUInt(UInt(bitPattern: v)).write(to: &output)
@@ -122,10 +129,10 @@ internal struct ManglingContext {
 
   /// Writes `o` to `output`.
   internal mutating func add(operator o: ManglingOperator) {
-    if pendingDeclarationEnds != 0 && o != .module && o != .reserved && o != .lookupRelative && o.isEntityOperator {
+    if declarationChainsToDisambiguate != 0 && !o.endsDeclarationChain {
       ensureDeclarationEndDisambiguation()
     }
-    pendingDeclarationEnds = 0
+    declarationChainsToDisambiguate = 0
     o.write(to: &output)
   }
 
@@ -143,7 +150,7 @@ internal struct ManglingContext {
 
   /// Marks the end of a declaration.
   internal mutating func endDeclaration() {
-    pendingDeclarationEnds += 1
+    declarationChainsToDisambiguate += 1
   }
 
   /// Records `s` in the symbol lookup table if it is not reserved or already recorded.
