@@ -12,6 +12,8 @@ extension Optional {
   }
 
   /// If `self` is `nil`, wraps and returns `newValue`; otherwise, returns the wrapped value.
+  ///
+  /// - See also: `??=`.
   public mutating func wrapIfEmpty(
     _ newValue: @autoclosure () throws -> Wrapped
   ) rethrows -> Wrapped {
