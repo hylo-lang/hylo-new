@@ -9,4 +9,5 @@ extension FixedWidthInteger where Self: UnsignedInteger {
   public var roundedUpToPowerOf2: UInt {
     self == 0 ? 1 : 1 << (self - 1).bitsInRepresentation
   }
+
 }
