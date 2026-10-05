@@ -24,7 +24,7 @@ internal struct ManglingContext {
 
   /// `true` iff the last symbol added to `output` was a declaration.
   /// todo
-  private var pendingDeclarationEnds: UInt8 = 0
+  private var declarationChainsToDisambiguate: UInt8 = 0
 
   /// Creates an instance for mangling symbols in `program`.
   internal init(_ program: Program) {
@@ -61,7 +61,7 @@ internal struct ManglingContext {
 
   @inline(__always)
   private mutating func ensureDeclarationEndDisambiguation() {
-    let e = exchange(&pendingDeclarationEnds, with: 0)
+    let e = exchange(&declarationChainsToDisambiguate, with: 0)
     for _ in 0..<e {
       add(operator: .declarationEnd)
     }
@@ -88,7 +88,7 @@ internal struct ManglingContext {
     if v >= 10 {
       ensureDeclarationEndDisambiguation()
     }
-    pendingDeclarationEnds = 0
+    declarationChainsToDisambiguate = 0
   }
 
   /// Writes non-negative`v` encoded as a variable-length integer to `output`.
@@ -122,10 +122,10 @@ internal struct ManglingContext {
 
   /// Writes `o` to `output`.
   internal mutating func add(operator o: ManglingOperator) {
-    if pendingDeclarationEnds != 0 && o != .module && o != .reserved && o != .lookupRelative && o.isEntityOperator {
+    if declarationChainsToDisambiguate != 0 && !o.endsDeclarationChain {
       ensureDeclarationEndDisambiguation()
     }
-    pendingDeclarationEnds = 0
+    declarationChainsToDisambiguate = 0
     o.write(to: &output)
   }
 
@@ -143,7 +143,7 @@ internal struct ManglingContext {
 
   /// Marks the end of a declaration.
   internal mutating func endDeclaration() {
-    pendingDeclarationEnds += 1
+    declarationChainsToDisambiguate += 1
   }
 
   /// Records `s` in the symbol lookup table if it is not reserved or already recorded.

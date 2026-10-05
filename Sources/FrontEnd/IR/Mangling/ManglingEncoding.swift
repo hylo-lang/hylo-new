@@ -114,6 +114,75 @@ internal struct ManglingEncoding: Sendable {
     output.endDeclaration()
   }
 
+  private static func takeDeclarationChainPart(_ o: ManglingOperator, from source: inout DemanglingContext) -> DemangledEntity {
+    switch o {
+    case .lookup:
+      entityOrError(source.takeLookupReference())
+    case .lookupRelative:
+      .relative
+    case .reserved:
+      entityOrError(source.takeReserved())
+    case .associatedTypeDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .enumCaseDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .enumDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .bindingDeclaration:
+      takeBindingDeclaration(from: &source)
+    case .conformanceDeclaration:
+      takeConformanceDeclaration(from: &source)
+    case .extensionDeclaration:
+      takeExtensionDeclaration(from: &source)
+    case .functionDeclaration:
+      takeFunctionDeclaration(static: false, from: &source)
+    case .staticFunctionDeclaration:
+      takeFunctionDeclaration(static: true, from: &source)
+    case .functionBundleDeclaration:
+      takeFunctionBundleDeclaration(from: &source)
+    case .initializerDeclaration:
+      takeInitializerDeclaration(from: &source)
+    case .synthesizedFunctionDeclaration:
+      takeSynthesizedFunctionDeclaration(from: &source)
+    case .implementationDeclaration:
+      takeImplementationDeclaration(from: &source)
+    case .existentializedDeclaration:
+      takeExistentializedDeclaration(from: &source)
+    case .appliedDeclaration:
+      takeTaggedEntity(from: &source, { (e, i) in .applied(e, i) })
+    case .slideDeclaration:
+      takeTaggedEntity(from: &source, { (e, i) in .slide(e, i) })
+    case .plateauDeclaration:
+      takeTaggedEntity(from: &source, { (e, i) in .plateau(e, i) })
+    case .genericParameterDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .importDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .parameterDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .structDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .typeAliasDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .traitDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .variableDeclaration:
+      takeUnqualifiedEntity(from: &source)
+    case .variantDeclaration:
+      takeVariantDeclaration(from: &source)
+    case .anonymousScope:
+      takeAnonymousScope(from: &source)
+    case .module:
+      takeModule(from: &source)
+    case .sourceFile:
+      takeSourceFile(from: &source)
+    case .virtualSourceFile:
+      takeVirtualSourceFile(from: &source)
+    default:
+      .error
+    }
+  }
+
   /// Demangles a (possibly qualified) entity from `source`.
   private static func takeEntity(
     from source: inout DemanglingContext
@@ -121,75 +190,8 @@ internal struct ManglingEncoding: Sendable {
     var qualifiedEntity: DemangledEntity? = nil
 
     while let o = source.takeOperator() {
-      let demangled: DemangledEntity
-
-      switch o {
-      case .lookup:
-        demangled = entityOrError(source.takeLookupReference())
-      case .lookupRelative:
-        demangled = .relative
-      case .reserved:
-        demangled = entityOrError(source.takeReserved())
-      case .associatedTypeDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .enumCaseDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .enumDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .bindingDeclaration:
-        demangled = takeBindingDeclaration(from: &source)
-      case .conformanceDeclaration:
-        demangled = takeConformanceDeclaration(from: &source)
-      case .extensionDeclaration:
-        demangled = takeExtensionDeclaration(from: &source)
-      case .functionDeclaration:
-        demangled = takeFunctionDeclaration(static: false, from: &source)
-      case .staticFunctionDeclaration:
-        demangled = takeFunctionDeclaration(static: true, from: &source)
-      case .functionBundleDeclaration:
-        demangled = takeFunctionBundleDeclaration(from: &source)
-      case .initializerDeclaration:
-        demangled = takeInitializerDeclaration(from: &source)
-      case .synthesizedFunctionDeclaration:
-        demangled = takeSynthesizedFunctionDeclaration(from: &source)
-      case .implementationDeclaration:
-        demangled = takeImplementationDeclaration(from: &source)
-      case .existentializedDeclaration:
-        demangled = takeExistentializedDeclaration(from: &source)
-      case .appliedDeclaration:
-        demangled = takeTaggedEntity(from: &source, { (e, i) in .applied(e, i) })
-      case .slideDeclaration:
-        demangled = takeTaggedEntity(from: &source, { (e, i) in .slide(e, i) })
-      case .plateauDeclaration:
-        demangled = takeTaggedEntity(from: &source, { (e, i) in .plateau(e, i) })
-      case .genericParameterDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .importDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .parameterDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .structDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .typeAliasDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .traitDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .variableDeclaration:
-        demangled = takeUnqualifiedEntity(from: &source)
-      case .variantDeclaration:
-        demangled = takeVariantDeclaration(from: &source)
-      case .anonymousScope:
-        demangled = takeAnonymousScope(from: &source)
-      case .module:
-        demangled = takeModule(from: &source)
-      case .sourceFile:
-        demangled = takeSourceFile(from: &source)
-      case .virtualSourceFile:
-        demangled = takeVirtualSourceFile(from: &source)
-      default:
-        demangled = .error
-        break
-      }
+      let demangled = takeDeclarationChainPart(o, from: &source)
+      if demangled == .error { return .error }
 
       qualifiedEntity = 
         if let q = qualifiedEntity {
@@ -203,14 +205,15 @@ internal struct ManglingEncoding: Sendable {
         source.record(symbol: .entity(qualifiedEntity!))
       }
 
-      // Stop if we cannot continue, or if we need to continue with something that cannot be a
-      // scope or a declaration. Also consider the case that we start another declaration.
-      guard demangled != .error, let n = source.peekOperator() else { break }
+      // Stop if we can't continue, or if the next operator is surely not part of the current entity.
+      guard let n = source.peekOperator() else {
+        break
+      }
+
       if n == .declarationEnd {
         _ = source.takeOperator()
         break
-      }
-      if n == .reserved || n == .module || n == .lookupRelative || !n.isEntityOperator {
+      } else if n.endsDeclarationChain {
         break
       }
     }
@@ -539,29 +542,39 @@ internal struct ManglingEncoding: Sendable {
   ) {
     switch s {
     case .lowered(let d):
-      // Note: no symbol needed; we assume it's a lowered function.
+      // Note: no wrapping operator needed; demangling assumes that an entity without a wrapping
+      // operator is .lowered.
       append(decl: d, to: &output)
     case .initializer(let d):
       output.add(operator: .initializerDeclaration)
       append(unqualified: d, to: &output)
+      // `d` is demangled by a chain of its own, nested in the one containing the initializer.
+      output.endDeclaration()
+      output.endDeclaration()
     case .synthesized(let d, let a):
       output.add(operator: .synthesizedFunctionDeclaration)
       append(decl: d, to: &output)
       append(typeArguments: a, to: &output)
+      output.endDeclaration()
     case .implementation(let d, let c, let a):
       output.add(operator: .implementationDeclaration)
       append(decl: d, to: &output)
       append(conformance: c, to: &output)
       append(typeArguments: a, to: &output)
+      output.endDeclaration()
     case .existentialized(let s):
       output.add(operator: .existentializedDeclaration)
       append(function: s, to: &output)
+      output.endDeclaration()
     case .applied(let s, let n):
       append(.appliedDeclaration, tagging: s, with: n, to: &output)
+      output.endDeclaration()
     case .slide(let s, let n):
       append(.slideDeclaration, tagging: s, with: n, to: &output)
+      output.endDeclaration()
     case .plateau(let s, let n):
       append(.plateauDeclaration, tagging: s, with: n, to: &output)
+      output.endDeclaration()
     }
   }
 
@@ -1303,4 +1316,14 @@ extension ScopeIdentity {
   internal var asSymbol: MangledSymbol {
     isFile ? .fileScope(self) : .node(node!)
   }
+}
+
+extension ManglingOperator {
+
+  /// If `true`, just by looking at the operator, we can tell that the chain ends before `self`.
+  internal var endsDeclarationChain: Bool {
+    self == .reserved || self == .module || self == .lookupRelative || self == .declarationEnd ||
+      !self.isEntityOperator
+  }
+
 }
