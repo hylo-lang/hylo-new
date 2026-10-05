@@ -170,7 +170,7 @@ public struct SortedDictionary<Key: Comparable, Value> {
         rangeStart ??= i
       } else if let start = rangeStart {
         // Append the range after the predicate no longer matches.
-        pairsToRemove.insert(contentsOf: start..<i)
+        pairsToRemove.insert(contentsOf: start ..< i)
         rangeStart = nil
       }
     }
