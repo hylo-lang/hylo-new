@@ -13,17 +13,16 @@ env:
   ACTIONS_RUNNER_DISABLE_NODE_MAGLEV: 1
 
 jobs:
-  line-length:
-    name: "Line length"
+  prek:
+    name: "prek"
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check max line length of 100 characters
-        # Lines ending with "[allow long]" are exempt.
-        run: >
-          ! grep -rnE --include=*.swift --exclude-dir=cmake.* --exclude-dir=.build '.{101,}' .
-          | grep -vE '\[allow long\]$'
+      - name: Run pre-commit hook
+        - uses: j178/prek-action@5337cb91e0fa35a7ff31b9ca345126d8bbbcdf16
+          with:
+            prek-version: '0.5.0'
 
   test:
     strategy:
