@@ -1,0 +1,197 @@
+/// A typed pointer whose contents can be read and written.
+public struct PointerToMutable<Pointee> is Deinitializable {
+
+  /// The raw bits of the address.
+  module var base: Builtin.ptr
+
+  /// Creates an instance from its raw value.
+  memberwise init
+
+  /// The value at the address represented by `self`.
+  ///
+  /// - Requires: the address stores an object of type Pointee.
+  @inline(always)
+  public subscript unsafe() auto -> Pointee {
+    /// - Requires: nothing mutates the value's storage during this projection's lifetime.
+    let { yield (self.base as* (let Pointee)) }
+
+    /// - Requires: the value is mutable, and nothing accesses its
+    ///   storage except through this projection during its lifetime.
+    inout { yield &(self.base as* (inout Pointee)) }
+
+    // TODO: https://github.com/hylo-lang/hylo-new/issues/447
+    //       https://github.com/orgs/hylo-lang/discussions/1825#discussioncomment-17956070
+    // set where Pointee is Deinitializable {
+    //   inout s = &self.unsafe[]
+    //   &s.deinit()
+    //   yield &s
+    // }
+  }
+
+  // /// Creates an instance with the same memory representation as `address`.
+  // ///  TODO design int to pointer semantics. https://github.com/hylo-lang/hylo-new/issues/438
+  // public init(bit_pattern address: UInt) { 
+  //   &self.base = Builtin.inttoptr_word(address.value)
+  // }
+
+  /// Creates an instance with mutable access to the memory pointed to by `p`.
+  ///
+  /// - Warning: while this initializer is not in itself unsafe, it should be used with caution.
+  @inline(always)
+  public init(adding_mutation_to p: Pointer<Pointee>) {
+    &self.base = p.base
+  }
+
+  /// Creates an instance referring to the same address as `p`.
+  ///
+  /// Note that dereferencing type-punned pointers will cause problems unless the rules for
+  /// `unsafe[]` (which see) are followed.
+  @inline(always)
+  public init<Other>(type_punning p: PointerToMutable<Other>) {
+    &self.base = p.base
+  }
+
+  // /// Projects a copy of `self` as a raw memory address.
+  // /// TODO design raw memory address representation.
+  // @inline(always)
+  // public subscript raw() -> Pointer<Never> {
+  //   yield Pointer<Never>(base: self.base)
+  // }
+
+  // /// Creates an instance with the same memory representation as `address`.
+  // ///  TODO design int to pointer semantics. https://github.com/hylo-lang/hylo-new/issues/438
+  // @inline(always)
+  // public init(bit_pattern address: Int) {
+  //   &self.base = Builtin.inttoptr_word(address.value)
+  // }
+
+  // /// Returns `self` offset forward by `n` array elements of `Pointee` type.
+  // @inline(always)
+  // public fun advance(by n: Int) -> Self {
+  //   // TODO implement MemoryLayout<T> or equivalent.
+  //   // let offset_in_bytes = Pointee.layout.stride() * n
+  //   // return PointerToMutable<Pointee>.new(
+  //   //   self.base: Builtin.advanced_by_bytes_word(self.base, offset_in_bytes.value))
+  // }
+
+  /// Creates an instance that does not address any usable storage.
+  @inline(always)
+  public static fun null() -> Self {
+    .new(base: Builtin.zeroinitializer_ptr())
+  }
+
+  // /// Returns the result of applying `initialize` to the uninitialized `Pointee` storage.
+  // ///
+  // /// - Requires: the `MemoryLayout<Pointee>.size()` bytes starting at the address are uninitialized
+  // ///   and suitably aligned for `Pointee`.
+  // /// TODO enable after fixing https://github.com/hylo-lang/hylo-new/issues/384
+  // @inline(always)
+  // public fun unsafe_initialize_pointee<E, R>(_ initialize: inout [E](set Pointee) inout -> R) -> R {
+  //   initialize(&(self.base as* (set Pointee)))
+  // }
+
+  // /// Initializes the memory referenced by `count` consecutive bytewise copies of `value`.
+  // @inline(always)
+  // public fun unsafe_initialize(copying_bytes_from source: Pointer<Pointee>, count: Int) {
+  //   var i = 0
+  //   var s = Pointer<Int8>(type_punning: source)
+  //   var d = PointerToMutable<Int8>(type_punning: self)
+
+  //   let byte_count = MemoryLayout<Pointee>.stride() * count
+  //   while i < byte_count {
+  //     d.unsafe_initialize_pointee(s.unsafe[].copy())
+  //     &s = s.advance(by: 1)
+  //     &d = d.advance(by: 1)
+  //     &i += 1
+  //   }
+  // }
+
+
+  // MARK: Copyable conformance.
+
+  /// Returns an equivalent instance.
+  ///
+  /// Because we don't have a `nonmutating` keyword yet, writing to the pointee of a `let`-bound
+  /// `PointerToMutable` is only possible by copying, e.g.  `&p.copy().unsafe[] = x`.
+  @inline(always)
+  public fun copy() -> Self {
+    PointerToMutable(base: self.base)
+  }
+
+  // MARK: Conformance to Equatable.
+
+  /// Returns `true` iff `other` has an equivalent value.
+  @inline(always)
+  public fun infix== (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_eq_ptr(self.base, other.base))
+  }
+
+  /// Returns `false` iff `other` has an equivalent value.
+  @inline(always)
+  public fun infix!= (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_ne_ptr(self.base, other.base))
+  }
+
+}
+
+public given <T> => PointerToMutable<T> is Movable {}
+
+public given <T> => PointerToMutable<T> is Copyable {}
+
+public given <T> => PointerToMutable<T> is Equatable {}
+
+extension <Pointee is Movable> PointerToMutable<Pointee> {
+
+  /// Returns the value at the address represented by `self`, leaving the storage at this address
+  /// uninitialized.
+  ///
+  /// Note: This method should be deprecated once nonmutating subscripts are implemented.
+  @inline(always)
+  public fun unsafe_pointee() -> Pointee {
+    self.base as* (sink Pointee)
+  }
+
+}
+
+extension <Pointee is Movable> PointerToMutable<Pointee> {
+
+  /// Initializes the value at the address represented by `self` to `value`.
+  ///
+  /// - Requires: the `MemoryLayout<Pointee>.size()` bytes starting at the address are uninitialized
+  ///   and suitably aligned for `Pointee`.
+  @inline(always)
+  public fun unsafe_initialize_pointee(value: sink Pointee) {
+    &(self.base as* (set Pointee)) = value
+  }
+
+}
+
+extension <Pointee is Deinitializable> PointerToMutable<Pointee> {
+
+  /// Deinitializes the value at the address represented by `self`.
+  @inline(always)
+  public fun unsafe_deinitialize_pointee() {
+    (self.base as* (sink Pointee)).deinit()
+  }
+
+}
+
+// extension <Pointee is Copyable> PointerToMutable<Pointee>  {
+
+//   /// Initializes the memory referenced by `self` with `count` consecutive copies of `value`.
+//   @inline(always)
+//   public fun unsafe_initialize(repeating value: Pointee, count: Int) {
+//     var i = 0
+//     while i < count {
+//       self.advance(by: i).unsafe_initialize_pointee(value.copy())
+//       &i += 1
+//     }
+//   }
+
+// }
+
+/// Yields a pointer to the mutable `x`.
+@inline(always)
+public subscript pointer<T>(to_mutable x: inout T) -> PointerToMutable<T> {
+  yield PointerToMutable(base: Builtin.address(of: x))
+}
