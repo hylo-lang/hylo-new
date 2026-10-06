@@ -9,6 +9,8 @@ extension Optional {
   }
 
   /// If `self` is `nil`, wraps and returns `newValue`; otherwise, returns the wrapped value.
+  ///
+  /// - See also: `orAssign`.
   public mutating func wrapIfEmpty(
     _ newValue: @autoclosure () throws -> Wrapped
   ) rethrows -> Wrapped {
@@ -29,6 +31,14 @@ extension Optional {
   /// Returns `true` iff `self` wraps a value satisfying `predicate`.
   public func satisfies(_ predicate: (Wrapped) throws -> Bool) rethrows -> Bool {
     try self.map(predicate) ?? false
+  }
+
+  /// Assigns `newValue()` to `optional` iff `optional` is `nil`.
+  ///
+  /// `newValue` is not evaluated if `optional` already wraps a value.
+  public mutating func orAssign (_ newValue: @autoclosure () throws -> Wrapped?
+  ) rethrows {
+    if self == nil { self = try newValue() }
   }
 
   /// Returns the value wrapped in `optional` or throws `error` if `optional` is `nil`.
