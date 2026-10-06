@@ -1,8 +1,5 @@
 // infix operator >>= : BitwiseShiftPrecedence
 
-/// Assigns the right operand to the left operand iff the latter is `nil`.
-infix operator ??= : AssignmentPrecedence
-
 extension Optional {
 
   /// Returns the value wrapped in `self`, which is not `nil`, and assigns `self` to `nil`.
@@ -13,7 +10,7 @@ extension Optional {
 
   /// If `self` is `nil`, wraps and returns `newValue`; otherwise, returns the wrapped value.
   ///
-  /// - See also: `??=`.
+  /// - See also: `orAssign`.
   public mutating func wrapIfEmpty(
     _ newValue: @autoclosure () throws -> Wrapped
   ) rethrows -> Wrapped {
@@ -39,10 +36,9 @@ extension Optional {
   /// Assigns `newValue()` to `optional` iff `optional` is `nil`.
   ///
   /// `newValue` is not evaluated if `optional` already wraps a value.
-  public static func ??= (
-    optional: inout Self, newValue: @autoclosure () throws -> Wrapped
+  public mutating func orAssign (_ newValue: @autoclosure () throws -> Wrapped?
   ) rethrows {
-    if optional == nil { optional = try newValue() }
+    if self == nil { self = try newValue() }
   }
 
   /// Returns the value wrapped in `optional` or throws `error` if `optional` is `nil`.

@@ -90,7 +90,7 @@ public struct DirectedGraph<Vertex: Hashable & Sendable, Label: Sendable>: Senda
   public mutating func insertEdge(
     from source: Vertex, to target: Vertex, labeledBy label: Label
   ) -> (inserted: Bool, labelAfterInsert: Label) {
-    out[target] ??= [:]
+    out[target].orAssign([:])
     return modify(&out[source, default: [:]]) { (tips) in
       if let currentLabel = tips[target] {
         return (false, currentLabel)

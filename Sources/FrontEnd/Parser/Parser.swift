@@ -2593,7 +2593,7 @@ public struct Parser {
 
   /// Returns the next token without consuming it.
   private mutating func peek() -> Token? {
-    lookahead ??= tokens.next()
+    lookahead.orAssign(tokens.next())
     return lookahead
   }
 

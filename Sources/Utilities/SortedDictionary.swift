@@ -167,7 +167,7 @@ public struct SortedDictionary<Key: Comparable, Value> {
 
     for i in keys.indices {
       if predicate(keys[i], values[i]) {
-        rangeStart ??= i
+        rangeStart.orAssign(i)
       } else if let start = rangeStart {
         // Append the range after the predicate no longer matches.
         pairsToRemove.insert(contentsOf: start ..< i)

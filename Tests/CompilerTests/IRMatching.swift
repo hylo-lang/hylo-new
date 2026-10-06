@@ -34,7 +34,7 @@ enum IRMatching {
     // a lookup.
     var byFirstLine: [Substring: Substring] = [:]
     for s in observed {
-      byFirstLine[s.firstLine] ??= s
+      byFirstLine[s.firstLine].orAssign(s)
     }
 
     return sections(of: expected.normalizedLineEndings()).map { (e) in
