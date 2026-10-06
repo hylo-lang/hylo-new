@@ -1,0 +1,35 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#:schema https://www.schemastore.org/prek.json
+minimum_prek_version = "0.5.0"
+
+[[repos]]
+repo = "builtin"
+hooks = [
+  { id = "trailing-whitespace" },
+  { id = "end-of-file-fixer" },
+  { id = "mixed-line-ending" },
+  { id = "check-case-conflict" },
+  { id = "check-illegal-windows-names" },
+]
+
+[[repos]]
+repo = "https://github.com/crate-ci/typos"
+rev = "v1.50.3"
+hooks = [
+  { id = "typos"},
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "line-length",
+    name = "line length",
+    language = "system",
+    # Lines ending with "[allow long]" are exempt.
+    entry = "! grep -nHE $'[^\r]{101,}' \"$@\" | grep -vE $'\\[allow long\\]\r?$'",
+    types = ["swift"],
+    shell = "bash",
+  },
+]
