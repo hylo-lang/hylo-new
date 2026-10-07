@@ -1,0 +1,14 @@
+//! no-std
+
+trait P { fun f() }
+
+struct A {}
+
+// Two conformances of A to P.
+given a1: A is P { fun f() {} }
+
+fun use<T is P>(_ x: T) { x.f() }
+
+fun main() {
+  use(A())
+}

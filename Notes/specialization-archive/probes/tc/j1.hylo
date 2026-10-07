@@ -1,0 +1,11 @@
+//! stage:typing no-std
+trait Bidi {}
+trait RA refines Bidi {}
+struct Arr { public memberwise init }
+given Arr is Bidi {}
+given Arr is RA {}
+struct Linear { public memberwise init }
+struct Binary { public memberwise init }
+fun lower_bound<T is Bidi>(x: T) -> Linear { Linear() }
+fun lower_bound<T is RA>(x: T) -> Binary { Binary() }
+fun check() -> Binary { lower_bound(Arr()) }

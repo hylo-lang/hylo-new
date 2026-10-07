@@ -1,0 +1,37 @@
+trait Fwd {
+}
+trait Bidi {
+  given Bidi.Self is Fwd
+}
+trait RA {
+  given RA.Self is Bidi
+}
+struct Arr {
+}
+given Arr is Fwd {
+}
+given Arr is Bidi {
+}
+given Arr is RA {
+}
+struct ViaFwd {
+}
+struct ViaBidi {
+}
+struct ViaRA {
+}
+trait LowerBound {
+  type Selected
+}
+given <T where let $y: Fwd<T>> T is LowerBound {
+  type Selected = ViaFwd
+}
+given <T where let $1b: Bidi<T>> T is LowerBound {
+  type Selected = ViaBidi
+}
+given <T where let $1o: RA<T>> T is LowerBound {
+  type Selected = ViaRA
+}
+fun check[](_ x: let Arr.Selected) let -> ViaRA {
+  return x
+}

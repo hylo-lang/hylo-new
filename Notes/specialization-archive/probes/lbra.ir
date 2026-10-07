@@ -1,0 +1,1573 @@
+global $<ConformanceDeclaration at lb_ra_only:17.1>.$12 as RA<T>, #preferred
+
+global #witness(Evens) as Type, #preferred
+
+fun Fwd.count<Self>(let %p0: Fwd<Self>, let %p1: Self, set %p2: Int32)
+
+fun Fwd.at(_:)<Self>(let %p0: Fwd<Self>, let %p1: Self, let %p2: Int32, set %p3: Int32)
+
+fun Bidi.$<ConformanceDeclaration at lb_ra_only:8.20><Self>(let %p0: Bidi<Self>) let <: Fwd<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at lb_ra_only:8.20>" of %p0 as Fwd<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r4 = end %r1
+  %r3 = return
+}
+
+fun RA.$<ConformanceDeclaration at lb_ra_only:9.18><Self>(let %p0: RA<Self>) let <: Bidi<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at lb_ra_only:9.18>" of %p0 as Bidi<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r4 = end %r1
+  %r3 = return
+}
+
+fun LowerBound.lower_bound(_:)<Self>(let %p0: LowerBound<Self>, let %p1: Self, let %p2: Int32, set %p3: Int32)
+
+fun $<ConformanceDeclaration at lb_ra_only:17.1>.lower_bound(_:)<T>(let %p0: T, let %p1: Int32, set %p2: Int32) {
+%b0:
+  %r0 = alloca Int32, #preferred
+  %r1 = subfield %r0 at 0 as i32
+  %r2 = access [set] %r1
+  %r3 = store i32 0 to %r2
+  %r4 = end %r2
+  %r5 = alloca Int32, #preferred
+  %r6 = global_access $<ConformanceDeclaration at lb_ra_only:17.1>.$12
+  %r7 = type_apply RA.$<ConformanceDeclaration at lb_ra_only:9.18><T>
+  %r8 = access [let] %r6
+  %r9 = project %r7[%r8]
+  %r10 = type_apply Bidi.$<ConformanceDeclaration at lb_ra_only:8.20><T>
+  %r11 = access [let] %r9
+  %r12 = project %r10[%r11]
+  %r13 = property "count" of %r12 as [Void](let Fwd<Self>, self: let Self) let -> Int32
+  %r14 = access [let] %r12
+  %r15 = access [let] %p0
+  %r16 = access [set] %r5
+  %r17 = apply %r13(%r14, %r15) => %r16
+  %r97 = end %r16
+  %r96 = end %r15
+  %r95 = end %r14
+  %r94 = end %r12
+  %r93 = end %r11
+  %r92 = end %r9
+  %r91 = end %r8
+  %r18 = br %b1
+%b1:
+  %r19 = alloca Bool, #preferred
+  %r20 = access [let] %r0
+  %r21 = access [let] %r5
+  %r22 = access [set] %r19
+  %r88 = subfield %r22 at 0 as i1
+  %r144 = property "value" of %r20 as i32
+  %r145 = access [let] %r144
+  %r146 = property "value" of %r21 as i32
+  %r147 = access [let] %r146
+  %r148 = apply_builtin icmp_slt_i32(%r145, %r147)
+  %r149 = end %r147
+  %r150 = end %r145
+  %r151 = access [set] %r88
+  %r152 = store %r148 to %r151
+  %r153 = end %r151
+  %r154 = br %b5
+%b2:
+  %r134 = access [sink] %r0
+  %r135 = access [set] %p2
+  %r136 = memcpy %r134 to %r135
+  %r137 = end %r135
+  %r138 = end %r134
+  %r89 = access [sink] %r5
+  %r139 = assume_state %r89 uninitialized
+  %r140 = end %r89
+  %r141 = access [sink] %r19
+  %r142 = assume_state %r141 uninitialized
+  %r143 = end %r141
+  %r90 = return
+%b3:
+  %r29 = alloca Int32, #preferred
+  %r30 = alloca Int32, #preferred
+  %r31 = alloca Int32, #preferred
+  %r32 = access [let] %r5
+  %r33 = access [let] %r0
+  %r34 = access [set] %r31
+  %r44 = alloca {i32, i1}, #preferred
+  %r425 = property "value" of %r32 as i32
+  %r426 = access [let] %r425
+  %r427 = property "value" of %r33 as i32
+  %r428 = access [let] %r427
+  %r429 = apply_builtin ssub_with_overflow_i32(%r426, %r428)
+  %r430 = end %r428
+  %r431 = end %r426
+  %r432 = access [set] %r44
+  %r433 = store %r429 to %r432
+  %r434 = end %r432
+  %r435 = access [let] %r44
+  %r436 = subfield %r435 at 0 as i32
+  %r437 = subfield %r435 at 1 as i1
+  %r438 = alloca Bool, #preferred
+  %r439 = subfield %r438 at 0 as i1
+  %r440 = access [set] %r439
+  %r441 = access [sink] %r437
+  %r442 = load %r441
+  %r443 = store %r442 to %r440
+  %r444 = access [sink] %r441
+  %r445 = assume_state %r444 uninitialized
+  %r446 = end %r444
+  %r447 = end %r441
+  %r448 = end %r440
+  %r449 = subfield %r438 at 0 as i1
+  %r450 = access [let] %r449
+  %r451 = load %r450
+  %r452 = end %r450
+  %r453 = condbr %r451, %b27, %b28
+%b4:
+  %r84 = access [let] %r49
+  %r131 = access [sink] %r5
+  %r132 = assume_state %r131 uninitialized
+  %r133 = end %r131
+  %r85 = access [set] %r5
+  %r35 = alloca Int32, #preferred
+  %r480 = access [set] %r35
+  %r481 = alloca Void, #preferred
+  %r482 = access [set] %r480
+  %r483 = access [set] %r481
+  %r484 = alloca i32, #preferred
+  %r485 = apply_builtin zeroinitializer_i32()
+  %r486 = access [set] %r484
+  %r487 = store %r485 to %r486
+  %r488 = end %r486
+  %r489 = property "value" of %r482 as i32
+  %r490 = access [set] %r489
+  %r491 = access [sink] %r484
+  %r492 = load %r491
+  %r493 = store %r492 to %r490
+  %r494 = access [sink] %r491
+  %r495 = assume_state %r494 uninitialized
+  %r496 = end %r494
+  %r497 = end %r491
+  %r498 = end %r490
+  %r499 = access [set] %r483
+  %r500 = assume_state %r499 initialized
+  %r501 = end %r499
+  %r502 = access [sink] %r484
+  %r503 = assume_state %r502 uninitialized
+  %r504 = end %r502
+  %r505 = br %b30
+%b6:
+  %r74 = alloca Int32, #preferred
+  %r75 = subfield %r74 at 0 as i32
+  %r76 = access [set] %r75
+  %r77 = store i32 1 to %r76
+  %r78 = end %r76
+  %r79 = access [let] %r49
+  %r80 = access [let] %r74
+  %r128 = access [sink] %r0
+  %r129 = assume_state %r128 uninitialized
+  %r130 = end %r128
+  %r81 = access [set] %r0
+  %r86 = alloca {i32, i1}, #preferred
+  %r579 = property "value" of %r79 as i32
+  %r580 = access [let] %r579
+  %r581 = property "value" of %r80 as i32
+  %r582 = access [let] %r581
+  %r583 = apply_builtin sadd_with_overflow_i32(%r580, %r582)
+  %r584 = end %r582
+  %r585 = end %r580
+  %r586 = access [set] %r86
+  %r587 = store %r583 to %r586
+  %r588 = end %r586
+  %r589 = access [let] %r86
+  %r590 = subfield %r589 at 0 as i32
+  %r591 = subfield %r589 at 1 as i1
+  %r592 = alloca Bool, #preferred
+  %r593 = subfield %r592 at 0 as i1
+  %r594 = access [set] %r593
+  %r595 = access [sink] %r591
+  %r596 = load %r595
+  %r597 = store %r596 to %r594
+  %r598 = access [sink] %r595
+  %r599 = assume_state %r598 uninitialized
+  %r600 = end %r598
+  %r601 = end %r595
+  %r602 = end %r594
+  %r603 = subfield %r592 at 0 as i1
+  %r604 = access [let] %r603
+  %r605 = load %r604
+  %r606 = end %r604
+  %r607 = condbr %r605, %b36, %b37
+%b5:
+  %r100 = end %r22
+  %r99 = end %r21
+  %r98 = end %r20
+  %r24 = subfield %r19 at 0 as i1
+  %r25 = access [let] %r24
+  %r26 = load %r25
+  %r27 = end %r25
+  %r28 = condbr %r26, %b3, %b2
+%b7:
+  %r122 = end %r67
+  %r121 = end %r66
+  %r120 = end %r65
+  %r69 = subfield %r50 at 0 as i1
+  %r70 = access [let] %r69
+  %r71 = load %r70
+  %r72 = end %r70
+  %r73 = condbr %r71, %b6, %b4
+%b8:
+  %r109 = end %r47
+  %r108 = end %r46
+  %r107 = end %r45
+  %r49 = access [let] %r29
+  %r50 = alloca Bool, #preferred
+  %r51 = alloca Int32, #preferred
+  %r52 = global_access $<ConformanceDeclaration at lb_ra_only:17.1>.$12
+  %r53 = type_apply RA.$<ConformanceDeclaration at lb_ra_only:9.18><T>
+  %r54 = access [let] %r52
+  %r55 = project %r53[%r54]
+  %r56 = type_apply Bidi.$<ConformanceDeclaration at lb_ra_only:8.20><T>
+  %r57 = access [let] %r55
+  %r58 = project %r56[%r57]
+  %r59 = property "at(_:)" of %r58 as [Void](let Fwd<Self>, self: let Self, let Int32) let -> Int32
+  %r60 = access [let] %r58
+  %r61 = access [let] %p0
+  %r62 = access [let] %r49
+  %r63 = access [set] %r51
+  %r64 = apply %r59(%r60, %r61, %r62) => %r63
+  %r119 = end %r63
+  %r118 = end %r62
+  %r117 = end %r61
+  %r116 = end %r60
+  %r115 = end %r58
+  %r114 = end %r57
+  %r113 = end %r55
+  %r112 = end %r54
+  %r65 = access [let] %r51
+  %r66 = access [let] %p1
+  %r67 = access [set] %r50
+  %r23 = subfield %r67 at 0 as i1
+  %r155 = property "value" of %r65 as i32
+  %r156 = access [let] %r155
+  %r157 = property "value" of %r66 as i32
+  %r158 = access [let] %r157
+  %r159 = apply_builtin icmp_slt_i32(%r156, %r158)
+  %r160 = end %r158
+  %r161 = end %r156
+  %r162 = access [set] %r23
+  %r163 = store %r159 to %r162
+  %r164 = end %r162
+  %r165 = br %b7
+%b9:
+  %r218 = end %r176
+  %r219 = apply_builtin trap()
+  %r220 = unreachable
+%b10:
+  %r195 = subfield %r47 at 0 as i32
+  %r196 = access [set] %r195
+  %r197 = access [sink] %r177
+  %r198 = load %r197
+  %r199 = store %r198 to %r196
+  %r200 = access [sink] %r197
+  %r201 = assume_state %r200 uninitialized
+  %r202 = end %r200
+  %r203 = end %r197
+  %r204 = end %r196
+  %r205 = end %r176
+  %r206 = subfield %r68 at 0 as i32
+  %r207 = access [sink] %r206
+  %r208 = assume_state %r207 uninitialized
+  %r209 = end %r207
+  %r210 = subfield %r68 at 1 as i1
+  %r211 = access [sink] %r210
+  %r212 = assume_state %r211 uninitialized
+  %r213 = end %r211
+  %r214 = access [sink] %r179
+  %r215 = assume_state %r214 uninitialized
+  %r216 = end %r214
+  %r217 = br %b8
+%b11:
+  %r106 = end %r43
+  %r105 = end %r42
+  %r104 = end %r41
+  %r45 = access [let] %r0
+  %r46 = access [let] %r30
+  %r47 = access [set] %r29
+  %r68 = alloca {i32, i1}, #preferred
+  %r166 = property "value" of %r45 as i32
+  %r167 = access [let] %r166
+  %r168 = property "value" of %r46 as i32
+  %r169 = access [let] %r168
+  %r170 = apply_builtin sadd_with_overflow_i32(%r167, %r169)
+  %r171 = end %r169
+  %r172 = end %r167
+  %r173 = access [set] %r68
+  %r174 = store %r170 to %r173
+  %r175 = end %r173
+  %r176 = access [let] %r68
+  %r177 = subfield %r176 at 0 as i32
+  %r178 = subfield %r176 at 1 as i1
+  %r179 = alloca Bool, #preferred
+  %r180 = subfield %r179 at 0 as i1
+  %r181 = access [set] %r180
+  %r182 = access [sink] %r178
+  %r183 = load %r182
+  %r184 = store %r183 to %r181
+  %r185 = access [sink] %r182
+  %r186 = assume_state %r185 uninitialized
+  %r187 = end %r185
+  %r188 = end %r182
+  %r189 = end %r181
+  %r190 = subfield %r179 at 0 as i1
+  %r191 = access [let] %r190
+  %r192 = load %r191
+  %r193 = end %r191
+  %r194 = condbr %r192, %b9, %b10
+%b12:
+  %r242 = end %r229
+  %r243 = end %r228
+  %r244 = end %r227
+  %r245 = alloca Bool, #preferred
+  %r246 = alloca Bool, #preferred
+  %r247 = alloca Int32, #preferred
+  %r248 = subfield %r247 at 0 as i32
+  %r249 = access [set] %r248
+  %r250 = store i32 -2147483648 to %r249
+  %r251 = end %r249
+  %r252 = access [let] %r41
+  %r253 = access [let] %r247
+  %r254 = access [set] %r246
+  %r255 = subfield %r254 at 0 as i1
+  %r256 = property "value" of %r252 as i32
+  %r257 = access [let] %r256
+  %r258 = property "value" of %r253 as i32
+  %r259 = access [let] %r258
+  %r260 = apply_builtin icmp_eq_i32(%r257, %r259)
+  %r261 = end %r259
+  %r262 = end %r257
+  %r263 = access [set] %r255
+  %r264 = store %r260 to %r263
+  %r265 = end %r263
+  %r266 = br %b13
+%b13:
+  %r267 = end %r254
+  %r268 = end %r253
+  %r269 = end %r252
+  %r270 = alloca Bool, #preferred
+  %r271 = alloca Int32, #preferred
+  %r272 = subfield %r271 at 0 as i32
+  %r273 = access [set] %r272
+  %r274 = store i32 -1 to %r273
+  %r275 = end %r273
+  %r276 = access [let] %r42
+  %r277 = access [let] %r271
+  %r278 = access [set] %r270
+  %r279 = subfield %r278 at 0 as i1
+  %r280 = property "value" of %r276 as i32
+  %r281 = access [let] %r280
+  %r282 = property "value" of %r277 as i32
+  %r283 = access [let] %r282
+  %r284 = apply_builtin icmp_eq_i32(%r281, %r283)
+  %r285 = end %r283
+  %r286 = end %r281
+  %r287 = access [set] %r279
+  %r288 = store %r284 to %r287
+  %r289 = end %r287
+  %r290 = br %b14
+%b14:
+  %r291 = end %r278
+  %r292 = end %r277
+  %r293 = end %r276
+  %r294 = access [let] %r246
+  %r295 = access [let] %r270
+  %r296 = access [set] %r245
+  %r297 = subfield %r294 at 0 as i1
+  %r298 = access [let] %r297
+  %r299 = load %r298
+  %r300 = end %r298
+  %r301 = condbr %r299, %b15, %b24
+%b15:
+  %r413 = subfield %r296 at 0 as i1
+  %r414 = property "value" of %r295 as i1
+  %r415 = access [set] %r413
+  %r416 = access [sink] %r414
+  %r417 = load %r416
+  %r418 = store %r417 to %r415
+  %r419 = access [sink] %r416
+  %r420 = assume_state %r419 uninitialized
+  %r421 = end %r419
+  %r422 = end %r416
+  %r423 = end %r415
+  %r424 = br %b16
+%b16:
+  %r330 = br %b17
+%b17:
+  %r331 = end %r296
+  %r332 = end %r295
+  %r333 = end %r294
+  %r334 = access [let] %r221
+  %r335 = access [let] %r245
+  %r336 = access [set] %r48
+  %r337 = subfield %r334 at 0 as i1
+  %r338 = access [let] %r337
+  %r339 = load %r338
+  %r340 = end %r338
+  %r341 = condbr %r339, %b18, %b23
+%b18:
+  %r401 = subfield %r336 at 0 as i1
+  %r402 = property "value" of %r334 as i1
+  %r403 = access [set] %r401
+  %r404 = access [sink] %r402
+  %r405 = load %r404
+  %r406 = store %r405 to %r403
+  %r407 = access [sink] %r404
+  %r408 = assume_state %r407 uninitialized
+  %r409 = end %r407
+  %r410 = end %r404
+  %r411 = end %r403
+  %r412 = br %b19
+%b19:
+  %r354 = br %b20
+%b20:
+  %r355 = end %r336
+  %r356 = end %r335
+  %r357 = end %r334
+  %r358 = subfield %r48 at 0 as i1
+  %r359 = access [let] %r358
+  %r360 = load %r359
+  %r361 = end %r359
+  %r362 = condbr %r360, %b21, %b22
+%b21:
+  %r399 = apply_builtin trap()
+  %r400 = unreachable
+%b22:
+  %r363 = subfield %r43 at 0 as i32
+  %r364 = property "value" of %r41 as i32
+  %r365 = access [let] %r364
+  %r366 = property "value" of %r42 as i32
+  %r367 = access [let] %r366
+  %r368 = apply_builtin sdiv_i32(%r365, %r367)
+  %r369 = end %r367
+  %r370 = end %r365
+  %r371 = access [set] %r363
+  %r372 = store %r368 to %r371
+  %r373 = end %r371
+  %r374 = access [sink] %r48
+  %r375 = assume_state %r374 uninitialized
+  %r376 = end %r374
+  %r377 = access [sink] %r221
+  %r378 = assume_state %r377 uninitialized
+  %r379 = end %r377
+  %r380 = access [sink] %r222
+  %r381 = assume_state %r380 uninitialized
+  %r382 = end %r380
+  %r383 = access [sink] %r245
+  %r384 = assume_state %r383 uninitialized
+  %r385 = end %r383
+  %r386 = access [sink] %r246
+  %r387 = assume_state %r386 uninitialized
+  %r388 = end %r386
+  %r389 = access [sink] %r247
+  %r390 = assume_state %r389 uninitialized
+  %r391 = end %r389
+  %r392 = access [sink] %r270
+  %r393 = assume_state %r392 uninitialized
+  %r394 = end %r392
+  %r395 = access [sink] %r271
+  %r396 = assume_state %r395 uninitialized
+  %r397 = end %r395
+  %r398 = br %b11
+%b23:
+  %r342 = subfield %r336 at 0 as i1
+  %r343 = property "value" of %r335 as i1
+  %r344 = access [set] %r342
+  %r345 = access [sink] %r343
+  %r346 = load %r345
+  %r347 = store %r346 to %r344
+  %r348 = access [sink] %r345
+  %r349 = assume_state %r348 uninitialized
+  %r350 = end %r348
+  %r351 = end %r345
+  %r352 = end %r344
+  %r353 = br %b19
+%b24:
+  %r302 = alloca Void, #preferred
+  %r303 = access [set] %r296
+  %r304 = access [set] %r302
+  %r305 = alloca i1, #preferred
+  %r306 = apply_builtin zeroinitializer_i1()
+  %r307 = access [set] %r305
+  %r308 = store %r306 to %r307
+  %r309 = end %r307
+  %r310 = property "value" of %r303 as i1
+  %r311 = access [set] %r310
+  %r312 = access [sink] %r305
+  %r313 = load %r312
+  %r314 = store %r313 to %r311
+  %r315 = access [sink] %r312
+  %r316 = assume_state %r315 uninitialized
+  %r317 = end %r315
+  %r318 = end %r312
+  %r319 = end %r311
+  %r320 = access [set] %r304
+  %r321 = assume_state %r320 initialized
+  %r322 = end %r320
+  %r323 = access [sink] %r305
+  %r324 = assume_state %r323 uninitialized
+  %r325 = end %r323
+  %r326 = br %b25
+%b25:
+  %r327 = end %r304
+  %r328 = end %r303
+  %r329 = br %b16
+%b26:
+  %r103 = end %r34
+  %r102 = end %r33
+  %r101 = end %r32
+  %r36 = alloca Int32, #preferred
+  %r37 = subfield %r36 at 0 as i32
+  %r38 = access [set] %r37
+  %r39 = store i32 2 to %r38
+  %r40 = end %r38
+  %r41 = access [let] %r31
+  %r42 = access [let] %r36
+  %r43 = access [set] %r30
+  %r48 = alloca Bool, #preferred
+  %r221 = alloca Bool, #preferred
+  %r222 = alloca Int32, #preferred
+  %r223 = subfield %r222 at 0 as i32
+  %r224 = access [set] %r223
+  %r225 = store i32 0 to %r224
+  %r226 = end %r224
+  %r227 = access [let] %r42
+  %r228 = access [let] %r222
+  %r229 = access [set] %r221
+  %r230 = subfield %r229 at 0 as i1
+  %r231 = property "value" of %r227 as i32
+  %r232 = access [let] %r231
+  %r233 = property "value" of %r228 as i32
+  %r234 = access [let] %r233
+  %r235 = apply_builtin icmp_eq_i32(%r232, %r234)
+  %r236 = end %r234
+  %r237 = end %r232
+  %r238 = access [set] %r230
+  %r239 = store %r235 to %r238
+  %r240 = end %r238
+  %r241 = br %b12
+%b27:
+  %r477 = end %r435
+  %r478 = apply_builtin trap()
+  %r479 = unreachable
+%b28:
+  %r454 = subfield %r34 at 0 as i32
+  %r455 = access [set] %r454
+  %r456 = access [sink] %r436
+  %r457 = load %r456
+  %r458 = store %r457 to %r455
+  %r459 = access [sink] %r456
+  %r460 = assume_state %r459 uninitialized
+  %r461 = end %r459
+  %r462 = end %r456
+  %r463 = end %r455
+  %r464 = end %r435
+  %r465 = subfield %r44 at 0 as i32
+  %r466 = access [sink] %r465
+  %r467 = assume_state %r466 uninitialized
+  %r468 = end %r466
+  %r469 = subfield %r44 at 1 as i1
+  %r470 = access [sink] %r469
+  %r471 = assume_state %r470 uninitialized
+  %r472 = end %r470
+  %r473 = access [sink] %r438
+  %r474 = assume_state %r473 uninitialized
+  %r475 = end %r473
+  %r476 = br %b26
+%b29:
+  %r127 = end %r85
+  %r126 = end %r84
+  %r110 = end %r49
+  %r87 = br %b1
+%b30:
+  %r506 = end %r483
+  %r507 = end %r482
+  %r508 = access [sink] %r481
+  %r509 = assume_state %r508 uninitialized
+  %r510 = end %r508
+  %r511 = br %b31
+%b31:
+  %r512 = end %r480
+  %r513 = access [let] %r84
+  %r514 = access [let] %r35
+  %r515 = access [set] %r85
+  %r516 = alloca {i32, i1}, #preferred
+  %r517 = property "value" of %r513 as i32
+  %r518 = access [let] %r517
+  %r519 = property "value" of %r514 as i32
+  %r520 = access [let] %r519
+  %r521 = apply_builtin sadd_with_overflow_i32(%r518, %r520)
+  %r522 = end %r520
+  %r523 = end %r518
+  %r524 = access [set] %r516
+  %r525 = store %r521 to %r524
+  %r526 = end %r524
+  %r527 = access [let] %r516
+  %r528 = subfield %r527 at 0 as i32
+  %r529 = subfield %r527 at 1 as i1
+  %r530 = alloca Bool, #preferred
+  %r531 = subfield %r530 at 0 as i1
+  %r532 = access [set] %r531
+  %r533 = access [sink] %r529
+  %r534 = load %r533
+  %r535 = store %r534 to %r532
+  %r536 = access [sink] %r533
+  %r537 = assume_state %r536 uninitialized
+  %r538 = end %r536
+  %r539 = end %r533
+  %r540 = end %r532
+  %r541 = subfield %r530 at 0 as i1
+  %r542 = access [let] %r541
+  %r543 = load %r542
+  %r544 = end %r542
+  %r545 = condbr %r543, %b32, %b33
+%b32:
+  %r576 = end %r527
+  %r577 = apply_builtin trap()
+  %r578 = unreachable
+%b33:
+  %r546 = subfield %r515 at 0 as i32
+  %r547 = access [set] %r546
+  %r548 = access [sink] %r528
+  %r549 = load %r548
+  %r550 = store %r549 to %r547
+  %r551 = access [sink] %r548
+  %r552 = assume_state %r551 uninitialized
+  %r553 = end %r551
+  %r554 = end %r548
+  %r555 = end %r547
+  %r556 = end %r527
+  %r557 = subfield %r516 at 0 as i32
+  %r558 = access [sink] %r557
+  %r559 = assume_state %r558 uninitialized
+  %r560 = end %r558
+  %r561 = subfield %r516 at 1 as i1
+  %r562 = access [sink] %r561
+  %r563 = assume_state %r562 uninitialized
+  %r564 = end %r562
+  %r565 = access [sink] %r530
+  %r566 = assume_state %r565 uninitialized
+  %r567 = end %r565
+  %r568 = br %b34
+%b34:
+  %r569 = end %r515
+  %r570 = end %r514
+  %r571 = end %r513
+  %r572 = access [sink] %r35
+  %r573 = assume_state %r572 uninitialized
+  %r574 = end %r572
+  %r575 = br %b29
+%b35:
+  %r125 = end %r81
+  %r124 = end %r80
+  %r123 = end %r79
+  %r111 = end %r49
+  %r83 = br %b1
+%b36:
+  %r631 = end %r589
+  %r632 = apply_builtin trap()
+  %r633 = unreachable
+%b37:
+  %r608 = subfield %r81 at 0 as i32
+  %r609 = access [set] %r608
+  %r610 = access [sink] %r590
+  %r611 = load %r610
+  %r612 = store %r611 to %r609
+  %r613 = access [sink] %r610
+  %r614 = assume_state %r613 uninitialized
+  %r615 = end %r613
+  %r616 = end %r610
+  %r617 = end %r609
+  %r618 = end %r589
+  %r619 = subfield %r86 at 0 as i32
+  %r620 = access [sink] %r619
+  %r621 = assume_state %r620 uninitialized
+  %r622 = end %r620
+  %r623 = subfield %r86 at 1 as i1
+  %r624 = access [sink] %r623
+  %r625 = assume_state %r624 uninitialized
+  %r626 = end %r624
+  %r627 = access [sink] %r592
+  %r628 = assume_state %r627 uninitialized
+  %r629 = end %r627
+  %r630 = br %b35
+}
+
+fun $<ConformanceDeclaration at lb_ra_only:17.1>.$12$init(set %p0: RA<T>)
+
+fun Int32.infix<(let %p0: Int32, let %p1: Int32, set %p2: Bool)
+
+fun Int32.infix+(let %p0: Int32, let %p1: Int32, set %p2: Int32)
+
+fun Int32.infix-(let %p0: Int32, let %p1: Int32, set %p2: Int32)
+
+fun Int32.infix/(let %p0: Int32, let %p1: Int32, set %p2: Int32)
+
+fun Int32.copy(let %p0: Int32, set %p1: Int32)
+
+fun $<ConformanceDeclaration at lb_ra_only:17.1><T>(let %p0: RA<T>) let <: LowerBound<T> {
+%b0:
+  %r0 = alloca LowerBound<T>, #preferred
+  %r1 = witnesstable {LowerBound.lower_bound(_:)<Self: T>} as LowerBound<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun LowerBound.lower_bound(_:)<Self: T>(let %p0: LowerBound<Self>, let %p1: Self, let %p2: Int32, set %p3: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [let] %p2
+  %r3 = access [set] %p3
+  %r4 = apply $<ConformanceDeclaration at lb_ra_only:17.1>.lower_bound(_:)(%r1, %r2) => %r3
+  %r9 = end %r3
+  %r8 = end %r2
+  %r7 = end %r1
+  %r6 = end %r0
+  %r5 = return
+}
+
+fun equal_range_size(_:from:to:)<T>(let %p0: LowerBound<T>, let %p1: T, let %p2: Int32, let %p3: Int32, set %p4: Int32) {
+%b0:
+  %r0 = alloca Int32, #preferred
+  %r1 = property "lower_bound(_:)" of %p0 as [Void](let LowerBound<Self>, self: let Self, let Int32) let -> Int32
+  %r2 = access [let] %p0
+  %r3 = access [let] %p1
+  %r4 = access [let] %p3
+  %r5 = access [set] %r0
+  %r6 = apply %r1(%r2, %r3, %r4) => %r5
+  %r22 = end %r5
+  %r21 = end %r4
+  %r20 = end %r3
+  %r19 = end %r2
+  %r7 = alloca Int32, #preferred
+  %r8 = property "lower_bound(_:)" of %p0 as [Void](let LowerBound<Self>, self: let Self, let Int32) let -> Int32
+  %r9 = access [let] %p0
+  %r10 = access [let] %p1
+  %r11 = access [let] %p2
+  %r12 = access [set] %r7
+  %r13 = apply %r8(%r9, %r10, %r11) => %r12
+  %r26 = end %r12
+  %r25 = end %r11
+  %r24 = end %r10
+  %r23 = end %r9
+  %r14 = access [let] %r0
+  %r15 = access [let] %r7
+  %r16 = access [set] %p4
+  %r36 = alloca {i32, i1}, #preferred
+  %r37 = property "value" of %r14 as i32
+  %r38 = access [let] %r37
+  %r39 = property "value" of %r15 as i32
+  %r40 = access [let] %r39
+  %r41 = apply_builtin ssub_with_overflow_i32(%r38, %r40)
+  %r42 = end %r40
+  %r43 = end %r38
+  %r44 = access [set] %r36
+  %r45 = store %r41 to %r44
+  %r46 = end %r44
+  %r47 = access [let] %r36
+  %r48 = subfield %r47 at 0 as i32
+  %r49 = subfield %r47 at 1 as i1
+  %r50 = alloca Bool, #preferred
+  %r51 = subfield %r50 at 0 as i1
+  %r52 = access [set] %r51
+  %r53 = access [sink] %r49
+  %r54 = load %r53
+  %r55 = store %r54 to %r52
+  %r56 = access [sink] %r53
+  %r57 = assume_state %r56 uninitialized
+  %r58 = end %r56
+  %r59 = end %r53
+  %r60 = end %r52
+  %r61 = subfield %r50 at 0 as i1
+  %r62 = access [let] %r61
+  %r63 = load %r62
+  %r64 = end %r62
+  %r65 = condbr %r63, %b2, %b3
+%b1:
+  %r29 = end %r16
+  %r28 = end %r15
+  %r27 = end %r14
+  %r30 = access [sink] %r0
+  %r31 = assume_state %r30 uninitialized
+  %r32 = end %r30
+  %r33 = access [sink] %r7
+  %r34 = assume_state %r33 uninitialized
+  %r35 = end %r33
+  %r18 = return
+%b2:
+  %r89 = end %r47
+  %r90 = apply_builtin trap()
+  %r91 = unreachable
+%b3:
+  %r66 = subfield %r16 at 0 as i32
+  %r67 = access [set] %r66
+  %r68 = access [sink] %r48
+  %r69 = load %r68
+  %r70 = store %r69 to %r67
+  %r71 = access [sink] %r68
+  %r72 = assume_state %r71 uninitialized
+  %r73 = end %r71
+  %r74 = end %r68
+  %r75 = end %r67
+  %r76 = end %r47
+  %r77 = subfield %r36 at 0 as i32
+  %r78 = access [sink] %r77
+  %r79 = assume_state %r78 uninitialized
+  %r80 = end %r78
+  %r81 = subfield %r36 at 1 as i1
+  %r82 = access [sink] %r81
+  %r83 = assume_state %r82 uninitialized
+  %r84 = end %r82
+  %r85 = access [sink] %r50
+  %r86 = assume_state %r85 uninitialized
+  %r87 = end %r85
+  %r88 = br %b1
+}
+
+fun middle_band(_:)<T>(let %p0: LowerBound<T>, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = type_apply equal_range_size(_:from:to:)<T>
+  %r1 = alloca Int32, #preferred
+  %r2 = subfield %r1 at 0 as i32
+  %r3 = access [set] %r2
+  %r4 = store i32 10 to %r3
+  %r5 = end %r3
+  %r6 = alloca Int32, #preferred
+  %r7 = subfield %r6 at 0 as i32
+  %r8 = access [set] %r7
+  %r9 = store i32 20 to %r8
+  %r10 = end %r8
+  %r11 = access [let] %p0
+  %r12 = access [let] %p1
+  %r13 = access [let] %r1
+  %r14 = access [let] %r6
+  %r15 = access [set] %p2
+  %r16 = apply %r0(%r11, %r12, %r13, %r14) => %r15
+  %r22 = end %r15
+  %r21 = end %r14
+  %r20 = end %r13
+  %r19 = end %r12
+  %r18 = end %r11
+  %r23 = access [sink] %r1
+  %r24 = assume_state %r23 uninitialized
+  %r25 = end %r23
+  %r26 = access [sink] %r6
+  %r27 = assume_state %r26 uninitialized
+  %r28 = end %r26
+  %r17 = return
+}
+
+fun Evens.$<ConformanceDeclaration at lb_ra_only:39.17>() let <: Deinitializable<Evens> {
+%b0:
+  %r0 = alloca Deinitializable<Evens>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: Evens>} as Deinitializable<Evens>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: Evens>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun Evens.$<ConformanceDeclaration at lb_ra_only:39.35>() let <: Movable<Evens> {
+%b0:
+  %r0 = alloca Movable<Evens>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: Evens>, Movable.take_value.take_value@inout$synthesized<Self: Evens>} as Movable<Evens>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: Evens>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: Evens>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Evens.init(set %p0: Evens, set %p1: Void)
+
+fun $<ConformanceDeclaration at lb_ra_only:40.1>.count(let %p0: Evens, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 50 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at lb_ra_only:40.1>.at(_:)(let %p0: Evens, let %p1: Int32, set %p2: Int32) {
+%b0:
+  %r0 = alloca Int32, #preferred
+  %r1 = subfield %r0 at 0 as i32
+  %r2 = access [set] %r1
+  %r3 = store i32 2 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %p1
+  %r6 = access [let] %r0
+  %r7 = access [set] %p2
+  %r16 = alloca {i32, i1}, #preferred
+  %r17 = property "value" of %r5 as i32
+  %r18 = access [let] %r17
+  %r19 = property "value" of %r6 as i32
+  %r20 = access [let] %r19
+  %r21 = apply_builtin smul_with_overflow_i32(%r18, %r20)
+  %r22 = end %r20
+  %r23 = end %r18
+  %r24 = access [set] %r16
+  %r25 = store %r21 to %r24
+  %r26 = end %r24
+  %r27 = access [let] %r16
+  %r28 = subfield %r27 at 0 as i32
+  %r29 = subfield %r27 at 1 as i1
+  %r30 = alloca Bool, #preferred
+  %r31 = subfield %r30 at 0 as i1
+  %r32 = access [set] %r31
+  %r33 = access [sink] %r29
+  %r34 = load %r33
+  %r35 = store %r34 to %r32
+  %r36 = access [sink] %r33
+  %r37 = assume_state %r36 uninitialized
+  %r38 = end %r36
+  %r39 = end %r33
+  %r40 = end %r32
+  %r41 = subfield %r30 at 0 as i1
+  %r42 = access [let] %r41
+  %r43 = load %r42
+  %r44 = end %r42
+  %r45 = condbr %r43, %b2, %b3
+%b1:
+  %r12 = end %r7
+  %r11 = end %r6
+  %r10 = end %r5
+  %r13 = access [sink] %r0
+  %r14 = assume_state %r13 uninitialized
+  %r15 = end %r13
+  %r9 = return
+%b2:
+  %r69 = end %r27
+  %r70 = apply_builtin trap()
+  %r71 = unreachable
+%b3:
+  %r46 = subfield %r7 at 0 as i32
+  %r47 = access [set] %r46
+  %r48 = access [sink] %r28
+  %r49 = load %r48
+  %r50 = store %r49 to %r47
+  %r51 = access [sink] %r48
+  %r52 = assume_state %r51 uninitialized
+  %r53 = end %r51
+  %r54 = end %r48
+  %r55 = end %r47
+  %r56 = end %r27
+  %r57 = subfield %r16 at 0 as i32
+  %r58 = access [sink] %r57
+  %r59 = assume_state %r58 uninitialized
+  %r60 = end %r58
+  %r61 = subfield %r16 at 1 as i1
+  %r62 = access [sink] %r61
+  %r63 = assume_state %r62 uninitialized
+  %r64 = end %r62
+  %r65 = access [sink] %r30
+  %r66 = assume_state %r65 uninitialized
+  %r67 = end %r65
+  %r68 = br %b1
+}
+
+fun Int32.infix*(let %p0: Int32, let %p1: Int32, set %p2: Int32)
+
+fun $<ConformanceDeclaration at lb_ra_only:40.1>() let <: Fwd<Evens> {
+%b0:
+  %r0 = alloca Fwd<Evens>, #preferred
+  %r1 = witnesstable {Fwd.count<Self: Evens>, Fwd.at(_:)<Self: Evens>} as Fwd<Evens>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Fwd.count<Self: Evens>(let %p0: Fwd<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let Evens
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at lb_ra_only:40.1>.count(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun Fwd.at(_:)<Self: Evens>(let %p0: Fwd<Self>, let %p1: Self, let %p2: Int32, set %p3: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let Evens
+  %r1 = access [let] %r0
+  %r2 = access [let] %p2
+  %r3 = access [set] %p3
+  %r4 = apply $<ConformanceDeclaration at lb_ra_only:40.1>.at(_:)(%r1, %r2) => %r3
+  %r9 = end %r3
+  %r8 = end %r2
+  %r7 = end %r1
+  %r6 = end %r0
+  %r5 = return
+}
+
+fun $<ConformanceDeclaration at lb_ra_only:44.1>() let <: Bidi<Evens> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at lb_ra_only:40.1>[]
+  %r1 = alloca Bidi<Evens>, #preferred
+  %r2 = witnesstable {%r0} as Bidi<Evens>
+  %r13 = end %r0
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun $<ConformanceDeclaration at lb_ra_only:45.1>() let <: RA<Evens> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at lb_ra_only:44.1>[]
+  %r1 = alloca RA<Evens>, #preferred
+  %r2 = witnesstable {%r0} as RA<Evens>
+  %r13 = end %r0
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun Odds.$<ConformanceDeclaration at lb_ra_only:47.16>() let <: Deinitializable<Odds> {
+%b0:
+  %r0 = alloca Deinitializable<Odds>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: Odds>} as Deinitializable<Odds>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: Odds>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun Odds.$<ConformanceDeclaration at lb_ra_only:47.34>() let <: Movable<Odds> {
+%b0:
+  %r0 = alloca Movable<Odds>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: Odds>, Movable.take_value.take_value@inout$synthesized<Self: Odds>} as Movable<Odds>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: Odds>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: Odds>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Odds.init(set %p0: Odds, set %p1: Void)
+
+fun $<ConformanceDeclaration at lb_ra_only:48.1>.count(let %p0: Odds, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 50 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at lb_ra_only:48.1>.at(_:)(let %p0: Odds, let %p1: Int32, set %p2: Int32) {
+%b0:
+  %r0 = alloca Int32, #preferred
+  %r1 = alloca Int32, #preferred
+  %r2 = subfield %r1 at 0 as i32
+  %r3 = access [set] %r2
+  %r4 = store i32 2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %p1
+  %r7 = access [let] %r1
+  %r8 = access [set] %r0
+  %r18 = alloca {i32, i1}, #preferred
+  %r91 = property "value" of %r6 as i32
+  %r92 = access [let] %r91
+  %r93 = property "value" of %r7 as i32
+  %r94 = access [let] %r93
+  %r95 = apply_builtin smul_with_overflow_i32(%r92, %r94)
+  %r96 = end %r94
+  %r97 = end %r92
+  %r98 = access [set] %r18
+  %r99 = store %r95 to %r98
+  %r100 = end %r98
+  %r101 = access [let] %r18
+  %r102 = subfield %r101 at 0 as i32
+  %r103 = subfield %r101 at 1 as i1
+  %r104 = alloca Bool, #preferred
+  %r105 = subfield %r104 at 0 as i1
+  %r106 = access [set] %r105
+  %r107 = access [sink] %r103
+  %r108 = load %r107
+  %r109 = store %r108 to %r106
+  %r110 = access [sink] %r107
+  %r111 = assume_state %r110 uninitialized
+  %r112 = end %r110
+  %r113 = end %r107
+  %r114 = end %r106
+  %r115 = subfield %r104 at 0 as i1
+  %r116 = access [let] %r115
+  %r117 = load %r116
+  %r118 = end %r116
+  %r119 = condbr %r117, %b5, %b6
+%b1:
+  %r25 = end %r17
+  %r24 = end %r16
+  %r23 = end %r15
+  %r26 = access [sink] %r0
+  %r27 = assume_state %r26 uninitialized
+  %r28 = end %r26
+  %r29 = access [sink] %r1
+  %r30 = assume_state %r29 uninitialized
+  %r31 = end %r29
+  %r32 = access [sink] %r10
+  %r33 = assume_state %r32 uninitialized
+  %r34 = end %r32
+  %r19 = return
+%b2:
+  %r88 = end %r46
+  %r89 = apply_builtin trap()
+  %r90 = unreachable
+%b3:
+  %r65 = subfield %r17 at 0 as i32
+  %r66 = access [set] %r65
+  %r67 = access [sink] %r47
+  %r68 = load %r67
+  %r69 = store %r68 to %r66
+  %r70 = access [sink] %r67
+  %r71 = assume_state %r70 uninitialized
+  %r72 = end %r70
+  %r73 = end %r67
+  %r74 = end %r66
+  %r75 = end %r46
+  %r76 = subfield %r35 at 0 as i32
+  %r77 = access [sink] %r76
+  %r78 = assume_state %r77 uninitialized
+  %r79 = end %r77
+  %r80 = subfield %r35 at 1 as i1
+  %r81 = access [sink] %r80
+  %r82 = assume_state %r81 uninitialized
+  %r83 = end %r81
+  %r84 = access [sink] %r49
+  %r85 = assume_state %r84 uninitialized
+  %r86 = end %r84
+  %r87 = br %b1
+%b4:
+  %r22 = end %r8
+  %r21 = end %r7
+  %r20 = end %r6
+  %r10 = alloca Int32, #preferred
+  %r11 = subfield %r10 at 0 as i32
+  %r12 = access [set] %r11
+  %r13 = store i32 1 to %r12
+  %r14 = end %r12
+  %r15 = access [let] %r0
+  %r16 = access [let] %r10
+  %r17 = access [set] %p2
+  %r35 = alloca {i32, i1}, #preferred
+  %r36 = property "value" of %r15 as i32
+  %r37 = access [let] %r36
+  %r38 = property "value" of %r16 as i32
+  %r39 = access [let] %r38
+  %r40 = apply_builtin sadd_with_overflow_i32(%r37, %r39)
+  %r41 = end %r39
+  %r42 = end %r37
+  %r43 = access [set] %r35
+  %r44 = store %r40 to %r43
+  %r45 = end %r43
+  %r46 = access [let] %r35
+  %r47 = subfield %r46 at 0 as i32
+  %r48 = subfield %r46 at 1 as i1
+  %r49 = alloca Bool, #preferred
+  %r50 = subfield %r49 at 0 as i1
+  %r51 = access [set] %r50
+  %r52 = access [sink] %r48
+  %r53 = load %r52
+  %r54 = store %r53 to %r51
+  %r55 = access [sink] %r52
+  %r56 = assume_state %r55 uninitialized
+  %r57 = end %r55
+  %r58 = end %r52
+  %r59 = end %r51
+  %r60 = subfield %r49 at 0 as i1
+  %r61 = access [let] %r60
+  %r62 = load %r61
+  %r63 = end %r61
+  %r64 = condbr %r62, %b2, %b3
+%b5:
+  %r143 = end %r101
+  %r144 = apply_builtin trap()
+  %r145 = unreachable
+%b6:
+  %r120 = subfield %r8 at 0 as i32
+  %r121 = access [set] %r120
+  %r122 = access [sink] %r102
+  %r123 = load %r122
+  %r124 = store %r123 to %r121
+  %r125 = access [sink] %r122
+  %r126 = assume_state %r125 uninitialized
+  %r127 = end %r125
+  %r128 = end %r122
+  %r129 = end %r121
+  %r130 = end %r101
+  %r131 = subfield %r18 at 0 as i32
+  %r132 = access [sink] %r131
+  %r133 = assume_state %r132 uninitialized
+  %r134 = end %r132
+  %r135 = subfield %r18 at 1 as i1
+  %r136 = access [sink] %r135
+  %r137 = assume_state %r136 uninitialized
+  %r138 = end %r136
+  %r139 = access [sink] %r104
+  %r140 = assume_state %r139 uninitialized
+  %r141 = end %r139
+  %r142 = br %b4
+}
+
+fun $<ConformanceDeclaration at lb_ra_only:48.1>() let <: Fwd<Odds> {
+%b0:
+  %r0 = alloca Fwd<Odds>, #preferred
+  %r1 = witnesstable {Fwd.count<Self: Odds>, Fwd.at(_:)<Self: Odds>} as Fwd<Odds>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Fwd.count<Self: Odds>(let %p0: Fwd<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let Odds
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at lb_ra_only:48.1>.count(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun Fwd.at(_:)<Self: Odds>(let %p0: Fwd<Self>, let %p1: Self, let %p2: Int32, set %p3: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let Odds
+  %r1 = access [let] %r0
+  %r2 = access [let] %p2
+  %r3 = access [set] %p3
+  %r4 = apply $<ConformanceDeclaration at lb_ra_only:48.1>.at(_:)(%r1, %r2) => %r3
+  %r9 = end %r3
+  %r8 = end %r2
+  %r7 = end %r1
+  %r6 = end %r0
+  %r5 = return
+}
+
+fun $<ConformanceDeclaration at lb_ra_only:52.1>() let <: Bidi<Odds> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at lb_ra_only:48.1>[]
+  %r1 = alloca Bidi<Odds>, #preferred
+  %r2 = witnesstable {%r0} as Bidi<Odds>
+  %r13 = end %r0
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r23 = global_access #witness(Evens)
+  %r0 = project $<ConformanceDeclaration at lb_ra_only:45.1>[]
+  %r4 = access [let] %r23
+  %r2 = access [let] %r0
+  %r28 = place_cast %r2 as let RA<T>
+  %r3 = project $<ConformanceDeclaration at lb_ra_only:17.1>$existentialized[%r4, %r28]
+  %r24 = access [let] %r23
+  %r5 = alloca Evens, #preferred
+  %r6 = access [set] %r5
+  %r7 = assume_state %r6 initialized
+  %r8 = end %r6
+  %r9 = access [let] %r3
+  %r10 = access [let] %r5
+  %r11 = access [set] %p0
+  %r25 = place_cast %r9 as let LowerBound<T>
+  %r26 = place_cast %r10 as let T
+  %r27 = access [set] %r11
+  %r12 = apply middle_band(_:)$existentialized(%r24, %r25, %r26) => %r27
+  %r29 = end %r24
+  %r19 = end %r11
+  %r18 = end %r10
+  %r17 = end %r9
+  %r16 = end %r3
+  %r1 = end %r4
+  %r15 = end %r2
+  %r14 = end %r0
+  %r20 = access [sink] %r5
+  %r21 = assume_state %r20 uninitialized
+  %r22 = end %r20
+  %r13 = return
+}
+
+fun Bidi.$<ConformanceDeclaration at lb_ra_only:8.20>$existentialized(let %p0: Type, let %p1: Bidi<Self>) let <: Fwd<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at lb_ra_only:8.20>" of %p1 as Fwd<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun RA.$<ConformanceDeclaration at lb_ra_only:9.18>$existentialized(let %p0: Type, let %p1: RA<Self>) let <: Bidi<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at lb_ra_only:9.18>" of %p1 as Bidi<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at lb_ra_only:17.1>$existentialized(let %p0: Type, let %p1: RA<T>) let <: LowerBound<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> LowerBound<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as LowerBound<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {LowerBound.lower_bound(_:)<Self: T>} as LowerBound<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun middle_band(_:)$existentialized(let %p0: Type, let %p1: LowerBound<T>, let %p2: T, set %p3: Int32) {
+%b0:
+  %r29 = access [let] %p0
+  %r1 = alloca Int32, #preferred
+  %r2 = subfield %r1 at 0 as i32
+  %r3 = access [set] %r2
+  %r4 = store i32 10 to %r3
+  %r5 = end %r3
+  %r6 = alloca Int32, #preferred
+  %r7 = subfield %r6 at 0 as i32
+  %r8 = access [set] %r7
+  %r9 = store i32 20 to %r8
+  %r10 = end %r8
+  %r11 = access [let] %p1
+  %r12 = access [let] %p2
+  %r13 = access [let] %r1
+  %r14 = access [let] %r6
+  %r15 = access [set] %p3
+  %r30 = place_cast %r11 as let LowerBound<T¹>
+  %r31 = place_cast %r12 as let T¹
+  %r32 = access [let] %r13
+  %r33 = access [let] %r14
+  %r34 = access [set] %r15
+  %r16 = apply equal_range_size(_:from:to:)$existentialized(%r29, %r30, %r31, %r32, %r33) => %r34
+  %r0 = end %r29
+  %r17 = end %r15
+  %r18 = end %r14
+  %r19 = end %r13
+  %r20 = end %r12
+  %r21 = end %r11
+  %r22 = access [sink] %r1
+  %r23 = assume_state %r22 uninitialized
+  %r24 = end %r22
+  %r25 = access [sink] %r6
+  %r26 = assume_state %r25 uninitialized
+  %r27 = end %r25
+  %r28 = return
+}
+
+fun equal_range_size(_:from:to:)$existentialized(let %p0: Type, let %p1: LowerBound<T>, let %p2: T, let %p3: Int32, let %p4: Int32, set %p5: Int32) {
+%b0:
+  %r0 = alloca Int32, #preferred
+  %r1 = property "lower_bound(_:)" of %p1 as [Void](let LowerBound<Self>, self: let Self, let Int32) let -> Int32
+  %r2 = access [let] %p1
+  %r3 = access [let] %p2
+  %r4 = access [let] %p4
+  %r5 = access [set] %r0
+  %r6 = apply %r1(%r2, %r3, %r4) => %r5
+  %r7 = end %r5
+  %r8 = end %r4
+  %r9 = end %r3
+  %r10 = end %r2
+  %r11 = alloca Int32, #preferred
+  %r12 = property "lower_bound(_:)" of %p1 as [Void](let LowerBound<Self>, self: let Self, let Int32) let -> Int32
+  %r13 = access [let] %p1
+  %r14 = access [let] %p2
+  %r15 = access [let] %p3
+  %r16 = access [set] %r11
+  %r17 = apply %r12(%r13, %r14, %r15) => %r16
+  %r18 = end %r16
+  %r19 = end %r15
+  %r20 = end %r14
+  %r21 = end %r13
+  %r22 = access [let] %r0
+  %r23 = access [let] %r11
+  %r24 = access [set] %p5
+  %r36 = alloca {i32, i1}, #preferred
+  %r37 = property "value" of %r22 as i32
+  %r38 = access [let] %r37
+  %r39 = property "value" of %r23 as i32
+  %r40 = access [let] %r39
+  %r41 = apply_builtin ssub_with_overflow_i32(%r38, %r40)
+  %r42 = end %r40
+  %r43 = end %r38
+  %r44 = access [set] %r36
+  %r45 = store %r41 to %r44
+  %r46 = end %r44
+  %r47 = access [let] %r36
+  %r48 = subfield %r47 at 0 as i32
+  %r49 = subfield %r47 at 1 as i1
+  %r50 = alloca Bool, #preferred
+  %r51 = subfield %r50 at 0 as i1
+  %r52 = access [set] %r51
+  %r53 = access [sink] %r49
+  %r54 = load %r53
+  %r55 = store %r54 to %r52
+  %r56 = access [sink] %r53
+  %r57 = assume_state %r56 uninitialized
+  %r58 = end %r56
+  %r59 = end %r53
+  %r60 = end %r52
+  %r61 = subfield %r50 at 0 as i1
+  %r62 = access [let] %r61
+  %r63 = load %r62
+  %r64 = end %r62
+  %r65 = condbr %r63, %b2, %b3
+%b1:
+  %r26 = end %r24
+  %r27 = end %r23
+  %r28 = end %r22
+  %r29 = access [sink] %r0
+  %r30 = assume_state %r29 uninitialized
+  %r31 = end %r29
+  %r32 = access [sink] %r11
+  %r33 = assume_state %r32 uninitialized
+  %r34 = end %r32
+  %r35 = return
+%b2:
+  %r89 = end %r47
+  %r90 = apply_builtin trap()
+  %r91 = unreachable
+%b3:
+  %r66 = subfield %r24 at 0 as i32
+  %r67 = access [set] %r66
+  %r68 = access [sink] %r48
+  %r69 = load %r68
+  %r70 = store %r69 to %r67
+  %r71 = access [sink] %r68
+  %r72 = assume_state %r71 uninitialized
+  %r73 = end %r71
+  %r74 = end %r68
+  %r75 = end %r67
+  %r76 = end %r47
+  %r77 = subfield %r36 at 0 as i32
+  %r78 = access [sink] %r77
+  %r79 = assume_state %r78 uninitialized
+  %r80 = end %r78
+  %r81 = subfield %r36 at 1 as i1
+  %r82 = access [sink] %r81
+  %r83 = assume_state %r82 uninitialized
+  %r84 = end %r82
+  %r85 = access [sink] %r50
+  %r86 = assume_state %r85 uninitialized
+  %r87 = end %r85
+  %r88 = br %b1
+}

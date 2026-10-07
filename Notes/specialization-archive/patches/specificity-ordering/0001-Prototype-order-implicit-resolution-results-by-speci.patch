@@ -1,0 +1,1012 @@
+From ee43a3c6f2c9adcd235d4eaf45c82779e12187bc Mon Sep 17 00:00:00 2001
+From: Ambrus Toth <ping@ambrus.dev>
+Date: Tue, 1 Sep 2026 01:37:30 +0200
+Subject: [PATCH] Prototype: order implicit resolution results by specificity.
+
+Implicit resolution currently returns the *smallest* derivation of a queried
+witness and reports an ambiguity when several derivations tie.  That rule is
+at odds with algorithm specialization: a given constrained on a finer trait
+does not, in general, produce a smaller derivation than one constrained on a
+coarser trait, so the specialized implementation of an algorithm either loses
+or ties with the generic one.
+
+This adds a specificity order over givens, defined by entailment between their
+context clauses after matching their heads (the rule used by C++ concept
+subsumption and by Siek and Lumsdaine's G), and applies it before lexical
+proximity when several derivations are found.  The breadth-first search no
+longer stops at the first depth that produces a result: it keeps exploring as
+long as a live thread is rooted at a strictly more specific given.
+
+Notes/specialization-experiments holds the programs used to check this.
+---
+ Notes/specialization-experiments/README.md    |  22 ++
+ Notes/specialization-experiments/e1.hylo      |  18 ++
+ Notes/specialization-experiments/e10.hylo     |  13 +
+ Notes/specialization-experiments/e11.hylo     |  10 +
+ Notes/specialization-experiments/e12.hylo     |  12 +
+ Notes/specialization-experiments/e2.hylo      |  12 +
+ Notes/specialization-experiments/e3.hylo      |  15 +
+ Notes/specialization-experiments/e4.hylo      |  18 ++
+ Notes/specialization-experiments/e5.hylo      |  28 ++
+ Notes/specialization-experiments/e6.hylo      |  16 +
+ Notes/specialization-experiments/e7.hylo      |  11 +
+ Notes/specialization-experiments/e8.hylo      |  15 +
+ Notes/specialization-experiments/e9.hylo      |  10 +
+ Notes/specialization-experiments/lb.hylo      |  65 ++++
+ .../lb_ra_only.hylo                           |  56 ++++
+ Notes/specialization-experiments/t1.hylo      |  14 +
+ Notes/specialization-experiments/t2.hylo      |   1 +
+ Sources/FrontEnd/Typer/Typer.swift            | 154 +++++++++-
+ e2.ast                                        |  20 ++
+ e3.ir                                         | 286 ++++++++++++++++++
+ 20 files changed, 794 insertions(+), 2 deletions(-)
+ create mode 100644 Notes/specialization-experiments/README.md
+ create mode 100644 Notes/specialization-experiments/e1.hylo
+ create mode 100644 Notes/specialization-experiments/e10.hylo
+ create mode 100644 Notes/specialization-experiments/e11.hylo
+ create mode 100644 Notes/specialization-experiments/e12.hylo
+ create mode 100644 Notes/specialization-experiments/e2.hylo
+ create mode 100644 Notes/specialization-experiments/e3.hylo
+ create mode 100644 Notes/specialization-experiments/e4.hylo
+ create mode 100644 Notes/specialization-experiments/e5.hylo
+ create mode 100644 Notes/specialization-experiments/e6.hylo
+ create mode 100644 Notes/specialization-experiments/e7.hylo
+ create mode 100644 Notes/specialization-experiments/e8.hylo
+ create mode 100644 Notes/specialization-experiments/e9.hylo
+ create mode 100644 Notes/specialization-experiments/lb.hylo
+ create mode 100644 Notes/specialization-experiments/lb_ra_only.hylo
+ create mode 100644 Notes/specialization-experiments/t1.hylo
+ create mode 100644 Notes/specialization-experiments/t2.hylo
+ create mode 100644 e2.ast
+ create mode 100644 e3.ir
+
+diff --git a/Notes/specialization-experiments/README.md b/Notes/specialization-experiments/README.md
+new file mode 100644
+index 0000000..6e2204e
+--- /dev/null
++++ b/Notes/specialization-experiments/README.md
+@@ -0,0 +1,22 @@
++# Algorithm-specialization experiments
++
++Each file is a standalone `hc` input. Compile with
++
++    ./.build/debug/hc --emit ir -o /tmp/out.ir <file>.hylo
++
++and read which `ConformanceDeclaration at <file>:<line>` the body of `main` (or the
++generic client) projects: that is the implementation implicit resolution selected.
++
++| file | question | result on `main` | result with specificity ordering |
++|------|----------|------------------|----------------------------------|
++| `e1`  | two overlapping blanket givens (`Bidi` vs `RA`), flat conformances | ambiguous | picks `RA` |
++| `e3`  | same, but the `Bidi` conformance is nested inside the `RA` one | picks `RA` (shorter derivation, by accident) | picks `RA` |
++| `e4`  | specialization seen from a generic caller | lost when the caller is constrained on `Bidi`; kept when constrained on the algorithm trait | unchanged |
++| `e5`  | "refinement-lifting given" carries the specialized implementation | works today, no compiler change | unchanged |
++| `e6`  | the more specific given needs a *deeper* derivation | picks the generic one (BFS stops at the first success) | picks `RA` |
++| `e7`  | two free functions differing only by constraints | ambiguous | still ambiguous (overload resolution not covered) |
++| `e8`  | lifting given vs. a conformance the type declares itself | type's own conformance wins | same (correct: it is more specific) |
++| `e9`  | `<T> => S<T> is P` vs `<T is Q> => T is P` (the `State-of-Generics` example) | picks the former | same (the former really is more specific) |
++| `e11` | two *incomparable* givens | ambiguous | ambiguous (no silent pick) |
++| `e12` | three-level refinement chain | ambiguous | picks the deepest |
++| `lb`  | realistic `lower_bound`, two models, two levels of generic client code | ambiguous | binary search for the random-access model, linear scan for the other |
+diff --git a/Notes/specialization-experiments/e1.hylo b/Notes/specialization-experiments/e1.hylo
+new file mode 100644
+index 0000000..8ab7e16
+--- /dev/null
++++ b/Notes/specialization-experiments/e1.hylo
+@@ -0,0 +1,18 @@
++trait Fwd {}
++trait Bidi refines Fwd {}
++trait RA refines Bidi {}
++
++struct Arr is Deinitializable & Movable { public memberwise init }
++
++given Arr is Fwd {}
++given Arr is Bidi {}
++given Arr is RA {}
++
++trait LowerBoundable { fun lb() -> Int32 }
++
++given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
++given <T is RA> => T is LowerBoundable { fun lb() -> Int32 { 2 } }
++
++public fun main() -> Int32 {
++  Arr().lb()
++}
+diff --git a/Notes/specialization-experiments/e10.hylo b/Notes/specialization-experiments/e10.hylo
+new file mode 100644
+index 0000000..bea3c70
+--- /dev/null
++++ b/Notes/specialization-experiments/e10.hylo
+@@ -0,0 +1,13 @@
++trait P { fun which() -> Int32 }
++trait Q { fun which2() -> Int32 }
++struct S<T> is Deinitializable & Movable { public memberwise init }
++
++given a: <T> => S<T> is P { fun which() -> Int32 { 1 } }
++given b: <T> => S<T> is Q { fun which2() -> Int32 { 2 } }
++given c: <T is Q> => T is P { fun which() -> Int32 { 3 } }
++
++fun use<T is P>(x: T) -> Int32 { x.which() }
++public fun main() -> Int32 {
++  given d: S<Int32> is P { fun which() -> Int32 { 9 } }   // local, concrete override
++  return use(S<Int32>())
++}
+diff --git a/Notes/specialization-experiments/e11.hylo b/Notes/specialization-experiments/e11.hylo
+new file mode 100644
+index 0000000..7b2dc33
+--- /dev/null
++++ b/Notes/specialization-experiments/e11.hylo
+@@ -0,0 +1,10 @@
++// Two mutually-incomparable givens: must remain ambiguous (no silent pick).
++trait P { fun which() -> Int32 }
++trait Q {}
++trait R {}
++struct S is Deinitializable & Movable { public memberwise init }
++given S is Q {}
++given S is R {}
++given <T is Q> => T is P { fun which() -> Int32 { 1 } }
++given <T is R> => T is P { fun which() -> Int32 { 2 } }
++public fun main() -> Int32 { S().which() }
+diff --git a/Notes/specialization-experiments/e12.hylo b/Notes/specialization-experiments/e12.hylo
+new file mode 100644
+index 0000000..ec2ad87
+--- /dev/null
++++ b/Notes/specialization-experiments/e12.hylo
+@@ -0,0 +1,12 @@
++trait A {}
++trait B refines A {}
++trait C refines B {}
++struct S is Deinitializable & Movable { public memberwise init }
++given S is A {}
++given S is B {}
++given S is C {}
++trait Alg { fun f() -> Int32 }
++given <T is A> => T is Alg { fun f() -> Int32 { 1 } }
++given <T is B> => T is Alg { fun f() -> Int32 { 2 } }
++given <T is C> => T is Alg { fun f() -> Int32 { 3 } }
++public fun main() -> Int32 { S().f() }
+diff --git a/Notes/specialization-experiments/e2.hylo b/Notes/specialization-experiments/e2.hylo
+new file mode 100644
+index 0000000..fde1ac0
+--- /dev/null
++++ b/Notes/specialization-experiments/e2.hylo
+@@ -0,0 +1,12 @@
++trait Fwd {}
++trait Bidi refines Fwd {}
++trait RA refines Bidi {}
++
++struct Arr { public memberwise init }
++
++given Arr is Fwd {}
++given Arr is RA {
++  given Arr is Bidi {}
++}
++
++public fun main() -> Int32 { 0 }
+diff --git a/Notes/specialization-experiments/e3.hylo b/Notes/specialization-experiments/e3.hylo
+new file mode 100644
+index 0000000..544ceea
+--- /dev/null
++++ b/Notes/specialization-experiments/e3.hylo
+@@ -0,0 +1,15 @@
++trait Fwd {}
++trait Bidi refines Fwd {}
++trait RA refines Bidi {}
++
++struct Arr is Deinitializable & Movable { public memberwise init }
++
++given Arr is Fwd {}
++given Arr is RA { given Arr is Bidi {} }
++
++trait LowerBoundable { fun lb() -> Int32 }
++
++given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
++given <T is RA> => T is LowerBoundable { fun lb() -> Int32 { 2 } }
++
++public fun main() -> Int32 { Arr().lb() }
+diff --git a/Notes/specialization-experiments/e4.hylo b/Notes/specialization-experiments/e4.hylo
+new file mode 100644
+index 0000000..57784de
+--- /dev/null
++++ b/Notes/specialization-experiments/e4.hylo
+@@ -0,0 +1,18 @@
++trait Fwd {}
++trait Bidi refines Fwd {}
++trait RA refines Bidi {}
++
++struct Arr is Deinitializable & Movable { public memberwise init }
++given Arr is RA { given Arr is Bidi { given Arr is Fwd {} } }
++
++trait LowerBoundable { fun lb() -> Int32 }
++given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
++given <T is RA>   => T is LowerBoundable { fun lb() -> Int32 { 2 } }
++
++// (A) generic context constrained on the *coarse* trait
++fun via_bidi<T is Bidi>(x: T) -> Int32 { x.lb() }
++
++// (B) generic context constrained on the *algorithm* trait
++fun via_alg<T is LowerBoundable>(x: T) -> Int32 { x.lb() }
++
++public fun main() -> Int32 { via_bidi(Arr()) + via_alg(Arr()) }
+diff --git a/Notes/specialization-experiments/e5.hylo b/Notes/specialization-experiments/e5.hylo
+new file mode 100644
+index 0000000..861e790
+--- /dev/null
++++ b/Notes/specialization-experiments/e5.hylo
+@@ -0,0 +1,28 @@
++// Design "L": refinement-lifting givens carry specialized implementations.
++// A trait requirement with a default implementation is the customization point.
++
++trait Bidi {
++  fun step() -> Int32
++  // default (generic) algorithm: linear scan
++  fun lb() -> Int32 { 1 }
++}
++
++// RA does *not* `refine` Bidi; instead, a lifting given produces a *better* Bidi witness.
++trait RA {
++  fun jump() -> Int32
++}
++
++given <T is RA> => T is Bidi {
++  fun step() -> Int32 { self.jump() }
++  fun lb() -> Int32 { 2 }          // specialized algorithm: binary search
++}
++
++struct Arr is Deinitializable & Movable { public memberwise init }
++given Arr is RA { fun jump() -> Int32 { 7 } }
++
++struct Lst is Deinitializable & Movable { public memberwise init }
++given Lst is Bidi { fun step() -> Int32 { 3 } }
++
++fun run<T is Bidi>(x: T) -> Int32 { x.lb() }
++
++public fun main() -> Int32 { run(Arr()) * (10 as Int32) + run(Lst()) }
+diff --git a/Notes/specialization-experiments/e6.hylo b/Notes/specialization-experiments/e6.hylo
+new file mode 100644
+index 0000000..4c2c0ef
+--- /dev/null
++++ b/Notes/specialization-experiments/e6.hylo
+@@ -0,0 +1,16 @@
++// Q-A: the more specific given needs a DEEPER derivation than the generic one.
++trait Bidi {}
++trait RA refines Bidi {}
++trait Marker {}
++
++struct Arr is Deinitializable & Movable { public memberwise init }
++
++given Arr is Bidi {}            // direct: Bidi<Arr> at depth 1
++given Arr is Marker {}
++given <T is Marker & Bidi> => T is RA {}   // RA<Arr> only at depth 2+
++
++trait LowerBoundable { fun lb() -> Int32 }
++given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
++given <T is RA>   => T is LowerBoundable { fun lb() -> Int32 { 2 } }
++
++public fun main() -> Int32 { Arr().lb() }
+diff --git a/Notes/specialization-experiments/e7.hylo b/Notes/specialization-experiments/e7.hylo
+new file mode 100644
+index 0000000..ea077f0
+--- /dev/null
++++ b/Notes/specialization-experiments/e7.hylo
+@@ -0,0 +1,11 @@
++// Q-C: can two free functions with the same name and labels differ only by constraints?
++trait Bidi {}
++trait RA refines Bidi {}
++struct Arr is Deinitializable & Movable { public memberwise init }
++given Arr is Bidi {}
++given Arr is RA {}
++
++fun lb<T is Bidi>(x: T) -> Int32 { 1 }
++fun lb<T is RA>(x: T) -> Int32 { 2 }
++
++public fun main() -> Int32 { lb(Arr()) }
+diff --git a/Notes/specialization-experiments/e8.hylo b/Notes/specialization-experiments/e8.hylo
+new file mode 100644
+index 0000000..2576cbc
+--- /dev/null
++++ b/Notes/specialization-experiments/e8.hylo
+@@ -0,0 +1,15 @@
++// Q: can a lifting given override a default implementation inherited via `refines`?
++trait Bidi {
++  fun lb() -> Int32 { 1 }        // default (generic) algorithm
++}
++trait RA refines Bidi {}
++
++struct Arr is Deinitializable & Movable { public memberwise init }
++given Arr is Bidi {}
++given Arr is RA {}
++
++// third party wants: every random-access collection gets a better `lb`
++given <T is RA> => T is Bidi { fun lb() -> Int32 { 2 } }
++
++fun run<T is Bidi>(x: T) -> Int32 { x.lb() }
++public fun main() -> Int32 { run(Arr()) }
+diff --git a/Notes/specialization-experiments/e9.hylo b/Notes/specialization-experiments/e9.hylo
+new file mode 100644
+index 0000000..1c78849
+--- /dev/null
++++ b/Notes/specialization-experiments/e9.hylo
+@@ -0,0 +1,10 @@
++trait P { fun which() -> Int32 }
++trait Q { fun which2() -> Int32 }
++struct S<T> is Deinitializable & Movable { public memberwise init }
++
++given a: <T> => S<T> is P { fun which() -> Int32 { 1 } }
++given b: <T> => S<T> is Q { fun which2() -> Int32 { 2 } }
++given c: <T is Q> => T is P { fun which() -> Int32 { 3 } }
++
++fun use<T is P>(x: T) -> Int32 { x.which() }
++public fun main() -> Int32 { use(S<Int32>()) }
+diff --git a/Notes/specialization-experiments/lb.hylo b/Notes/specialization-experiments/lb.hylo
+new file mode 100644
+index 0000000..3790000
+--- /dev/null
++++ b/Notes/specialization-experiments/lb.hylo
+@@ -0,0 +1,65 @@
++// A realistic sketch: lower_bound specialized from Bidirectional to RandomAccess,
++// selected correctly through TWO levels of generic client code.
++
++trait Fwd {
++  fun count() -> Int32
++  fun at(p: Int32) -> Int32          // sorted, ascending
++}
++trait Bidi refines Fwd {}
++trait RA refines Bidi {}
++
++// ---- the algorithm, as a customization point ----------------------------------
++trait LowerBound {
++  fun lower_bound(x: Int32) -> Int32
++}
++
++// generic implementation: linear scan, valid for any forward collection
++given <T is Bidi> => T is LowerBound {
++  fun lower_bound(x: Int32) -> Int32 {
++    var i: Int32 = 0
++    while (i < self.count()) && (self.at(i) < x) { &i += (1 as Int32) }
++    return i
++  }
++}
++
++// specialized implementation: binary search, requires random access
++given <T is RA> => T is LowerBound {
++  fun lower_bound(x: Int32) -> Int32 {
++    var lo: Int32 = 0
++    var hi = self.count()
++    while lo < hi {
++      let mid = lo + ((hi - lo) / (2 as Int32))
++      if self.at(mid) < x { &lo = mid + (1 as Int32) } else { &hi = mid.copy() }
++    }
++    return lo
++  }
++}
++
++// ---- client code, generic over the *algorithm*, not the data structure --------
++fun equal_range_size<T is LowerBound>(c: T, from lo: Int32, to hi: Int32) -> Int32 {
++  c.lower_bound(hi) - c.lower_bound(lo)
++}
++
++fun middle_band<T is LowerBound>(c: T) -> Int32 {
++  equal_range_size(c, from: 10 as Int32, to: 20 as Int32)
++}
++
++// ---- two models ---------------------------------------------------------------
++struct Evens is Deinitializable & Movable { public memberwise init }   // 0,2,4,...,98
++given Evens is Fwd {
++  fun count() -> Int32 { 50 }
++  fun at(p: Int32) -> Int32 { p * (2 as Int32) }
++}
++given Evens is Bidi {}
++given Evens is RA {}
++
++struct Odds is Deinitializable & Movable { public memberwise init }    // 1,3,5,...,99
++given Odds is Fwd {
++  fun count() -> Int32 { 50 }
++  fun at(p: Int32) -> Int32 { (p * (2 as Int32)) + (1 as Int32) }
++}
++given Odds is Bidi {}
++
++public fun main() -> Int32 {
++  middle_band(Evens()) + middle_band(Odds())
++}
+diff --git a/Notes/specialization-experiments/lb_ra_only.hylo b/Notes/specialization-experiments/lb_ra_only.hylo
+new file mode 100644
+index 0000000..c91577f
+--- /dev/null
++++ b/Notes/specialization-experiments/lb_ra_only.hylo
+@@ -0,0 +1,56 @@
++// A realistic sketch: lower_bound specialized from Bidirectional to RandomAccess,
++// selected correctly through TWO levels of generic client code.
++
++trait Fwd {
++  fun count() -> Int32
++  fun at(p: Int32) -> Int32          // sorted, ascending
++}
++trait Bidi refines Fwd {}
++trait RA refines Bidi {}
++
++// ---- the algorithm, as a customization point ----------------------------------
++trait LowerBound {
++  fun lower_bound(x: Int32) -> Int32
++}
++
++// specialized implementation: binary search, requires random access
++given <T is RA> => T is LowerBound {
++  fun lower_bound(x: Int32) -> Int32 {
++    var lo: Int32 = 0
++    var hi = self.count()
++    while lo < hi {
++      let mid = lo + ((hi - lo) / (2 as Int32))
++      if self.at(mid) < x { &lo = mid + (1 as Int32) } else { &hi = mid.copy() }
++    }
++    return lo
++  }
++}
++
++// ---- client code, generic over the *algorithm*, not the data structure --------
++fun equal_range_size<T is LowerBound>(c: T, from lo: Int32, to hi: Int32) -> Int32 {
++  c.lower_bound(hi) - c.lower_bound(lo)
++}
++
++fun middle_band<T is LowerBound>(c: T) -> Int32 {
++  equal_range_size(c, from: 10 as Int32, to: 20 as Int32)
++}
++
++// ---- two models ---------------------------------------------------------------
++struct Evens is Deinitializable & Movable { public memberwise init }   // 0,2,4,...,98
++given Evens is Fwd {
++  fun count() -> Int32 { 50 }
++  fun at(p: Int32) -> Int32 { p * (2 as Int32) }
++}
++given Evens is Bidi {}
++given Evens is RA {}
++
++struct Odds is Deinitializable & Movable { public memberwise init }    // 1,3,5,...,99
++given Odds is Fwd {
++  fun count() -> Int32 { 50 }
++  fun at(p: Int32) -> Int32 { (p * (2 as Int32)) + (1 as Int32) }
++}
++given Odds is Bidi {}
++
++public fun main() -> Int32 {
++  middle_band(Evens())
++}
+diff --git a/Notes/specialization-experiments/t1.hylo b/Notes/specialization-experiments/t1.hylo
+new file mode 100644
+index 0000000..63c9447
+--- /dev/null
++++ b/Notes/specialization-experiments/t1.hylo
+@@ -0,0 +1,14 @@
++//! no-std
++
++trait P { fun f() }
++
++struct A {}
++
++// Two conformances of A to P.
++given a1: A is P { fun f() {} }
++
++fun use<T is P>(_ x: T) { x.f() }
++
++fun main() {
++  use(A())
++}
+diff --git a/Notes/specialization-experiments/t2.hylo b/Notes/specialization-experiments/t2.hylo
+new file mode 100644
+index 0000000..0a845fd
+--- /dev/null
++++ b/Notes/specialization-experiments/t2.hylo
+@@ -0,0 +1 @@
++public fun main() -> Int32 { 42 }
+diff --git a/Sources/FrontEnd/Typer/Typer.swift b/Sources/FrontEnd/Typer/Typer.swift
+index 13d9a11..3a93a68 100644
+--- a/Sources/FrontEnd/Typer/Typer.swift
++++ b/Sources/FrontEnd/Typer/Typer.swift
+@@ -1,3 +1,4 @@
++import Foundation
+ import Algorithms
+ import OrderedCollections
+ import Utilities
+@@ -23,6 +24,12 @@ public struct Typer {
+   /// The maximum depth of a derivation during implicit search.
+   private let maxImplicitDepth = 10
+ 
++  /// `true` iff the typer is currently comparing the specificity of two givens.
++  ///
++  /// Specificity comparison uses implicit resolution, which must not itself attempt to
++  /// order its results by specificity lest it diverge.
++  private var isComparingSpecificity = false
++
+   /// Creates an instance assigning types to syntax trees in `m`, which is a module in `p`.
+   public init(
+     typing m: Module.ID, of p: consuming Program,
+@@ -3541,6 +3548,14 @@ public struct Typer {
+     /// Penalties are used to favor lexically closer givens.
+     let penalties: Int
+ 
++    /// The declaration of the given at the root of the derivation being built, if any.
++    ///
++    /// Continuations are applied outside-in, so the first item of the tail (if any) carries the
++    /// elaboration that started this derivation.
++    var root: DeclarationIdentity? {
++      tail.first?.elaboration.witness.declaration ?? witness.declaration
++    }
++
+     /// Creates an instance with the given properties.
+     init(
+       matching witness: WitnessExpression, to queried: AnyTypeIdentity,
+@@ -3790,7 +3805,9 @@ public struct Typer {
+     var done: [SummonResult] = []
+     var depth = 0
+ 
+-    while done.isEmpty && !work.isEmpty && (depth < maxImplicitDepth) {
++    while !work.isEmpty && (depth < maxImplicitDepth)
++      && (done.isEmpty || mayOutrank(work, done, in: scopeOfUse))
++    {
+       var next: [ResolutionThread] = []
+       for item in work {
+         switch match(item, in: scopeOfUse) {
+@@ -3802,7 +3819,140 @@ public struct Typer {
+       swap(&next, &work)
+     }
+ 
+-    return done.minimalElements(by: { (a, b) in a.penalties < b.penalties })
++    if done.count < 2 { return done }
++    let best = done.minimalElements(by: { (a, b) in isMoreSpecific(a, than: b, in: scopeOfUse) })
++    if best.count < 2 { return best }
++    return best.minimalElements(by: { (a, b) in a.penalties < b.penalties })
++  }
++
++
++  // MARK: Specificity
++
++  /// Returns `true` iff some thread in `work` is rooted at a given that is strictly more specific
++  /// than the root of every result in `done`, and is therefore still worth exploring.
++  private mutating func mayOutrank(
++    _ work: [ResolutionThread], _ done: [SummonResult], in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    guard !isComparingSpecificity else { return false }
++    let incumbents = Set(done.compactMap(\.witness.declaration))
++    if incumbents.isEmpty { return false }
++
++    let dbg = ProcessInfo.processInfo.environment["HYLO_DEBUG_SPEC"] != nil
++    var seen = Set<DeclarationIdentity>()
++    for t in work {
++      guard let r = t.root, !incumbents.contains(r), seen.insert(r).inserted else { continue }
++      if incumbents.allSatisfy({ (i) in isStrictlyMoreSpecific(r, than: i, in: scopeOfUse) }) {
++        if dbg { FileHandle.standardError.write("  -> keep going for \(r.erased)\n".data(using: .utf8)!) }
++        return true
++      }
++    }
++    return false
++  }
++
++  /// Returns `true` iff the given declared by `a` is strictly more specific than the one declared
++  /// by `b`, in `scopeOfUse`.
++  private mutating func isStrictlyMoreSpecific(
++    _ a: DeclarationIdentity, than b: DeclarationIdentity, in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    guard !isComparingSpecificity, a != b else { return false }
++    isComparingSpecificity = true
++    defer { isComparingSpecificity = false }
++    return entails(a, b, in: scopeOfUse) && !entails(b, a, in: scopeOfUse)
++  }
++
++
++  /// Returns `true` iff the given used at the root of `a` is strictly more specific than the one
++  /// used at the root of `b`, in `scopeOfUse`.
++  ///
++  /// A given `g` is *at least as specific* as a given `h` if the head of `h` can be instantiated
++  /// to the head of `g` and, under the assumptions of `g`'s context clause, every requirement of
++  /// that instantiation of `h` is derivable. Intuitively, `g` applies to no more types than `h`
++  /// does, so `g` describes a more refined situation. `g` is *strictly* more specific than `h` if
++  /// it is at least as specific and the converse does not hold.
++  private mutating func isMoreSpecific(
++    _ a: SummonResult, than b: SummonResult, in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    guard !isComparingSpecificity else { return false }
++    guard let (x, y) = divergence(a.witness, b.witness) else { return false }
++
++    isComparingSpecificity = true
++    defer { isComparingSpecificity = false }
++
++    return entails(x, y, in: scopeOfUse) && !entails(y, x, in: scopeOfUse)
++  }
++
++  /// Returns the declarations of the givens at the roots of the smallest subterms in which `a` and
++  /// `b` differ, or `nil` if they do not differ in a way that can be compared.
++  ///
++  /// Two derivations of the same type often share a common prefix; the choice that distinguishes
++  /// them is made deeper in the term. This method locates that choice.
++  private func divergence(
++    _ a: WitnessExpression, _ b: WitnessExpression
++  ) -> (DeclarationIdentity, DeclarationIdentity)? {
++    if a.value == b.value { return nil }
++
++    switch (a.value, b.value) {
++    case (.termApplication(let f, let x), .termApplication(let g, let y)):
++      if f.value == g.value { return divergence(x, y) }
++      if x.value == y.value { return divergence(f, g) }
++
++    case (.typeApplication(let f, _), .typeApplication(let g, _)):
++      return divergence(f, g)
++
++    case (.nested(let f), .nested(let g)):
++      return divergence(f, g)
++
++    default:
++      break
++    }
++
++    guard let x = a.declaration, let y = b.declaration, x != y else { return nil }
++    return (x, y)
++  }
++
++  /// Returns `true` iff, in the scope of `a`, the head of `b` can be instantiated to the head of
++  /// `a` and every requirement of `b` is derivable.
++  ///
++  /// The scope of `a` is exactly the context in which `a`'s own requirements hold, so deriving
++  /// `b`'s requirements there amounts to proving that `a`'s assumptions entail `b`'s.
++  private mutating func entails(
++    _ a: DeclarationIdentity, _ b: DeclarationIdentity, in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    let dbg = ProcessInfo.processInfo.environment["HYLO_DEBUG_SPEC"] != nil
++
++    // `a`'s parameters stay rigid; its own scope exposes its requirements as givens.
++    let ha = program.types.head(declaredType(of: a))
++    let hypotheses = ScopeIdentity(uncheckedFrom: a.erased)
++
++    // `b` is opened for unification.
++    let (ub, hb) = program.types.open(declaredType(of: b))
++
++    if dbg {
++      FileHandle.standardError.write(
++        "  entails? a.head=\(program.show(ha)) | b.head=\(program.show(hb)) b.usings=\(ub.map({ program.show($0) }))\n"
++          .data(using: .utf8)!)
++    }
++
++    // The heads must match.
++    guard var s = program.types.unifiable(hb, ha) else {
++      if dbg { FileHandle.standardError.write("    heads not unifiable\n".data(using: .utf8)!) }
++      return false
++    }
++
++    // Every requirement of `b` must hold under `a`'s assumptions.
++    for u in ub {
++      let t = program.types.reify(u, applying: s, withVariables: .kept)
++      let rs = summon(t, in: hypotheses)
++      guard let r = rs.first else {
++        if dbg {
++          FileHandle.standardError.write("    cannot derive \(program.show(t))\n".data(using: .utf8)!)
++        }
++        return false
++      }
++      s = s.union(r.substitutions)
++    }
++    if dbg { FileHandle.standardError.write("    YES\n".data(using: .utf8)!) }
++    return true
+   }
+ 
+   /// Returns the givens whose definitions are at the top-level of `m`.
+diff --git a/e2.ast b/e2.ast
+new file mode 100644
+index 0000000..1f364ee
+--- /dev/null
++++ b/e2.ast
+@@ -0,0 +1,20 @@
++trait Fwd {
++}
++trait Bidi {
++  given Bidi.Self is Fwd
++}
++trait RA {
++  given RA.Self is Bidi
++}
++struct Arr {
++  public memberwise init[](self: set Self)
++}
++given Arr is Fwd {
++}
++given Arr is RA {
++  given Arr is Bidi {
++  }
++}
++public fun main[]() let -> Int32 {
++  return .new(integer_literal: 0)
++}
+\ No newline at end of file
+diff --git a/e3.ir b/e3.ir
+new file mode 100644
+index 0000000..3fb8e22
+--- /dev/null
++++ b/e3.ir
+@@ -0,0 +1,286 @@
++global #witness(Arr) as Type, #preferred
++
++fun Bidi.$<ConformanceDeclaration at e3:2.20><Self>(let %p0: Bidi<Self>) let <: Fwd<Self> {
++%b0:
++  %r0 = property "$<ConformanceDeclaration at e3:2.20>" of %p0 as Fwd<Self>
++  %r1 = access [let] %r0
++  %r2 = yield %r1
++  %r4 = end %r1
++  %r3 = return
++}
++
++fun RA.$<ConformanceDeclaration at e3:3.18><Self>(let %p0: RA<Self>) let <: Bidi<Self> {
++%b0:
++  %r0 = property "$<ConformanceDeclaration at e3:3.18>" of %p0 as Bidi<Self>
++  %r1 = access [let] %r0
++  %r2 = yield %r1
++  %r4 = end %r1
++  %r3 = return
++}
++
++fun Arr.$<ConformanceDeclaration at e3:5.15>() let <: Deinitializable<Arr> {
++%b0:
++  %r0 = alloca Deinitializable<Arr>, #preferred
++  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: Arr>} as Deinitializable<Arr>
++  %r2 = access [set] %r0
++  %r3 = store %r1 to %r2
++  %r4 = end %r2
++  %r5 = access [let] %r0
++  %r6 = yield %r5
++  %r7 = end %r5
++  %r8 = access [sink] %r0
++  %r9 = assume_state %r8 uninitialized
++  %r10 = end %r8
++  %r11 = return
++}
++
++fun Deinitializable.deinit$synthesized<Self: Arr>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
++%b0:
++  %r0 = access [sink] %p1
++  %r1 = assume_state %r0 uninitialized
++  %r2 = end %r0
++  %r3 = access [set] %p2
++  %r4 = assume_state %r3 initialized
++  %r5 = end %r3
++  %r6 = return
++}
++
++fun Arr.$<ConformanceDeclaration at e3:5.33>() let <: Movable<Arr> {
++%b0:
++  %r0 = alloca Movable<Arr>, #preferred
++  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: Arr>, Movable.take_value.take_value@inout$synthesized<Self: Arr>} as Movable<Arr>
++  %r2 = access [set] %r0
++  %r3 = store %r1 to %r2
++  %r4 = end %r2
++  %r5 = access [let] %r0
++  %r6 = yield %r5
++  %r7 = end %r5
++  %r8 = access [sink] %r0
++  %r9 = assume_state %r8 uninitialized
++  %r10 = end %r8
++  %r11 = return
++}
++
++fun Movable.take_value.take_value@set$synthesized<Self: Arr>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
++
++fun Movable.take_value.take_value@inout$synthesized<Self: Arr>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
++
++fun Arr.init(set %p0: Arr, set %p1: Void)
++
++fun $<ConformanceDeclaration at e3:7.1>() let <: Fwd<Arr> {
++%b0:
++  %r0 = alloca Fwd<Arr>, #preferred
++  %r1 = witnesstable {} as Fwd<Arr>
++  %r2 = access [set] %r0
++  %r3 = store %r1 to %r2
++  %r4 = end %r2
++  %r5 = access [let] %r0
++  %r6 = yield %r5
++  %r7 = end %r5
++  %r8 = access [sink] %r0
++  %r9 = assume_state %r8 uninitialized
++  %r10 = end %r8
++  %r11 = return
++}
++
++fun $<ConformanceDeclaration at e3:8.1>.$<ConformanceDeclaration at e3:8.19>() let <: Bidi<Arr> {
++%b0:
++  %r0 = project $<ConformanceDeclaration at e3:7.1>[]
++  %r1 = alloca Bidi<Arr>, #preferred
++  %r2 = witnesstable {%r0} as Bidi<Arr>
++  %r13 = end %r0
++  %r3 = access [set] %r1
++  %r4 = store %r2 to %r3
++  %r5 = end %r3
++  %r6 = access [let] %r1
++  %r7 = yield %r6
++  %r8 = end %r6
++  %r9 = access [sink] %r1
++  %r10 = assume_state %r9 uninitialized
++  %r11 = end %r9
++  %r12 = return
++}
++
++fun $<ConformanceDeclaration at e3:8.1>() let <: RA<Arr> {
++%b0:
++  %r0 = project $<ConformanceDeclaration at e3:8.1>.$<ConformanceDeclaration at e3:8.19>[]
++  %r1 = alloca RA<Arr>, #preferred
++  %r2 = witnesstable {%r0} as RA<Arr>
++  %r13 = end %r0
++  %r3 = access [set] %r1
++  %r4 = store %r2 to %r3
++  %r5 = end %r3
++  %r6 = access [let] %r1
++  %r7 = yield %r6
++  %r8 = end %r6
++  %r9 = access [sink] %r1
++  %r10 = assume_state %r9 uninitialized
++  %r11 = end %r9
++  %r12 = return
++}
++
++fun LowerBoundable.lb<Self>(let %p0: LowerBoundable<Self>, let %p1: Self, set %p2: Int32)
++
++fun $<ConformanceDeclaration at e3:12.1>.lb<T>(let %p0: T, set %p1: Int32) {
++%b0:
++  %r0 = subfield %p1 at 0 as i32
++  %r1 = access [set] %r0
++  %r2 = store i32 1 to %r1
++  %r3 = end %r1
++  %r4 = return
++}
++
++fun $<ConformanceDeclaration at e3:12.1><T>(let %p0: Bidi<T>) let <: LowerBoundable<T> {
++%b0:
++  %r0 = alloca LowerBoundable<T>, #preferred
++  %r1 = witnesstable {LowerBoundable.lb<Self: T>} as LowerBoundable<T>
++  %r2 = access [set] %r0
++  %r3 = store %r1 to %r2
++  %r4 = end %r2
++  %r5 = access [let] %r0
++  %r6 = yield %r5
++  %r7 = end %r5
++  %r8 = access [sink] %r0
++  %r9 = assume_state %r8 uninitialized
++  %r10 = end %r8
++  %r11 = return
++}
++
++fun LowerBoundable.lb<Self: T>(let %p0: LowerBoundable<Self>, let %p1: Self, set %p2: Int32) {
++%b0:
++  %r0 = place_cast %p1 as let T
++  %r1 = access [let] %r0
++  %r2 = access [set] %p2
++  %r3 = apply $<ConformanceDeclaration at e3:12.1>.lb(%r1) => %r2
++  %r7 = end %r2
++  %r6 = end %r1
++  %r5 = end %r0
++  %r4 = return
++}
++
++fun $<ConformanceDeclaration at e3:13.1>.lb<T>(let %p0: T, set %p1: Int32) {
++%b0:
++  %r0 = subfield %p1 at 0 as i32
++  %r1 = access [set] %r0
++  %r2 = store i32 2 to %r1
++  %r3 = end %r1
++  %r4 = return
++}
++
++fun $<ConformanceDeclaration at e3:13.1><T>(let %p0: RA<T>) let <: LowerBoundable<T> {
++%b0:
++  %r0 = alloca LowerBoundable<T>, #preferred
++  %r1 = witnesstable {LowerBoundable.lb<Self: T>} as LowerBoundable<T>
++  %r2 = access [set] %r0
++  %r3 = store %r1 to %r2
++  %r4 = end %r2
++  %r5 = access [let] %r0
++  %r6 = yield %r5
++  %r7 = end %r5
++  %r8 = access [sink] %r0
++  %r9 = assume_state %r8 uninitialized
++  %r10 = end %r8
++  %r11 = return
++}
++
++fun LowerBoundable.lb<Self: T>(let %p0: LowerBoundable<Self>, let %p1: Self, set %p2: Int32) {
++%b0:
++  %r0 = place_cast %p1 as let T
++  %r1 = access [let] %r0
++  %r2 = access [set] %p2
++  %r3 = apply $<ConformanceDeclaration at e3:13.1>.lb(%r1) => %r2
++  %r7 = end %r2
++  %r6 = end %r1
++  %r5 = end %r0
++  %r4 = return
++}
++
++fun main(set %p0: Int32) {
++%b0:
++  %r23 = global_access #witness(Arr)
++  %r0 = alloca Arr, #preferred
++  %r1 = access [set] %r0
++  %r2 = assume_state %r1 initialized
++  %r3 = end %r1
++  %r4 = project $<ConformanceDeclaration at e3:8.1>[]
++  %r24 = access [let] %r23
++  %r6 = access [let] %r4
++  %r25 = place_cast %r6 as let RA<T>
++  %r7 = project $<ConformanceDeclaration at e3:13.1>$existentialized[%r24, %r25]
++  %r8 = property "lb" of %r7 as [Void](let LowerBoundable<Self>, self: let Self) let -> Int32
++  %r9 = access [let] %r7
++  %r10 = access [let] %r0
++  %r11 = access [set] %p0
++  %r12 = apply %r8(%r9, %r10) => %r11
++  %r19 = end %r11
++  %r18 = end %r10
++  %r17 = end %r9
++  %r16 = end %r7
++  %r5 = end %r24
++  %r15 = end %r6
++  %r14 = end %r4
++  %r20 = access [sink] %r0
++  %r21 = assume_state %r20 uninitialized
++  %r22 = end %r20
++  %r13 = return
++}
++
++fun Bidi.$<ConformanceDeclaration at e3:2.20>$existentialized(let %p0: Type, let %p1: Bidi<Self>) let <: Fwd<Self> {
++%b0:
++  %r0 = property "$<ConformanceDeclaration at e3:2.20>" of %p1 as Fwd<Self>
++  %r1 = access [let] %r0
++  %r2 = yield %r1
++  %r3 = end %r1
++  %r4 = return
++}
++
++fun RA.$<ConformanceDeclaration at e3:3.18>$existentialized(let %p0: Type, let %p1: RA<Self>) let <: Bidi<Self> {
++%b0:
++  %r0 = property "$<ConformanceDeclaration at e3:3.18>" of %p1 as Bidi<Self>
++  %r1 = access [let] %r0
++  %r2 = yield %r1
++  %r3 = end %r1
++  %r4 = return
++}
++
++fun $<ConformanceDeclaration at e3:12.1>$existentialized(let %p0: Type, let %p1: Bidi<T>) let <: LowerBoundable<T> {
++%b0:
++  %r0 = access [let] %p0
++  %r1 = type_witness <T> LowerBoundable<T>(%r0)
++  %r15 = end %r0
++  %r2 = access [let] %r1
++  %r3 = alloca %r2 as LowerBoundable<T>, #preferred
++  %r16 = end %r2
++  %r4 = witnesstable {LowerBoundable.lb<Self: T>} as LowerBoundable<T>
++  %r5 = access [set] %r3
++  %r6 = store %r4 to %r5
++  %r7 = end %r5
++  %r8 = access [let] %r3
++  %r9 = yield %r8
++  %r10 = end %r8
++  %r11 = access [sink] %r3
++  %r12 = assume_state %r11 uninitialized
++  %r13 = end %r11
++  %r14 = return
++}
++
++fun $<ConformanceDeclaration at e3:13.1>$existentialized(let %p0: Type, let %p1: RA<T>) let <: LowerBoundable<T> {
++%b0:
++  %r0 = access [let] %p0
++  %r1 = type_witness <T> LowerBoundable<T>(%r0)
++  %r15 = end %r0
++  %r2 = access [let] %r1
++  %r3 = alloca %r2 as LowerBoundable<T>, #preferred
++  %r16 = end %r2
++  %r4 = witnesstable {LowerBoundable.lb<Self: T>} as LowerBoundable<T>
++  %r5 = access [set] %r3
++  %r6 = store %r4 to %r5
++  %r7 = end %r5
++  %r8 = access [let] %r3
++  %r9 = yield %r8
++  %r10 = end %r8
++  %r11 = access [sink] %r3
++  %r12 = assume_state %r11 uninitialized
++  %r13 = end %r11
++  %r14 = return
++}
+-- 
+2.43.0
+

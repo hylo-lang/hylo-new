@@ -1,0 +1,917 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>Algorithm Specialization for Hylo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,500;0,600;1,500&display=swap">
+
+<style>
+  :root {
+    --paper:      #e7ecef;
+    --sheet:      #fdfefe;
+    --sheet-2:    #f2f5f7;
+    --ink:        #14191f;
+    --ink-2:      #3d4a56;
+    --muted:      #6a7885;
+    --rule:       #c3ced6;
+    --rule-soft:  #d9e1e6;
+    --signal:     #0d6558;
+    --signal-bg:  #dcece8;
+    --warn:       #a34a0c;
+    --warn-bg:    #f6e6da;
+    --code-bg:    #f4f7f8;
+    --shadow:     0 1px 0 rgba(20,25,31,.05), 0 12px 32px -20px rgba(20,25,31,.35);
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #0e1216;
+      --sheet:     #161c22;
+      --sheet-2:   #1b232a;
+      --ink:       #e2e8ed;
+      --ink-2:     #b3bfc9;
+      --muted:     #7e8d99;
+      --rule:      #2c363f;
+      --rule-soft: #232c34;
+      --signal:    #56c9b0;
+      --signal-bg: #123029;
+      --warn:      #e08b4c;
+      --warn-bg:   #33220f;
+      --code-bg:   #11171c;
+      --shadow:    0 1px 0 rgba(0,0,0,.4), 0 12px 32px -20px rgba(0,0,0,.9);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:     #0e1216;
+    --sheet:     #161c22;
+    --sheet-2:   #1b232a;
+    --ink:       #e2e8ed;
+    --ink-2:     #b3bfc9;
+    --muted:     #7e8d99;
+    --rule:      #2c363f;
+    --rule-soft: #232c34;
+    --signal:    #56c9b0;
+    --signal-bg: #123029;
+    --warn:      #e08b4c;
+    --warn-bg:   #33220f;
+    --code-bg:   #11171c;
+    --shadow:    0 1px 0 rgba(0,0,0,.4), 0 12px 32px -20px rgba(0,0,0,.9);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 74rem;
+    margin: 0 auto;
+    padding: clamp(1rem, 3vw, 3rem) clamp(.75rem, 3vw, 2rem) 5rem;
+  }
+
+  /* ---- masthead ------------------------------------------------------- */
+
+  .masthead {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+    padding: clamp(1.5rem, 4vw, 3.25rem) clamp(1.25rem, 4vw, 3.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .7rem;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.25rem;
+  }
+  .kicker b { color: var(--signal); font-weight: 600; }
+
+  h1 {
+    font-family: Spectral, ui-serif, Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(2rem, 5.5vw, 3.4rem);
+    line-height: 1.08;
+    letter-spacing: -.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .thesis {
+    font-family: Spectral, ui-serif, Georgia, serif;
+    font-size: clamp(1.05rem, 2.1vw, 1.3rem);
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: 46ch;
+    margin: 0;
+  }
+  .thesis em { color: var(--ink); font-style: italic; }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--rule-soft);
+    border-top: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .fact { background: var(--sheet); padding: .9rem 0 .9rem; }
+  .fact dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .66rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 .2rem;
+  }
+  .fact dd {
+    margin: 0; font-size: 1.02rem; font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- sections ------------------------------------------------------- */
+
+  main { display: flex; flex-direction: column; gap: 2rem; margin-top: 2rem; }
+
+  section {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+    padding: clamp(1.25rem, 3.5vw, 2.75rem) clamp(1.1rem, 4vw, 3.5rem);
+    display: grid;
+    grid-template-columns: 8rem minmax(0, 1fr);
+    gap: 0 2.5rem;
+    align-items: start;
+  }
+  @media (max-width: 56rem) {
+    section { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+  }
+
+  .rail {
+    position: sticky;
+    top: 1.5rem;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .7rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: .55rem;
+    border-top: 2px solid var(--ink);
+  }
+  @media (max-width: 56rem) {
+    .rail { position: static; border-top: none; padding-top: 0; }
+  }
+  .rail .glyph {
+    display: block;
+    font-family: Spectral, ui-serif, serif;
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: 0;
+    text-transform: none;
+    margin-bottom: .35rem;
+  }
+
+  .body { min-width: 0; }
+  .body > * + * { margin-top: 1.1rem; }
+
+  h2 {
+    font-family: Spectral, ui-serif, Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(1.4rem, 3vw, 1.95rem);
+    line-height: 1.2;
+    letter-spacing: -.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 0;
+    letter-spacing: -.005em;
+  }
+  p { margin: 0; max-width: 68ch; }
+  .body p, .body li { color: var(--ink-2); }
+  .body strong { color: var(--ink); font-weight: 600; }
+
+  a { color: var(--signal); text-underline-offset: .18em; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 2px;
+  }
+
+  code, kbd {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .86em;
+    background: var(--code-bg);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+    padding: .07em .32em;
+  }
+
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    border: 1px solid var(--rule-soft);
+    border-left: 2px solid var(--rule);
+    border-radius: 2px;
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .82rem;
+    line-height: 1.72;
+    color: var(--ink);
+    tab-size: 2;
+  }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--signal); font-weight: 500; }
+  pre .hi { color: var(--warn); font-weight: 500; }
+
+  figure { margin: 0; }
+  figcaption {
+    font-size: .82rem; color: var(--muted); margin-top: .7rem;
+    max-width: 62ch;
+  }
+
+  ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: .85rem; }
+  ul.plain > li { padding-left: 1.15rem; position: relative; }
+  ul.plain > li::before {
+    content: "—"; position: absolute; left: 0; color: var(--rule); font-weight: 600;
+  }
+
+  /* ---- findings ------------------------------------------------------- */
+
+  .findings { display: grid; gap: 1px; background: var(--rule-soft);
+              border: 1px solid var(--rule-soft); border-radius: 2px; }
+  .finding { background: var(--sheet); padding: 1.05rem 1.15rem; display: grid; gap: .4rem; }
+  .finding p { font-size: .93rem; }
+  .src {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .72rem; color: var(--muted); letter-spacing: .01em;
+  }
+
+  /* ---- evidence table ------------------------------------------------- */
+
+  .scroller { overflow-x: auto; border: 1px solid var(--rule-soft); border-radius: 2px; }
+  table { border-collapse: collapse; width: 100%; min-width: 46rem; font-size: .875rem; }
+  caption { caption-side: top; text-align: left; font-size: .82rem; color: var(--muted);
+            padding: 0 0 .6rem; }
+  th, td { text-align: left; padding: .6rem .85rem; vertical-align: top; border-bottom: 1px solid var(--rule-soft); }
+  thead th {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .66rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 500; background: var(--sheet-2);
+    border-bottom: 1px solid var(--rule); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.probe {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 500; color: var(--ink); white-space: nowrap;
+  }
+  td.was { color: var(--muted); }
+  td.now { color: var(--ink); }
+  .tick { color: var(--signal); font-weight: 600; }
+  .flag { color: var(--warn); font-weight: 600; }
+
+  /* ---- phases --------------------------------------------------------- */
+
+  ol.phases { list-style: none; counter-reset: none; padding: 0; margin: 0;
+              display: grid; gap: 0; }
+  ol.phases > li {
+    display: grid;
+    grid-template-columns: 3.6rem minmax(0, 1fr);
+    gap: 0 1.1rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--rule-soft);
+  }
+  ol.phases > li:first-child { border-top: none; }
+  .tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .78rem; font-weight: 600; color: var(--signal);
+    padding-top: .1rem;
+  }
+  .tag.blocked { color: var(--warn); }
+  .phase-body { display: grid; gap: .35rem; min-width: 0; }
+  .phase-body p { font-size: .93rem; }
+  .dep {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .7rem; color: var(--muted); letter-spacing: .04em;
+  }
+
+  /* ---- decisions ------------------------------------------------------ */
+
+  details {
+    border: 1px solid var(--rule-soft); border-radius: 2px;
+    background: var(--sheet-2); padding: .75rem .95rem;
+  }
+  details + details { margin-top: .55rem; }
+  summary {
+    cursor: pointer; font-weight: 600; color: var(--ink);
+    font-size: .95rem; list-style-position: outside;
+  }
+  details > p { margin-top: .6rem; font-size: .91rem; }
+
+  .callout {
+    border-left: 2px solid var(--warn);
+    background: var(--warn-bg);
+    padding: .85rem 1.1rem;
+    border-radius: 0 2px 2px 0;
+  }
+  .callout p { color: var(--ink); font-size: .93rem; }
+
+  /* ---- the rule ------------------------------------------------------- */
+
+  .rule-box {
+    background: var(--signal-bg);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+    padding: 1.15rem 1.3rem;
+  }
+  .rule-box .formula {
+    font-family: Spectral, ui-serif, Georgia, serif;
+    font-size: clamp(.98rem, 2vw, 1.16rem);
+    line-height: 1.75;
+    color: var(--ink);
+    margin: 0;
+    max-width: 60ch;
+  }
+  .rule-box .formula i { font-style: italic; }
+  .rule-box .formula b { font-weight: 600; color: var(--signal); font-style: normal; }
+
+  footer {
+    margin-top: 2.5rem; padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    font-size: .82rem; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: .4rem 1.5rem;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a, summary { transition: color .15s ease; }
+  }
+</style>
+
+<div class="sheet">
+
+  <header class="masthead">
+    <div class="kicker">
+      <span>Design proposal</span>
+      <span>hylo-lang/hylo-new @ <b>840aa66</b></span>
+      <span>2026-09-01</span>
+    </div>
+
+    <h1>Algorithm Specialization for Hylo</h1>
+
+    <p class="thesis">
+      Write <em>lower_bound</em> once for bidirectional collections, add a better one for
+      random-access collections, and have the better one win — including when the call is made
+      from inside another generic algorithm.
+    </p>
+
+    <dl class="facts">
+      <div class="fact">
+        <dt>Missing piece</dt>
+        <dd>A specificity order</dd>
+      </div>
+      <div class="fact">
+        <dt>Prototype</dt>
+        <dd>2 branches, 186/186 green</dd>
+      </div>
+      <div class="fact">
+        <dt>Compile-time cost</dt>
+        <dd>&lt;&#8202;3&#8202;%</dd>
+      </div>
+      <div class="fact">
+        <dt>Probes</dt>
+        <dd>16 programs</dd>
+      </div>
+    </dl>
+  </header>
+
+  <main>
+
+    <!-- ================================================================= -->
+    <section>
+      <div class="rail"><span class="glyph">§</span>The ask</div>
+      <div class="body">
+        <h2>What we want to be able to write</h2>
+        <p>
+          Two implementations of one algorithm, differing only in what they assume about their
+          operand, and a compiler that picks the better one wherever it is applicable — the thing
+          the STL gets from tag dispatching and C++20 gets from concept subsumption.
+        </p>
+<pre><span class="c">// the generic implementation — a linear scan</span>
+<span class="k">fun</span> lower_bound&lt;C <span class="k">is</span> BidirectionalCollection&gt;(<span class="k">in</span> c: C, _ x: C.Element) -&gt; C.Position
+
+<span class="c">// the specialized one — a binary search</span>
+<span class="k">fun</span> lower_bound&lt;C <span class="k">is</span> RandomAccessCollection&gt;(<span class="k">in</span> c: C, _ x: C.Element) -&gt; C.Position
+
+<span class="c">// …and one hand-tuned for a single type</span>
+<span class="k">given</span> &lt;T&gt; =&gt; Array&lt;T&gt; <span class="k">is</span> lower_bound { … }</pre>
+        <p>
+          <code>Docs/State-of-Generics.md</code> already lists this under <strong>Known
+          limitations → Specialization</strong>, and offers only a manual, per-call-site override.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <section>
+      <div class="rail"><span class="glyph">⊩</span>Ground truth</div>
+      <div class="body">
+        <h2>Four things that are true today</h2>
+        <p>
+          Established by building the compiler and reading the IR it emits, not by reading the
+          source alone.
+        </p>
+
+        <div class="findings">
+          <div class="finding">
+            <h3>Generics are compiled by existentialization, not monomorphization</h3>
+            <p>
+              Every generic function receives its witnesses as runtime values. So specialization
+              cannot be a code-generation trick: the implementation a generic function uses must be
+              <strong>reachable from a witness its caller hands it</strong>. That single constraint
+              determines the whole design.
+            </p>
+            <p class="src">Sources/FrontEnd/IR/IREmitter+Deploymorphization.swift</p>
+          </div>
+
+          <div class="finding">
+            <h3>Implicit resolution ranks by derivation size, which is orthogonal to specificity</h3>
+            <p>
+              The search stops at the first depth that yields a result, then keeps the lexically
+              closest. Two overlapping givens at equal depth are an ambiguity error; a more specific
+              given one step deeper is never reached at all.
+            </p>
+            <p class="src">Typer.takeSummonResults — probes e1, e6</p>
+          </div>
+
+          <div class="finding">
+            <h3>The encoding that works is already expressible — just unusable at scale</h3>
+            <p>
+              Naming the algorithm as its own trait and constraining clients on <em>that</em> does
+              carry the specialized implementation across a generic boundary. It is Siek and
+              Lumsdaine's <span style="font-style:italic">CopyRange</span> idiom, and it works in
+              Hylo today. Every overlap is simply an ambiguity error.
+            </p>
+            <p class="src">probes e4, lb</p>
+          </div>
+
+          <div class="finding">
+            <h3>Two functions differing only in their context clause already parse</h3>
+            <p>
+              The compiler accepts them and builds an overload set; the call is merely ambiguous.
+              Concept-based overloading is one ranking rule away.
+            </p>
+            <p class="src">probe e7</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <section>
+      <div class="rail"><span class="glyph">≺</span>The rule</div>
+      <div class="body">
+        <h2>Order givens by entailment, not by size</h2>
+
+        <figure>
+          <svg viewBox="0 0 620 236" width="100%" role="img"
+               aria-label="Two derivations of LowerBound for Array, both of size two, distinguished only by the specificity order between their root givens."
+               style="max-width:620px; display:block; overflow:visible;">
+            <defs>
+              <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7"
+                      orient="auto-start-reverse">
+                <path d="M0 0 L8 4 L0 8 z" fill="var(--rule)"/>
+              </marker>
+              <marker id="ars" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7"
+                      orient="auto-start-reverse">
+                <path d="M0 0 L8 4 L0 8 z" fill="var(--signal)"/>
+              </marker>
+            </defs>
+
+            <text x="0" y="14" font-family="IBM Plex Mono, monospace" font-size="11"
+                  letter-spacing="1.4" fill="var(--muted)">QUERY</text>
+            <text x="0" y="36" font-family="IBM Plex Mono, monospace" font-size="14"
+                  fill="var(--ink)">LowerBound&lt;Array&lt;Int&gt;&gt;</text>
+
+            <!-- branch lines -->
+            <path d="M18 46 V72 H150" fill="none" stroke="var(--rule)" stroke-width="1.4"
+                  marker-end="url(#ar)"/>
+            <path d="M18 46 V172 H150" fill="none" stroke="var(--signal)" stroke-width="1.4"
+                  marker-end="url(#ars)"/>
+
+            <!-- generic branch -->
+            <rect x="158" y="52" width="300" height="42" rx="2"
+                  fill="var(--code-bg)" stroke="var(--rule-soft)"/>
+            <text x="172" y="70" font-family="IBM Plex Mono, monospace" font-size="12"
+                  fill="var(--ink)">&lt;T is Bidirectional&gt; =&gt; T is LowerBound</text>
+            <text x="172" y="86" font-family="IBM Plex Mono, monospace" font-size="10.5"
+                  fill="var(--muted)">then Bidirectional&lt;Array&gt;  ·  size 2</text>
+            <text x="472" y="78" font-family="IBM Plex Sans, sans-serif" font-size="12"
+                  fill="var(--muted)">linear scan</text>
+
+            <!-- specialized branch -->
+            <rect x="158" y="152" width="300" height="42" rx="2"
+                  fill="var(--signal-bg)" stroke="var(--signal)" stroke-opacity=".45"/>
+            <text x="172" y="170" font-family="IBM Plex Mono, monospace" font-size="12"
+                  fill="var(--ink)">&lt;T is RandomAccess&gt; =&gt; T is LowerBound</text>
+            <text x="172" y="186" font-family="IBM Plex Mono, monospace" font-size="10.5"
+                  fill="var(--muted)">then RandomAccess&lt;Array&gt;  ·  size 2</text>
+            <text x="472" y="178" font-family="IBM Plex Sans, sans-serif" font-size="12"
+                  fill="var(--signal)" font-weight="500">binary search</text>
+
+            <!-- the ordering -->
+            <path d="M308 148 V100" fill="none" stroke="var(--signal)" stroke-width="1.4"
+                  marker-end="url(#ars)"/>
+            <text x="320" y="122" font-family="Spectral, serif" font-size="15"
+                  fill="var(--signal)" font-style="italic">≺ &#160;strictly more specific</text>
+
+            <text x="0" y="222" font-family="IBM Plex Sans, sans-serif" font-size="12.5"
+                  fill="var(--muted)">Equal size, so today this is an ambiguity error. The
+              ordering breaks the tie.</text>
+          </svg>
+          <figcaption>
+            Derivation size cannot separate these: both roots are one implication away from a
+            conformance the type declares directly. What separates them is that
+            <code>RandomAccess&lt;T&gt;</code> entails <code>Bidirectional&lt;T&gt;</code> and not
+            the reverse.
+          </figcaption>
+        </figure>
+
+        <div class="rule-box">
+          <p class="formula">
+            For givens <i>g</i> = ∀X̄. C̄<sub>g</sub> ⇒ H<sub>g</sub> and
+            <i>g′</i> = ∀Ȳ. C̄<sub>g′</sub> ⇒ H<sub>g′</sub>:
+            <i>g</i> is <b>at least as specific as</b> <i>g′</i> when some substitution ρ of Ȳ makes
+            ρ(H<sub>g′</sub>) = H<sub>g</sub> and, under the assumptions C̄<sub>g</sub>, every
+            requirement in ρ(C̄<sub>g′</sub>) is <b>derivable</b>.
+          </p>
+        </div>
+
+        <p>
+          This is C++20's subsumption, G's “callable from”, and Rust RFC 1210's
+          <code>apply(I) ⊆ apply(J)</code>, transposed onto Hylo's givens. Two properties make it
+          fit Hylo rather than fight it.
+        </p>
+
+        <ul class="plain">
+          <li>
+            <strong>It is stratified.</strong> Specificity is defined in terms of
+            <em>derivability</em>, never in terms of the choice rule — so the ordering can never
+            depend on itself.
+          </li>
+          <li>
+            <strong>It subsumes the existing escape hatch.</strong> A local given with a closed head
+            and an empty context entails everything and is entailed by nothing, so it is
+            automatically maximal. The manual override documented in
+            <code>State-of-Generics.md</code> keeps working, and now for a principled reason.
+          </li>
+          <li>
+            <strong>It covers the whole chain in one mechanism.</strong>
+            <code>Array</code> ≺ <code>RandomAccessCollection</code> ≺
+            <code>BidirectionalCollection</code>: a more concrete <em>head</em> and a finer
+            <em>context</em> are both ordered by the same definition.
+          </li>
+          <li>
+            <strong>It stays silent when it should.</strong> Genuinely incomparable givens remain an
+            ambiguity error. Nothing is picked arbitrarily.
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <section>
+      <div class="rail"><span class="glyph">⊨</span>Evidence</div>
+      <div class="body">
+        <h2>What the prototype actually does</h2>
+        <p>
+          Each probe is a standalone program. The result is read off <code>--emit ir</code>: which
+          <code>ConformanceDeclaration</code> the body of <code>main</code> projects <em>is</em> the
+          implementation resolution selected.
+        </p>
+
+        <div class="scroller">
+          <table>
+            <caption>Two branches off <code>main</code>, both with the full test suite green.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Probe</th>
+                <th scope="col">Question</th>
+                <th scope="col">On main</th>
+                <th scope="col">With the order</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="probe">e1</td>
+                <td>Overlapping givens on <code>Bidi</code> and <code>RA</code></td>
+                <td class="was">ambiguous</td>
+                <td class="now"><span class="tick">✓</span> picks <code>RA</code></td>
+              </tr>
+              <tr>
+                <td class="probe">e12</td>
+                <td>Three-level refinement chain</td>
+                <td class="was">ambiguous</td>
+                <td class="now"><span class="tick">✓</span> picks the deepest</td>
+              </tr>
+              <tr>
+                <td class="probe">e14</td>
+                <td>A given for <code>Arr&lt;T&gt;</code> against ones for <code>RA</code> and <code>Bidi</code></td>
+                <td class="was">ambiguous</td>
+                <td class="now"><span class="tick">✓</span> the <code>Arr&lt;T&gt;</code> one</td>
+              </tr>
+              <tr>
+                <td class="probe">lb</td>
+                <td>Realistic <code>lower_bound</code>, two models, two levels of generic client</td>
+                <td class="was">ambiguous</td>
+                <td class="now"><span class="tick">✓</span> binary search, and linear for the other model</td>
+              </tr>
+              <tr>
+                <td class="probe">e6</td>
+                <td>Specialized given needs a <em>deeper</em> derivation</td>
+                <td class="was">picks the generic one</td>
+                <td class="now"><span class="tick">✓</span> picks <code>RA</code></td>
+              </tr>
+              <tr>
+                <td class="probe">e7</td>
+                <td>Two overloads differing only by constraints</td>
+                <td class="was">ambiguous</td>
+                <td class="now"><span class="tick">✓</span> the <code>RA</code> overload</td>
+              </tr>
+              <tr>
+                <td class="probe">e11</td>
+                <td>Two <em>incomparable</em> givens</td>
+                <td class="was">ambiguous</td>
+                <td class="now">ambiguous — unchanged, by design</td>
+              </tr>
+              <tr>
+                <td class="probe">e9</td>
+                <td>The <code>State-of-Generics</code> <code>S&lt;T&gt;</code> / <code>Q</code> example</td>
+                <td class="was">picks <code>&lt;T&gt; =&gt; S&lt;T&gt; is P</code></td>
+                <td class="now">the same — and for the right reason</td>
+              </tr>
+              <tr>
+                <td class="probe">e15</td>
+                <td>Finer constraint is <code>where T.Position == Int32</code></td>
+                <td class="was">generic given wins</td>
+                <td class="now"><span class="flag">!</span> the search continuation hangs</td>
+              </tr>
+              <tr>
+                <td class="probe">e13</td>
+                <td>Overloads called from a generic client</td>
+                <td class="was">—</td>
+                <td class="now">binds the coarse overload — G's documented limit</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <p>
+            <strong>e15 is the one regression, and it is instructive.</strong> The specificity
+            <em>filter</em> is fine. What hangs is keeping the breadth-first search alive past its
+            first success, which then reaches the built-in reflexivity, symmetry and transitivity
+            givens. Probe e16 shows the underlying divergence is <strong>already present on
+            main</strong> for a search that simply fails. That is why the work is split, and why P0
+            exists.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <section>
+      <div class="rail"><span class="glyph">→</span>Sequence</div>
+      <div class="body">
+        <h2>The work, in dependency order</h2>
+        <p>
+          The numbering is a real sequence: each phase names what must land before it.
+        </p>
+
+        <ol class="phases">
+          <li>
+            <span class="tag">P0</span>
+            <div class="phase-body">
+              <h3>Make an exhausting implicit search terminate</h3>
+              <p>
+                A query over equality constraints that cannot be satisfied already diverges on
+                unmodified <code>main</code>. Today the first-success cutoff hides it. P1b removes
+                that cutoff and makes it reachable from ordinary code.
+              </p>
+              <p class="dep">independent of specialization · worth doing on its own merits</p>
+            </div>
+          </li>
+          <li>
+            <span class="tag">P1a</span>
+            <div class="phase-body">
+              <h3>The specificity filter</h3>
+              <p>
+                Order the candidates that already reach the result set together — precisely the set
+                that is an ambiguity error today. Cheap, safe, and the bulk of the payoff. Keep the
+                existing depth cutoff. Split the <code>penalties</code> counter first: it currently
+                charges for derivation shape as well as lexical distance.
+              </p>
+              <p class="dep">buys e1, e12, e14, lb</p>
+            </div>
+          </li>
+          <li>
+            <span class="tag">P1b</span>
+            <div class="phase-body">
+              <h3>Reach candidates the depth cutoff hides</h3>
+              <p>
+                Not a breadth-first continuation — e15 shows that is not viable. Instead, enumerate
+                root givens by lexical stratum, order them, and try the maximal ones first. That
+                bounds the extra work to one derivation attempt per root given and makes the
+                algorithm provably agree with the declarative rule.
+              </p>
+              <p class="dep">needs P0 · buys e6, e15</p>
+            </div>
+          </li>
+          <li>
+            <span class="tag">P2</span>
+            <div class="phase-body">
+              <h3>Specificity for overload resolution</h3>
+              <p>
+                The same order, applied where two functions differ only in their context clause.
+                This is what makes the familiar syntax work at call sites where the type is
+                concrete.
+              </p>
+              <p class="dep">needs P1a</p>
+            </div>
+          </li>
+          <li>
+            <span class="tag">P3</span>
+            <div class="phase-body">
+              <h3>Diagnostics that say why</h3>
+              <p>
+                When candidates survive as incomparable, say so, and name the requirement that
+                could not be derived — the entailment check already knows it.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span class="tag">P4</span>
+            <div class="phase-body">
+              <h3><code>specializing fun</code></h3>
+              <p>
+                Generate the algorithm-trait idiom instead of writing it by hand. A family of
+                declarations differing only in their constraints desugars to a synthesized trait
+                named after the function, one given per member, and a forwarder. Clients then opt
+                into late binding with one token:
+                <code>&lt;C is BidirectionalCollection &amp; lower_bound&gt;</code>.
+              </p>
+              <p class="dep">needs P1 · this is the part that crosses a generic boundary</p>
+            </div>
+          </li>
+          <li>
+            <span class="tag">P5</span>
+            <div class="phase-body">
+              <h3>The collection hierarchy in the standard library</h3>
+              <p>
+                Greenfield — today's <code>Core</code> has no collection traits at all. Design it
+                with P4 in hand rather than retrofitting.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span class="tag blocked">P6</span>
+            <div class="phase-body">
+              <h3>Blocked: running any of it</h3>
+              <p>
+                Programs of this shape die in the LLVM backend on
+                <code>Runtime-defined IRWitnessTable operand</code>. Type checking and IR are
+                complete and correct — every result above was read off <code>--emit ir</code> — but
+                nothing with a generic client and a conformance witness can execute yet.
+              </p>
+              <p class="dep">external · hylo-new#342</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <section>
+      <div class="rail"><span class="glyph">?</span>Open</div>
+      <div class="body">
+        <h2>Decisions this raises but does not settle</h2>
+
+        <details>
+          <summary>Should <code>refines</code> desugar to a lifting given?</summary>
+          <p>
+            Today <code>given Arr is RA {}</code> fails unless the author separately supplies
+            <code>Bidi&lt;Arr&gt;</code>. If refinement generated
+            <code>given &lt;T is RA&gt; =&gt; T is Bidi</code> instead, conformance authors would
+            write less, the coarse conformance would have a single derivation, and a third party
+            could install a better witness for a whole class of types. The cost: a type that
+            declares the coarse conformance itself then shadows the lifted witness wholesale,
+            losing every refinement-level specialization at once. That argues for a companion
+            feature — witness update syntax.
+          </p>
+        </details>
+
+        <details>
+          <summary>Should algorithm constraints be inferred rather than written?</summary>
+          <p>
+            P4 still asks the client to write <code>&amp; lower_bound</code>. It could be inferred
+            by fixpoint over the call graph, and there is a clean theorem behind it: if a witness is
+            derivable from a function's declared context, adding it to that context never
+            invalidates any call site, because the caller has already discharged that context — and
+            the caller may supply a strictly more specific one. So propagation is always type-safe
+            and can only improve specificity. The objection is that it makes a function's signature,
+            and hence its module interface hash, depend on its body. Proposal: not in v1.
+          </p>
+        </details>
+
+        <details>
+          <summary>Does specificity outrank lexical proximity, or the other way round?</summary>
+          <p>
+            The prototype puts specificity first, which is what makes e6 work. But scoped
+            overlapping conformances are a deliberate Hylo feature, and a <em>conditional</em> local
+            override now loses to a more specific imported given. A context-free local given still
+            wins, so the documented escape hatch survives. My reading is that this is an artefact of
+            the conflated <code>penalties</code> counter rather than a real trade-off — but it
+            should be decided explicitly, not inherited from a prototype.
+          </p>
+        </details>
+
+        <details>
+          <summary>Is there a role for monomorphization-time re-resolution?</summary>
+          <p>
+            It would recover C++ behaviour with no signature changes, but only as a best-effort
+            optimization, and only if an algorithm's implementations are declared observationally
+            interchangeable — the assumption C++ and GHC's <code>SPECIALIZE</code> both make
+            tacitly. Worth a marker on the algorithm trait. Not v1.
+          </p>
+        </details>
+
+        <p style="margin-top:1.35rem">
+          The sharpest objection is completeness. <code>State-of-Generics.md</code> argues the
+          smallest-term rule earns its place because it admits an algorithm <em>complete</em> with
+          respect to a three-line declarative spec, so a user need only understand the spec. The
+          specificity rule has to come with the same story — which is why the stratum-ordered
+          enumeration in P1b is the load-bearing piece, not a refactor.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <section>
+      <div class="rail"><span class="glyph">↩</span>Prior art</div>
+      <div class="body">
+        <h2>Where this comes from</h2>
+        <ul class="plain">
+          <li>
+            <strong>Siek &amp; Lumsdaine, <em>A Language for Generic Programming in the
+            Large</em>.</strong> The closest prior art. G has concept-based overloading with a
+            most-specific rule, and §4.3 documents exactly the problem P4 solves — dispatching to an
+            optimized algorithm from <em>inside</em> another generic function under separate
+            compilation. G gave that case up; the witness-passing model gets it back.
+          </li>
+          <li>
+            <strong>Racordon, Flesselle &amp; Pham, <em>On the State of Coherence in the Land of
+            Type Classes</em>.</strong> Hylo's own position: reject global uniqueness, allow
+            overlapping instances, disambiguate at the use site. A most-specific-wins policy is the
+            natural completion of that stance, not a departure from it.
+          </li>
+          <li>
+            <strong>Rust RFC 1210.</strong> The chain rule, the <code>default</code> opt-in, and
+            why the lattice rule was dropped — plus a decade of evidence that specialization tied to
+            code generation is where the soundness problems live.
+          </li>
+          <li>
+            <strong>C++20 <code>[temp.constr.order]</code>.</strong> Subsumption as a partial order
+            on constraints, decided without analysing types for equivalence.
+          </li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <span>proto/specificity-ordering · ee43a3c</span>
+    <span>proto/overload-specificity · 7598a6e</span>
+    <span>186/186 tests</span>
+  </footer>
+
+</div>
+
+</body></html>

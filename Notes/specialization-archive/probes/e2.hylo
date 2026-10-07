@@ -1,0 +1,12 @@
+trait Fwd {}
+trait Bidi refines Fwd {}
+trait RA refines Bidi {}
+
+struct Arr { public memberwise init }
+
+given Arr is Fwd {}
+given Arr is RA {
+  given Arr is Bidi {}
+}
+
+public fun main() -> Int32 { 0 }

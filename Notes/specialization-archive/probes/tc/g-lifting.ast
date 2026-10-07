@@ -1,0 +1,30 @@
+trait Bidi {
+  type Selected
+}
+trait RA {
+}
+struct Arr {
+}
+struct Lst {
+}
+struct Linear {
+}
+struct Binary {
+}
+given Arr is RA {
+}
+given Lst is Bidi {
+  type Selected = Linear
+}
+given <T where let $k: RA<T>> T is Bidi {
+  type Selected = Binary
+}
+fun client<T where let $x: Bidi<T>>[](_ x: let T.Selected) let -> T.Selected {
+  return x
+}
+fun check_arr[](_ x: let Arr.Selected) let -> Binary {
+  return x
+}
+fun check_lst[](_ x: let Lst.Selected) let -> Linear {
+  return x
+}

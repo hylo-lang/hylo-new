@@ -1,0 +1,18 @@
+// The full chain from the request: Array > RandomAccess > Bidirectional.
+trait Bidi {}
+trait RA refines Bidi {}
+
+struct Arr<T> is Deinitializable & Movable { public memberwise init }
+struct Lst<T> is Deinitializable & Movable { public memberwise init }
+
+given <T> => Arr<T> is Bidi {}
+given <T> => Arr<T> is RA {}
+given <T> => Lst<T> is Bidi {}
+
+trait LowerBound { fun lb() -> Int32 }
+
+given <T is Bidi> => T is LowerBound { fun lb() -> Int32 { 1 } }   // linear
+given <T is RA>   => T is LowerBound { fun lb() -> Int32 { 2 } }   // binary search
+given <U> => Arr<U> is LowerBound   { fun lb() -> Int32 { 3 } }    // hand-tuned for Arr
+
+public fun main() -> Int32 { Arr<Int32>().lb() + Lst<Int32>().lb() }

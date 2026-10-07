@@ -1,0 +1,10 @@
+//! stage:typing no-std
+trait Bidi { type Selected }
+trait RA {}
+struct Slow {}
+struct Fast {}
+struct MyArray {}
+given ra_is_bidi: <T is RA> => T is Bidi { type Selected = Fast }
+given MyArray is RA {}
+given w = ra_is_bidi<MyArray>[]
+fun observe(x: MyArray.Selected) -> Fast { x }

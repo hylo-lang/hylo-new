@@ -1,0 +1,5 @@
+//! stage:typing no-std
+trait Bidi {}
+trait RA refines Bidi {}
+struct MyArray {}
+given MyArray is RA {}

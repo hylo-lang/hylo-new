@@ -1,0 +1,65 @@
+// A realistic sketch: lower_bound specialized from Bidirectional to RandomAccess,
+// selected correctly through TWO levels of generic client code.
+
+trait Fwd {
+  fun count() -> Int32
+  fun at(p: Int32) -> Int32          // sorted, ascending
+}
+trait Bidi refines Fwd {}
+trait RA refines Bidi {}
+
+// ---- the algorithm, as a customization point ----------------------------------
+trait LowerBound {
+  fun lower_bound(x: Int32) -> Int32
+}
+
+// generic implementation: linear scan, valid for any forward collection
+given <T is Bidi> => T is LowerBound {
+  fun lower_bound(x: Int32) -> Int32 {
+    var i: Int32 = 0
+    while (i < self.count()) && (self.at(i) < x) { &i += (1 as Int32) }
+    return i
+  }
+}
+
+// specialized implementation: binary search, requires random access
+given <T is RA> => T is LowerBound {
+  fun lower_bound(x: Int32) -> Int32 {
+    var lo: Int32 = 0
+    var hi = self.count()
+    while lo < hi {
+      let mid = lo + ((hi - lo) / (2 as Int32))
+      if self.at(mid) < x { &lo = mid + (1 as Int32) } else { &hi = mid.copy() }
+    }
+    return lo
+  }
+}
+
+// ---- client code, generic over the *algorithm*, not the data structure --------
+fun equal_range_size<T is LowerBound>(c: T, from lo: Int32, to hi: Int32) -> Int32 {
+  c.lower_bound(hi) - c.lower_bound(lo)
+}
+
+fun middle_band<T is LowerBound>(c: T) -> Int32 {
+  equal_range_size(c, from: 10 as Int32, to: 20 as Int32)
+}
+
+// ---- two models ---------------------------------------------------------------
+struct Evens is Deinitializable & Movable { public memberwise init }   // 0,2,4,...,98
+given Evens is Fwd {
+  fun count() -> Int32 { 50 }
+  fun at(p: Int32) -> Int32 { p * (2 as Int32) }
+}
+given Evens is Bidi {}
+given Evens is RA {}
+
+struct Odds is Deinitializable & Movable { public memberwise init }    // 1,3,5,...,99
+given Odds is Fwd {
+  fun count() -> Int32 { 50 }
+  fun at(p: Int32) -> Int32 { (p * (2 as Int32)) + (1 as Int32) }
+}
+given Odds is Bidi {}
+
+public fun main() -> Int32 {
+  middle_band(Evens()) + middle_band(Odds())
+}

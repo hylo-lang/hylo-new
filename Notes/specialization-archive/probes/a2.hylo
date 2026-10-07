@@ -1,0 +1,16 @@
+//! stage:typing no-std
+trait Bidi {}
+trait RA refines Bidi {}
+struct Arr {}
+given Arr is Bidi {}
+given Arr is RA {}
+
+struct Linear {}
+struct Binary {}
+
+trait LowerBound { type Selected }
+given <T is Bidi> => T is LowerBound { type Selected = Linear }
+given <T is RA>   => T is LowerBound { type Selected = Binary }
+
+// correct expectation
+fun ok(x: Arr.Selected) -> Linear { x }

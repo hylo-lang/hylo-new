@@ -1,0 +1,12 @@
+public trait Bidi {}
+public trait RA refines Bidi {}
+public trait Contiguous refines RA {}
+
+public trait LowerBound { fun run() -> Int32 }
+
+public given linear_scan: <T is Bidi> => T is LowerBound { public fun run() -> Int32 { 1 } }
+public given binary_search: <T is RA> => T is LowerBound { public fun run() -> Int32 { 2 } }
+public given branchless: <T is Contiguous> => T is LowerBound { public fun run() -> Int32 { 5 } }
+
+public fun search<T is LowerBound>(c: T) -> Int32 { c.run() }
+public fun search_via_bidi<T is Bidi>(c: T) -> Int32 { c.run() }

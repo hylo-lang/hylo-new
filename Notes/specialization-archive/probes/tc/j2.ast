@@ -1,0 +1,27 @@
+trait Bidi {
+}
+trait RA {
+  given RA.Self is Bidi
+}
+struct Arr {
+  public memberwise init[](self: set Self)
+}
+given Arr is Bidi {
+}
+given Arr is RA {
+}
+struct Linear {
+  public memberwise init[](self: set Self)
+}
+struct Binary {
+  public memberwise init[](self: set Self)
+}
+fun lower_bound<T where let $x: Bidi<T>>[](_ x: let T) let -> Linear {
+  return Linear.new()
+}
+fun lower_bound<T where let $1c: RA<T>>[](_ x: let T) let -> Binary {
+  return Binary.new()
+}
+fun check[]() let -> Linear {
+  return lower_bound<Arr>($<ConformanceDeclaration at j2:5.1>)(Arr.new())
+}

@@ -1,0 +1,328 @@
+global #witness(S<Int32>) as Type, #preferred
+
+global #witness(Int32) as Type, #preferred
+
+fun P.which<Self>(let %p0: P<Self>, let %p1: Self, set %p2: Int32)
+
+fun Q.which2<Self>(let %p0: Q<Self>, let %p1: Self, set %p2: Int32)
+
+fun S.$<ConformanceDeclaration at e9:3.16><T>() let <: Deinitializable<S<T>> {
+%b0:
+  %r0 = alloca Deinitializable<S<T>>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: S<T>>} as Deinitializable<S<T>>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: S<T>>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun S.$<ConformanceDeclaration at e9:3.34><T>() let <: Movable<S<T>> {
+%b0:
+  %r0 = alloca Movable<S<T>>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: S<T>>, Movable.take_value.take_value@inout$synthesized<Self: S<T>>} as Movable<S<T>>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: S<T>>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: S<T>>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun S.init<T>(set %p0: S<T>, set %p1: Void)
+
+fun a.which<T>(let %p0: S<T>, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun a<T>() let <: P<S<T>> {
+%b0:
+  %r0 = alloca P<S<T>>, #preferred
+  %r1 = witnesstable {P.which<Self: S<T>>} as P<S<T>>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun P.which<Self: S<T>>(let %p0: P<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let S<T>
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply a.which(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun b.which2<T>(let %p0: S<T>, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 2 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun b<T>() let <: Q<S<T>> {
+%b0:
+  %r0 = alloca Q<S<T>>, #preferred
+  %r1 = witnesstable {Q.which2<Self: S<T>>} as Q<S<T>>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Q.which2<Self: S<T>>(let %p0: Q<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let S<T>
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply b.which2(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun c.which<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 3 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun c<T>(let %p0: Q<T>) let <: P<T> {
+%b0:
+  %r0 = alloca P<T>, #preferred
+  %r1 = witnesstable {P.which<Self: T>} as P<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun P.which<Self: T>(let %p0: P<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply c.which(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun use(_:)<T>(let %p0: P<T>, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = property "which" of %p0 as [Void](let P<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p0
+  %r2 = access [let] %p1
+  %r3 = access [set] %p2
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r8 = end %r3
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r2 = global_access #witness(Int32)
+  %r19 = global_access #witness(S<Int32>)
+  %r24 = access [let] %r2
+  %r1 = project a$existentialized[%r24]
+  %r20 = access [let] %r19
+  %r3 = alloca S<Int32>, #preferred
+  %r4 = access [set] %r3
+  %r5 = assume_state %r4 initialized
+  %r6 = end %r4
+  %r7 = access [let] %r1
+  %r8 = access [let] %r3
+  %r9 = access [set] %p0
+  %r21 = place_cast %r7 as let P<T>
+  %r22 = place_cast %r8 as let T
+  %r23 = access [set] %r9
+  %r10 = apply use(_:)$existentialized(%r20, %r21, %r22) => %r23
+  %r0 = end %r20
+  %r15 = end %r9
+  %r14 = end %r8
+  %r13 = end %r7
+  %r12 = end %r1
+  %r25 = end %r24
+  %r16 = access [sink] %r3
+  %r17 = assume_state %r16 uninitialized
+  %r18 = end %r16
+  %r11 = return
+}
+
+fun S.$<ConformanceDeclaration at e9:3.16>$existentialized(let %p0: Type) let <: Deinitializable<S<T>> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Deinitializable<S<T>>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Deinitializable<S<T>>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Deinitializable.deinit$synthesized<Self: S<T>>} as Deinitializable<S<T>>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun S.$<ConformanceDeclaration at e9:3.34>$existentialized(let %p0: Type) let <: Movable<S<T>> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Movable<S<T>>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Movable<S<T>>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: S<T>>, Movable.take_value.take_value@inout$synthesized<Self: S<T>>} as Movable<S<T>>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun a$existentialized(let %p0: Type) let <: P<S<T>> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> P<S<T>>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as P<S<T>>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {P.which<Self: S<T>>} as P<S<T>>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun b$existentialized(let %p0: Type) let <: Q<S<T>> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Q<S<T>>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Q<S<T>>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Q.which2<Self: S<T>>} as Q<S<T>>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun c$existentialized(let %p0: Type, let %p1: Q<T>) let <: P<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> P<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as P<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {P.which<Self: T>} as P<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun use(_:)$existentialized(let %p0: Type, let %p1: P<T>, let %p2: T, set %p3: Int32) {
+%b0:
+  %r0 = property "which" of %p1 as [Void](let P<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p1
+  %r2 = access [let] %p2
+  %r3 = access [set] %p3
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r5 = end %r3
+  %r6 = end %r2
+  %r7 = end %r1
+  %r8 = return
+}

@@ -1,0 +1,12 @@
+trait A {}
+trait B refines A {}
+trait C refines B {}
+struct S is Deinitializable & Movable { public memberwise init }
+given S is A {}
+given S is B {}
+given S is C {}
+trait Alg { fun f() -> Int32 }
+given <T is A> => T is Alg { fun f() -> Int32 { 1 } }
+given <T is B> => T is Alg { fun f() -> Int32 { 2 } }
+given <T is C> => T is Alg { fun f() -> Int32 { 3 } }
+public fun main() -> Int32 { S().f() }

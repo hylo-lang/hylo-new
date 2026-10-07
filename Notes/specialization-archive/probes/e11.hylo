@@ -1,0 +1,10 @@
+// Two mutually-incomparable givens: must remain ambiguous (no silent pick).
+trait P { fun which() -> Int32 }
+trait Q {}
+trait R {}
+struct S is Deinitializable & Movable { public memberwise init }
+given S is Q {}
+given S is R {}
+given <T is Q> => T is P { fun which() -> Int32 { 1 } }
+given <T is R> => T is P { fun which() -> Int32 { 2 } }
+public fun main() -> Int32 { S().which() }

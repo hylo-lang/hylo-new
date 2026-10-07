@@ -1,0 +1,17 @@
+//! stage:typing no-std
+trait Bidi {}
+trait RA refines Bidi {}
+struct Arr {}
+given Arr is Bidi {}
+given Arr is RA {}
+
+struct Linear {}
+struct Binary {}
+
+trait LowerBound { type Selected }
+given <T is Bidi> => T is LowerBound { type Selected = Linear }
+given <T is RA>   => T is LowerBound { type Selected = Binary }
+
+fun in_bidi_context<T is Bidi>(x: T.Selected) -> Linear { x }
+fun in_ra_context<T is RA>(x: T.Selected) -> Binary { x }
+fun in_concrete_context(x: Arr.Selected) -> Binary { x }

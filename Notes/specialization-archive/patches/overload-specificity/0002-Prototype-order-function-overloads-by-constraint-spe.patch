@@ -1,0 +1,101 @@
+From dc6f1c97ed1c2a164ed3cb3d6e89a2207e225094 Mon Sep 17 00:00:00 2001
+From: Ambrus Toth <ping@ambrus.dev>
+Date: Tue, 1 Sep 2026 01:42:25 +0200
+Subject: [PATCH 2/7] Prototype: order function overloads by constraint
+ specificity.
+
+Two functions that differ only in their context clauses are currently
+reported as an ambiguous use.  This ranks them with the same specificity
+order used for givens, so a call whose arguments satisfy the finer
+constraints selects the more constrained overload -- concept-based
+overloading in the sense of Siek and Lumsdaine's G.
+
+As in G, the choice is still made from the static constraints of the call
+site: a generic caller constrained on the coarser trait binds the coarser
+overload (Notes/specialization-experiments/e13.hylo).
+---
+ Notes/specialization-experiments/bench.hylo |  6 ++++++
+ Notes/specialization-experiments/e13.hylo   | 13 +++++++++++++
+ Sources/FrontEnd/Typer/Solver.swift         |  2 +-
+ Sources/FrontEnd/Typer/Typer.swift          | 19 +++++++++++++++++++
+ 4 files changed, 39 insertions(+), 1 deletion(-)
+ create mode 100644 Notes/specialization-experiments/bench.hylo
+ create mode 100644 Notes/specialization-experiments/e13.hylo
+
+diff --git a/Notes/specialization-experiments/bench.hylo b/Notes/specialization-experiments/bench.hylo
+new file mode 100644
+index 0000000..9ca9d0e
+--- /dev/null
++++ b/Notes/specialization-experiments/bench.hylo
+@@ -0,0 +1,6 @@
++public fun main() -> Int32 {
++  var s: Int32 = 0
++  var i: Int32 = 0
++  while i < 100 { &s += i ; &i += (1 as Int32) }
++  return s % (256 as Int32)
++}
+diff --git a/Notes/specialization-experiments/e13.hylo b/Notes/specialization-experiments/e13.hylo
+new file mode 100644
+index 0000000..ceb6edf
+--- /dev/null
++++ b/Notes/specialization-experiments/e13.hylo
+@@ -0,0 +1,13 @@
++// G-style concept-based overloading + the generic-context limitation.
++trait Bidi {}
++trait RA refines Bidi {}
++struct Arr is Deinitializable & Movable { public memberwise init }
++given Arr is Bidi {}
++given Arr is RA {}
++
++fun lb<T is Bidi>(x: T) -> Int32 { 1 }   // generic
++fun lb<T is RA>(x: T) -> Int32 { 2 }     // specialized
++
++fun client<T is Bidi>(x: T) -> Int32 { lb(x) }   // sees only Bidi
++
++public fun main() -> Int32 { lb(Arr()) + client(Arr()) }   // want 2 + 2, will get 2 + 1
+diff --git a/Sources/FrontEnd/Typer/Solver.swift b/Sources/FrontEnd/Typer/Solver.swift
+index bac10c8..e53073b 100644
+--- a/Sources/FrontEnd/Typer/Solver.swift
++++ b/Sources/FrontEnd/Typer/Solver.swift
+@@ -589,7 +589,7 @@ internal struct Solver {
+     // Otherwise, identify the right choice.
+     let scopeOfUse = program.parent(containing: k.name)
+     let least = viable.least { (a, b) in
+-      program.isPreferred(a.choice, other: b.choice, in: scopeOfUse)
++      typer.isPreferred(a.choice, other: b.choice, in: scopeOfUse)
+     }
+ 
+     if let (_, s) = least {
+diff --git a/Sources/FrontEnd/Typer/Typer.swift b/Sources/FrontEnd/Typer/Typer.swift
+index 3a93a68..b5c3c0e 100644
+--- a/Sources/FrontEnd/Typer/Typer.swift
++++ b/Sources/FrontEnd/Typer/Typer.swift
+@@ -3828,6 +3828,25 @@ public struct Typer {
+ 
+   // MARK: Specificity
+ 
++  /// Returns `true` iff `lhs` is preferred over `rhs` for overload resolution.
++  ///
++  /// Extends the syntactic preferences of `Program.isPreferred` with an ordering by constraint
++  /// specificity: between two declarations that are otherwise equally good, the one whose context
++  /// clause is entailed by (but does not entail) the other's is preferred.
++  internal mutating func isPreferred(
++    _ lhs: NameResolutionCandidate, other rhs: NameResolutionCandidate,
++    in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    if program.isPreferred(lhs, other: rhs, in: scopeOfUse) { return true }
++    if program.isPreferred(rhs, other: lhs, in: scopeOfUse) { return false }
++
++    guard
++      case .direct(let a) = lhs.reference, case .direct(let b) = rhs.reference, a != b
++    else { return false }
++    return isStrictlyMoreSpecific(a, than: b, in: scopeOfUse)
++  }
++
++
+   /// Returns `true` iff some thread in `work` is rooted at a given that is strictly more specific
+   /// than the root of every result in `done`, and is therefore still worth exploring.
+   private mutating func mayOutrank(
+-- 
+2.43.0
+

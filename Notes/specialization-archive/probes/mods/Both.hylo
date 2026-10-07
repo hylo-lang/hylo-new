@@ -1,0 +1,6 @@
+import Collections
+import Turbo
+public struct MyArray is Deinitializable & Movable { public memberwise init }
+given MyArray is Bidi {}
+given MyArray is RA {}
+public fun main() -> Int32 { search(MyArray()) }

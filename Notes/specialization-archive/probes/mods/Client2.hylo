@@ -1,0 +1,5 @@
+import Collections
+public struct MyArray is Deinitializable & Movable { public memberwise init }
+given MyArray is Bidi {}
+given MyArray is RA {}
+public fun main() -> Int32 { search_via_bidi(MyArray()) }

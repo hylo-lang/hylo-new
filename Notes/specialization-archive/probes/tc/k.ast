@@ -1,0 +1,37 @@
+trait Bidi {
+}
+trait RA {
+  given RA.Self is Bidi
+}
+struct Arr {
+}
+given Arr is Bidi {
+}
+given Arr is RA {
+}
+struct Linear {
+}
+struct Binary {
+}
+struct Local {
+}
+trait LowerBound {
+  type Selected
+}
+given <T where let $o: Bidi<T>> T is LowerBound {
+  type Selected = Linear
+}
+given <T where let $11: RA<T>> T is LowerBound {
+  type Selected = Binary
+}
+fun without_override[](_ x: let Arr.Selected) let -> Binary {
+  return x
+}
+fun with_override[]() let -> Void {
+  given Arr is LowerBound {
+    type Selected = Local
+  }
+  fun inner[](_ x: let Arr.Selected) let -> Local {
+    return x
+  }
+}

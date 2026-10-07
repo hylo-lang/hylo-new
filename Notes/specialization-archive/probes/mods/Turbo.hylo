@@ -1,0 +1,4 @@
+import Collections
+public given turbo_search: <T is RA> => T is LowerBound {
+  public fun run() -> Int32 { 4 }
+}

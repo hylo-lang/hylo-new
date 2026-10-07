@@ -1,0 +1,24 @@
+//! stage:typing no-std
+trait Bidi {}
+trait RA refines Bidi {}
+struct Arr<T> {}
+struct Lst<T> {}
+struct Elem {}
+given <T> => Arr<T> is Bidi {}
+given <T> => Arr<T> is RA {}
+given <T> => Lst<T> is Bidi {}
+
+struct Linear {}
+struct Binary {}
+struct HandTuned {}
+
+trait LowerBound { type Selected }
+given <T is Bidi> => T is LowerBound { type Selected = Linear }
+given <T is RA>   => T is LowerBound { type Selected = Binary }
+given <U> => Arr<U> is LowerBound { type Selected = HandTuned }
+
+type ArrOfElem = Arr<Elem>
+type LstOfElem = Lst<Elem>
+
+fun check_arr(x: ArrOfElem.Selected) -> HandTuned { x }
+fun check_lst(x: LstOfElem.Selected) -> Linear { x }

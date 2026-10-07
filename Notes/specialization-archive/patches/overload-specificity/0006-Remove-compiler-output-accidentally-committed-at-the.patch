@@ -1,0 +1,348 @@
+From a881b08bdd74ba4626561791c5a052d8292f0dfc Mon Sep 17 00:00:00 2001
+From: Ambrus Toth <ping@ambrus.dev>
+Date: Tue, 1 Sep 2026 11:25:34 +0200
+Subject: [PATCH 6/7] Remove compiler output accidentally committed at the
+ repository root.
+
+---
+ .gitignore |   4 +
+ e2.ast     |  20 ----
+ e3.ir      | 286 -----------------------------------------------------
+ 3 files changed, 4 insertions(+), 306 deletions(-)
+ delete mode 100644 e2.ast
+ delete mode 100644 e3.ir
+
+diff --git a/.gitignore b/.gitignore
+index bfa11d5..245f3d6 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -23,3 +23,7 @@ StandardLibrary/**/*.observed
+ 
+ # Local development
+ /Playground
++
++# compiler output accidentally written into the working directory
++*.ast
++*.ir
+diff --git a/e2.ast b/e2.ast
+deleted file mode 100644
+index 1f364ee..0000000
+--- a/e2.ast
++++ /dev/null
+@@ -1,20 +0,0 @@
+-trait Fwd {
+-}
+-trait Bidi {
+-  given Bidi.Self is Fwd
+-}
+-trait RA {
+-  given RA.Self is Bidi
+-}
+-struct Arr {
+-  public memberwise init[](self: set Self)
+-}
+-given Arr is Fwd {
+-}
+-given Arr is RA {
+-  given Arr is Bidi {
+-  }
+-}
+-public fun main[]() let -> Int32 {
+-  return .new(integer_literal: 0)
+-}
+\ No newline at end of file
+diff --git a/e3.ir b/e3.ir
+deleted file mode 100644
+index 3fb8e22..0000000
+--- a/e3.ir
++++ /dev/null
+@@ -1,286 +0,0 @@
+-global #witness(Arr) as Type, #preferred
+-
+-fun Bidi.$<ConformanceDeclaration at e3:2.20><Self>(let %p0: Bidi<Self>) let <: Fwd<Self> {
+-%b0:
+-  %r0 = property "$<ConformanceDeclaration at e3:2.20>" of %p0 as Fwd<Self>
+-  %r1 = access [let] %r0
+-  %r2 = yield %r1
+-  %r4 = end %r1
+-  %r3 = return
+-}
+-
+-fun RA.$<ConformanceDeclaration at e3:3.18><Self>(let %p0: RA<Self>) let <: Bidi<Self> {
+-%b0:
+-  %r0 = property "$<ConformanceDeclaration at e3:3.18>" of %p0 as Bidi<Self>
+-  %r1 = access [let] %r0
+-  %r2 = yield %r1
+-  %r4 = end %r1
+-  %r3 = return
+-}
+-
+-fun Arr.$<ConformanceDeclaration at e3:5.15>() let <: Deinitializable<Arr> {
+-%b0:
+-  %r0 = alloca Deinitializable<Arr>, #preferred
+-  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: Arr>} as Deinitializable<Arr>
+-  %r2 = access [set] %r0
+-  %r3 = store %r1 to %r2
+-  %r4 = end %r2
+-  %r5 = access [let] %r0
+-  %r6 = yield %r5
+-  %r7 = end %r5
+-  %r8 = access [sink] %r0
+-  %r9 = assume_state %r8 uninitialized
+-  %r10 = end %r8
+-  %r11 = return
+-}
+-
+-fun Deinitializable.deinit$synthesized<Self: Arr>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+-%b0:
+-  %r0 = access [sink] %p1
+-  %r1 = assume_state %r0 uninitialized
+-  %r2 = end %r0
+-  %r3 = access [set] %p2
+-  %r4 = assume_state %r3 initialized
+-  %r5 = end %r3
+-  %r6 = return
+-}
+-
+-fun Arr.$<ConformanceDeclaration at e3:5.33>() let <: Movable<Arr> {
+-%b0:
+-  %r0 = alloca Movable<Arr>, #preferred
+-  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: Arr>, Movable.take_value.take_value@inout$synthesized<Self: Arr>} as Movable<Arr>
+-  %r2 = access [set] %r0
+-  %r3 = store %r1 to %r2
+-  %r4 = end %r2
+-  %r5 = access [let] %r0
+-  %r6 = yield %r5
+-  %r7 = end %r5
+-  %r8 = access [sink] %r0
+-  %r9 = assume_state %r8 uninitialized
+-  %r10 = end %r8
+-  %r11 = return
+-}
+-
+-fun Movable.take_value.take_value@set$synthesized<Self: Arr>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+-
+-fun Movable.take_value.take_value@inout$synthesized<Self: Arr>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+-
+-fun Arr.init(set %p0: Arr, set %p1: Void)
+-
+-fun $<ConformanceDeclaration at e3:7.1>() let <: Fwd<Arr> {
+-%b0:
+-  %r0 = alloca Fwd<Arr>, #preferred
+-  %r1 = witnesstable {} as Fwd<Arr>
+-  %r2 = access [set] %r0
+-  %r3 = store %r1 to %r2
+-  %r4 = end %r2
+-  %r5 = access [let] %r0
+-  %r6 = yield %r5
+-  %r7 = end %r5
+-  %r8 = access [sink] %r0
+-  %r9 = assume_state %r8 uninitialized
+-  %r10 = end %r8
+-  %r11 = return
+-}
+-
+-fun $<ConformanceDeclaration at e3:8.1>.$<ConformanceDeclaration at e3:8.19>() let <: Bidi<Arr> {
+-%b0:
+-  %r0 = project $<ConformanceDeclaration at e3:7.1>[]
+-  %r1 = alloca Bidi<Arr>, #preferred
+-  %r2 = witnesstable {%r0} as Bidi<Arr>
+-  %r13 = end %r0
+-  %r3 = access [set] %r1
+-  %r4 = store %r2 to %r3
+-  %r5 = end %r3
+-  %r6 = access [let] %r1
+-  %r7 = yield %r6
+-  %r8 = end %r6
+-  %r9 = access [sink] %r1
+-  %r10 = assume_state %r9 uninitialized
+-  %r11 = end %r9
+-  %r12 = return
+-}
+-
+-fun $<ConformanceDeclaration at e3:8.1>() let <: RA<Arr> {
+-%b0:
+-  %r0 = project $<ConformanceDeclaration at e3:8.1>.$<ConformanceDeclaration at e3:8.19>[]
+-  %r1 = alloca RA<Arr>, #preferred
+-  %r2 = witnesstable {%r0} as RA<Arr>
+-  %r13 = end %r0
+-  %r3 = access [set] %r1
+-  %r4 = store %r2 to %r3
+-  %r5 = end %r3
+-  %r6 = access [let] %r1
+-  %r7 = yield %r6
+-  %r8 = end %r6
+-  %r9 = access [sink] %r1
+-  %r10 = assume_state %r9 uninitialized
+-  %r11 = end %r9
+-  %r12 = return
+-}
+-
+-fun LowerBoundable.lb<Self>(let %p0: LowerBoundable<Self>, let %p1: Self, set %p2: Int32)
+-
+-fun $<ConformanceDeclaration at e3:12.1>.lb<T>(let %p0: T, set %p1: Int32) {
+-%b0:
+-  %r0 = subfield %p1 at 0 as i32
+-  %r1 = access [set] %r0
+-  %r2 = store i32 1 to %r1
+-  %r3 = end %r1
+-  %r4 = return
+-}
+-
+-fun $<ConformanceDeclaration at e3:12.1><T>(let %p0: Bidi<T>) let <: LowerBoundable<T> {
+-%b0:
+-  %r0 = alloca LowerBoundable<T>, #preferred
+-  %r1 = witnesstable {LowerBoundable.lb<Self: T>} as LowerBoundable<T>
+-  %r2 = access [set] %r0
+-  %r3 = store %r1 to %r2
+-  %r4 = end %r2
+-  %r5 = access [let] %r0
+-  %r6 = yield %r5
+-  %r7 = end %r5
+-  %r8 = access [sink] %r0
+-  %r9 = assume_state %r8 uninitialized
+-  %r10 = end %r8
+-  %r11 = return
+-}
+-
+-fun LowerBoundable.lb<Self: T>(let %p0: LowerBoundable<Self>, let %p1: Self, set %p2: Int32) {
+-%b0:
+-  %r0 = place_cast %p1 as let T
+-  %r1 = access [let] %r0
+-  %r2 = access [set] %p2
+-  %r3 = apply $<ConformanceDeclaration at e3:12.1>.lb(%r1) => %r2
+-  %r7 = end %r2
+-  %r6 = end %r1
+-  %r5 = end %r0
+-  %r4 = return
+-}
+-
+-fun $<ConformanceDeclaration at e3:13.1>.lb<T>(let %p0: T, set %p1: Int32) {
+-%b0:
+-  %r0 = subfield %p1 at 0 as i32
+-  %r1 = access [set] %r0
+-  %r2 = store i32 2 to %r1
+-  %r3 = end %r1
+-  %r4 = return
+-}
+-
+-fun $<ConformanceDeclaration at e3:13.1><T>(let %p0: RA<T>) let <: LowerBoundable<T> {
+-%b0:
+-  %r0 = alloca LowerBoundable<T>, #preferred
+-  %r1 = witnesstable {LowerBoundable.lb<Self: T>} as LowerBoundable<T>
+-  %r2 = access [set] %r0
+-  %r3 = store %r1 to %r2
+-  %r4 = end %r2
+-  %r5 = access [let] %r0
+-  %r6 = yield %r5
+-  %r7 = end %r5
+-  %r8 = access [sink] %r0
+-  %r9 = assume_state %r8 uninitialized
+-  %r10 = end %r8
+-  %r11 = return
+-}
+-
+-fun LowerBoundable.lb<Self: T>(let %p0: LowerBoundable<Self>, let %p1: Self, set %p2: Int32) {
+-%b0:
+-  %r0 = place_cast %p1 as let T
+-  %r1 = access [let] %r0
+-  %r2 = access [set] %p2
+-  %r3 = apply $<ConformanceDeclaration at e3:13.1>.lb(%r1) => %r2
+-  %r7 = end %r2
+-  %r6 = end %r1
+-  %r5 = end %r0
+-  %r4 = return
+-}
+-
+-fun main(set %p0: Int32) {
+-%b0:
+-  %r23 = global_access #witness(Arr)
+-  %r0 = alloca Arr, #preferred
+-  %r1 = access [set] %r0
+-  %r2 = assume_state %r1 initialized
+-  %r3 = end %r1
+-  %r4 = project $<ConformanceDeclaration at e3:8.1>[]
+-  %r24 = access [let] %r23
+-  %r6 = access [let] %r4
+-  %r25 = place_cast %r6 as let RA<T>
+-  %r7 = project $<ConformanceDeclaration at e3:13.1>$existentialized[%r24, %r25]
+-  %r8 = property "lb" of %r7 as [Void](let LowerBoundable<Self>, self: let Self) let -> Int32
+-  %r9 = access [let] %r7
+-  %r10 = access [let] %r0
+-  %r11 = access [set] %p0
+-  %r12 = apply %r8(%r9, %r10) => %r11
+-  %r19 = end %r11
+-  %r18 = end %r10
+-  %r17 = end %r9
+-  %r16 = end %r7
+-  %r5 = end %r24
+-  %r15 = end %r6
+-  %r14 = end %r4
+-  %r20 = access [sink] %r0
+-  %r21 = assume_state %r20 uninitialized
+-  %r22 = end %r20
+-  %r13 = return
+-}
+-
+-fun Bidi.$<ConformanceDeclaration at e3:2.20>$existentialized(let %p0: Type, let %p1: Bidi<Self>) let <: Fwd<Self> {
+-%b0:
+-  %r0 = property "$<ConformanceDeclaration at e3:2.20>" of %p1 as Fwd<Self>
+-  %r1 = access [let] %r0
+-  %r2 = yield %r1
+-  %r3 = end %r1
+-  %r4 = return
+-}
+-
+-fun RA.$<ConformanceDeclaration at e3:3.18>$existentialized(let %p0: Type, let %p1: RA<Self>) let <: Bidi<Self> {
+-%b0:
+-  %r0 = property "$<ConformanceDeclaration at e3:3.18>" of %p1 as Bidi<Self>
+-  %r1 = access [let] %r0
+-  %r2 = yield %r1
+-  %r3 = end %r1
+-  %r4 = return
+-}
+-
+-fun $<ConformanceDeclaration at e3:12.1>$existentialized(let %p0: Type, let %p1: Bidi<T>) let <: LowerBoundable<T> {
+-%b0:
+-  %r0 = access [let] %p0
+-  %r1 = type_witness <T> LowerBoundable<T>(%r0)
+-  %r15 = end %r0
+-  %r2 = access [let] %r1
+-  %r3 = alloca %r2 as LowerBoundable<T>, #preferred
+-  %r16 = end %r2
+-  %r4 = witnesstable {LowerBoundable.lb<Self: T>} as LowerBoundable<T>
+-  %r5 = access [set] %r3
+-  %r6 = store %r4 to %r5
+-  %r7 = end %r5
+-  %r8 = access [let] %r3
+-  %r9 = yield %r8
+-  %r10 = end %r8
+-  %r11 = access [sink] %r3
+-  %r12 = assume_state %r11 uninitialized
+-  %r13 = end %r11
+-  %r14 = return
+-}
+-
+-fun $<ConformanceDeclaration at e3:13.1>$existentialized(let %p0: Type, let %p1: RA<T>) let <: LowerBoundable<T> {
+-%b0:
+-  %r0 = access [let] %p0
+-  %r1 = type_witness <T> LowerBoundable<T>(%r0)
+-  %r15 = end %r0
+-  %r2 = access [let] %r1
+-  %r3 = alloca %r2 as LowerBoundable<T>, #preferred
+-  %r16 = end %r2
+-  %r4 = witnesstable {LowerBoundable.lb<Self: T>} as LowerBoundable<T>
+-  %r5 = access [set] %r3
+-  %r6 = store %r4 to %r5
+-  %r7 = end %r5
+-  %r8 = access [let] %r3
+-  %r9 = yield %r8
+-  %r10 = end %r8
+-  %r11 = access [sink] %r3
+-  %r12 = assume_state %r11 uninitialized
+-  %r13 = end %r11
+-  %r14 = return
+-}
+-- 
+2.43.0
+

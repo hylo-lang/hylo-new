@@ -1,0 +1,8 @@
+//! stage:typing no-std
+struct Arr<T> {}
+struct Elem {}
+struct Marker {}
+trait LowerBound { type Selected }
+given <U> => Arr<U> is LowerBound { type Selected = Marker }
+type ArrElem = Arr<Elem>
+fun check(x: ArrElem.Selected) -> Marker { x }

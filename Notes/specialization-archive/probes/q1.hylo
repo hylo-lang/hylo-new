@@ -1,0 +1,11 @@
+//! stage:typing no-std
+trait Bidi { type Selected }
+trait RA {}
+struct Slow {}
+struct Fast {}
+struct MyArray {}
+given ra_is_bidi: <T is RA> => T is Bidi { type Selected = Fast }
+given MyArray is RA {}
+given MyArray is Bidi { type Selected = Slow }     // the client also conforms directly
+fun client<T is Bidi>(x: T.Selected) -> T.Selected { x }
+fun observe(x: MyArray.Selected) -> Slow { x }

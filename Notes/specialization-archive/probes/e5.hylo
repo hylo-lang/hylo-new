@@ -1,0 +1,28 @@
+// Design "L": refinement-lifting givens carry specialized implementations.
+// A trait requirement with a default implementation is the customization point.
+
+trait Bidi {
+  fun step() -> Int32
+  // default (generic) algorithm: linear scan
+  fun lb() -> Int32 { 1 }
+}
+
+// RA does *not* `refine` Bidi; instead, a lifting given produces a *better* Bidi witness.
+trait RA {
+  fun jump() -> Int32
+}
+
+given <T is RA> => T is Bidi {
+  fun step() -> Int32 { self.jump() }
+  fun lb() -> Int32 { 2 }          // specialized algorithm: binary search
+}
+
+struct Arr is Deinitializable & Movable { public memberwise init }
+given Arr is RA { fun jump() -> Int32 { 7 } }
+
+struct Lst is Deinitializable & Movable { public memberwise init }
+given Lst is Bidi { fun step() -> Int32 { 3 } }
+
+fun run<T is Bidi>(x: T) -> Int32 { x.lb() }
+
+public fun main() -> Int32 { run(Arr()) * (10 as Int32) + run(Lst()) }

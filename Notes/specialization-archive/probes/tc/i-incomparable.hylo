@@ -1,0 +1,12 @@
+//! stage:typing no-std
+trait P { type Selected }
+trait Q {}
+trait R {}
+struct S {}
+struct ViaQ {}
+struct ViaR {}
+given S is Q {}
+given S is R {}
+given <T is Q> => T is P { type Selected = ViaQ }
+given <T is R> => T is P { type Selected = ViaR }
+fun check(x: S.Selected) {}

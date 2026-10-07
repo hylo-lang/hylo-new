@@ -1,0 +1,11 @@
+//! stage:lowering
+trait Bidi {}
+trait RA refines Bidi {}
+struct Arr is Deinitializable & Movable { public memberwise init }
+given Arr is Bidi {}
+given Arr is RA {}
+trait LowerBound { fun run() -> Int32 }
+given <T is Bidi> => T is LowerBound { fun run() -> Int32 { 1 } }
+given <T is RA> => T is LowerBound { fun run() -> Int32 { 2 } }
+fun client<T is LowerBound>(c: T) -> Int32 { c.run() }
+public fun main() -> Int32 { client(Arr()) }

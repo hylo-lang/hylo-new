@@ -1,0 +1,16 @@
+// Q-A: the more specific given needs a DEEPER derivation than the generic one.
+trait Bidi {}
+trait RA refines Bidi {}
+trait Marker {}
+
+struct Arr is Deinitializable & Movable { public memberwise init }
+
+given Arr is Bidi {}            // direct: Bidi<Arr> at depth 1
+given Arr is Marker {}
+given <T is Marker & Bidi> => T is RA {}   // RA<Arr> only at depth 2+
+
+trait LowerBoundable { fun lb() -> Int32 }
+given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
+given <T is RA>   => T is LowerBoundable { fun lb() -> Int32 { 2 } }
+
+public fun main() -> Int32 { Arr().lb() }

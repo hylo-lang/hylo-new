@@ -1,0 +1,34 @@
+trait Coll {
+  type Position
+}
+struct Cursor is Deinitializable & Movable {
+  public memberwise init[](self: set Self)
+}
+struct Fast is Deinitializable & Movable {
+  public memberwise init[](self: set Self)
+}
+struct Slow is Deinitializable & Movable {
+  public memberwise init[](self: set Self)
+}
+given Fast is Coll {
+  type Position = Int32
+}
+given Slow is Coll {
+  type Position = Cursor
+}
+trait LowerBound {
+  fun lb[](self: let Self) let -> Int32
+}
+given <T where let $1q: Coll<T>> T is LowerBound {
+  fun lb[](self: let Self) let -> Int32 {
+    return .new(integer_literal: 1)
+  }
+}
+given <T where let $28: Coll<T>, let $2g: Coercible<T.Position, Int32>> T is LowerBound {
+  fun lb[](self: let Self) let -> Int32 {
+    return .new(integer_literal: 2)
+  }
+}
+public fun main[]() let -> Int32 {
+  return Fast.new().lb().infix+(Slow.new().lb())
+}

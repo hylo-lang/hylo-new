@@ -1,0 +1,13 @@
+trait P { fun which() -> Int32 }
+trait Q { fun which2() -> Int32 }
+struct S<T> is Deinitializable & Movable { public memberwise init }
+
+given a: <T> => S<T> is P { fun which() -> Int32 { 1 } }
+given b: <T> => S<T> is Q { fun which2() -> Int32 { 2 } }
+given c: <T is Q> => T is P { fun which() -> Int32 { 3 } }
+
+fun use<T is P>(x: T) -> Int32 { x.which() }
+public fun main() -> Int32 {
+  given d: S<Int32> is P { fun which() -> Int32 { 9 } }   // local, concrete override
+  return use(S<Int32>())
+}

@@ -1,0 +1,92 @@
+fun Bidi.sort<Self>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = subfield %p2 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun ra_is_bidi.sort<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 2 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun ra_is_bidi<T>(let %p0: RA<T>) let <: Bidi<T> {
+%b0:
+  %r0 = alloca Bidi<T>, #preferred
+  %r1 = witnesstable {Bidi.sort<Self: T>} as Bidi<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Bidi.sort<Self: T>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply ra_is_bidi.sort(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun sort_all(_:)<T>(let %p0: Bidi<T>, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = property "sort" of %p0 as [Void](let Bidi<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p0
+  %r2 = access [let] %p1
+  %r3 = access [set] %p2
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r8 = end %r3
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = return
+}
+
+fun ra_is_bidi$existentialized(let %p0: Type, let %p1: RA<T>) let <: Bidi<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Bidi<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Bidi<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Bidi.sort<Self: T>} as Bidi<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun sort_all(_:)$existentialized(let %p0: Type, let %p1: Bidi<T>, let %p2: T, set %p3: Int32) {
+%b0:
+  %r0 = property "sort" of %p1 as [Void](let Bidi<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p1
+  %r2 = access [let] %p2
+  %r3 = access [set] %p3
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r5 = end %r3
+  %r6 = end %r2
+  %r7 = end %r1
+  %r8 = return
+}

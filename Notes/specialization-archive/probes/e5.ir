@@ -1,0 +1,543 @@
+global $<ConformanceDeclaration at e5:15.1>.$m as RA<T>, #preferred
+
+global #witness(Lst) as Type, #preferred
+
+global #witness(Arr) as Type, #preferred
+
+fun Bidi.step<Self>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32)
+
+fun Bidi.lb<Self>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = subfield %p2 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun RA.jump<Self>(let %p0: RA<Self>, let %p1: Self, set %p2: Int32)
+
+fun $<ConformanceDeclaration at e5:15.1>.step<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = global_access $<ConformanceDeclaration at e5:15.1>.$m
+  %r1 = property "jump" of %r0 as [Void](let RA<Self>, self: let Self) let -> Int32
+  %r2 = access [let] %r0
+  %r3 = access [let] %p0
+  %r4 = access [set] %p1
+  %r5 = apply %r1(%r2, %r3) => %r4
+  %r9 = end %r4
+  %r8 = end %r3
+  %r7 = end %r2
+  %r6 = return
+}
+
+fun $<ConformanceDeclaration at e5:15.1>.$m$init(set %p0: RA<T>)
+
+fun $<ConformanceDeclaration at e5:15.1>.lb<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 2 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e5:15.1><T>(let %p0: RA<T>) let <: Bidi<T> {
+%b0:
+  %r0 = alloca Bidi<T>, #preferred
+  %r1 = witnesstable {Bidi.step<Self: T>, Bidi.lb<Self: T>} as Bidi<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Bidi.step<Self: T>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at e5:15.1>.step(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun Bidi.lb<Self: T>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at e5:15.1>.lb(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun Arr.$<ConformanceDeclaration at e5:20.15>() let <: Deinitializable<Arr> {
+%b0:
+  %r0 = alloca Deinitializable<Arr>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: Arr>} as Deinitializable<Arr>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: Arr>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun Arr.$<ConformanceDeclaration at e5:20.33>() let <: Movable<Arr> {
+%b0:
+  %r0 = alloca Movable<Arr>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: Arr>, Movable.take_value.take_value@inout$synthesized<Self: Arr>} as Movable<Arr>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: Arr>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: Arr>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Arr.init(set %p0: Arr, set %p1: Void)
+
+fun $<ConformanceDeclaration at e5:21.1>.jump(let %p0: Arr, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 7 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e5:21.1>() let <: RA<Arr> {
+%b0:
+  %r0 = alloca RA<Arr>, #preferred
+  %r1 = witnesstable {RA.jump<Self: Arr>} as RA<Arr>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun RA.jump<Self: Arr>(let %p0: RA<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let Arr
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at e5:21.1>.jump(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun Lst.$<ConformanceDeclaration at e5:23.15>() let <: Deinitializable<Lst> {
+%b0:
+  %r0 = alloca Deinitializable<Lst>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: Lst>} as Deinitializable<Lst>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: Lst>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun Lst.$<ConformanceDeclaration at e5:23.33>() let <: Movable<Lst> {
+%b0:
+  %r0 = alloca Movable<Lst>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: Lst>, Movable.take_value.take_value@inout$synthesized<Self: Lst>} as Movable<Lst>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: Lst>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: Lst>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Lst.init(set %p0: Lst, set %p1: Void)
+
+fun $<ConformanceDeclaration at e5:24.1>.step(let %p0: Lst, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 3 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e5:24.1>() let <: Bidi<Lst> {
+%b0:
+  %r0 = alloca Bidi<Lst>, #preferred
+  %r1 = witnesstable {Bidi.step<Self: Lst>, Bidi.lb<Self: Lst>} as Bidi<Lst>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Bidi.step<Self: Lst>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let Lst
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at e5:24.1>.step(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun Bidi.lb<Self: Lst>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r13 = global_access #witness(Lst)
+  %r14 = access [let] %r13
+  %r1 = place_cast %p0 as let Bidi<Lst>
+  %r2 = place_cast %p1 as let Lst
+  %r3 = access [let] %r1
+  %r4 = access [let] %r2
+  %r5 = access [set] %p2
+  %r15 = place_cast %r3 as let Bidi<Self>
+  %r16 = place_cast %r4 as let Self
+  %r17 = access [set] %r5
+  %r6 = apply Bidi.lb$existentialized(%r14, %r15, %r16) => %r17
+  %r0 = end %r14
+  %r12 = end %r5
+  %r11 = end %r4
+  %r10 = end %r3
+  %r9 = end %r2
+  %r8 = end %r1
+  %r7 = return
+}
+
+fun run(_:)<T>(let %p0: Bidi<T>, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = property "lb" of %p0 as [Void](let Bidi<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p0
+  %r2 = access [let] %p1
+  %r3 = access [set] %p2
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r8 = end %r3
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r26 = global_access #witness(Arr)
+  %r74 = global_access #witness(Lst)
+  %r0 = alloca Int32, #preferred
+  %r1 = alloca Int32, #preferred
+  %r2 = project $<ConformanceDeclaration at e5:21.1>[]
+  %r6 = access [let] %r26
+  %r4 = access [let] %r2
+  %r83 = place_cast %r4 as let RA<T>
+  %r5 = project $<ConformanceDeclaration at e5:15.1>$existentialized[%r6, %r83]
+  %r79 = access [let] %r26
+  %r7 = alloca Arr, #preferred
+  %r8 = access [set] %r7
+  %r9 = assume_state %r8 initialized
+  %r10 = end %r8
+  %r11 = access [let] %r5
+  %r12 = access [let] %r7
+  %r13 = access [set] %r1
+  %r80 = place_cast %r11 as let Bidi<T>
+  %r81 = place_cast %r12 as let T
+  %r82 = access [set] %r13
+  %r14 = apply run(_:)$existentialized(%r79, %r80, %r81) => %r82
+  %r85 = end %r79
+  %r45 = end %r13
+  %r44 = end %r12
+  %r43 = end %r11
+  %r42 = end %r5
+  %r3 = end %r6
+  %r41 = end %r4
+  %r40 = end %r2
+  %r15 = alloca Int32, #preferred
+  %r16 = subfield %r15 at 0 as i32
+  %r17 = access [set] %r16
+  %r18 = store i32 10 to %r17
+  %r19 = end %r17
+  %r20 = access [let] %r1
+  %r21 = access [let] %r15
+  %r22 = access [set] %r0
+  %r38 = alloca {i32, i1}, #preferred
+  %r142 = property "value" of %r20 as i32
+  %r143 = access [let] %r142
+  %r144 = property "value" of %r21 as i32
+  %r145 = access [let] %r144
+  %r146 = apply_builtin smul_with_overflow_i32(%r143, %r145)
+  %r147 = end %r145
+  %r148 = end %r143
+  %r149 = access [set] %r38
+  %r150 = store %r146 to %r149
+  %r151 = end %r149
+  %r152 = access [let] %r38
+  %r153 = subfield %r152 at 0 as i32
+  %r154 = subfield %r152 at 1 as i1
+  %r155 = alloca Bool, #preferred
+  %r156 = subfield %r155 at 0 as i1
+  %r157 = access [set] %r156
+  %r158 = access [sink] %r154
+  %r159 = load %r158
+  %r160 = store %r159 to %r157
+  %r161 = access [sink] %r158
+  %r162 = assume_state %r161 uninitialized
+  %r163 = end %r161
+  %r164 = end %r158
+  %r165 = end %r157
+  %r166 = subfield %r155 at 0 as i1
+  %r167 = access [let] %r166
+  %r168 = load %r167
+  %r169 = end %r167
+  %r170 = condbr %r168, %b5, %b6
+%b1:
+  %r55 = end %r37
+  %r54 = end %r36
+  %r53 = end %r35
+  %r56 = access [sink] %r0
+  %r57 = assume_state %r56 uninitialized
+  %r58 = end %r56
+  %r59 = access [sink] %r1
+  %r60 = assume_state %r59 uninitialized
+  %r61 = end %r59
+  %r62 = access [sink] %r7
+  %r63 = assume_state %r62 uninitialized
+  %r64 = end %r62
+  %r65 = access [sink] %r15
+  %r66 = assume_state %r65 uninitialized
+  %r67 = end %r65
+  %r68 = access [sink] %r24
+  %r69 = assume_state %r68 uninitialized
+  %r70 = end %r68
+  %r71 = access [sink] %r27
+  %r72 = assume_state %r71 uninitialized
+  %r73 = end %r71
+  %r39 = return
+%b2:
+  %r139 = end %r97
+  %r140 = apply_builtin trap()
+  %r141 = unreachable
+%b3:
+  %r116 = subfield %r37 at 0 as i32
+  %r117 = access [set] %r116
+  %r118 = access [sink] %r98
+  %r119 = load %r118
+  %r120 = store %r119 to %r117
+  %r121 = access [sink] %r118
+  %r122 = assume_state %r121 uninitialized
+  %r123 = end %r121
+  %r124 = end %r118
+  %r125 = end %r117
+  %r126 = end %r97
+  %r127 = subfield %r86 at 0 as i32
+  %r128 = access [sink] %r127
+  %r129 = assume_state %r128 uninitialized
+  %r130 = end %r128
+  %r131 = subfield %r86 at 1 as i1
+  %r132 = access [sink] %r131
+  %r133 = assume_state %r132 uninitialized
+  %r134 = end %r132
+  %r135 = access [sink] %r100
+  %r136 = assume_state %r135 uninitialized
+  %r137 = end %r135
+  %r138 = br %b1
+%b4:
+  %r48 = end %r22
+  %r47 = end %r21
+  %r46 = end %r20
+  %r24 = alloca Int32, #preferred
+  %r25 = project $<ConformanceDeclaration at e5:24.1>[]
+  %r75 = access [let] %r74
+  %r27 = alloca Lst, #preferred
+  %r28 = access [set] %r27
+  %r29 = assume_state %r28 initialized
+  %r30 = end %r28
+  %r31 = access [let] %r25
+  %r32 = access [let] %r27
+  %r33 = access [set] %r24
+  %r76 = place_cast %r31 as let Bidi<T>
+  %r77 = place_cast %r32 as let T
+  %r78 = access [set] %r33
+  %r34 = apply run(_:)$existentialized(%r75, %r76, %r77) => %r78
+  %r84 = end %r75
+  %r52 = end %r33
+  %r51 = end %r32
+  %r50 = end %r31
+  %r49 = end %r25
+  %r35 = access [let] %r0
+  %r36 = access [let] %r24
+  %r37 = access [set] %p0
+  %r86 = alloca {i32, i1}, #preferred
+  %r87 = property "value" of %r35 as i32
+  %r88 = access [let] %r87
+  %r89 = property "value" of %r36 as i32
+  %r90 = access [let] %r89
+  %r91 = apply_builtin sadd_with_overflow_i32(%r88, %r90)
+  %r92 = end %r90
+  %r93 = end %r88
+  %r94 = access [set] %r86
+  %r95 = store %r91 to %r94
+  %r96 = end %r94
+  %r97 = access [let] %r86
+  %r98 = subfield %r97 at 0 as i32
+  %r99 = subfield %r97 at 1 as i1
+  %r100 = alloca Bool, #preferred
+  %r101 = subfield %r100 at 0 as i1
+  %r102 = access [set] %r101
+  %r103 = access [sink] %r99
+  %r104 = load %r103
+  %r105 = store %r104 to %r102
+  %r106 = access [sink] %r103
+  %r107 = assume_state %r106 uninitialized
+  %r108 = end %r106
+  %r109 = end %r103
+  %r110 = end %r102
+  %r111 = subfield %r100 at 0 as i1
+  %r112 = access [let] %r111
+  %r113 = load %r112
+  %r114 = end %r112
+  %r115 = condbr %r113, %b2, %b3
+%b5:
+  %r194 = end %r152
+  %r195 = apply_builtin trap()
+  %r196 = unreachable
+%b6:
+  %r171 = subfield %r22 at 0 as i32
+  %r172 = access [set] %r171
+  %r173 = access [sink] %r153
+  %r174 = load %r173
+  %r175 = store %r174 to %r172
+  %r176 = access [sink] %r173
+  %r177 = assume_state %r176 uninitialized
+  %r178 = end %r176
+  %r179 = end %r173
+  %r180 = end %r172
+  %r181 = end %r152
+  %r182 = subfield %r38 at 0 as i32
+  %r183 = access [sink] %r182
+  %r184 = assume_state %r183 uninitialized
+  %r185 = end %r183
+  %r186 = subfield %r38 at 1 as i1
+  %r187 = access [sink] %r186
+  %r188 = assume_state %r187 uninitialized
+  %r189 = end %r187
+  %r190 = access [sink] %r155
+  %r191 = assume_state %r190 uninitialized
+  %r192 = end %r190
+  %r193 = br %b4
+}
+
+fun Int32.infix*(let %p0: Int32, let %p1: Int32, set %p2: Int32)
+
+fun Int32.infix+(let %p0: Int32, let %p1: Int32, set %p2: Int32)
+
+fun $<ConformanceDeclaration at e5:15.1>$existentialized(let %p0: Type, let %p1: RA<T>) let <: Bidi<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Bidi<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Bidi<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Bidi.step<Self: T>, Bidi.lb<Self: T>} as Bidi<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun Bidi.lb$existentialized(let %p0: Type, let %p1: Bidi<Self>, let %p2: Self, set %p3: Int32) {
+%b0:
+  %r0 = subfield %p3 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun run(_:)$existentialized(let %p0: Type, let %p1: Bidi<T>, let %p2: T, set %p3: Int32) {
+%b0:
+  %r0 = property "lb" of %p1 as [Void](let Bidi<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p1
+  %r2 = access [let] %p2
+  %r3 = access [set] %p3
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r5 = end %r3
+  %r6 = end %r2
+  %r7 = end %r1
+  %r8 = return
+}

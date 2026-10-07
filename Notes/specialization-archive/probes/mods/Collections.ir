@@ -1,0 +1,219 @@
+fun RA.$<ConformanceDeclaration at Collections:3.25><Self>(let %p0: RA<Self>) let <: Bidi<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at Collections:3.25>" of %p0 as Bidi<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r4 = end %r1
+  %r3 = return
+}
+
+fun LowerBound.run<Self>(let %p0: LowerBound<Self>, let %p1: Self, set %p2: Int32)
+
+fun linear_scan.run<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun linear_scan<T>(let %p0: Bidi<T>) let <: LowerBound<T> {
+%b0:
+  %r0 = alloca LowerBound<T>, #preferred
+  %r1 = witnesstable {LowerBound.run<Self: T>} as LowerBound<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun LowerBound.run<Self: T>(let %p0: LowerBound<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply linear_scan.run(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun binary_search.run<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 2 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun binary_search<T>(let %p0: RA<T>) let <: LowerBound<T> {
+%b0:
+  %r0 = alloca LowerBound<T>, #preferred
+  %r1 = witnesstable {LowerBound.run<Self: T>} as LowerBound<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun LowerBound.run<Self: T>(let %p0: LowerBound<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply binary_search.run(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun search(_:)<T>(let %p0: LowerBound<T>, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = property "run" of %p0 as [Void](let LowerBound<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p0
+  %r2 = access [let] %p1
+  %r3 = access [set] %p2
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r8 = end %r3
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = return
+}
+
+fun search_via_bidi(_:)<T>(let %p0: Bidi<T>, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = type_apply linear_scan<T>
+  %r1 = access [let] %p0
+  %r2 = project %r0[%r1]
+  %r3 = property "run" of %r2 as [Void](let LowerBound<Self>, self: let Self) let -> Int32
+  %r4 = access [let] %r2
+  %r5 = access [let] %p1
+  %r6 = access [set] %p2
+  %r7 = apply %r3(%r4, %r5) => %r6
+  %r13 = end %r6
+  %r12 = end %r5
+  %r11 = end %r4
+  %r10 = end %r2
+  %r9 = end %r1
+  %r8 = return
+}
+
+fun RA.$<ConformanceDeclaration at Collections:3.25>$existentialized(let %p0: Type, let %p1: RA<Self>) let <: Bidi<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at Collections:3.25>" of %p1 as Bidi<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun linear_scan.run$existentialized(let %p0: Type, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = subfield %p2 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun linear_scan$existentialized(let %p0: Type, let %p1: Bidi<T>) let <: LowerBound<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> LowerBound<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as LowerBound<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {LowerBound.run<Self: T>} as LowerBound<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun binary_search.run$existentialized(let %p0: Type, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = subfield %p2 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 2 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun binary_search$existentialized(let %p0: Type, let %p1: RA<T>) let <: LowerBound<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> LowerBound<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as LowerBound<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {LowerBound.run<Self: T>} as LowerBound<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun search(_:)$existentialized(let %p0: Type, let %p1: LowerBound<T>, let %p2: T, set %p3: Int32) {
+%b0:
+  %r0 = property "run" of %p1 as [Void](let LowerBound<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p1
+  %r2 = access [let] %p2
+  %r3 = access [set] %p3
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r5 = end %r3
+  %r6 = end %r2
+  %r7 = end %r1
+  %r8 = return
+}
+
+fun search_via_bidi(_:)$existentialized(let %p0: Type, let %p1: Bidi<T>, let %p2: T, set %p3: Int32) {
+%b0:
+  %r14 = access [let] %p0
+  %r1 = access [let] %p1
+  %r15 = place_cast %r1 as let Bidi<T¹>
+  %r16 = project linear_scan$existentialized[%r14, %r15]
+  %r2 = place_cast %r16 as let LowerBound<T>
+  %r3 = property "run" of %r2 as [Void](let LowerBound<Self>, self: let Self) let -> Int32
+  %r4 = access [let] %r2
+  %r5 = access [let] %p2
+  %r6 = access [set] %p3
+  %r7 = apply %r3(%r4, %r5) => %r6
+  %r8 = end %r6
+  %r9 = end %r5
+  %r10 = end %r4
+  %r11 = end %r2
+  %r17 = end %r16
+  %r0 = end %r14
+  %r12 = end %r1
+  %r13 = return
+}

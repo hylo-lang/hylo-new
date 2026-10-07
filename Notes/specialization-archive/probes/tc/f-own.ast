@@ -1,0 +1,22 @@
+trait Bidi {
+  type Selected
+}
+trait RA {
+}
+struct Arr {
+}
+struct Linear {
+}
+struct Binary {
+}
+given Arr is RA {
+}
+given <T where let $d: RA<T>> T is Bidi {
+  type Selected = Binary
+}
+given Arr is Bidi {
+  type Selected = Linear
+}
+fun check[](_ x: let Arr.Selected) let -> Linear {
+  return x
+}

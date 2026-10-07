@@ -1,0 +1,15 @@
+// Specificity where the finer constraint is an associated-type equality.
+trait Coll { type Position }
+struct Cursor is Deinitializable & Movable { public memberwise init }
+
+struct Fast is Deinitializable & Movable { public memberwise init }
+struct Slow is Deinitializable & Movable { public memberwise init }
+
+given Fast is Coll { type Position = Int32 }
+given Slow is Coll { type Position = Cursor }
+
+trait LowerBound { fun lb() -> Int32 }
+given <T is Coll> => T is LowerBound { fun lb() -> Int32 { 1 } }
+given <T is Coll where T.Position == Int32> => T is LowerBound { fun lb() -> Int32 { 2 } }
+
+public fun main() -> Int32 { Fast().lb() + Slow().lb() }

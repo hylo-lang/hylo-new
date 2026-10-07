@@ -1,0 +1,43 @@
+trait Bidi {
+}
+trait RA {
+  given RA.Self is Bidi
+}
+struct Arr<T> {
+}
+struct Lst<T> {
+}
+struct Elem {
+}
+given <T> Arr<T> is Bidi {
+}
+given <T> Arr<T> is RA {
+}
+given <T> Lst<T> is Bidi {
+}
+struct Linear {
+}
+struct Binary {
+}
+struct HandTuned {
+}
+trait LowerBound {
+  type Selected
+}
+given <T where let $15: Bidi<T>> T is LowerBound {
+  type Selected = Linear
+}
+given <T where let $1i: RA<T>> T is LowerBound {
+  type Selected = Binary
+}
+given <U> Arr<U> is LowerBound {
+  type Selected = HandTuned
+}
+type ArrOfElem = Arr<Elem>
+type LstOfElem = Lst<Elem>
+fun check_arr[](_ x: let ArrOfElem.Selected) let -> HandTuned {
+  return x
+}
+fun check_lst[](_ x: let LstOfElem.Selected) let -> Linear {
+  return x
+}

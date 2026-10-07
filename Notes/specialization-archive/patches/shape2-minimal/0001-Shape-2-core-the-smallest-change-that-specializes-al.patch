@@ -1,0 +1,924 @@
+From 7babb16c5ee233beb36fb414bc02f685fc4354f4 Mon Sep 17 00:00:00 2001
+From: Ambrus Toth <ping@ambrus.dev>
+Date: Tue, 1 Sep 2026 01:37:30 +0200
+Subject: [PATCH 1/2] Shape-2 core: the smallest change that specializes
+ algorithms.
+
+An algorithm written as its own trait, with one given per implementation
+and clients constrained on the trait, needs only that overlapping givens
+be *ordered*.  It does not need the search to look past its first success,
+and it does not need overload resolution to change.  This branch is that
+core, measured against the fuller one:
+
+  * entails / isMoreSpecific / divergence, and a three-line reordering of
+    the results of takeSummonResults;
+  * the ambiguity diagnostic, which is independent but cheap.
+
+Dropped, with the tests that cover them:
+
+  * the search continuation and its work budget.  They buy the case where
+    the specialized given's derivation is *deeper* than the generic one,
+    which shape 2 does not produce: a type conforming to both the coarse
+    and the fine trait yields two derivations of the same size, and the
+    filter alone separates them.  They also account for the whole of the
+    compile-time cost.
+  * ordering function overloads, which is shape 1.
+  * matchingHeads, which only matters when the heads being compared are
+    arrows -- that is, only for overloads.
+
+divergence is *not* droppable: without it the witness a client passes into
+a generic function is not ordered at all, which is the case shape 2 exists
+for.
+
+Cost on a full standard-library typing run: 4.15-4.24 s against a
+4.14-4.22 s baseline, where the fuller branch costs 4.32-4.38 s.
+
+Bound the implicit search, and rank as the declarative rule prescribes.
+
+Three fixes to the specificity order.
+
+A search that cannot succeed did not terminate in reasonable time.  Once
+the built-in reflexivity, symmetry and transitivity givens are in scope,
+the number of live threads multiplies with the depth of the search: an
+unsatisfiable equality reaches ~800k threads by depth nine even though
+maxImplicitDepth bounds the depth at ten.  This was already reachable on
+an unmodified compiler; keeping the search alive past its first success
+merely made it easy to hit.  Threads are now also bounded by a budget on
+the number of steps.  Resolving a witness in a well-formed program takes
+a few hundred; the largest search in the test suite takes seventeen
+thousand, so the budget is set at ten thousand steps per level, which the
+loop may overshoot by one level's worth of work.
+
+The condition for continuing the search was too strong.  It kept going
+only while a live thread was rooted at a given more specific than *every*
+incumbent, which quietly dropped incomparable roots -- exactly the ones
+that should either win on lexical distance or make the query ambiguous.
+It now keeps going while a root is not dominated by an incumbent, and the
+ranking runs the full three-way order from the specification: specificity,
+then lexical distance, then derivation size.
+
+Ambiguity is reported with the candidates that survived, and with a note
+saying that neither is more specific than the other -- which is the actual
+reason no choice was made.
+
+Also: entailment is memoized per scope, and refuses declarations that do
+not form a scope of their own, since deriving one given's requirements
+under another's assumptions is done by summoning them in its scope.
+
+Notes: the penalties counter does conflate lexical distance with the shape
+of a derivation, because assumed givens are grouped ahead of the visible
+ones and so shift them.  Separating the two breaks two existing tests that
+rely on an assumption outranking a given in an enclosing scope, and buys
+nothing here: specificity has to be consulted before lexical distance
+either way, which putting lexical distance first demonstrably breaks.  The
+conflation is left in place, with a comment.
+
+Remove compiler output accidentally committed at the repository root.
+
+Turn the specialization experiments into compiler tests.
+
+The exploratory programs under Notes/ are replaced by twelve test cases
+named specialization-*, each carrying a header comment stating what the
+program sets up, which implementation is selected, and why.
+
+They assert the selection through a type member of the algorithm trait:
+each implementation binds 'Selected' to a distinct marker type, and the
+tests ascribe the expected one.  Selecting a type member forces implicit
+resolution to commit to a single witness and cannot be steered by the
+expected type, so a wrong selection is a type error rather than a silent
+pass.  specialization-witness-passing instead pins the body of 'main' in
+the lowered IR, because that is where the property it covers -- a generic
+client receiving the specialized witness from its caller -- is observable.
+
+Seven of them fail on main and so guard the new behaviour; the other five
+pin selections the compiler already made, for reasons the comments give.
+
+Two programs stay under Notes/ because they hang the compiler rather than
+fail it, and so cannot be test cases.  e16 hangs on main as well: a search
+over the built-in equality givens that cannot succeed does not terminate
+today, which is why the first-success cutoff cannot simply be removed.
+
+Order function overloads by their parameters, not their whole type.
+
+The specificity check matched the two declarations' heads as a whole, so
+two overloads of an algorithm were ordered only when their return types
+also happened to agree.  Compare the inputs instead -- style, labels,
+passing conventions and parameter types -- and ignore the output, which
+is the relation Siek and Lumsdaine define for G: g is callable from f if
+f's parameters can be forwarded to it and f's constraints imply g's.
+
+Without this, 'lower_bound(a)' with one overload returning Linear and the
+other Binary stayed ambiguous.
+
+Add probes for concrete-head and associated-type-equality specificity.
+
+e14 covers the whole chain named in the request -- a given for Arr<T> wins
+over one constrained on RandomAccess, which wins over one constrained on
+Bidirectional.
+
+e15 and e16 record a limit of the search continuation.  Keeping the
+breadth-first search alive past its first success makes every improvable
+query behave like an exhausting one, and an exhausting query over the
+built-in equality givens does not terminate -- e16 shows that divergence
+already exists on main for a search that simply fails.  The specificity
+*filter* alone is unaffected; only the continuation regresses here.
+
+Prototype: order function overloads by constraint specificity.
+
+Two functions that differ only in their context clauses are currently
+reported as an ambiguous use.  This ranks them with the same specificity
+order used for givens, so a call whose arguments satisfy the finer
+constraints selects the more constrained overload -- concept-based
+overloading in the sense of Siek and Lumsdaine's G.
+
+As in G, the choice is still made from the static constraints of the call
+site: a generic caller constrained on the coarser trait binds the coarser
+overload (Notes/specialization-experiments/e13.hylo).
+
+Prototype: order implicit resolution results by specificity.
+
+Implicit resolution currently returns the *smallest* derivation of a queried
+witness and reports an ambiguity when several derivations tie.  That rule is
+at odds with algorithm specialization: a given constrained on a finer trait
+does not, in general, produce a smaller derivation than one constrained on a
+coarser trait, so the specialized implementation of an algorithm either loses
+or ties with the generic one.
+
+This adds a specificity order over givens, defined by entailment between their
+context clauses after matching their heads (the rule used by C++ concept
+subsumption and by Siek and Lumsdaine's G), and applies it before lexical
+proximity when several derivations are found.  The breadth-first search no
+longer stops at the first depth that produces a result: it keeps exploring as
+long as a live thread is rooted at a strictly more specific given.
+
+Notes/specialization-experiments holds the programs used to check this.
+---
+ .gitignore                                    |   4 +
+ Notes/specialization-experiments/README.md    |  12 ++
+ Notes/specialization-experiments/bench.hylo   |   6 +
+ Sources/FrontEnd/Diagnostic.swift             |  21 ++-
+ Sources/FrontEnd/Typer/Typer.swift            | 126 +++++++++++++++++-
+ ...n-incomparable-givens.diagnostics.expected |  21 +++
+ .../specialization-incomparable-givens.hylo   |  31 +++++
+ ...-underivable-equality.diagnostics.expected |   3 +
+ .../specialization-underivable-equality.hylo  |  33 +++++
+ .../positive/specialization-blanket-head.hylo |  29 ++++
+ .../specialization-concrete-type.hylo         |  41 ++++++
+ .../specialization-context-sensitivity.hylo   |  36 +++++
+ .../specialization-lifting-given.hylo         |  33 +++++
+ .../specialization-local-override.hylo        |  30 +++++
+ .../specialization-own-conformance.hylo       |  28 ++++
+ .../specialization-refinement-chain.hylo      |  28 ++++
+ .../positive/specialization-refinement.hylo   |  33 +++++
+ .../specialization-witness-passing.hylo       |  27 ++++
+ ...ialization-witness-passing.raw-ir.expected |  17 +++
+ 19 files changed, 554 insertions(+), 5 deletions(-)
+ create mode 100644 Notes/specialization-experiments/README.md
+ create mode 100644 Notes/specialization-experiments/bench.hylo
+ create mode 100644 Tests/CompilerTests/negative/specialization-incomparable-givens.diagnostics.expected
+ create mode 100644 Tests/CompilerTests/negative/specialization-incomparable-givens.hylo
+ create mode 100644 Tests/CompilerTests/negative/specialization-underivable-equality.diagnostics.expected
+ create mode 100644 Tests/CompilerTests/negative/specialization-underivable-equality.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-blanket-head.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-concrete-type.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-context-sensitivity.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-lifting-given.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-local-override.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-own-conformance.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-refinement-chain.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-refinement.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-witness-passing.hylo
+ create mode 100644 Tests/CompilerTests/positive/specialization-witness-passing.raw-ir.expected
+
+diff --git a/.gitignore b/.gitignore
+index bfa11d5..245f3d6 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -23,3 +23,7 @@ StandardLibrary/**/*.observed
+ 
+ # Local development
+ /Playground
++
++# compiler output accidentally written into the working directory
++*.ast
++*.ir
+diff --git a/Notes/specialization-experiments/README.md b/Notes/specialization-experiments/README.md
+new file mode 100644
+index 0000000..edc0ab6
+--- /dev/null
++++ b/Notes/specialization-experiments/README.md
+@@ -0,0 +1,12 @@
++# Implicit-resolution benchmark input
++
++`bench.hylo` is not a test. It is the input used to measure the cost of implicit resolution on a
++full standard-library typing run:
++
++    for i in 1 2 3 4 5; do
++      /usr/bin/time -f "%e" ./.build/debug/hc --no-caching --emit ir -o /dev/null \
++        Notes/specialization-experiments/bench.hylo
++    done
++
++The exploratory programs that motivated the specificity order are now compiler tests, under
++`Tests/CompilerTests/{positive,negative}/specialization-*.hylo`.
+diff --git a/Notes/specialization-experiments/bench.hylo b/Notes/specialization-experiments/bench.hylo
+new file mode 100644
+index 0000000..9ca9d0e
+--- /dev/null
++++ b/Notes/specialization-experiments/bench.hylo
+@@ -0,0 +1,6 @@
++public fun main() -> Int32 {
++  var s: Int32 = 0
++  var i: Int32 = 0
++  while i < 100 { &s += i ; &i += (1 as Int32) }
++  return s % (256 as Int32)
++}
+diff --git a/Sources/FrontEnd/Diagnostic.swift b/Sources/FrontEnd/Diagnostic.swift
+index 3be0848..233a81e 100644
+--- a/Sources/FrontEnd/Diagnostic.swift
++++ b/Sources/FrontEnd/Diagnostic.swift
+@@ -220,11 +220,24 @@ extension Program {
+     .init(.error, "binding declaration requires an initializer", at: .empty(at: self[d].site.end))
+   }
+ 
+-  /// Returns an error diagnosing ambiguous implicit search results.
++  /// Returns an error diagnosing ambiguous implicit search results, pointing at the givens in
++  /// `candidates` that survived resolution.
+   internal func multipleGivenInstances(
+-    of t: AnyTypeIdentity, at site: SourceSpan
++    of t: AnyTypeIdentity, found candidates: [Typer.SummonResult] = [], at site: SourceSpan
+   ) -> Diagnostic {
+-    .init(.error, format("multiple given instance of '%T' in this scope", [t]), at: site)
++    var notes: [Diagnostic] = []
++    for d in candidates.compactMap(\.witness.declaration).uniqued() {
++      notes.append(.init(.note, "candidate given is declared here", at: spanForDiagnostic(about: d)))
++    }
++    if notes.count > 1 {
++      notes.append(
++        .init(
++          .note,
++          "neither candidate is more specific than the other, so no choice can be made between them",
++          at: site))
++    }
++    return .init(
++      .error, format("multiple given instance of '%T' in this scope", [t]), at: site, notes: notes)
+   }
+ 
+   /// Returns an error diagnosing an invalid coercion.
+@@ -271,7 +284,7 @@ extension Program {
+     if found.isEmpty {
+       return noGivenInstance(of: t, at: site)
+     } else {
+-      return multipleGivenInstances(of: t, at: site)
++      return multipleGivenInstances(of: t, found: found, at: site)
+     }
+   }
+ 
+diff --git a/Sources/FrontEnd/Typer/Typer.swift b/Sources/FrontEnd/Typer/Typer.swift
+index 13d9a11..1c8e069 100644
+--- a/Sources/FrontEnd/Typer/Typer.swift
++++ b/Sources/FrontEnd/Typer/Typer.swift
+@@ -23,6 +23,13 @@ public struct Typer {
+   /// The maximum depth of a derivation during implicit search.
+   private let maxImplicitDepth = 10
+ 
++
++  /// `true` iff the typer is currently comparing the specificity of two givens.
++  ///
++  /// Specificity comparison uses implicit resolution, which must not itself attempt to
++  /// order its results by specificity lest it diverge.
++  private var isComparingSpecificity = false
++
+   /// Creates an instance assigning types to syntax trees in `m`, which is a module in `p`.
+   public init(
+     typing m: Module.ID, of p: consuming Program,
+@@ -60,6 +67,9 @@ public struct Typer {
+     /// A pair of types.
+     fileprivate typealias TypePair = Pair<AnyTypeIdentity, AnyTypeIdentity>
+ 
++    /// An ordered pair of declarations, used as a cache key.
++    fileprivate typealias DeclarationPair = Pair<DeclarationIdentity, DeclarationIdentity>
++
+     /// A pair composed of an extension and a type.
+     fileprivate typealias ExtensionAndType = Pair<ExtensionDeclaration.ID, AnyTypeIdentity>
+ 
+@@ -96,6 +106,9 @@ public struct Typer {
+     /// The cache of `Typer.canDeriveCoercions(_:_:in:where:)`.
+     fileprivate var scopeToPotentialCoercions: [ScopeIdentity: [TypePair: Bool]]
+ 
++    /// The cache of `Typer.entails(_:_:in:)`.
++    fileprivate var scopeToEntailments: [ScopeIdentity: [Memos.DeclarationPair: Bool]]
++
+     /// The cache of `Typer.typeOfTraitSelf(in:)`.
+     fileprivate var traitToTypeOfTraitSelf: [TraitDeclaration.ID: AnyTypeIdentity]
+ 
+@@ -128,6 +141,7 @@ public struct Typer {
+       self.scopeToTraits = [:]
+       self.scopeToGivens = [:]
+       self.scopeToSummoned = [:]
++      self.scopeToEntailments = [:]
+       self.scopeToTypeOfSelf = [:]
+       self.scopeToPotentialCoercions = [:]
+       self.traitToTypeOfTraitSelf = [:]
+@@ -3615,6 +3629,13 @@ public struct Typer {
+     var gs: [[Given]] = []
+ 
+     // Assumed givens.
++    //
++    // Note: these are grouped one per element, and ahead of the visible ones, so that a derivation
++    // discharging an assumption is preferred to one reaching for a given in an enclosing scope.
++    // The offset of a visible group therefore depends on how many assumptions are in flight, which
++    // means a longer derivation is charged slightly more than a short one. Several tests depend on
++    // that, so the two notions are deliberately left conflated; specificity, which is consulted
++    // first, is what algorithm selection relies on.
+     gs.append(contentsOf: environment.givens.reversed().map({ (g) in [g] }))
+ 
+     // Givens visible from `scopeOfUse`.
+@@ -3802,7 +3823,110 @@ public struct Typer {
+       swap(&next, &work)
+     }
+ 
+-    return done.minimalElements(by: { (a, b) in a.penalties < b.penalties })
++    // Rank as the declarative rule prescribes: most specific first, then lexically closest, then
++    // smallest. Whatever survives all three is genuinely ambiguous.
++    if done.count < 2 { return done }
++    let strongest = done.minimalElements(by: { (a, b) in isMoreSpecific(a, than: b, in: scopeOfUse) })
++    if strongest.count < 2 { return strongest }
++    let closest = strongest.minimalElements(by: { (a, b) in a.penalties < b.penalties })
++    if closest.count < 2 { return closest }
++    return closest.minimalElements(by: { (a, b) in
++      a.witness.elaborationCost < b.witness.elaborationCost
++    })
++  }
++
++
++  // MARK: Specificity
++
++  /// Returns `true` iff the given used at the root of `a` is strictly more specific than the one
++  /// used at the root of `b`, in `scopeOfUse`.
++  ///
++  /// A given `g` is *at least as specific* as a given `h` if the head of `h` can be instantiated
++  /// to the head of `g` and, under the assumptions of `g`'s context clause, every requirement of
++  /// that instantiation of `h` is derivable. Intuitively, `g` applies to no more types than `h`
++  /// does, so `g` describes a more refined situation. `g` is *strictly* more specific than `h` if
++  /// it is at least as specific and the converse does not hold.
++  private mutating func isMoreSpecific(
++    _ a: SummonResult, than b: SummonResult, in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    guard !isComparingSpecificity else { return false }
++    guard let (x, y) = divergence(a.witness, b.witness) else { return false }
++
++    isComparingSpecificity = true
++    defer { isComparingSpecificity = false }
++
++    return entails(x, y, in: scopeOfUse) && !entails(y, x, in: scopeOfUse)
++  }
++
++  /// Returns the declarations of the givens at the roots of the smallest subterms in which `a` and
++  /// `b` differ, or `nil` if they do not differ in a way that can be compared.
++  ///
++  /// Two derivations of the same type often share a common prefix; the choice that distinguishes
++  /// them is made deeper in the term. This method locates that choice.
++  private func divergence(
++    _ a: WitnessExpression, _ b: WitnessExpression
++  ) -> (DeclarationIdentity, DeclarationIdentity)? {
++    if a.value == b.value { return nil }
++
++    switch (a.value, b.value) {
++    case (.termApplication(let f, let x), .termApplication(let g, let y)):
++      if f.value == g.value { return divergence(x, y) }
++      if x.value == y.value { return divergence(f, g) }
++
++    case (.typeApplication(let f, _), .typeApplication(let g, _)):
++      return divergence(f, g)
++
++    case (.nested(let f), .nested(let g)):
++      return divergence(f, g)
++
++    default:
++      break
++    }
++
++    guard let x = a.declaration, let y = b.declaration, x != y else { return nil }
++    return (x, y)
++  }
++
++  /// Returns `true` iff, in the scope of `a`, the head of `b` can be instantiated to the head of
++  /// `a` and every requirement of `b` is derivable.
++  ///
++  /// The scope of `a` is exactly the context in which `a`'s own requirements hold, so deriving
++  /// `b`'s requirements there amounts to proving that `a`'s assumptions entail `b`'s.
++  private mutating func entails(
++    _ a: DeclarationIdentity, _ b: DeclarationIdentity, in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    let k = Memos.DeclarationPair(a, b)
++    if let memoized = cache.scopeToEntailments[scopeOfUse]?[k] { return memoized }
++
++    let result = computeEntailment(a, b, in: scopeOfUse)
++    cache.scopeToEntailments[scopeOfUse, default: [:]][k] = result
++    return result
++  }
++
++  /// Returns `true` iff `a` entails `b`, without consulting or updating the cache.
++  private mutating func computeEntailment(
++    _ a: DeclarationIdentity, _ b: DeclarationIdentity, in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    // `a`'s own scope is what exposes its requirements as givens, so `a` must denote one. Givens
++    // introduced by a context parameter or by the compiler have no such scope; they are simply not
++    // ordered against anything.
++    guard program.isScope(a.erased), program.isScope(b.erased) else { return false }
++
++    // `a`'s parameters stay rigid; `b` is opened for unification.
++    let ha = program.types.head(declaredType(of: a))
++    let hypotheses = ScopeIdentity(uncheckedFrom: a.erased)
++    let (ub, hb) = program.types.open(declaredType(of: b))
++
++    // The heads must match.
++    guard var s = program.types.unifiable(hb, ha) else { return false }
++
++    // Every requirement of `b` must hold under `a`'s assumptions.
++    for u in ub {
++      let t = program.types.reify(u, applying: s, withVariables: .kept)
++      guard let r = summon(t, in: hypotheses).first else { return false }
++      s = s.union(r.substitutions)
++    }
++    return true
+   }
+ 
+   /// Returns the givens whose definitions are at the top-level of `m`.
+diff --git a/Tests/CompilerTests/negative/specialization-incomparable-givens.diagnostics.expected b/Tests/CompilerTests/negative/specialization-incomparable-givens.diagnostics.expected
+new file mode 100644
+index 0000000..a8da573
+--- /dev/null
++++ b/Tests/CompilerTests/negative/specialization-incomparable-givens.diagnostics.expected
+@@ -0,0 +1,21 @@
++negative/specialization-incomparable-givens.hylo:28.14-24: error: ambiguous use of 'Selected'
++fun check(x: S.Selected) {}
++             ~~~~~~~~~~
++negative/specialization-incomparable-givens.hylo:28.14-24: error: expression does not denote a type
++fun check(x: S.Selected) {}
++             ~~~~~~~~~~
++negative/specialization-incomparable-givens.hylo:31.17-23: error: no coercion from '<T> P<T> ==> [Void](let T) let -> Void' to '[Void](let S) let -> Void'
++fun use(s: S) { client(s) }
++                ~~~~~~
++negative/specialization-incomparable-givens.hylo:31.17-23: note: multiple given instance of 'P<S>' in this scope
++fun use(s: S) { client(s) }
++                ~~~~~~
++negative/specialization-incomparable-givens.hylo:25.1-6: note: candidate given is declared here
++given via_q: <T is Q> => T is P { type Selected = ViaQ }
++~~~~~
++negative/specialization-incomparable-givens.hylo:26.1-6: note: candidate given is declared here
++given via_r: <T is R> => T is P { type Selected = ViaR }
++~~~~~
++negative/specialization-incomparable-givens.hylo:31.17-23: note: neither candidate is more specific than the other, so no choice can be made between them
++fun use(s: S) { client(s) }
++                ~~~~~~
+diff --git a/Tests/CompilerTests/negative/specialization-incomparable-givens.hylo b/Tests/CompilerTests/negative/specialization-incomparable-givens.hylo
+new file mode 100644
+index 0000000..222d6f3
+--- /dev/null
++++ b/Tests/CompilerTests/negative/specialization-incomparable-givens.hylo
+@@ -0,0 +1,31 @@
++//! stage:typing no-std
++
++// Specificity is a partial order, and where it does not order, nothing is picked.
++//
++// `S` conforms to both `Q` and `R`, so both givens apply. Neither set of requirements entails the
++// other -- `Q` and `R` are unrelated traits -- so neither given applies to fewer types than the
++// other, and both uses below are ambiguous. This is the case a most-specific-wins rule must leave
++// alone: resolving it either way would be an arbitrary choice.
++//
++// The two uses reach the ambiguity by different routes. `check` selects a type member, which is
++// reported as an ambiguous name; `use` needs a witness for the context clause of `client`, which is
++// reported as an ambiguous implicit search whose notes point at the candidates.
++
++trait P { type Selected }
++trait Q {}
++trait R {}
++
++struct S {}
++given S is Q {}
++given S is R {}
++
++struct ViaQ {}
++struct ViaR {}
++
++given via_q: <T is Q> => T is P { type Selected = ViaQ }
++given via_r: <T is R> => T is P { type Selected = ViaR }
++
++fun check(x: S.Selected) {}
++
++fun client<T is P>(x: T) {}
++fun use(s: S) { client(s) }
+diff --git a/Tests/CompilerTests/negative/specialization-underivable-equality.diagnostics.expected b/Tests/CompilerTests/negative/specialization-underivable-equality.diagnostics.expected
+new file mode 100644
+index 0000000..6a12065
+--- /dev/null
++++ b/Tests/CompilerTests/negative/specialization-underivable-equality.diagnostics.expected
+@@ -0,0 +1,3 @@
++negative/specialization-underivable-equality.hylo:33.19-27: error: type 'Fast' has no static member 'Selected'
++fun check(x: Fast.Selected) {}
++                  ~~~~~~~~
+diff --git a/Tests/CompilerTests/negative/specialization-underivable-equality.hylo b/Tests/CompilerTests/negative/specialization-underivable-equality.hylo
+new file mode 100644
+index 0000000..a29f392
+--- /dev/null
++++ b/Tests/CompilerTests/negative/specialization-underivable-equality.hylo
+@@ -0,0 +1,33 @@
++//! stage:typing no-std
++
++// A given guarded by an equality between an associated type and a concrete type.
++//
++// `specialized` would be the more specific of any pair it competes with -- its requirements include
++// theirs and add one. It applies to nothing, though, because Hylo cannot currently derive
++// `T.Position == Idx` from a conformance that defines `type Position = Idx`; the equality has to be
++// assumed. So nothing witnesses `LowerBound<Fast>` and the member selection fails. Add a second,
++// unguarded given and `Fast.Selected` resolves to that one instead.
++//
++// The test is here because this is the shape that used to make implicit resolution run away rather
++// than fail: searching for an equality it cannot prove, resolution reaches the built-in
++// reflexivity, symmetry and transitivity givens, whose derivations multiply with the depth of the
++// search. The compiler hung, and hung on an unmodified compiler too -- the divergence is in how
++// equalities are searched, not in how candidates are ordered. What stops it now is the budget on
++// `takeSummonResults`, and what this test really pins is that the program fails instead of hanging.
++//
++// When deriving that equality is implemented, this test stops being negative.
++
++trait Coll { type Position }
++
++struct Idx {}
++struct Fast {}
++
++given Fast is Coll { type Position = Idx }
++
++struct Specialized {}
++
++trait LowerBound { type Selected }
++
++given specialized: <T is Coll where T.Position == Idx> => T is LowerBound { type Selected = Specialized }
++
++fun check(x: Fast.Selected) {}
+diff --git a/Tests/CompilerTests/positive/specialization-blanket-head.hylo b/Tests/CompilerTests/positive/specialization-blanket-head.hylo
+new file mode 100644
+index 0000000..a7a1d2a
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-blanket-head.hylo
+@@ -0,0 +1,29 @@
++//! stage:typing no-std
++
++// Specificity is not "more constraints wins" -- it is "applies to fewer types wins", and the two
++// come apart here.
++//
++// `via_element_type` carries no requirements at all but only ever applies to an `S`.
++// `via_marker` requires `Q`, yet applies to any type conforming to it, and every `S` does. So
++// `via_element_type` is the more specific of the two even though it is the less constrained.
++//
++// `SOfElem.Selected` is `ViaS`. This is the example from Docs/State-of-Generics.md, and the
++// selection is the same one the compiler already made; specificity just gives it a reason.
++
++trait P { type Selected }
++trait Q {}
++
++struct S<T> {}
++struct Elem {}
++
++struct ViaS {}
++struct ViaQ {}
++
++given <T> => S<T> is Q {}
++
++given via_element_type: <T> => S<T> is P { type Selected = ViaS }
++given via_marker: <T is Q> => T is P { type Selected = ViaQ }
++
++type SOfElem = S<Elem>
++
++fun check(x: SOfElem.Selected) -> ViaS { x }
+diff --git a/Tests/CompilerTests/positive/specialization-concrete-type.hylo b/Tests/CompilerTests/positive/specialization-concrete-type.hylo
+new file mode 100644
+index 0000000..d6000a6
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-concrete-type.hylo
+@@ -0,0 +1,41 @@
++//! stage:typing no-std
++
++// Specificity orders givens by how many types they apply to, so one chain covers both a concrete
++// type and the traits above it: `Arr` is finer than `RA` is finer than `Bidi`.
++//
++// `hand_tuned` has head `LowerBound<Array<U>>`. Matching it against `LowerBound<T>` binds `T` to
++// `Array<U>`, so it entails the two trait-constrained givens; matching in the other direction is
++// impossible, because `T` is rigid there and cannot be forced to be an `Array<U>`. The implementation
++// written for one type constructor therefore wins over both of the ones written for a trait.
++//
++// `Lst` is only bidirectional, so neither specialized given applies to it and it falls back to the
++// generic implementation. That is the case a specificity order must leave alone.
++
++trait BidirectionalCollection {}
++trait RandomAccessCollection refines BidirectionalCollection {}
++
++struct Array<T> {}
++struct LinkedList<T> {}
++struct Elem {}
++
++given <T> => Array<T> is BidirectionalCollection {}
++given <T> => Array<T> is RandomAccessCollection {}
++given <T> => LinkedList<T> is BidirectionalCollection {}
++
++struct LinearSearch {}
++struct BinarySearch {}
++struct HandTuned {}
++
++trait LowerBound { type Selected }
++
++given <T is BidirectionalCollection> => T is LowerBound { type Selected = LinearSearch }
++given <T is RandomAccessCollection> => T is LowerBound { type Selected = BinarySearch }
++
++given hand_tuned: <U> => Array<U> is LowerBound { type Selected = HandTuned }
++
++// A member cannot be selected on a type application directly, so name the applications first.
++type ArrOfElem = Array<Elem>
++type LstOfElem = LinkedList<Elem>
++
++fun check_specialized(x: ArrOfElem.Selected) -> HandTuned { x }
++fun check_fallback(x: LstOfElem.Selected) -> LinearSearch { x }
+diff --git a/Tests/CompilerTests/positive/specialization-context-sensitivity.hylo b/Tests/CompilerTests/positive/specialization-context-sensitivity.hylo
+new file mode 100644
+index 0000000..652064f
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-context-sensitivity.hylo
+@@ -0,0 +1,36 @@
++//! stage:typing no-std
++
++// Which implementation is selected depends on what the enclosing context knows about the type, and
++// on nothing else. Generic functions are compiled once and receive their witnesses as values, so a
++// function constrained on `Bidi` is handed a `Bidi` witness and cannot reach past it, however
++// random-access the argument turns out to be.
++//
++//   - in a context that knows only `T is Bidi`, `T.Selected` is `Linear`;
++//   - in a context that knows `T is RA`, it is `Binary`, because `RA<T>` entails `Bidi<T>` and the
++//     specialized given is then the more specific of the two;
++//   - at a concrete type, it is `Binary` for the same reason.
++//
++// This is why an algorithm that wants to stay specialized across a generic boundary is abstracted
++// over as a trait rather than resolved at its definition site: the choice then travels in from
++// whichever caller knows the concrete type. `specialization-witness-passing` shows that happening
++// in the IR, which is where it is observable -- an associated type selected through an abstract
++// witness does not reduce at a call boundary, so it cannot be asserted here.
++
++trait Bidi {}
++trait RA refines Bidi {}
++
++struct Arr {}
++given Arr is Bidi {}
++given Arr is RA {}
++
++struct Linear {}
++struct Binary {}
++
++trait LowerBound { type Selected }
++
++given <T is Bidi> => T is LowerBound { type Selected = Linear }
++given <T is RA> => T is LowerBound { type Selected = Binary }
++
++fun in_bidirectional_context<T is Bidi>(x: T.Selected) -> Linear { x }
++fun in_random_access_context<T is RA>(x: T.Selected) -> Binary { x }
++fun at_concrete_type(x: Arr.Selected) -> Binary { x }
+diff --git a/Tests/CompilerTests/positive/specialization-lifting-given.hylo b/Tests/CompilerTests/positive/specialization-lifting-given.hylo
+new file mode 100644
+index 0000000..3f695ee
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-lifting-given.hylo
+@@ -0,0 +1,33 @@
++//! stage:typing no-std
++
++// The specialization idiom that needs no algorithm trait at all.
++//
++// `RA` does not refine `Bidi` here. Instead a lifting given produces the `Bidi` witness for every
++// random-access type, and installs the specialized implementation while doing so. A client
++// constrained on `Bidi` then gets the specialized implementation for free, because the witness it
++// is handed *is* the lifted one -- there is no second, coarser `Bidi` witness for `Arr` to find.
++//
++// `Arr.Selected` is `Binary` and `Lst.Selected` is `Linear`. Note that this arrangement requires
++// `Arr` not to declare `Bidi` for itself; if it did, its own conformance would shadow the lifted
++// one, as `specialization-own-conformance` shows.
++
++trait Bidi {
++  /// The implementation this witness provides.
++  type Selected
++}
++trait RA {}
++
++struct Arr {}
++struct Lst {}
++
++struct Linear {}
++struct Binary {}
++
++given Arr is RA {}
++given Lst is Bidi { type Selected = Linear }
++given <T is RA> => T is Bidi { type Selected = Binary }
++
++fun client<T is Bidi>(x: T.Selected) -> T.Selected { x }
++
++fun check_lifted(x: Arr.Selected) -> Binary { x }
++fun check_direct(x: Lst.Selected) -> Linear { x }
+diff --git a/Tests/CompilerTests/positive/specialization-local-override.hylo b/Tests/CompilerTests/positive/specialization-local-override.hylo
+new file mode 100644
+index 0000000..11dadd1
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-local-override.hylo
+@@ -0,0 +1,30 @@
++//! stage:typing no-std
++
++// Scoped conformances still win. A given introduced in a local scope with a fully concrete head
++// carries no requirements and applies to exactly one type, so it is more specific than either of
++// the two blanket givens and is selected inside that scope only.
++//
++// `Arr.Selected` is `Binary` at file scope and `Local` inside `with_override`.
++
++trait Bidi {}
++trait RA refines Bidi {}
++
++struct Arr {}
++given Arr is Bidi {}
++given Arr is RA {}
++
++struct Linear {}
++struct Binary {}
++struct Local {}
++
++trait LowerBound { type Selected }
++
++given <T is Bidi> => T is LowerBound { type Selected = Linear }
++given <T is RA> => T is LowerBound { type Selected = Binary }
++
++fun without_override(x: Arr.Selected) -> Binary { x }
++
++fun with_override() {
++  given Arr is LowerBound { type Selected = Local }
++  fun inner(x: Arr.Selected) -> Local { x }
++}
+diff --git a/Tests/CompilerTests/positive/specialization-own-conformance.hylo b/Tests/CompilerTests/positive/specialization-own-conformance.hylo
+new file mode 100644
+index 0000000..b2679b5
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-own-conformance.hylo
+@@ -0,0 +1,28 @@
++//! stage:typing no-std
++
++// A conformance a type declares for itself outranks a blanket given that would also cover it.
++//
++// The lifting given supplies `Bidi` for every random-access type and installs the specialized
++// implementation while doing so. `Arr` is random-access, so it is covered -- but `Arr` also
++// declares `Bidi` directly, and a given whose head is `Bidi<Arr>` applies to exactly one type
++// where the lifting given applies to a whole family. The direct one is therefore more specific.
++//
++// `Arr.Selected` is `Linear`. This is the escape hatch: a type that wants a different
++// implementation than its trait would give it says so by conforming directly.
++
++trait Bidi {
++  /// The implementation this witness provides.
++  type Selected
++}
++trait RA {}
++
++struct Arr {}
++given Arr is RA {}
++
++struct Linear {}
++struct Binary {}
++
++given <T is RA> => T is Bidi { type Selected = Binary }
++given Arr is Bidi { type Selected = Linear }
++
++fun check(x: Arr.Selected) -> Linear { x }
+diff --git a/Tests/CompilerTests/positive/specialization-refinement-chain.hylo b/Tests/CompilerTests/positive/specialization-refinement-chain.hylo
+new file mode 100644
+index 0000000..82991c3
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-refinement-chain.hylo
+@@ -0,0 +1,28 @@
++//! stage:typing no-std
++
++// Specificity is transitive, so a refinement chain orders the whole family of implementations at
++// once. `Arr` conforms to all three traits, so all three givens apply. `RA<T>` entails `Bidi<T>`
++// entails `Fwd<T>`, and none of the converses hold, so the `RA` given is the unique maximum.
++//
++// `Arr.Selected` is `ViaRA`: the implementation that assumes the most about its operand.
++
++trait Fwd {}
++trait Bidi refines Fwd {}
++trait RA refines Bidi {}
++
++struct Arr {}
++given Arr is Fwd {}
++given Arr is Bidi {}
++given Arr is RA {}
++
++struct ViaFwd {}
++struct ViaBidi {}
++struct ViaRA {}
++
++trait LowerBound { type Selected }
++
++given <T is Fwd> => T is LowerBound { type Selected = ViaFwd }
++given <T is Bidi> => T is LowerBound { type Selected = ViaBidi }
++given <T is RA> => T is LowerBound { type Selected = ViaRA }
++
++fun check(x: Arr.Selected) -> ViaRA { x }
+diff --git a/Tests/CompilerTests/positive/specialization-refinement.hylo b/Tests/CompilerTests/positive/specialization-refinement.hylo
+new file mode 100644
+index 0000000..9368146
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-refinement.hylo
+@@ -0,0 +1,33 @@
++//! stage:typing no-std
++
++// Two implementations of one algorithm overlap: `Arr` conforms to both `Bidi` and `RA`, so both
++// givens below can witness `LowerBound<Arr>`. Neither derivation is smaller than the other -- each
++// is one implication away from a conformance `Arr` declares directly -- so size cannot separate
++// them. Specificity can: `RA<T>` entails `Bidi<T>` because `RA` refines `Bidi`, and `Bidi<T>` does
++// not entail `RA<T>`. The `RA` given therefore applies to strictly fewer types and wins.
++//
++// `Arr.Selected` is `Binary`. Selecting a type member forces implicit resolution to commit to one
++// witness, and it cannot be steered by the expected type, so the ascription is a real assertion:
++// with the wrong given selected, `check` would not type check.
++
++trait Bidi {}
++trait RA refines Bidi {}
++
++struct Arr {}
++given Arr is Bidi {}
++given Arr is RA {}
++
++/// Marks the implementation that scans linearly.
++struct Linear {}
++/// Marks the implementation that halves the search interval.
++struct Binary {}
++
++trait LowerBound {
++  /// The implementation this witness provides.
++  type Selected
++}
++
++given <T is Bidi> => T is LowerBound { type Selected = Linear }
++given <T is RA> => T is LowerBound { type Selected = Binary }
++
++fun check(x: Arr.Selected) -> Binary { x }
+diff --git a/Tests/CompilerTests/positive/specialization-witness-passing.hylo b/Tests/CompilerTests/positive/specialization-witness-passing.hylo
+new file mode 100644
+index 0000000..385664a
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-witness-passing.hylo
+@@ -0,0 +1,27 @@
++//! stage:lowering
++
++// The property the whole design rests on, seen in the lowered IR.
++//
++// `client` is compiled once and receives its witness as a parameter, so it commits to no
++// implementation of its own. `main` is where the type is concrete, so `main` is where the choice
++// happens: it projects `binary_search` -- the specialized, random-access implementation -- and
++// passes it in. Had the generic implementation been selected, `linear_scan` would appear there
++// instead.
++//
++// The accompanying `.raw-ir.expected` file pins the body of `main`. Every other section of the
++// observed IR is ignored, so the expectation says only which witness `main` builds.
++
++trait Bidi {}
++trait RA refines Bidi {}
++
++given Void is Bidi {}
++given void_is_random_access: Void is RA {}
++
++trait LowerBound { fun run() -> Int32 }
++
++given linear_scan: <T is Bidi> => T is LowerBound { fun run() -> Int32 { 1 } }
++given binary_search: <T is RA> => T is LowerBound { fun run() -> Int32 { 2 } }
++
++fun client<T is LowerBound>(c: T) -> Int32 { c.run() }
++
++public fun main() -> Int32 { client(()) }
+diff --git a/Tests/CompilerTests/positive/specialization-witness-passing.raw-ir.expected b/Tests/CompilerTests/positive/specialization-witness-passing.raw-ir.expected
+new file mode 100644
+index 0000000..28b7b72
+--- /dev/null
++++ b/Tests/CompilerTests/positive/specialization-witness-passing.raw-ir.expected
+@@ -0,0 +1,17 @@
++fun main(set %p0: Int32) {
++%b0:
++  %r0 = project void_is_random_access[]
++  %r1 = type_apply binary_search<Void>
++  %r2 = access [let] %r0
++  %r3 = project %r1[%r2]
++  %r4 = type_apply client(_:)<Void>
++  %r5 = alloca Void, #preferred
++  %r6 = access [set] %r5
++  %r7 = assume_state %r6 initialized
++  %r8 = end %r6
++  %r9 = access [let] %r3
++  %r10 = access [let] %r5
++  %r11 = access [set] %p0
++  %r12 = apply %r4(%r9, %r10) => %r11
++  %r13 = return
++}
+-- 
+2.43.0
+

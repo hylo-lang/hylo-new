@@ -1,0 +1,106 @@
+From 7598a6e02e74d5dbe153af89ddc1817eb19884dd Mon Sep 17 00:00:00 2001
+From: Ambrus Toth <ping@ambrus.dev>
+Date: Tue, 1 Sep 2026 09:31:04 +0200
+Subject: [PATCH 3/7] Add probes for concrete-head and associated-type-equality
+ specificity.
+
+e14 covers the whole chain named in the request -- a given for Arr<T> wins
+over one constrained on RandomAccess, which wins over one constrained on
+Bidirectional.
+
+e15 and e16 record a limit of the search continuation.  Keeping the
+breadth-first search alive past its first success makes every improvable
+query behave like an exhausting one, and an exhausting query over the
+built-in equality givens does not terminate -- e16 shows that divergence
+already exists on main for a search that simply fails.  The specificity
+*filter* alone is unaffected; only the continuation regresses here.
+---
+ Notes/specialization-experiments/README.md |  4 ++++
+ Notes/specialization-experiments/e14.hylo  | 18 ++++++++++++++++++
+ Notes/specialization-experiments/e15.hylo  | 15 +++++++++++++++
+ Notes/specialization-experiments/e16.hylo  | 14 ++++++++++++++
+ 4 files changed, 51 insertions(+)
+ create mode 100644 Notes/specialization-experiments/e14.hylo
+ create mode 100644 Notes/specialization-experiments/e15.hylo
+ create mode 100644 Notes/specialization-experiments/e16.hylo
+
+diff --git a/Notes/specialization-experiments/README.md b/Notes/specialization-experiments/README.md
+index 6e2204e..ab3b5f1 100644
+--- a/Notes/specialization-experiments/README.md
++++ b/Notes/specialization-experiments/README.md
+@@ -20,3 +20,7 @@ generic client) projects: that is the implementation implicit resolution selecte
+ | `e11` | two *incomparable* givens | ambiguous | ambiguous (no silent pick) |
+ | `e12` | three-level refinement chain | ambiguous | picks the deepest |
+ | `lb`  | realistic `lower_bound`, two models, two levels of generic client code | ambiguous | binary search for the random-access model, linear scan for the other |
++| `e13` | overloads called from a generic client | n/a | client binds the coarse overload (G's documented limit) |
++| `e14` | `Arr<T>`-specific given vs. `RA` vs. `Bidi` givens | ambiguous | the `Arr<T>`-specific one; `Lst<T>` still gets the linear one |
++| `e15` | finer constraint is `where T.Position == Int32` | generic given wins (it is shallower) | **hangs**: continuing the search past the first success reaches the built-in equality givens and explodes |
++| `e16` | same, with only the equality-constrained given (search must fail) | **hangs on `main` too** — pre-existing divergence of a failing search over equality constraints |  |
+diff --git a/Notes/specialization-experiments/e14.hylo b/Notes/specialization-experiments/e14.hylo
+new file mode 100644
+index 0000000..f291481
+--- /dev/null
++++ b/Notes/specialization-experiments/e14.hylo
+@@ -0,0 +1,18 @@
++// The full chain from the request: Array > RandomAccess > Bidirectional.
++trait Bidi {}
++trait RA refines Bidi {}
++
++struct Arr<T> is Deinitializable & Movable { public memberwise init }
++struct Lst<T> is Deinitializable & Movable { public memberwise init }
++
++given <T> => Arr<T> is Bidi {}
++given <T> => Arr<T> is RA {}
++given <T> => Lst<T> is Bidi {}
++
++trait LowerBound { fun lb() -> Int32 }
++
++given <T is Bidi> => T is LowerBound { fun lb() -> Int32 { 1 } }   // linear
++given <T is RA>   => T is LowerBound { fun lb() -> Int32 { 2 } }   // binary search
++given <U> => Arr<U> is LowerBound   { fun lb() -> Int32 { 3 } }    // hand-tuned for Arr
++
++public fun main() -> Int32 { Arr<Int32>().lb() + Lst<Int32>().lb() }
+diff --git a/Notes/specialization-experiments/e15.hylo b/Notes/specialization-experiments/e15.hylo
+new file mode 100644
+index 0000000..18ab584
+--- /dev/null
++++ b/Notes/specialization-experiments/e15.hylo
+@@ -0,0 +1,15 @@
++// Specificity where the finer constraint is an associated-type equality.
++trait Coll { type Position }
++struct Cursor is Deinitializable & Movable { public memberwise init }
++
++struct Fast is Deinitializable & Movable { public memberwise init }
++struct Slow is Deinitializable & Movable { public memberwise init }
++
++given Fast is Coll { type Position = Int32 }
++given Slow is Coll { type Position = Cursor }
++
++trait LowerBound { fun lb() -> Int32 }
++given <T is Coll> => T is LowerBound { fun lb() -> Int32 { 1 } }
++given <T is Coll where T.Position == Int32> => T is LowerBound { fun lb() -> Int32 { 2 } }
++
++public fun main() -> Int32 { Fast().lb() + Slow().lb() }
+diff --git a/Notes/specialization-experiments/e16.hylo b/Notes/specialization-experiments/e16.hylo
+new file mode 100644
+index 0000000..3c16ee8
+--- /dev/null
++++ b/Notes/specialization-experiments/e16.hylo
+@@ -0,0 +1,14 @@
++// Specificity where the finer constraint is an associated-type equality.
++trait Coll { type Position }
++struct Cursor is Deinitializable & Movable { public memberwise init }
++
++struct Fast is Deinitializable & Movable { public memberwise init }
++struct Slow is Deinitializable & Movable { public memberwise init }
++
++given Fast is Coll { type Position = Int32 }
++given Slow is Coll { type Position = Cursor }
++
++trait LowerBound { fun lb() -> Int32 }
++given <T is Coll where T.Position == Int32> => T is LowerBound { fun lb() -> Int32 { 2 } }
++
++public fun main() -> Int32 { Fast().lb() + Slow().lb() }
+-- 
+2.43.0
+

@@ -1,0 +1,5 @@
+import Lifted
+public struct MyArray is Deinitializable & Movable { public memberwise init }
+given MyArray is RA {}
+given MyArray is Bidi {}          // the client also conforms directly
+public fun main() -> Int32 { sort_all(MyArray()) }

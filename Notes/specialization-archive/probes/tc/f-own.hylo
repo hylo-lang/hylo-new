@@ -1,0 +1,10 @@
+//! stage:typing no-std
+trait Bidi { type Selected }
+trait RA {}
+struct Arr {}
+struct Linear {}
+struct Binary {}
+given Arr is RA {}
+given <T is RA> => T is Bidi { type Selected = Binary }
+given Arr is Bidi { type Selected = Linear }
+fun check(x: Arr.Selected) -> Linear { x }

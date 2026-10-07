@@ -1,0 +1,253 @@
+global #witness(Arr) as Type, #preferred
+
+fun Bidi.lb<Self>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = subfield %p2 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun RA.$<ConformanceDeclaration at e8:5.18><Self>(let %p0: RA<Self>) let <: Bidi<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at e8:5.18>" of %p0 as Bidi<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r4 = end %r1
+  %r3 = return
+}
+
+fun Arr.$<ConformanceDeclaration at e8:7.15>() let <: Deinitializable<Arr> {
+%b0:
+  %r0 = alloca Deinitializable<Arr>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: Arr>} as Deinitializable<Arr>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: Arr>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun Arr.$<ConformanceDeclaration at e8:7.33>() let <: Movable<Arr> {
+%b0:
+  %r0 = alloca Movable<Arr>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: Arr>, Movable.take_value.take_value@inout$synthesized<Self: Arr>} as Movable<Arr>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: Arr>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: Arr>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Arr.init(set %p0: Arr, set %p1: Void)
+
+fun $<ConformanceDeclaration at e8:8.1>() let <: Bidi<Arr> {
+%b0:
+  %r0 = alloca Bidi<Arr>, #preferred
+  %r1 = witnesstable {Bidi.lb<Self: Arr>} as Bidi<Arr>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Bidi.lb<Self: Arr>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r13 = global_access #witness(Arr)
+  %r14 = access [let] %r13
+  %r1 = place_cast %p0 as let Bidi<Arr>
+  %r2 = place_cast %p1 as let Arr
+  %r3 = access [let] %r1
+  %r4 = access [let] %r2
+  %r5 = access [set] %p2
+  %r15 = place_cast %r3 as let Bidi<Self>
+  %r16 = place_cast %r4 as let Self
+  %r17 = access [set] %r5
+  %r6 = apply Bidi.lb$existentialized(%r14, %r15, %r16) => %r17
+  %r0 = end %r14
+  %r12 = end %r5
+  %r11 = end %r4
+  %r10 = end %r3
+  %r9 = end %r2
+  %r8 = end %r1
+  %r7 = return
+}
+
+fun $<ConformanceDeclaration at e8:9.1>() let <: RA<Arr> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at e8:8.1>[]
+  %r1 = alloca RA<Arr>, #preferred
+  %r2 = witnesstable {%r0} as RA<Arr>
+  %r13 = end %r0
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun $<ConformanceDeclaration at e8:12.1>.lb<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 2 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e8:12.1><T>(let %p0: RA<T>) let <: Bidi<T> {
+%b0:
+  %r0 = alloca Bidi<T>, #preferred
+  %r1 = witnesstable {Bidi.lb<Self: T>} as Bidi<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Bidi.lb<Self: T>(let %p0: Bidi<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at e8:12.1>.lb(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun run(_:)<T>(let %p0: Bidi<T>, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = property "lb" of %p0 as [Void](let Bidi<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p0
+  %r2 = access [let] %p1
+  %r3 = access [set] %p2
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r8 = end %r3
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r18 = global_access #witness(Arr)
+  %r0 = project $<ConformanceDeclaration at e8:8.1>[]
+  %r19 = access [let] %r18
+  %r2 = alloca Arr, #preferred
+  %r3 = access [set] %r2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = access [let] %r0
+  %r7 = access [let] %r2
+  %r8 = access [set] %p0
+  %r20 = place_cast %r6 as let Bidi<T>
+  %r21 = place_cast %r7 as let T
+  %r22 = access [set] %r8
+  %r9 = apply run(_:)$existentialized(%r19, %r20, %r21) => %r22
+  %r1 = end %r19
+  %r14 = end %r8
+  %r13 = end %r7
+  %r12 = end %r6
+  %r11 = end %r0
+  %r15 = access [sink] %r2
+  %r16 = assume_state %r15 uninitialized
+  %r17 = end %r15
+  %r10 = return
+}
+
+fun RA.$<ConformanceDeclaration at e8:5.18>$existentialized(let %p0: Type, let %p1: RA<Self>) let <: Bidi<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at e8:5.18>" of %p1 as Bidi<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun Bidi.lb$existentialized(let %p0: Type, let %p1: Bidi<Self>, let %p2: Self, set %p3: Int32) {
+%b0:
+  %r0 = subfield %p3 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e8:12.1>$existentialized(let %p0: Type, let %p1: RA<T>) let <: Bidi<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Bidi<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Bidi<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Bidi.lb<Self: T>} as Bidi<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun run(_:)$existentialized(let %p0: Type, let %p1: Bidi<T>, let %p2: T, set %p3: Int32) {
+%b0:
+  %r0 = property "lb" of %p1 as [Void](let Bidi<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p1
+  %r2 = access [let] %p2
+  %r3 = access [set] %p3
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r5 = end %r3
+  %r6 = end %r2
+  %r7 = end %r1
+  %r8 = return
+}

@@ -1,0 +1,30 @@
+From 74d7c800286b6766cb9585cf3afa4d6ff2628fc9 Mon Sep 17 00:00:00 2001
+From: Ambrus Toth <ping@ambrus.dev>
+Date: Thu, 3 Sep 2026 15:54:19 +0200
+Subject: [PATCH 2/2] remove comment
+
+---
+ Sources/FrontEnd/Typer/Typer.swift | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/Sources/FrontEnd/Typer/Typer.swift b/Sources/FrontEnd/Typer/Typer.swift
+index 1c8e069..ee1db50 100644
+--- a/Sources/FrontEnd/Typer/Typer.swift
++++ b/Sources/FrontEnd/Typer/Typer.swift
+@@ -3629,13 +3629,6 @@ public struct Typer {
+     var gs: [[Given]] = []
+ 
+     // Assumed givens.
+-    //
+-    // Note: these are grouped one per element, and ahead of the visible ones, so that a derivation
+-    // discharging an assumption is preferred to one reaching for a given in an enclosing scope.
+-    // The offset of a visible group therefore depends on how many assumptions are in flight, which
+-    // means a longer derivation is charged slightly more than a short one. Several tests depend on
+-    // that, so the two notions are deliberately left conflated; specificity, which is consulted
+-    // first, is what algorithm selection relies on.
+     gs.append(contentsOf: environment.givens.reversed().map({ (g) in [g] }))
+ 
+     // Givens visible from `scopeOfUse`.
+-- 
+2.43.0
+

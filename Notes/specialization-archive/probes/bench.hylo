@@ -1,0 +1,6 @@
+public fun main() -> Int32 {
+  var s: Int32 = 0
+  var i: Int32 = 0
+  while i < 100 { &s += i ; &i += (1 as Int32) }
+  return s % (256 as Int32)
+}

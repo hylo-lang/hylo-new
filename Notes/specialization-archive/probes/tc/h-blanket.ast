@@ -1,0 +1,25 @@
+trait P {
+  type Selected
+}
+trait Q {
+}
+struct S<T> {
+}
+struct Elem {
+}
+struct ViaS {
+}
+struct ViaQ {
+}
+given <T> S<T> is P {
+  type Selected = ViaS
+}
+given <T> S<T> is Q {
+}
+given <T where let $r: Q<T>> T is P {
+  type Selected = ViaQ
+}
+type SOfElem = S<Elem>
+fun check[](_ x: let SOfElem.Selected) let -> ViaS {
+  return x
+}

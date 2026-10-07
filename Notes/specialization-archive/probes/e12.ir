@@ -1,0 +1,344 @@
+global #witness(S) as Type, #preferred
+
+fun B.$<ConformanceDeclaration at e12:2.17><Self>(let %p0: B<Self>) let <: A<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at e12:2.17>" of %p0 as A<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r4 = end %r1
+  %r3 = return
+}
+
+fun C.$<ConformanceDeclaration at e12:3.17><Self>(let %p0: C<Self>) let <: B<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at e12:3.17>" of %p0 as B<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r4 = end %r1
+  %r3 = return
+}
+
+fun S.$<ConformanceDeclaration at e12:4.13>() let <: Deinitializable<S> {
+%b0:
+  %r0 = alloca Deinitializable<S>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: S>} as Deinitializable<S>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: S>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun S.$<ConformanceDeclaration at e12:4.31>() let <: Movable<S> {
+%b0:
+  %r0 = alloca Movable<S>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: S>, Movable.take_value.take_value@inout$synthesized<Self: S>} as Movable<S>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: S>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: S>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun S.init(set %p0: S, set %p1: Void)
+
+fun $<ConformanceDeclaration at e12:5.1>() let <: A<S> {
+%b0:
+  %r0 = alloca A<S>, #preferred
+  %r1 = witnesstable {} as A<S>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun $<ConformanceDeclaration at e12:6.1>() let <: B<S> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at e12:5.1>[]
+  %r1 = alloca B<S>, #preferred
+  %r2 = witnesstable {%r0} as B<S>
+  %r13 = end %r0
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun $<ConformanceDeclaration at e12:7.1>() let <: C<S> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at e12:6.1>[]
+  %r1 = alloca C<S>, #preferred
+  %r2 = witnesstable {%r0} as C<S>
+  %r13 = end %r0
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun Alg.f<Self>(let %p0: Alg<Self>, let %p1: Self, set %p2: Int32)
+
+fun $<ConformanceDeclaration at e12:9.1>.f<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e12:9.1><T>(let %p0: A<T>) let <: Alg<T> {
+%b0:
+  %r0 = alloca Alg<T>, #preferred
+  %r1 = witnesstable {Alg.f<Self: T>} as Alg<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Alg.f<Self: T>(let %p0: Alg<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at e12:9.1>.f(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e12:10.1>.f<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 2 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e12:10.1><T>(let %p0: B<T>) let <: Alg<T> {
+%b0:
+  %r0 = alloca Alg<T>, #preferred
+  %r1 = witnesstable {Alg.f<Self: T>} as Alg<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Alg.f<Self: T>(let %p0: Alg<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at e12:10.1>.f(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e12:11.1>.f<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 3 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e12:11.1><T>(let %p0: C<T>) let <: Alg<T> {
+%b0:
+  %r0 = alloca Alg<T>, #preferred
+  %r1 = witnesstable {Alg.f<Self: T>} as Alg<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Alg.f<Self: T>(let %p0: Alg<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at e12:11.1>.f(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r23 = global_access #witness(S)
+  %r0 = alloca S, #preferred
+  %r1 = access [set] %r0
+  %r2 = assume_state %r1 initialized
+  %r3 = end %r1
+  %r4 = project $<ConformanceDeclaration at e12:7.1>[]
+  %r24 = access [let] %r23
+  %r6 = access [let] %r4
+  %r25 = place_cast %r6 as let C<T>
+  %r7 = project $<ConformanceDeclaration at e12:11.1>$existentialized[%r24, %r25]
+  %r8 = property "f" of %r7 as [Void](let Alg<Self>, self: let Self) let -> Int32
+  %r9 = access [let] %r7
+  %r10 = access [let] %r0
+  %r11 = access [set] %p0
+  %r12 = apply %r8(%r9, %r10) => %r11
+  %r19 = end %r11
+  %r18 = end %r10
+  %r17 = end %r9
+  %r16 = end %r7
+  %r5 = end %r24
+  %r15 = end %r6
+  %r14 = end %r4
+  %r20 = access [sink] %r0
+  %r21 = assume_state %r20 uninitialized
+  %r22 = end %r20
+  %r13 = return
+}
+
+fun B.$<ConformanceDeclaration at e12:2.17>$existentialized(let %p0: Type, let %p1: B<Self>) let <: A<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at e12:2.17>" of %p1 as A<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun C.$<ConformanceDeclaration at e12:3.17>$existentialized(let %p0: Type, let %p1: C<Self>) let <: B<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at e12:3.17>" of %p1 as B<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at e12:9.1>$existentialized(let %p0: Type, let %p1: A<T>) let <: Alg<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Alg<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Alg<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Alg.f<Self: T>} as Alg<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun $<ConformanceDeclaration at e12:10.1>$existentialized(let %p0: Type, let %p1: B<T>) let <: Alg<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Alg<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Alg<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Alg.f<Self: T>} as Alg<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}
+
+fun $<ConformanceDeclaration at e12:11.1>$existentialized(let %p0: Type, let %p1: C<T>) let <: Alg<T> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = type_witness <T> Alg<T>(%r0)
+  %r15 = end %r0
+  %r2 = access [let] %r1
+  %r3 = alloca %r2 as Alg<T>, #preferred
+  %r16 = end %r2
+  %r4 = witnesstable {Alg.f<Self: T>} as Alg<T>
+  %r5 = access [set] %r3
+  %r6 = store %r4 to %r5
+  %r7 = end %r5
+  %r8 = access [let] %r3
+  %r9 = yield %r8
+  %r10 = end %r8
+  %r11 = access [sink] %r3
+  %r12 = assume_state %r11 uninitialized
+  %r13 = end %r11
+  %r14 = return
+}

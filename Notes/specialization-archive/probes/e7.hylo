@@ -1,0 +1,11 @@
+// Q-C: can two free functions with the same name and labels differ only by constraints?
+trait Bidi {}
+trait RA refines Bidi {}
+struct Arr is Deinitializable & Movable { public memberwise init }
+given Arr is Bidi {}
+given Arr is RA {}
+
+fun lb<T is Bidi>(x: T) -> Int32 { 1 }
+fun lb<T is RA>(x: T) -> Int32 { 2 }
+
+public fun main() -> Int32 { lb(Arr()) }

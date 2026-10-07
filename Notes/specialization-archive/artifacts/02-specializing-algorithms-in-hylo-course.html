@@ -1,0 +1,835 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>Specializing Algorithms in Hylo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=Zilla+Slab:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --paper:    #eceef1;
+    --sheet:    #fdfdfe;
+    --sheet-2:  #f4f6f8;
+    --ink:      #15171a;
+    --ink-2:    #414851;
+    --muted:    #6d757f;
+    --rule:     #ccd2d9;
+    --rule-2:   #e2e7ec;
+    --pick:     #2647c4;
+    --pick-bg:  #e3e8fb;
+    --drop:     #868d97;
+    --warn:     #9c5a12;
+    --warn-bg:  #f7ecdd;
+    --code:     #f3f5f8;
+    --lift:     0 1px 0 rgba(21,23,26,.04), 0 14px 34px -24px rgba(21,23,26,.4);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #0d0f12; --sheet: #15181d; --sheet-2: #1b1f26;
+      --ink:     #e4e8ed; --ink-2: #b5bdc7; --muted: #7d8792;
+      --rule:    #2b323b; --rule-2: #222831;
+      --pick:    #92a8ff; --pick-bg: #182147;
+      --drop:    #767f8a;
+      --warn:    #d9954e; --warn-bg: #30220e;
+      --code:    #10141a;
+      --lift:    0 1px 0 rgba(0,0,0,.45), 0 14px 34px -24px rgba(0,0,0,.95);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:   #0d0f12; --sheet: #15181d; --sheet-2: #1b1f26;
+    --ink:     #e4e8ed; --ink-2: #b5bdc7; --muted: #7d8792;
+    --rule:    #2b323b; --rule-2: #222831;
+    --pick:    #92a8ff; --pick-bg: #182147;
+    --drop:    #767f8a;
+    --warn:    #d9954e; --warn-bg: #30220e;
+    --code:    #10141a;
+    --lift:    0 1px 0 rgba(0,0,0,.45), 0 14px 34px -24px rgba(0,0,0,.95);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 60rem; margin: 0 auto; padding: clamp(1rem,3vw,3rem) clamp(.75rem,3vw,2rem) 6rem; }
+
+  /* ---------- cover ---------- */
+  .cover {
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
+    box-shadow: var(--lift);
+    padding: clamp(1.5rem,4vw,3.5rem);
+    display: grid; gap: 1.4rem;
+  }
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--pick);
+    font-weight: 500;
+  }
+  h1 {
+    font-family: "Zilla Slab", ui-serif, Georgia, serif; font-weight: 600;
+    font-size: clamp(2.1rem,6vw,3.6rem); line-height: 1.04; letter-spacing: -.02em;
+    margin: 0; text-wrap: balance;
+  }
+  .standfirst { font-size: clamp(1.05rem,2.2vw,1.22rem); color: var(--ink-2); margin: 0; max-width: 48ch; }
+  .toc { display: grid; gap: .1rem; margin-top: .4rem; }
+  .toc a {
+    display: grid; grid-template-columns: 2.4rem 1fr; gap: .8rem;
+    padding: .5rem 0; border-top: 1px solid var(--rule-2);
+    color: var(--ink); text-decoration: none; align-items: baseline;
+  }
+  .toc a:hover { color: var(--pick); }
+  .toc a:last-child { border-bottom: 1px solid var(--rule-2); }
+  .toc .n {
+    font-family: "JetBrains Mono", monospace; font-size: .78rem; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .toc .t { font-weight: 600; }
+  .toc .d { color: var(--muted); font-weight: 400; }
+
+  /* ---------- lessons ---------- */
+  .lesson {
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
+    box-shadow: var(--lift);
+    padding: clamp(1.25rem,3.5vw,3rem);
+    margin-top: 1.75rem;
+  }
+  .lesson > * + * { margin-top: 1.15rem; }
+
+  .lhead { display: grid; gap: .3rem; margin-bottom: 1.6rem; }
+  .lhead .n {
+    font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--pick); font-weight: 500;
+  }
+  h2 {
+    font-family: "Zilla Slab", ui-serif, Georgia, serif; font-weight: 600;
+    font-size: clamp(1.55rem,3.4vw,2.15rem); line-height: 1.14; letter-spacing: -.015em;
+    margin: 0; text-wrap: balance;
+  }
+  h3 {
+    font-family: "Source Sans 3", sans-serif; font-weight: 700; font-size: 1.02rem;
+    margin: 0; letter-spacing: .005em;
+  }
+  p { margin: 0; max-width: 68ch; color: var(--ink-2); }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+  em { font-style: italic; }
+  a { color: var(--pick); text-underline-offset: .18em; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--pick); outline-offset: 3px; border-radius: 2px; }
+
+  ul, ol { margin: 0; padding-left: 1.2rem; max-width: 68ch; color: var(--ink-2); }
+  li + li { margin-top: .45rem; }
+
+  code {
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .84em;
+    background: var(--code); border: 1px solid var(--rule-2); border-radius: 3px; padding: .06em .32em;
+  }
+  pre {
+    margin: 0; background: var(--code); border: 1px solid var(--rule-2);
+    border-radius: 4px; padding: 1rem 1.1rem; overflow-x: auto;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .8rem; line-height: 1.7; color: var(--ink); tab-size: 2;
+  }
+  pre b { font-weight: 700; color: var(--pick); }
+  pre i { font-style: normal; color: var(--muted); }
+  pre u { text-decoration: none; color: var(--warn); font-weight: 500; }
+
+  figure { margin: 0; }
+  figcaption { font-size: .85rem; color: var(--muted); margin-top: .7rem; max-width: 64ch; }
+
+  .panel {
+    border: 1px solid var(--rule-2); border-radius: 4px; background: var(--sheet-2);
+    padding: .9rem 1.1rem; display: grid; gap: .5rem;
+  }
+  .panel .tag {
+    font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .panel p, .panel li { font-size: .93rem; }
+
+  .tryit { border-left: 2px solid var(--pick); background: var(--pick-bg); }
+  .tryit .tag { color: var(--pick); }
+  .hazard { border-left: 2px solid var(--warn); background: var(--warn-bg); }
+  .hazard .tag { color: var(--warn); }
+  .hazard p { color: var(--ink); }
+
+  .verdict {
+    display: grid; grid-template-columns: auto 1fr; gap: .1rem .7rem; align-items: baseline;
+    border-top: 1px solid var(--rule-2); border-bottom: 1px solid var(--rule-2);
+    padding: .8rem 0;
+  }
+  .verdict .k {
+    font-family: "JetBrains Mono", monospace; font-size: .72rem; font-weight: 700;
+    letter-spacing: .05em; text-transform: uppercase;
+  }
+  .verdict .yes { color: var(--pick); }
+  .verdict .no  { color: var(--warn); }
+  .verdict .v { font-weight: 600; color: var(--ink); }
+
+  .scroller { overflow-x: auto; border: 1px solid var(--rule-2); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; min-width: 42rem; font-size: .89rem; }
+  th, td { text-align: left; padding: .65rem .85rem; vertical-align: top; border-bottom: 1px solid var(--rule-2); color: var(--ink-2); }
+  thead th {
+    font-family: "JetBrains Mono", monospace; font-size: .65rem; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--muted); font-weight: 500;
+    background: var(--sheet-2); border-bottom: 1px solid var(--rule); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.h { color: var(--ink); font-weight: 600; }
+  .ok  { color: var(--pick); font-weight: 700; }
+  .nope { color: var(--warn); font-weight: 700; }
+
+  .qa { display: grid; gap: 1rem; }
+  .q {
+    border: 1px solid var(--rule-2); border-radius: 4px; overflow: hidden;
+    background: var(--sheet-2);
+  }
+  .q > .qh {
+    padding: .8rem 1.1rem; font-weight: 700; color: var(--ink);
+    border-bottom: 1px solid var(--rule-2); background: var(--sheet);
+    font-size: 1rem;
+  }
+  .q > .qb { padding: .9rem 1.1rem; display: grid; gap: .7rem; }
+  .q > .qb p { font-size: .95rem; }
+
+  footer {
+    margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--rule);
+    font-family: "JetBrains Mono", monospace; font-size: .76rem; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: .4rem 1.5rem;
+  }
+  @media (prefers-reduced-motion: no-preference) { a { transition: color .15s ease; } }
+</style>
+
+<div class="wrap">
+
+  <header class="cover">
+    <span class="eyebrow">A short course · Hylo generics</span>
+    <h1>Specializing Algorithms in Hylo</h1>
+    <p class="standfirst">
+      Write <code>lower_bound</code> once for bidirectional collections. Add a better one for
+      random-access collections. Make the better one win — and understand exactly when it can't.
+    </p>
+    <nav class="toc">
+      <a href="#l1"><span class="n">01</span><span><span class="t">Why the obvious approach fails.</span> <span class="d">Witnesses are values, not code.</span></span></a>
+      <a href="#l2"><span class="n">02</span><span><span class="t">The rule.</span> <span class="d">"More specific" means "applies to fewer types".</span></span></a>
+      <a href="#l3"><span class="n">03</span><span><span class="t">Where the choice happens.</span> <span class="d">The context decides, and nothing else.</span></span></a>
+      <a href="#l4"><span class="n">04</span><span><span class="t">Three shapes.</span> <span class="d">Overload, algorithm trait, lifting given.</span></span></a>
+      <a href="#l5"><span class="n">05</span><span><span class="t">Across module boundaries.</span> <span class="d">Four questions, answered with real IR.</span></span></a>
+      <a href="#l6"><span class="n">06</span><span><span class="t">Where it breaks.</span> <span class="d">Hazards, and what is still missing.</span></span></a>
+    </nav>
+  </header>
+
+  <!-- =============================================================== -->
+  <section class="lesson" id="l1">
+    <div class="lhead"><span class="n">Lesson 01</span><h2>Why the obvious approach fails</h2></div>
+
+    <p>
+      In C++, specialization is a compile-time affair. Templates are instantiated per type, overload
+      resolution happens after instantiation, and the compiler picks the best <code>advance</code>
+      for the iterator it actually has. Hylo cannot do this, and the reason is worth understanding
+      before anything else.
+    </p>
+
+    <p>
+      <strong>Hylo compiles a generic function once.</strong> It does not stamp out a copy per type.
+      Instead, the conformances a function requires arrive as <em>runtime values</em> — witnesses —
+      passed in like any other argument. Here is a generic function in Hylo's IR:
+    </p>
+
+<pre>fun search(_:)&lt;T&gt;(let %p0: <b>LowerBound&lt;T&gt;</b>, let %p1: T, set %p2: Int32) {
+  %r0 = property "run" of <b>%p0</b> as ... -&gt; Int32
+  %r3 = apply %r0(...)
+}</pre>
+
+    <p>
+      <code>%p0</code> is the witness. The function calls <code>run</code> <em>through</em> it. There
+      is no copy of <code>search</code> for arrays and another for lists — there is one function, and
+      what varies is the value it is handed.
+    </p>
+
+    <div class="panel">
+      <span class="tag">The consequence</span>
+      <p>
+        Specialization cannot be a code-generation trick, because there is no per-type code to
+        generate. The specialized implementation has to be <strong>reachable from a witness that
+        somebody hands the function</strong>. Everything else in this course follows from that one
+        sentence.
+      </p>
+    </div>
+
+    <p>
+      That sounds like a limitation. It is actually the feature: because the choice is a
+      <em>value</em>, it can be made where the type is known and then travel inward through as many
+      generic layers as you like — no monomorphization, no code duplication. The whole design is
+      about arranging for the right value to be chosen in the right place.
+    </p>
+  </section>
+
+  <!-- =============================================================== -->
+  <section class="lesson" id="l2">
+    <div class="lhead"><span class="n">Lesson 02</span><h2>The rule: applies to fewer types wins</h2></div>
+
+    <p>
+      Suppose <code>Arr</code> is both bidirectional and random-access, and two implementations are
+      in scope:
+    </p>
+
+<pre><i>// the generic one — a linear scan</i>
+given linear_scan:   &lt;T is Bidi&gt; =&gt; T is LowerBound { fun run() -&gt; Int32 { 1 } }
+<i>// the specialized one — a binary search</i>
+given binary_search: &lt;T is RA&gt;   =&gt; T is LowerBound { fun run() -&gt; Int32 { 2 } }</pre>
+
+    <p>
+      Both apply to <code>Arr</code>. Both derivations are the same size — each is one step away from
+      a conformance <code>Arr</code> declares directly. So <em>size cannot tell them apart</em>, and
+      before this work the compiler simply reported an ambiguity.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 640 250" width="100%" role="img"
+           aria-label="Two derivations of LowerBound for Arr, both of size two; the specificity order breaks the tie in favour of the random-access one."
+           style="max-width:640px;display:block;overflow:visible;">
+        <defs>
+          <marker id="a1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L8 4 L0 8 z" fill="var(--drop)"/></marker>
+          <marker id="a2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L8 4 L0 8 z" fill="var(--pick)"/></marker>
+        </defs>
+
+        <text x="0" y="13" font-family="JetBrains Mono, monospace" font-size="10.5" letter-spacing="1.5" fill="var(--muted)">GOAL</text>
+        <text x="0" y="35" font-family="JetBrains Mono, monospace" font-size="14" fill="var(--ink)">LowerBound&lt;Arr&gt;</text>
+
+        <path d="M14 44 V74 H150" fill="none" stroke="var(--drop)" stroke-width="1.4" marker-end="url(#a1)"/>
+        <path d="M14 44 V184 H150" fill="none" stroke="var(--pick)" stroke-width="1.6" marker-end="url(#a2)"/>
+
+        <rect x="158" y="54" width="296" height="40" rx="3" fill="var(--sheet-2)" stroke="var(--rule-2)"/>
+        <text x="171" y="71" font-family="JetBrains Mono, monospace" font-size="11.5" fill="var(--drop)">linear_scan : &lt;T is Bidi&gt; ⇒ LowerBound&lt;T&gt;</text>
+        <text x="171" y="87" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">needs Bidi&lt;Arr&gt;   ·   size 2</text>
+
+        <rect x="158" y="164" width="296" height="40" rx="3" fill="var(--pick-bg)" stroke="var(--pick)" stroke-opacity=".5"/>
+        <text x="171" y="181" font-family="JetBrains Mono, monospace" font-size="11.5" fill="var(--ink)">binary_search : &lt;T is RA&gt; ⇒ LowerBound&lt;T&gt;</text>
+        <text x="171" y="197" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">needs RA&lt;Arr&gt;   ·   size 2</text>
+
+        <path d="M306 160 V100" fill="none" stroke="var(--pick)" stroke-width="1.6" marker-end="url(#a2)"/>
+        <text x="318" y="126" font-family="Zilla Slab, serif" font-size="15" fill="var(--pick)">≺ &#160;more specific</text>
+
+        <text x="470" y="78" font-family="Source Sans 3, sans-serif" font-size="12.5" fill="var(--drop)">discarded</text>
+        <text x="470" y="188" font-family="Source Sans 3, sans-serif" font-size="12.5" fill="var(--pick)" font-weight="600">selected</text>
+
+        <text x="0" y="238" font-family="Source Sans 3, sans-serif" font-size="12.5" fill="var(--muted)">Same size. What separates them is that RA entails Bidi, and Bidi does not entail RA.</text>
+      </svg>
+      <figcaption>
+        Every <code>RA</code> is a <code>Bidi</code>, so <code>binary_search</code> applies to a
+        subset of the types <code>linear_scan</code> applies to. That is what "more specific" means.
+      </figcaption>
+    </figure>
+
+    <h3>The definition, precisely</h3>
+    <p>
+      Write a given as <code>∀X̄. C̄ ⇒ H</code> — type parameters, requirements, and the conformance it
+      produces. Then:
+    </p>
+    <div class="panel">
+      <p style="color:var(--ink)">
+        <em>g</em> is <strong>at least as specific as</strong> <em>h</em> when <em>h</em>'s head can
+        be instantiated to <em>g</em>'s head, and every one of <em>h</em>'s requirements is derivable
+        under <em>g</em>'s assumptions. <em>g</em> is <strong>strictly</strong> more specific when
+        that holds one way and not the other.
+      </p>
+    </div>
+    <p>
+      This is C++20's concept subsumption and Siek &amp; Lumsdaine's "callable from", transposed onto
+      givens. Two things follow that are easy to get wrong:
+    </p>
+    <ul>
+      <li>
+        <strong>It is not "more constraints wins."</strong> A given with <em>no</em> requirements but
+        a head of <code>LowerBound&lt;Arr&gt;</code> beats one requiring <code>T is RA</code>,
+        because it applies to one type rather than a family. Head and requirements are judged
+        together.
+      </li>
+      <li>
+        <strong>It is a partial order.</strong> Two givens constrained on unrelated traits are
+        <em>incomparable</em>, and the compiler refuses to guess. That refusal is the design working,
+        not failing — see Lesson 6.
+      </li>
+    </ul>
+
+    <p>
+      One order therefore covers the whole chain you would want:
+      <code>Array</code> ≺ <code>RandomAccessCollection</code> ≺ <code>BidirectionalCollection</code>
+      — a more concrete head and a finer requirement are ranked by the same definition.
+    </p>
+
+    <div class="panel tryit">
+      <span class="tag">Try it</span>
+<pre>swift test --filter specialization</pre>
+      <p>
+        Thirteen cases in <code>Tests/CompilerTests/</code>, each with a header comment saying what it
+        sets up, what gets selected, and why. Start with
+        <code>specialization-refinement.hylo</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- =============================================================== -->
+  <section class="lesson" id="l3">
+    <div class="lhead"><span class="n">Lesson 03</span><h2>Where the choice happens</h2></div>
+
+    <p>
+      Here is the single most important thing to internalise: <strong>the implementation is chosen
+      from what the enclosing context knows about the type, and from nothing else.</strong> Not from
+      what the value really is at runtime. Not from what the caller knows.
+    </p>
+
+    <p>
+      You can watch this directly. Give the algorithm trait a type member that names the chosen
+      implementation, then ask for it in three different contexts:
+    </p>
+
+<pre>trait LowerBound { type Selected }
+given &lt;T is Bidi&gt; =&gt; T is LowerBound { type Selected = Linear }
+given &lt;T is RA&gt;   =&gt; T is LowerBound { type Selected = Binary }
+
+fun in_bidirectional_context&lt;T is Bidi&gt;(x: T.Selected) -&gt; <u>Linear</u> { x }
+fun in_random_access_context&lt;T is RA&gt;  (x: T.Selected) -&gt; <b>Binary</b> { x }
+fun at_concrete_type          (x: Arr.Selected) -&gt; <b>Binary</b> { x }</pre>
+
+    <p>
+      All three type-check. Inside a function that knows only <code>T is Bidi</code>,
+      <code>T.Selected</code> <em>is</em> <code>Linear</code> — the specialized implementation is not
+      merely unused, it is unreachable. Add one fact to the context and the answer changes.
+    </p>
+
+    <div class="panel">
+      <span class="tag">Why this assertion is honest</span>
+      <p>
+        Selecting a type member forces resolution to commit to one witness, and unlike an overloaded
+        call it cannot be steered by the expected type. Flip <code>Linear</code> to
+        <code>Binary</code> in the first line and the file stops compiling. That is how every test in
+        this suite is written.
+      </p>
+    </div>
+
+    <h3>So how does the choice travel inward?</h3>
+    <p>
+      By being a parameter. A function that abstracts over the <em>algorithm</em> rather than the
+      data structure commits to nothing, and whoever knows the concrete type plugs in the
+      implementation:
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 640 268" width="100%" role="img"
+           aria-label="Two panels contrasting a generic function that hard-wires the generic implementation with one that receives the implementation as a parameter."
+           style="max-width:640px;display:block;overflow:visible;">
+        <defs>
+          <marker id="b1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L8 4 L0 8 z" fill="var(--drop)"/></marker>
+          <marker id="b2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L8 4 L0 8 z" fill="var(--pick)"/></marker>
+        </defs>
+
+        <!-- panel A -->
+        <text x="0" y="12" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" fill="var(--muted)">A · CONSTRAINED ON THE DATA STRUCTURE</text>
+        <rect x="0" y="24" width="180" height="46" rx="3" fill="var(--sheet-2)" stroke="var(--rule-2)"/>
+        <text x="12" y="44" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--ink)">main</text>
+        <text x="12" y="60" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">knows Arr is RA</text>
+
+        <path d="M180 47 H250" stroke="var(--drop)" stroke-width="1.4" fill="none" marker-end="url(#b1)"/>
+        <text x="190" y="40" font-family="JetBrains Mono, monospace" font-size="9.5" fill="var(--muted)">Bidi&lt;Arr&gt;</text>
+
+        <rect x="258" y="20" width="300" height="54" rx="3" fill="var(--sheet-2)" stroke="var(--rule-2)"/>
+        <text x="270" y="40" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--ink)">sort_all&lt;T is Bidi&gt;</text>
+        <text x="270" y="58" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--drop)">type_apply linear_scan&lt;T&gt;  ← baked in</text>
+        <text x="566" y="52" font-family="Source Sans 3, sans-serif" font-size="12" fill="var(--drop)">slow</text>
+
+        <line x1="0" y1="100" x2="640" y2="100" stroke="var(--rule-2)"/>
+
+        <!-- panel B -->
+        <text x="0" y="128" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.4" fill="var(--muted)">B · CONSTRAINED ON THE ALGORITHM</text>
+        <rect x="0" y="140" width="180" height="62" rx="3" fill="var(--pick-bg)" stroke="var(--pick)" stroke-opacity=".5"/>
+        <text x="12" y="160" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--ink)">main</text>
+        <text x="12" y="176" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">knows Arr is RA</text>
+        <text x="12" y="192" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--pick)">picks binary_search</text>
+
+        <path d="M180 171 H250" stroke="var(--pick)" stroke-width="1.6" fill="none" marker-end="url(#b2)"/>
+        <text x="186" y="164" font-family="JetBrains Mono, monospace" font-size="9.5" fill="var(--pick)">LowerBound&lt;Arr&gt;</text>
+
+        <rect x="258" y="140" width="300" height="62" rx="3" fill="var(--sheet-2)" stroke="var(--rule-2)"/>
+        <text x="270" y="160" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--ink)">search&lt;T is LowerBound&gt;</text>
+        <text x="270" y="178" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--ink-2)">property "run" of %p0</text>
+        <text x="270" y="194" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">calls through the parameter</text>
+        <text x="566" y="174" font-family="Source Sans 3, sans-serif" font-size="12" fill="var(--pick)" font-weight="600">fast</text>
+
+        <text x="0" y="240" font-family="Source Sans 3, sans-serif" font-size="12.5" fill="var(--muted)">One compiled function in both cases. What differs is whether the</text>
+        <text x="0" y="257" font-family="Source Sans 3, sans-serif" font-size="12.5" fill="var(--muted)">implementation is a constant inside it or a value passed into it.</text>
+      </svg>
+      <figcaption>
+        Neither panel involves monomorphization. <code>search</code> is compiled once and works for
+        every model; the specialization rides in as an argument.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- =============================================================== -->
+  <section class="lesson" id="l4">
+    <div class="lhead"><span class="n">Lesson 04</span><h2>Three shapes an algorithm can take</h2></div>
+
+    <p>
+      Everything above leaves you with a design choice. There are exactly three ways to write a
+      specializable algorithm in Hylo, and they differ in who can extend them and whether
+      specialization survives a generic boundary.
+    </p>
+
+    <h3>Shape 1 — plain overloads</h3>
+<pre>fun lower_bound&lt;C is Bidi&gt;(in c: C, _ x: C.Element) -&gt; C.Position { <i>…linear…</i> }
+fun lower_bound&lt;C is RA&gt;  (in c: C, _ x: C.Element) -&gt; C.Position { <i>…binary…</i> }</pre>
+    <p>
+      Familiar, and it works at any call site where the type is concrete. Overloads are ordered by
+      the operands they <em>accept</em>, not by what they return. But a caller declared
+      <code>&lt;C is Bidi&gt;</code> binds the coarse overload statically — this shape does not cross
+      a generic boundary. G documented exactly this limit in 2008.
+    </p>
+
+    <h3>Shape 2 — the algorithm as its own trait</h3>
+<pre>trait LowerBound { fun run() -&gt; Int32 }
+given linear_scan:   &lt;T is Bidi&gt; =&gt; T is LowerBound { <i>…</i> }
+given binary_search: &lt;T is RA&gt;   =&gt; T is LowerBound { <i>…</i> }
+
+fun search&lt;T is <b>LowerBound</b>&gt;(c: T) -&gt; Int32 { c.run() }</pre>
+    <p>
+      This is the <code>CopyRange</code> idiom from Siek &amp; Lumsdaine's G. It is fully open —
+      anyone, in any module, can add an implementation — and the choice crosses generic boundaries.
+      The price is that every intermediate function must name the algorithm in its constraints. The
+      requirement is viral.
+    </p>
+
+    <h3>Shape 3 — a trait member, installed by a lifting given</h3>
+<pre>trait Bidi { fun sort() -&gt; Int32 { 1 } }   <i>// default implementation</i>
+trait RA {}                                <i>// note: NOT a refinement</i>
+
+given ra_is_bidi: &lt;T is RA&gt; =&gt; T is Bidi { fun sort() -&gt; Int32 { 2 } }
+
+fun sort_all&lt;T is <b>Bidi</b>&gt;(c: T) -&gt; Int32 { c.sort() }</pre>
+    <p>
+      Here the algorithm lives <em>inside</em> the data-structure witness. A random-access type never
+      gets a plain <code>Bidi</code> witness — it gets the lifted one, which carries the better
+      <code>sort</code>. So <code>sort_all</code>, constrained only on <code>Bidi</code>, runs the
+      specialized implementation. No viral constraints, no monomorphization. The catch is that you
+      must own the trait, and the type must not conform to <code>Bidi</code> directly.
+    </p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr>
+          <th>Shape</th><th>Crosses a generic boundary?</th><th>Third parties can extend?</th><th>Cost</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td class="h">1 · Overloads</td>
+            <td><span class="nope">No</span> — the caller's constraints decide</td>
+            <td><span class="ok">Yes</span></td>
+            <td>None. Familiar syntax.</td>
+          </tr>
+          <tr>
+            <td class="h">2 · Algorithm trait</td>
+            <td><span class="ok">Yes</span></td>
+            <td><span class="ok">Yes</span> — fully open</td>
+            <td>Viral constraint on every intermediate function.</td>
+          </tr>
+          <tr>
+            <td class="h">3 · Lifting given</td>
+            <td><span class="ok">Yes</span></td>
+            <td><span class="nope">No</span> — needs the trait's author</td>
+            <td>The type must not declare the coarse conformance itself.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      A real standard library uses all three: shape 3 for the algorithms the collection protocols own,
+      shape 2 for open extension points, shape 1 for everything called at concrete types.
+    </p>
+  </section>
+
+  <!-- =============================================================== -->
+  <section class="lesson" id="l5">
+    <div class="lhead"><span class="n">Lesson 05</span><h2>Across module boundaries</h2></div>
+
+    <p>
+      All of the above was one file. The interesting questions start when a library and its client are
+      compiled separately. Each answer below was produced by building actual
+      <code>.hylomodule</code> archives and reading the client's IR.
+    </p>
+
+    <div class="qa">
+
+      <div class="q">
+        <div class="qh">Can a client add a faster implementation for its own type?</div>
+        <div class="qb">
+          <div class="verdict"><span class="k yes">Yes</span><span class="v">And it wins over the library's.</span></div>
+          <p>
+            Hylo has no orphan rule. A downstream module declares a given for the library's algorithm
+            keyed on its own type, and because a concrete head applies to exactly one type, it is
+            more specific than any trait-keyed given the library shipped.
+          </p>
+<pre><i>// Client.hylo</i>
+import Collections
+public struct MyArray { <i>…</i> }
+given MyArray is Bidi {}
+given MyArray is RA {}
+given <b>my_array_tuned</b>: MyArray is LowerBound { fun run() -&gt; Int32 { 3 } }
+
+public fun main() -&gt; Int32 { search(MyArray()) }</pre>
+<pre><i>// Client.ir — what main actually builds</i>
+fun main(set %p0: Int32) {
+  %r0 = project <b>my_array_tuned</b>[]      <i>← not binary_search</i></pre>
+        </div>
+      </div>
+
+      <div class="q">
+        <div class="qh">What if the library ships a new, more specific implementation?</div>
+        <div class="qb">
+          <div class="verdict"><span class="k yes">Additive</span><span class="v">Clients opt in by conforming.</span></div>
+          <p>
+            A library cannot name your types, so its specializations are always keyed on traits. Ship
+            a finer trait and an implementation for it:
+          </p>
+<pre><i>// Collections v2</i>
+public trait Contiguous refines RA {}
+public given <b>branchless</b>: &lt;T is Contiguous&gt; =&gt; T is LowerBound { <i>…</i> }</pre>
+          <p>
+            A client that does nothing is <strong>unaffected</strong> — it still resolves to whatever
+            it resolved to before. A client that adds <code>given MyArray is Contiguous {}</code> and
+            recompiles picks up <code>branchless</code>. Both verified.
+          </p>
+          <p>
+            The one thing to be clear about: the choice is baked into the <em>client's</em> compiled
+            code, as the IR above shows. A library upgrade only takes effect when the client is
+            recompiled. That is inherent to dictionary passing with separate compilation, and it is
+            the same deal as any inlined constant.
+          </p>
+        </div>
+      </div>
+
+      <div class="q">
+        <div class="qh">I pass an <code>Array&lt;T&gt;</code> to a generic <code>sort</code> that expects a <code>BidirectionalCollection</code>. Does it use the random-access algorithm — without monomorphizing?</div>
+        <div class="qb">
+          <div class="verdict"><span class="k no">Depends</span><span class="v">On how <code>sort</code> is declared. Two of the three shapes say yes.</span></div>
+          <p>
+            This is the question the whole design turns on, so here is the direct evidence for each
+            case. In all of them <code>sort</code> is compiled exactly once — monomorphization is
+            never involved.
+          </p>
+
+          <p><strong>Declared <code>&lt;T is Bidi&gt;</code>, resolving the algorithm inside — no.</strong></p>
+<pre>public fun search_via_bidi&lt;T is Bidi&gt;(c: T) -&gt; Int32 { c.run() }</pre>
+<pre><i>// Collections.ir</i>
+fun search_via_bidi(_:)&lt;T&gt;(let %p0: Bidi&lt;T&gt;, ...) {
+  %r0 = type_apply <u>linear_scan</u>&lt;T&gt;      <i>← a constant, fixed when the library compiled</i></pre>
+          <p>
+            The library committed at its own definition site, where the only fact available was
+            <code>T is Bidi</code>. No client can change that. This is the case the plain reading of
+            your question describes, and the answer is a clean no.
+          </p>
+
+          <p><strong>Declared <code>&lt;T is LowerBound&gt;</code> — yes.</strong> Shape 2. The
+            witness is a parameter; the client picks <code>binary_search</code> and passes it in.</p>
+
+          <p><strong>Algorithm inside the <code>Bidi</code> witness — yes, and you keep the natural signature.</strong> Shape 3:</p>
+<pre><i>// Lifted.ir — one generic function, no copies</i>
+fun sort_all(_:)&lt;T&gt;(let %p0: <b>Bidi&lt;T&gt;</b>, let %p1: T, set %p2: Int32) {
+  %r0 = property "sort" of <b>%p0</b> ...
+
+<i>// LClient.ir — the client builds the lifted witness</i>
+fun main(...) {
+  %r5 = project <b>ra_is_bidi$existentialized</b>[...]</pre>
+          <p>
+            <code>MyArray</code> conforms only to <code>RA</code>. Its <code>Bidi</code> witness is
+            manufactured by the lifting given, and that witness carries the random-access
+            <code>sort</code>. <code>sort_all</code> asks for <code>Bidi</code> and gets the fast
+            implementation, because for a random-access type there is no other <code>Bidi</code>
+            witness to get.
+          </p>
+        </div>
+      </div>
+
+      <div class="q">
+        <div class="qh">What if my type conforms to <em>both</em> <code>Bidi</code> and <code>RA</code>? Can I still get the random-access implementation?</div>
+        <div class="qb">
+          <div class="verdict"><span class="k yes">Yes</span><span class="v">— but only with shape 2. Shape 3 dies here, and it dies quietly.</span></div>
+          <p>
+            This is not a corner case, it is the <em>normal</em> case: if the library writes
+            <code>trait RA refines Bidi</code>, conforming to both is not optional. Declaring only
+            the finer one is rejected —
+          </p>
+<pre>given MyArray is RA {}
+<u>error</u>: no given instance of 'Bidi&lt;MyArray&gt;' in this scope</pre>
+          <p>
+            <strong>Shape 3 loses.</strong> Your own <code>Bidi</code> conformance has a concrete
+            head, so it is more specific than the lifting given and shadows it — carrying the
+            trait's <em>default</em> implementations. Nothing is ambiguous, so nothing is reported.
+            You just silently get the slow path.
+          </p>
+          <p>
+            And the lifting given cannot rescue you by supplying the base conformance that
+            <code>refines</code> demands: that is circular, and the cycle guard rejects it. So
+            <strong><code>refines</code> and shape 3 are mutually exclusive</strong> — which is the
+            real reason shape 3 requires <code>RA</code> not to refine <code>Bidi</code>.
+          </p>
+          <p>
+            <strong>Shape 2 wins.</strong> When the algorithm is its own trait, it does not live in
+            the <code>Bidi</code> witness, so shadowing that witness costs you nothing. Verified
+            across a module boundary, with <code>MyArray</code> conforming to both:
+          </p>
+<pre><i>// Both3.ir</i>
+fun main(set %p0: Int32) {
+  %r3 = project <b>binary_search</b>$existentialized[...]   <i>← the RA implementation</i></pre>
+          <p>
+            The catch is the one from Lesson 3, unchanged: the function you call must be constrained
+            on the <em>algorithm</em>. A <code>sort_all&lt;T is Bidi&gt;</code> still gets the slow
+            one, no matter how many traits your type conforms to. Conformances of the type are not
+            what decides — constraints of the function are.
+          </p>
+          <p>
+            If you are stuck with a <code>&lt;T is Bidi&gt;</code> signature and a type that conforms
+            to both, the only local escape is to declare a better <code>Bidi&lt;MyArray&gt;</code>
+            given in the scope where it matters. It works, and it means writing the fast
+            implementation out again — a workaround, not a fix.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panel tryit">
+      <span class="tag">Try it</span>
+<pre>hc --module-name Collections --emit-module-to Collections.hylomodule Collections.hylo
+hc --module-name Client --module-search-path . --import Collections \
+   --emit ir -o Client.ir Client.hylo</pre>
+      <p>Then read the body of <code>fun main</code> and see which given it projects.</p>
+    </div>
+  </section>
+
+  <!-- =============================================================== -->
+  <section class="lesson" id="l6">
+    <div class="lhead"><span class="n">Lesson 06</span><h2>Where it breaks</h2></div>
+
+    <h3>Hazard 1 · Two modules, equally specific</h3>
+    <p>
+      This is the real multi-module risk, and it is not hypothetical. Two independent libraries each
+      add an implementation for <code>&lt;T is RA&gt;</code>. Neither is more specific than the other.
+      A client that imports both gets:
+    </p>
+<pre><u>error</u>: no coercion from ... to ...
+  <i>note:</i> multiple given instance of 'LowerBound&lt;MyArray&gt;' in this scope
+  <i>note:</i> candidate given is declared here     <i>Collections.hylo:10</i>
+  <i>note:</i> candidate given is declared here     <i>Turbo.hylo:2</i>
+  <i>note:</i> neither candidate is more specific than the other,
+        so no choice can be made between them</pre>
+    <div class="panel hazard">
+      <span class="tag">What this means for you</span>
+      <p>
+        Hylo detects the conflict <strong>at the point of use, not at the point of definition</strong>
+        — it has no orphan rules to prevent you writing the second one. So the failure lands on the
+        client that imports both, which is not who created it. The fix is local and cheap: the client
+        declares its own given with a concrete head, which is more specific than both and resolves
+        the conflict for its own code only.
+      </p>
+    </div>
+    <p>
+      This is a deliberate position, not an oversight. Hylo rejects global uniqueness of instances,
+      which buys scoped and overlapping conformances; the cost is that conflicts surface downstream.
+      A most-specific-wins rule <em>reduces</em> how often that happens — most overlaps are now
+      ordered rather than ambiguous — but it cannot remove it, and it must not: guessing between two
+      incomparable implementations would be worse.
+    </p>
+
+    <h3>Hazard 2 · A direct conformance silently shadows a lifted one</h3>
+    <p>
+      In shape 3, if the client writes <code>given MyArray is Bidi {}</code> alongside
+      <code>given MyArray is RA {}</code>, its own conformance is more specific than the lifting
+      given, so it wins — and it carries the <em>default</em> implementations. The client loses every
+      refinement-level specialization at once, with no diagnostic, because nothing is ambiguous. It
+      is simply a different, worse witness.
+    </p>
+    <p>
+      What makes this sharp rather than academic: <strong>a trait declared with
+      <code>refines</code> forces exactly this.</strong> Hylo requires each conformance to a refined
+      trait to supply a witness for the base, and the lifting given cannot supply it — that would be
+      circular. So the moment a library writes <code>trait RA refines Bidi</code>, shape 3 is off the
+      table for every client of it.
+    </p>
+    <p>
+      Two things would fix this, and neither exists yet. A way to derive a witness from another and
+      override part of it, instead of all-or-nothing. Or — better — making <code>refines</code>
+      <em>generate</em> a lifting given rather than demanding a base witness per conformance, so that
+      "conforms to both" stops being something you are pushed into.
+    </p>
+
+    <h3>Hazard 3 · Specificity outranks lexical distance</h3>
+    <p>
+      When two candidates are incomparable, the lexically closer one wins. But specificity is
+      consulted <em>first</em>, so a <em>conditional</em> given you declare locally no longer
+      overrides a more specific one from an imported module. A local given with a concrete head still
+      wins, because it is maximal — the documented escape hatch survives, the conditional one does
+      not. I tested the alternative ordering; it breaks refinement chains outright.
+    </p>
+
+    <h3>Still missing</h3>
+    <ul>
+      <li>
+        <strong>The boilerplate.</strong> Shape 2 is written by hand today. A
+        <code>specializing fun</code> declaration could generate the trait, the givens and the
+        forwarder, and let clients opt in with
+        <code>&lt;C is BidirectionalCollection &amp; lower_bound&gt;</code>.
+      </li>
+      <li>
+        <strong>Equality-constrained specialization.</strong> A given guarded by
+        <code>where T.Position == Int32</code> applies to nothing, because Hylo cannot yet derive
+        that equality from a conformance that defines <code>type Position = Int32</code>. This
+        predates the work here.
+      </li>
+      <li>
+        <strong>Running any of it.</strong> The LLVM backend cannot yet lower a generic client that
+        takes a conformance witness. Everything in this course was verified at the IR level, which is
+        where the choice is visible — but these programs do not execute yet.
+      </li>
+      <li>
+        <strong>A bounded search, not a complete one.</strong> Resolution is cut off by a work budget
+        as well as a depth limit, because reasoning about equalities can derive the same goal along
+        hundreds of thousands of paths. Answering each goal once and sharing the answer is the proper
+        fix.
+      </li>
+    </ul>
+  </section>
+
+  <!-- =============================================================== -->
+  <section class="lesson">
+    <div class="lhead"><span class="n">Recap</span><h2>The five sentences worth keeping</h2></div>
+    <ol>
+      <li>Hylo compiles a generic function once and passes conformances as values, so a specialized implementation must be reachable from a witness somebody hands in.</li>
+      <li>More specific means applies to fewer types — head and requirements judged together — and where that does not order, nothing is chosen.</li>
+      <li>The implementation is picked from what the enclosing context knows, so specialization crosses a generic boundary only if the algorithm is something the function receives.</li>
+      <li>Constrain on the algorithm (open, viral) or put it in the data-structure witness (closed, invisible) — both avoid monomorphization; constraining on the data structure alone does not specialize.</li>
+      <li>Clients can always specialize for their own types and always win; conflicts between two libraries surface at the client, and the client fixes them locally.</li>
+      <li>If your type conforms to both the coarse and the fine trait — which <code>refines</code> forces — use shape 2; shape 3 loses silently there.</li>
+    </ol>
+  </section>
+
+  <footer>
+    <span>hylo-new @ 5ab4c83</span>
+    <span>199/199 tests</span>
+    <span>13 specialization cases</span>
+  </footer>
+
+</div>
+
+</body></html>

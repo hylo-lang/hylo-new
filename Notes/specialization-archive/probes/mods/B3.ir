@@ -1,0 +1,126 @@
+global #witness(MyArray) as Type, #preferred
+
+fun MyArray.$<ConformanceDeclaration at Both3:2.26>() let <: Deinitializable<MyArray> {
+%b0:
+  %r0 = alloca Deinitializable<MyArray>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: MyArray>} as Deinitializable<MyArray>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: MyArray>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun MyArray.$<ConformanceDeclaration at Both3:2.44>() let <: Movable<MyArray> {
+%b0:
+  %r0 = alloca Movable<MyArray>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: MyArray>, Movable.take_value.take_value@inout$synthesized<Self: MyArray>} as Movable<MyArray>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: MyArray>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: MyArray>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun MyArray.init(set %p0: MyArray, set %p1: Void)
+
+fun $<ConformanceDeclaration at Both3:3.1>() let <: Bidi<MyArray> {
+%b0:
+  %r0 = alloca Bidi<MyArray>, #preferred
+  %r1 = witnesstable {} as Bidi<MyArray>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun $<ConformanceDeclaration at Both3:4.1>() let <: RA<MyArray> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at Both3:3.1>[]
+  %r1 = alloca RA<MyArray>, #preferred
+  %r2 = witnesstable {%r0} as RA<MyArray>
+  %r13 = end %r0
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r23 = global_access #witness(MyArray)
+  %r0 = project $<ConformanceDeclaration at Both3:4.1>[]
+  %r4 = access [let] %r23
+  %r2 = access [let] %r0
+  %r28 = place_cast %r2 as let RA<T>
+  %r3 = project binary_search$existentialized[%r4, %r28]
+  %r24 = access [let] %r23
+  %r5 = alloca MyArray, #preferred
+  %r6 = access [set] %r5
+  %r7 = assume_state %r6 initialized
+  %r8 = end %r6
+  %r9 = access [let] %r3
+  %r10 = access [let] %r5
+  %r11 = access [set] %p0
+  %r25 = place_cast %r9 as let LowerBound<T>
+  %r26 = place_cast %r10 as let T
+  %r27 = access [set] %r11
+  %r12 = apply search(_:)$existentialized(%r24, %r25, %r26) => %r27
+  %r29 = end %r24
+  %r19 = end %r11
+  %r18 = end %r10
+  %r17 = end %r9
+  %r16 = end %r3
+  %r1 = end %r4
+  %r15 = end %r2
+  %r14 = end %r0
+  %r20 = access [sink] %r5
+  %r21 = assume_state %r20 uninitialized
+  %r22 = end %r20
+  %r13 = return
+}
+
+fun search(_:)<T>(let %p0: LowerBound<T>, let %p1: T, set %p2: Int32)
+
+fun binary_search<T>(let %p0: RA<T>) let <: LowerBound<T>
+
+fun search(_:)$existentialized(let %p0: Type, let %p1: LowerBound<T>, let %p2: T, set %p3: Int32)
+
+fun binary_search$existentialized(let %p0: Type, let %p1: RA<T>) let <: LowerBound<T>

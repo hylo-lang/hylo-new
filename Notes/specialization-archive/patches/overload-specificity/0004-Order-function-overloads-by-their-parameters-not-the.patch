@@ -1,0 +1,560 @@
+From 3ca2a24fa6bbfaa97fc78a3f5526796456b0d9e2 Mon Sep 17 00:00:00 2001
+From: Ambrus Toth <ping@ambrus.dev>
+Date: Tue, 1 Sep 2026 11:13:56 +0200
+Subject: [PATCH 4/7] Order function overloads by their parameters, not their
+ whole type.
+
+The specificity check matched the two declarations' heads as a whole, so
+two overloads of an algorithm were ordered only when their return types
+also happened to agree.  Compare the inputs instead -- style, labels,
+passing conventions and parameter types -- and ignore the output, which
+is the relation Siek and Lumsdaine define for G: g is callable from f if
+f's parameters can be forwarded to it and f's constraints imply g's.
+
+Without this, 'lower_bound(a)' with one overload returning Linear and the
+other Binary stayed ambiguous.
+---
+ Notes/specialization-experiments/e1.hylo      | 18 -----
+ Notes/specialization-experiments/e10.hylo     | 13 ----
+ Notes/specialization-experiments/e11.hylo     | 10 ---
+ Notes/specialization-experiments/e12.hylo     | 12 ----
+ Notes/specialization-experiments/e13.hylo     | 13 ----
+ Notes/specialization-experiments/e14.hylo     | 18 -----
+ Notes/specialization-experiments/e2.hylo      | 12 ----
+ Notes/specialization-experiments/e3.hylo      | 15 -----
+ Notes/specialization-experiments/e4.hylo      | 18 -----
+ Notes/specialization-experiments/e5.hylo      | 28 --------
+ Notes/specialization-experiments/e6.hylo      | 16 -----
+ Notes/specialization-experiments/e7.hylo      | 11 ----
+ Notes/specialization-experiments/e8.hylo      | 15 -----
+ Notes/specialization-experiments/e9.hylo      | 10 ---
+ Notes/specialization-experiments/lb.hylo      | 65 -------------------
+ .../lb_ra_only.hylo                           | 56 ----------------
+ Notes/specialization-experiments/t1.hylo      | 14 ----
+ Notes/specialization-experiments/t2.hylo      |  1 -
+ Sources/FrontEnd/Typer/Typer.swift            | 31 ++++++++-
+ 19 files changed, 29 insertions(+), 347 deletions(-)
+ delete mode 100644 Notes/specialization-experiments/e1.hylo
+ delete mode 100644 Notes/specialization-experiments/e10.hylo
+ delete mode 100644 Notes/specialization-experiments/e11.hylo
+ delete mode 100644 Notes/specialization-experiments/e12.hylo
+ delete mode 100644 Notes/specialization-experiments/e13.hylo
+ delete mode 100644 Notes/specialization-experiments/e14.hylo
+ delete mode 100644 Notes/specialization-experiments/e2.hylo
+ delete mode 100644 Notes/specialization-experiments/e3.hylo
+ delete mode 100644 Notes/specialization-experiments/e4.hylo
+ delete mode 100644 Notes/specialization-experiments/e5.hylo
+ delete mode 100644 Notes/specialization-experiments/e6.hylo
+ delete mode 100644 Notes/specialization-experiments/e7.hylo
+ delete mode 100644 Notes/specialization-experiments/e8.hylo
+ delete mode 100644 Notes/specialization-experiments/e9.hylo
+ delete mode 100644 Notes/specialization-experiments/lb.hylo
+ delete mode 100644 Notes/specialization-experiments/lb_ra_only.hylo
+ delete mode 100644 Notes/specialization-experiments/t1.hylo
+ delete mode 100644 Notes/specialization-experiments/t2.hylo
+
+diff --git a/Notes/specialization-experiments/e1.hylo b/Notes/specialization-experiments/e1.hylo
+deleted file mode 100644
+index 8ab7e16..0000000
+--- a/Notes/specialization-experiments/e1.hylo
++++ /dev/null
+@@ -1,18 +0,0 @@
+-trait Fwd {}
+-trait Bidi refines Fwd {}
+-trait RA refines Bidi {}
+-
+-struct Arr is Deinitializable & Movable { public memberwise init }
+-
+-given Arr is Fwd {}
+-given Arr is Bidi {}
+-given Arr is RA {}
+-
+-trait LowerBoundable { fun lb() -> Int32 }
+-
+-given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
+-given <T is RA> => T is LowerBoundable { fun lb() -> Int32 { 2 } }
+-
+-public fun main() -> Int32 {
+-  Arr().lb()
+-}
+diff --git a/Notes/specialization-experiments/e10.hylo b/Notes/specialization-experiments/e10.hylo
+deleted file mode 100644
+index bea3c70..0000000
+--- a/Notes/specialization-experiments/e10.hylo
++++ /dev/null
+@@ -1,13 +0,0 @@
+-trait P { fun which() -> Int32 }
+-trait Q { fun which2() -> Int32 }
+-struct S<T> is Deinitializable & Movable { public memberwise init }
+-
+-given a: <T> => S<T> is P { fun which() -> Int32 { 1 } }
+-given b: <T> => S<T> is Q { fun which2() -> Int32 { 2 } }
+-given c: <T is Q> => T is P { fun which() -> Int32 { 3 } }
+-
+-fun use<T is P>(x: T) -> Int32 { x.which() }
+-public fun main() -> Int32 {
+-  given d: S<Int32> is P { fun which() -> Int32 { 9 } }   // local, concrete override
+-  return use(S<Int32>())
+-}
+diff --git a/Notes/specialization-experiments/e11.hylo b/Notes/specialization-experiments/e11.hylo
+deleted file mode 100644
+index 7b2dc33..0000000
+--- a/Notes/specialization-experiments/e11.hylo
++++ /dev/null
+@@ -1,10 +0,0 @@
+-// Two mutually-incomparable givens: must remain ambiguous (no silent pick).
+-trait P { fun which() -> Int32 }
+-trait Q {}
+-trait R {}
+-struct S is Deinitializable & Movable { public memberwise init }
+-given S is Q {}
+-given S is R {}
+-given <T is Q> => T is P { fun which() -> Int32 { 1 } }
+-given <T is R> => T is P { fun which() -> Int32 { 2 } }
+-public fun main() -> Int32 { S().which() }
+diff --git a/Notes/specialization-experiments/e12.hylo b/Notes/specialization-experiments/e12.hylo
+deleted file mode 100644
+index ec2ad87..0000000
+--- a/Notes/specialization-experiments/e12.hylo
++++ /dev/null
+@@ -1,12 +0,0 @@
+-trait A {}
+-trait B refines A {}
+-trait C refines B {}
+-struct S is Deinitializable & Movable { public memberwise init }
+-given S is A {}
+-given S is B {}
+-given S is C {}
+-trait Alg { fun f() -> Int32 }
+-given <T is A> => T is Alg { fun f() -> Int32 { 1 } }
+-given <T is B> => T is Alg { fun f() -> Int32 { 2 } }
+-given <T is C> => T is Alg { fun f() -> Int32 { 3 } }
+-public fun main() -> Int32 { S().f() }
+diff --git a/Notes/specialization-experiments/e13.hylo b/Notes/specialization-experiments/e13.hylo
+deleted file mode 100644
+index ceb6edf..0000000
+--- a/Notes/specialization-experiments/e13.hylo
++++ /dev/null
+@@ -1,13 +0,0 @@
+-// G-style concept-based overloading + the generic-context limitation.
+-trait Bidi {}
+-trait RA refines Bidi {}
+-struct Arr is Deinitializable & Movable { public memberwise init }
+-given Arr is Bidi {}
+-given Arr is RA {}
+-
+-fun lb<T is Bidi>(x: T) -> Int32 { 1 }   // generic
+-fun lb<T is RA>(x: T) -> Int32 { 2 }     // specialized
+-
+-fun client<T is Bidi>(x: T) -> Int32 { lb(x) }   // sees only Bidi
+-
+-public fun main() -> Int32 { lb(Arr()) + client(Arr()) }   // want 2 + 2, will get 2 + 1
+diff --git a/Notes/specialization-experiments/e14.hylo b/Notes/specialization-experiments/e14.hylo
+deleted file mode 100644
+index f291481..0000000
+--- a/Notes/specialization-experiments/e14.hylo
++++ /dev/null
+@@ -1,18 +0,0 @@
+-// The full chain from the request: Array > RandomAccess > Bidirectional.
+-trait Bidi {}
+-trait RA refines Bidi {}
+-
+-struct Arr<T> is Deinitializable & Movable { public memberwise init }
+-struct Lst<T> is Deinitializable & Movable { public memberwise init }
+-
+-given <T> => Arr<T> is Bidi {}
+-given <T> => Arr<T> is RA {}
+-given <T> => Lst<T> is Bidi {}
+-
+-trait LowerBound { fun lb() -> Int32 }
+-
+-given <T is Bidi> => T is LowerBound { fun lb() -> Int32 { 1 } }   // linear
+-given <T is RA>   => T is LowerBound { fun lb() -> Int32 { 2 } }   // binary search
+-given <U> => Arr<U> is LowerBound   { fun lb() -> Int32 { 3 } }    // hand-tuned for Arr
+-
+-public fun main() -> Int32 { Arr<Int32>().lb() + Lst<Int32>().lb() }
+diff --git a/Notes/specialization-experiments/e2.hylo b/Notes/specialization-experiments/e2.hylo
+deleted file mode 100644
+index fde1ac0..0000000
+--- a/Notes/specialization-experiments/e2.hylo
++++ /dev/null
+@@ -1,12 +0,0 @@
+-trait Fwd {}
+-trait Bidi refines Fwd {}
+-trait RA refines Bidi {}
+-
+-struct Arr { public memberwise init }
+-
+-given Arr is Fwd {}
+-given Arr is RA {
+-  given Arr is Bidi {}
+-}
+-
+-public fun main() -> Int32 { 0 }
+diff --git a/Notes/specialization-experiments/e3.hylo b/Notes/specialization-experiments/e3.hylo
+deleted file mode 100644
+index 544ceea..0000000
+--- a/Notes/specialization-experiments/e3.hylo
++++ /dev/null
+@@ -1,15 +0,0 @@
+-trait Fwd {}
+-trait Bidi refines Fwd {}
+-trait RA refines Bidi {}
+-
+-struct Arr is Deinitializable & Movable { public memberwise init }
+-
+-given Arr is Fwd {}
+-given Arr is RA { given Arr is Bidi {} }
+-
+-trait LowerBoundable { fun lb() -> Int32 }
+-
+-given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
+-given <T is RA> => T is LowerBoundable { fun lb() -> Int32 { 2 } }
+-
+-public fun main() -> Int32 { Arr().lb() }
+diff --git a/Notes/specialization-experiments/e4.hylo b/Notes/specialization-experiments/e4.hylo
+deleted file mode 100644
+index 57784de..0000000
+--- a/Notes/specialization-experiments/e4.hylo
++++ /dev/null
+@@ -1,18 +0,0 @@
+-trait Fwd {}
+-trait Bidi refines Fwd {}
+-trait RA refines Bidi {}
+-
+-struct Arr is Deinitializable & Movable { public memberwise init }
+-given Arr is RA { given Arr is Bidi { given Arr is Fwd {} } }
+-
+-trait LowerBoundable { fun lb() -> Int32 }
+-given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
+-given <T is RA>   => T is LowerBoundable { fun lb() -> Int32 { 2 } }
+-
+-// (A) generic context constrained on the *coarse* trait
+-fun via_bidi<T is Bidi>(x: T) -> Int32 { x.lb() }
+-
+-// (B) generic context constrained on the *algorithm* trait
+-fun via_alg<T is LowerBoundable>(x: T) -> Int32 { x.lb() }
+-
+-public fun main() -> Int32 { via_bidi(Arr()) + via_alg(Arr()) }
+diff --git a/Notes/specialization-experiments/e5.hylo b/Notes/specialization-experiments/e5.hylo
+deleted file mode 100644
+index 861e790..0000000
+--- a/Notes/specialization-experiments/e5.hylo
++++ /dev/null
+@@ -1,28 +0,0 @@
+-// Design "L": refinement-lifting givens carry specialized implementations.
+-// A trait requirement with a default implementation is the customization point.
+-
+-trait Bidi {
+-  fun step() -> Int32
+-  // default (generic) algorithm: linear scan
+-  fun lb() -> Int32 { 1 }
+-}
+-
+-// RA does *not* `refine` Bidi; instead, a lifting given produces a *better* Bidi witness.
+-trait RA {
+-  fun jump() -> Int32
+-}
+-
+-given <T is RA> => T is Bidi {
+-  fun step() -> Int32 { self.jump() }
+-  fun lb() -> Int32 { 2 }          // specialized algorithm: binary search
+-}
+-
+-struct Arr is Deinitializable & Movable { public memberwise init }
+-given Arr is RA { fun jump() -> Int32 { 7 } }
+-
+-struct Lst is Deinitializable & Movable { public memberwise init }
+-given Lst is Bidi { fun step() -> Int32 { 3 } }
+-
+-fun run<T is Bidi>(x: T) -> Int32 { x.lb() }
+-
+-public fun main() -> Int32 { run(Arr()) * (10 as Int32) + run(Lst()) }
+diff --git a/Notes/specialization-experiments/e6.hylo b/Notes/specialization-experiments/e6.hylo
+deleted file mode 100644
+index 4c2c0ef..0000000
+--- a/Notes/specialization-experiments/e6.hylo
++++ /dev/null
+@@ -1,16 +0,0 @@
+-// Q-A: the more specific given needs a DEEPER derivation than the generic one.
+-trait Bidi {}
+-trait RA refines Bidi {}
+-trait Marker {}
+-
+-struct Arr is Deinitializable & Movable { public memberwise init }
+-
+-given Arr is Bidi {}            // direct: Bidi<Arr> at depth 1
+-given Arr is Marker {}
+-given <T is Marker & Bidi> => T is RA {}   // RA<Arr> only at depth 2+
+-
+-trait LowerBoundable { fun lb() -> Int32 }
+-given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
+-given <T is RA>   => T is LowerBoundable { fun lb() -> Int32 { 2 } }
+-
+-public fun main() -> Int32 { Arr().lb() }
+diff --git a/Notes/specialization-experiments/e7.hylo b/Notes/specialization-experiments/e7.hylo
+deleted file mode 100644
+index ea077f0..0000000
+--- a/Notes/specialization-experiments/e7.hylo
++++ /dev/null
+@@ -1,11 +0,0 @@
+-// Q-C: can two free functions with the same name and labels differ only by constraints?
+-trait Bidi {}
+-trait RA refines Bidi {}
+-struct Arr is Deinitializable & Movable { public memberwise init }
+-given Arr is Bidi {}
+-given Arr is RA {}
+-
+-fun lb<T is Bidi>(x: T) -> Int32 { 1 }
+-fun lb<T is RA>(x: T) -> Int32 { 2 }
+-
+-public fun main() -> Int32 { lb(Arr()) }
+diff --git a/Notes/specialization-experiments/e8.hylo b/Notes/specialization-experiments/e8.hylo
+deleted file mode 100644
+index 2576cbc..0000000
+--- a/Notes/specialization-experiments/e8.hylo
++++ /dev/null
+@@ -1,15 +0,0 @@
+-// Q: can a lifting given override a default implementation inherited via `refines`?
+-trait Bidi {
+-  fun lb() -> Int32 { 1 }        // default (generic) algorithm
+-}
+-trait RA refines Bidi {}
+-
+-struct Arr is Deinitializable & Movable { public memberwise init }
+-given Arr is Bidi {}
+-given Arr is RA {}
+-
+-// third party wants: every random-access collection gets a better `lb`
+-given <T is RA> => T is Bidi { fun lb() -> Int32 { 2 } }
+-
+-fun run<T is Bidi>(x: T) -> Int32 { x.lb() }
+-public fun main() -> Int32 { run(Arr()) }
+diff --git a/Notes/specialization-experiments/e9.hylo b/Notes/specialization-experiments/e9.hylo
+deleted file mode 100644
+index 1c78849..0000000
+--- a/Notes/specialization-experiments/e9.hylo
++++ /dev/null
+@@ -1,10 +0,0 @@
+-trait P { fun which() -> Int32 }
+-trait Q { fun which2() -> Int32 }
+-struct S<T> is Deinitializable & Movable { public memberwise init }
+-
+-given a: <T> => S<T> is P { fun which() -> Int32 { 1 } }
+-given b: <T> => S<T> is Q { fun which2() -> Int32 { 2 } }
+-given c: <T is Q> => T is P { fun which() -> Int32 { 3 } }
+-
+-fun use<T is P>(x: T) -> Int32 { x.which() }
+-public fun main() -> Int32 { use(S<Int32>()) }
+diff --git a/Notes/specialization-experiments/lb.hylo b/Notes/specialization-experiments/lb.hylo
+deleted file mode 100644
+index 3790000..0000000
+--- a/Notes/specialization-experiments/lb.hylo
++++ /dev/null
+@@ -1,65 +0,0 @@
+-// A realistic sketch: lower_bound specialized from Bidirectional to RandomAccess,
+-// selected correctly through TWO levels of generic client code.
+-
+-trait Fwd {
+-  fun count() -> Int32
+-  fun at(p: Int32) -> Int32          // sorted, ascending
+-}
+-trait Bidi refines Fwd {}
+-trait RA refines Bidi {}
+-
+-// ---- the algorithm, as a customization point ----------------------------------
+-trait LowerBound {
+-  fun lower_bound(x: Int32) -> Int32
+-}
+-
+-// generic implementation: linear scan, valid for any forward collection
+-given <T is Bidi> => T is LowerBound {
+-  fun lower_bound(x: Int32) -> Int32 {
+-    var i: Int32 = 0
+-    while (i < self.count()) && (self.at(i) < x) { &i += (1 as Int32) }
+-    return i
+-  }
+-}
+-
+-// specialized implementation: binary search, requires random access
+-given <T is RA> => T is LowerBound {
+-  fun lower_bound(x: Int32) -> Int32 {
+-    var lo: Int32 = 0
+-    var hi = self.count()
+-    while lo < hi {
+-      let mid = lo + ((hi - lo) / (2 as Int32))
+-      if self.at(mid) < x { &lo = mid + (1 as Int32) } else { &hi = mid.copy() }
+-    }
+-    return lo
+-  }
+-}
+-
+-// ---- client code, generic over the *algorithm*, not the data structure --------
+-fun equal_range_size<T is LowerBound>(c: T, from lo: Int32, to hi: Int32) -> Int32 {
+-  c.lower_bound(hi) - c.lower_bound(lo)
+-}
+-
+-fun middle_band<T is LowerBound>(c: T) -> Int32 {
+-  equal_range_size(c, from: 10 as Int32, to: 20 as Int32)
+-}
+-
+-// ---- two models ---------------------------------------------------------------
+-struct Evens is Deinitializable & Movable { public memberwise init }   // 0,2,4,...,98
+-given Evens is Fwd {
+-  fun count() -> Int32 { 50 }
+-  fun at(p: Int32) -> Int32 { p * (2 as Int32) }
+-}
+-given Evens is Bidi {}
+-given Evens is RA {}
+-
+-struct Odds is Deinitializable & Movable { public memberwise init }    // 1,3,5,...,99
+-given Odds is Fwd {
+-  fun count() -> Int32 { 50 }
+-  fun at(p: Int32) -> Int32 { (p * (2 as Int32)) + (1 as Int32) }
+-}
+-given Odds is Bidi {}
+-
+-public fun main() -> Int32 {
+-  middle_band(Evens()) + middle_band(Odds())
+-}
+diff --git a/Notes/specialization-experiments/lb_ra_only.hylo b/Notes/specialization-experiments/lb_ra_only.hylo
+deleted file mode 100644
+index c91577f..0000000
+--- a/Notes/specialization-experiments/lb_ra_only.hylo
++++ /dev/null
+@@ -1,56 +0,0 @@
+-// A realistic sketch: lower_bound specialized from Bidirectional to RandomAccess,
+-// selected correctly through TWO levels of generic client code.
+-
+-trait Fwd {
+-  fun count() -> Int32
+-  fun at(p: Int32) -> Int32          // sorted, ascending
+-}
+-trait Bidi refines Fwd {}
+-trait RA refines Bidi {}
+-
+-// ---- the algorithm, as a customization point ----------------------------------
+-trait LowerBound {
+-  fun lower_bound(x: Int32) -> Int32
+-}
+-
+-// specialized implementation: binary search, requires random access
+-given <T is RA> => T is LowerBound {
+-  fun lower_bound(x: Int32) -> Int32 {
+-    var lo: Int32 = 0
+-    var hi = self.count()
+-    while lo < hi {
+-      let mid = lo + ((hi - lo) / (2 as Int32))
+-      if self.at(mid) < x { &lo = mid + (1 as Int32) } else { &hi = mid.copy() }
+-    }
+-    return lo
+-  }
+-}
+-
+-// ---- client code, generic over the *algorithm*, not the data structure --------
+-fun equal_range_size<T is LowerBound>(c: T, from lo: Int32, to hi: Int32) -> Int32 {
+-  c.lower_bound(hi) - c.lower_bound(lo)
+-}
+-
+-fun middle_band<T is LowerBound>(c: T) -> Int32 {
+-  equal_range_size(c, from: 10 as Int32, to: 20 as Int32)
+-}
+-
+-// ---- two models ---------------------------------------------------------------
+-struct Evens is Deinitializable & Movable { public memberwise init }   // 0,2,4,...,98
+-given Evens is Fwd {
+-  fun count() -> Int32 { 50 }
+-  fun at(p: Int32) -> Int32 { p * (2 as Int32) }
+-}
+-given Evens is Bidi {}
+-given Evens is RA {}
+-
+-struct Odds is Deinitializable & Movable { public memberwise init }    // 1,3,5,...,99
+-given Odds is Fwd {
+-  fun count() -> Int32 { 50 }
+-  fun at(p: Int32) -> Int32 { (p * (2 as Int32)) + (1 as Int32) }
+-}
+-given Odds is Bidi {}
+-
+-public fun main() -> Int32 {
+-  middle_band(Evens())
+-}
+diff --git a/Notes/specialization-experiments/t1.hylo b/Notes/specialization-experiments/t1.hylo
+deleted file mode 100644
+index 63c9447..0000000
+--- a/Notes/specialization-experiments/t1.hylo
++++ /dev/null
+@@ -1,14 +0,0 @@
+-//! no-std
+-
+-trait P { fun f() }
+-
+-struct A {}
+-
+-// Two conformances of A to P.
+-given a1: A is P { fun f() {} }
+-
+-fun use<T is P>(_ x: T) { x.f() }
+-
+-fun main() {
+-  use(A())
+-}
+diff --git a/Notes/specialization-experiments/t2.hylo b/Notes/specialization-experiments/t2.hylo
+deleted file mode 100644
+index 0a845fd..0000000
+--- a/Notes/specialization-experiments/t2.hylo
++++ /dev/null
+@@ -1 +0,0 @@
+-public fun main() -> Int32 { 42 }
+diff --git a/Sources/FrontEnd/Typer/Typer.swift b/Sources/FrontEnd/Typer/Typer.swift
+index b5c3c0e..f318825 100644
+--- a/Sources/FrontEnd/Typer/Typer.swift
++++ b/Sources/FrontEnd/Typer/Typer.swift
+@@ -3929,6 +3929,32 @@ public struct Typer {
+     return (x, y)
+   }
+ 
++  /// Returns a substitution instantiating `pattern` to `subject`, or `nil` if there is none.
++  ///
++  /// Only `pattern`'s open variables may be assigned, so the match is one-way. When both types are
++  /// term abstractions, their outputs are ignored: an algorithm's overloads are ordered by the
++  /// operands they accept, exactly as in Siek and Lumsdaine's "callable from" relation.
++  private func matchingHeads(
++    _ pattern: AnyTypeIdentity, _ subject: AnyTypeIdentity
++  ) -> SubstitutionTable? {
++    guard
++      let p = program.types[pattern] as? Arrow, let q = program.types[subject] as? Arrow,
++      p.style == q.style, p.inputs.count == q.inputs.count,
++      p.labels.elementsEqual(q.labels)
++    else {
++      return program.types.unifiable(pattern, subject)
++    }
++
++    var s = SubstitutionTable()
++    for (x, y) in zip(p.inputs, q.inputs) {
++      guard
++        x.access == y.access,
++        program.types.unifiable(x.type, y.type, extending: &s, handlingCoercionsWith: { _, _ in false })
++      else { return nil }
++    }
++    return s
++  }
++
+   /// Returns `true` iff, in the scope of `a`, the head of `b` can be instantiated to the head of
+   /// `a` and every requirement of `b` is derivable.
+   ///
+@@ -3952,8 +3978,9 @@ public struct Typer {
+           .data(using: .utf8)!)
+     }
+ 
+-    // The heads must match.
+-    guard var s = program.types.unifiable(hb, ha) else {
++    // The heads must match. For term abstractions only the parameters take part: two overloads
++    // of an algorithm are ordered by what they accept, not by what they return.
++    guard var s = matchingHeads(hb, ha) else {
+       if dbg { FileHandle.standardError.write("    heads not unifiable\n".data(using: .utf8)!) }
+       return false
+     }
+-- 
+2.43.0
+

@@ -1,0 +1,488 @@
+From 5ab4c8315b8e11ad6738d02539778d88bcc3735c Mon Sep 17 00:00:00 2001
+From: Ambrus Toth <ping@ambrus.dev>
+Date: Tue, 1 Sep 2026 12:17:29 +0200
+Subject: [PATCH 7/7] Bound the implicit search, and rank as the declarative
+ rule prescribes.
+
+Three fixes to the specificity order.
+
+A search that cannot succeed did not terminate in reasonable time.  Once
+the built-in reflexivity, symmetry and transitivity givens are in scope,
+the number of live threads multiplies with the depth of the search: an
+unsatisfiable equality reaches ~800k threads by depth nine even though
+maxImplicitDepth bounds the depth at ten.  This was already reachable on
+an unmodified compiler; keeping the search alive past its first success
+merely made it easy to hit.  Threads are now also bounded by a budget on
+the number of steps.  Resolving a witness in a well-formed program takes
+a few hundred; the largest search in the test suite takes seventeen
+thousand, so the budget is set at ten thousand steps per level, which the
+loop may overshoot by one level's worth of work.
+
+The condition for continuing the search was too strong.  It kept going
+only while a live thread was rooted at a given more specific than *every*
+incumbent, which quietly dropped incomparable roots -- exactly the ones
+that should either win on lexical distance or make the query ambiguous.
+It now keeps going while a root is not dominated by an incumbent, and the
+ranking runs the full three-way order from the specification: specificity,
+then lexical distance, then derivation size.
+
+Ambiguity is reported with the candidates that survived, and with a note
+saying that neither is more specific than the other -- which is the actual
+reason no choice was made.
+
+Also: entailment is memoized per scope, and refuses declarations that do
+not form a scope of their own, since deriving one given's requirements
+under another's assumptions is done by summoning them in its scope.
+
+Notes: the penalties counter does conflate lexical distance with the shape
+of a derivation, because assumed givens are grouped ahead of the visible
+ones and so shift them.  Separating the two breaks two existing tests that
+rely on an assumption outranking a given in an enclosing scope, and buys
+nothing here: specificity has to be consulted before lexical distance
+either way, which putting lexical distance first demonstrably breaks.  The
+conflation is left in place, with a comment.
+---
+ Notes/specialization-experiments/README.md    |  28 ++---
+ Notes/specialization-experiments/e15.hylo     |  15 ---
+ Notes/specialization-experiments/e16.hylo     |  14 ---
+ Sources/FrontEnd/Diagnostic.swift             |  21 +++-
+ Sources/FrontEnd/Typer/Typer.swift            | 104 ++++++++++++------
+ ...n-incomparable-givens.diagnostics.expected |  19 +++-
+ .../specialization-incomparable-givens.hylo   |  15 ++-
+ ...-underivable-equality.diagnostics.expected |   3 +
+ .../specialization-underivable-equality.hylo  |  33 ++++++
+ 9 files changed, 158 insertions(+), 94 deletions(-)
+ delete mode 100644 Notes/specialization-experiments/e15.hylo
+ delete mode 100644 Notes/specialization-experiments/e16.hylo
+ create mode 100644 Tests/CompilerTests/negative/specialization-underivable-equality.diagnostics.expected
+ create mode 100644 Tests/CompilerTests/negative/specialization-underivable-equality.hylo
+
+diff --git a/Notes/specialization-experiments/README.md b/Notes/specialization-experiments/README.md
+index bb6e5a6..edc0ab6 100644
+--- a/Notes/specialization-experiments/README.md
++++ b/Notes/specialization-experiments/README.md
+@@ -1,22 +1,12 @@
+-# Implicit search that does not terminate
++# Implicit-resolution benchmark input
+ 
+-The exploratory programs that motivated the specificity order now live in the compiler test suite
+-as `Tests/CompilerTests/{positive,negative}/specialization-*.hylo`.
++`bench.hylo` is not a test. It is the input used to measure the cost of implicit resolution on a
++full standard-library typing run:
+ 
+-The two files kept here cannot be test cases, because they hang the compiler.
++    for i in 1 2 3 4 5; do
++      /usr/bin/time -f "%e" ./.build/debug/hc --no-caching --emit ir -o /dev/null \
++        Notes/specialization-experiments/bench.hylo
++    done
+ 
+-| file | what it does |
+-|------|--------------|
+-| `e15.hylo` | The finer of two givens is constrained by an associated-type equality (`where T.Position == Int32`). Type checking terminates on `main` and terminates with the specificity *filter* alone, but hangs once the breadth-first search is allowed to continue past its first success: it then reaches the built-in reflexivity, symmetry and transitivity givens and the thread count explodes. |
+-| `e16.hylo` | The same program with only the equality-constrained given, so the search must fail. **This hangs on unmodified `main`.** The divergence is pre-existing; continuing the search merely makes it reachable from programs that today stop early. |
+-
+-Fixing `e16` is a prerequisite for lifting the first-success cutoff. Until then,
+-`specialization-deeper-derivation` is the only test that depends on the continuation, and the
+-associated-type-equality case has no coverage.
+-
+-`bench.hylo` is not a test either; it is the input used to measure implicit-resolution overhead on a
+-full standard-library typing run.
+-
+-Run the two repros with a timeout:
+-
+-    timeout 60 ./.build/debug/hc --emit typed-ast -o /tmp/out.ast Notes/specialization-experiments/e16.hylo
++The exploratory programs that motivated the specificity order are now compiler tests, under
++`Tests/CompilerTests/{positive,negative}/specialization-*.hylo`.
+diff --git a/Notes/specialization-experiments/e15.hylo b/Notes/specialization-experiments/e15.hylo
+deleted file mode 100644
+index 18ab584..0000000
+--- a/Notes/specialization-experiments/e15.hylo
++++ /dev/null
+@@ -1,15 +0,0 @@
+-// Specificity where the finer constraint is an associated-type equality.
+-trait Coll { type Position }
+-struct Cursor is Deinitializable & Movable { public memberwise init }
+-
+-struct Fast is Deinitializable & Movable { public memberwise init }
+-struct Slow is Deinitializable & Movable { public memberwise init }
+-
+-given Fast is Coll { type Position = Int32 }
+-given Slow is Coll { type Position = Cursor }
+-
+-trait LowerBound { fun lb() -> Int32 }
+-given <T is Coll> => T is LowerBound { fun lb() -> Int32 { 1 } }
+-given <T is Coll where T.Position == Int32> => T is LowerBound { fun lb() -> Int32 { 2 } }
+-
+-public fun main() -> Int32 { Fast().lb() + Slow().lb() }
+diff --git a/Notes/specialization-experiments/e16.hylo b/Notes/specialization-experiments/e16.hylo
+deleted file mode 100644
+index 3c16ee8..0000000
+--- a/Notes/specialization-experiments/e16.hylo
++++ /dev/null
+@@ -1,14 +0,0 @@
+-// Specificity where the finer constraint is an associated-type equality.
+-trait Coll { type Position }
+-struct Cursor is Deinitializable & Movable { public memberwise init }
+-
+-struct Fast is Deinitializable & Movable { public memberwise init }
+-struct Slow is Deinitializable & Movable { public memberwise init }
+-
+-given Fast is Coll { type Position = Int32 }
+-given Slow is Coll { type Position = Cursor }
+-
+-trait LowerBound { fun lb() -> Int32 }
+-given <T is Coll where T.Position == Int32> => T is LowerBound { fun lb() -> Int32 { 2 } }
+-
+-public fun main() -> Int32 { Fast().lb() + Slow().lb() }
+diff --git a/Sources/FrontEnd/Diagnostic.swift b/Sources/FrontEnd/Diagnostic.swift
+index 3be0848..233a81e 100644
+--- a/Sources/FrontEnd/Diagnostic.swift
++++ b/Sources/FrontEnd/Diagnostic.swift
+@@ -220,11 +220,24 @@ extension Program {
+     .init(.error, "binding declaration requires an initializer", at: .empty(at: self[d].site.end))
+   }
+ 
+-  /// Returns an error diagnosing ambiguous implicit search results.
++  /// Returns an error diagnosing ambiguous implicit search results, pointing at the givens in
++  /// `candidates` that survived resolution.
+   internal func multipleGivenInstances(
+-    of t: AnyTypeIdentity, at site: SourceSpan
++    of t: AnyTypeIdentity, found candidates: [Typer.SummonResult] = [], at site: SourceSpan
+   ) -> Diagnostic {
+-    .init(.error, format("multiple given instance of '%T' in this scope", [t]), at: site)
++    var notes: [Diagnostic] = []
++    for d in candidates.compactMap(\.witness.declaration).uniqued() {
++      notes.append(.init(.note, "candidate given is declared here", at: spanForDiagnostic(about: d)))
++    }
++    if notes.count > 1 {
++      notes.append(
++        .init(
++          .note,
++          "neither candidate is more specific than the other, so no choice can be made between them",
++          at: site))
++    }
++    return .init(
++      .error, format("multiple given instance of '%T' in this scope", [t]), at: site, notes: notes)
+   }
+ 
+   /// Returns an error diagnosing an invalid coercion.
+@@ -271,7 +284,7 @@ extension Program {
+     if found.isEmpty {
+       return noGivenInstance(of: t, at: site)
+     } else {
+-      return multipleGivenInstances(of: t, at: site)
++      return multipleGivenInstances(of: t, found: found, at: site)
+     }
+   }
+ 
+diff --git a/Sources/FrontEnd/Typer/Typer.swift b/Sources/FrontEnd/Typer/Typer.swift
+index f318825..23cdc61 100644
+--- a/Sources/FrontEnd/Typer/Typer.swift
++++ b/Sources/FrontEnd/Typer/Typer.swift
+@@ -1,4 +1,3 @@
+-import Foundation
+ import Algorithms
+ import OrderedCollections
+ import Utilities
+@@ -24,6 +23,17 @@ public struct Typer {
+   /// The maximum depth of a derivation during implicit search.
+   private let maxImplicitDepth = 10
+ 
++  /// The maximum number of steps taken by a single implicit search.
++  ///
++  /// Reasoning about equalities derives the same goal along many different paths, so the number of
++  /// live threads can grow exponentially with the depth of the search even though the depth itself
++  /// is bounded. Resolving a witness in a well-formed program takes a few hundred steps; a search
++  /// that exceeds this budget is abandoned, exactly as one that exceeds `maxImplicitDepth` is.
++  ///
++  /// - Note: The proper fix is to answer each goal once and share that answer with every
++  ///   continuation that asked for it. Until then this bound is what keeps the compiler responsive.
++  private let maxImplicitWork = 10_000
++
+   /// `true` iff the typer is currently comparing the specificity of two givens.
+   ///
+   /// Specificity comparison uses implicit resolution, which must not itself attempt to
+@@ -67,6 +77,9 @@ public struct Typer {
+     /// A pair of types.
+     fileprivate typealias TypePair = Pair<AnyTypeIdentity, AnyTypeIdentity>
+ 
++    /// An ordered pair of declarations, used as a cache key.
++    fileprivate typealias DeclarationPair = Pair<DeclarationIdentity, DeclarationIdentity>
++
+     /// A pair composed of an extension and a type.
+     fileprivate typealias ExtensionAndType = Pair<ExtensionDeclaration.ID, AnyTypeIdentity>
+ 
+@@ -103,6 +116,9 @@ public struct Typer {
+     /// The cache of `Typer.canDeriveCoercions(_:_:in:where:)`.
+     fileprivate var scopeToPotentialCoercions: [ScopeIdentity: [TypePair: Bool]]
+ 
++    /// The cache of `Typer.entails(_:_:in:)`.
++    fileprivate var scopeToEntailments: [ScopeIdentity: [Memos.DeclarationPair: Bool]]
++
+     /// The cache of `Typer.typeOfTraitSelf(in:)`.
+     fileprivate var traitToTypeOfTraitSelf: [TraitDeclaration.ID: AnyTypeIdentity]
+ 
+@@ -135,6 +151,7 @@ public struct Typer {
+       self.scopeToTraits = [:]
+       self.scopeToGivens = [:]
+       self.scopeToSummoned = [:]
++      self.scopeToEntailments = [:]
+       self.scopeToTypeOfSelf = [:]
+       self.scopeToPotentialCoercions = [:]
+       self.traitToTypeOfTraitSelf = [:]
+@@ -3630,6 +3647,13 @@ public struct Typer {
+     var gs: [[Given]] = []
+ 
+     // Assumed givens.
++    //
++    // Note: these are grouped one per element, and ahead of the visible ones, so that a derivation
++    // discharging an assumption is preferred to one reaching for a given in an enclosing scope.
++    // The offset of a visible group therefore depends on how many assumptions are in flight, which
++    // means a longer derivation is charged slightly more than a short one. Several tests depend on
++    // that, so the two notions are deliberately left conflated; specificity, which is consulted
++    // first, is what algorithm selection relies on.
+     gs.append(contentsOf: environment.givens.reversed().map({ (g) in [g] }))
+ 
+     // Givens visible from `scopeOfUse`.
+@@ -3804,12 +3828,14 @@ public struct Typer {
+     var work = threads
+     var done: [SummonResult] = []
+     var depth = 0
++    var steps = 0
+ 
+-    while !work.isEmpty && (depth < maxImplicitDepth)
+-      && (done.isEmpty || mayOutrank(work, done, in: scopeOfUse))
++    while !work.isEmpty && (depth < maxImplicitDepth) && (steps < maxImplicitWork)
++      && (done.isEmpty || hasUndominatedThread(work, done, in: scopeOfUse))
+     {
+       var next: [ResolutionThread] = []
+       for item in work {
++        steps += 1
+         switch match(item, in: scopeOfUse) {
+         case .done(let r): done.append(r)
+         case .next(let s): next.append(contentsOf: s)
+@@ -3819,10 +3845,16 @@ public struct Typer {
+       swap(&next, &work)
+     }
+ 
++    // Rank as the declarative rule prescribes: most specific first, then lexically closest, then
++    // smallest. Whatever survives all three is genuinely ambiguous.
+     if done.count < 2 { return done }
+-    let best = done.minimalElements(by: { (a, b) in isMoreSpecific(a, than: b, in: scopeOfUse) })
+-    if best.count < 2 { return best }
+-    return best.minimalElements(by: { (a, b) in a.penalties < b.penalties })
++    let strongest = done.minimalElements(by: { (a, b) in isMoreSpecific(a, than: b, in: scopeOfUse) })
++    if strongest.count < 2 { return strongest }
++    let closest = strongest.minimalElements(by: { (a, b) in a.penalties < b.penalties })
++    if closest.count < 2 { return closest }
++    return closest.minimalElements(by: { (a, b) in
++      a.witness.elaborationCost < b.witness.elaborationCost
++    })
+   }
+ 
+ 
+@@ -3847,21 +3879,24 @@ public struct Typer {
+   }
+ 
+ 
+-  /// Returns `true` iff some thread in `work` is rooted at a given that is strictly more specific
+-  /// than the root of every result in `done`, and is therefore still worth exploring.
+-  private mutating func mayOutrank(
++  /// Returns `true` iff some thread in `work` is rooted at a given that no result in `done` is
++  /// strictly more specific than, and which may therefore still be selected.
++  ///
++  /// A root that an incumbent dominates can never be the maximum, so nothing is lost by abandoning
++  /// it. Anything else -- a root that is more specific than an incumbent, or one that is merely
++  /// incomparable to it -- still has to be explored, either because it will win or because it will
++  /// make the query ambiguous.
++  private mutating func hasUndominatedThread(
+     _ work: [ResolutionThread], _ done: [SummonResult], in scopeOfUse: ScopeIdentity
+   ) -> Bool {
+     guard !isComparingSpecificity else { return false }
+     let incumbents = Set(done.compactMap(\.witness.declaration))
+     if incumbents.isEmpty { return false }
+ 
+-    let dbg = ProcessInfo.processInfo.environment["HYLO_DEBUG_SPEC"] != nil
+     var seen = Set<DeclarationIdentity>()
+     for t in work {
+       guard let r = t.root, !incumbents.contains(r), seen.insert(r).inserted else { continue }
+-      if incumbents.allSatisfy({ (i) in isStrictlyMoreSpecific(r, than: i, in: scopeOfUse) }) {
+-        if dbg { FileHandle.standardError.write("  -> keep going for \(r.erased)\n".data(using: .utf8)!) }
++      if !incumbents.contains(where: { (i) in isStrictlyMoreSpecific(i, than: r, in: scopeOfUse) }) {
+         return true
+       }
+     }
+@@ -3963,41 +3998,38 @@ public struct Typer {
+   private mutating func entails(
+     _ a: DeclarationIdentity, _ b: DeclarationIdentity, in scopeOfUse: ScopeIdentity
+   ) -> Bool {
+-    let dbg = ProcessInfo.processInfo.environment["HYLO_DEBUG_SPEC"] != nil
++    let k = Memos.DeclarationPair(a, b)
++    if let memoized = cache.scopeToEntailments[scopeOfUse]?[k] { return memoized }
++
++    let result = computeEntailment(a, b, in: scopeOfUse)
++    cache.scopeToEntailments[scopeOfUse, default: [:]][k] = result
++    return result
++  }
++
++  /// Returns `true` iff `a` entails `b`, without consulting or updating the cache.
++  private mutating func computeEntailment(
++    _ a: DeclarationIdentity, _ b: DeclarationIdentity, in scopeOfUse: ScopeIdentity
++  ) -> Bool {
++    // `a`'s own scope is what exposes its requirements as givens, so `a` must denote one. Givens
++    // introduced by a context parameter or by the compiler have no such scope; they are simply not
++    // ordered against anything.
++    guard program.isScope(a.erased), program.isScope(b.erased) else { return false }
+ 
+-    // `a`'s parameters stay rigid; its own scope exposes its requirements as givens.
++    // `a`'s parameters stay rigid; `b` is opened for unification.
+     let ha = program.types.head(declaredType(of: a))
+     let hypotheses = ScopeIdentity(uncheckedFrom: a.erased)
+-
+-    // `b` is opened for unification.
+     let (ub, hb) = program.types.open(declaredType(of: b))
+ 
+-    if dbg {
+-      FileHandle.standardError.write(
+-        "  entails? a.head=\(program.show(ha)) | b.head=\(program.show(hb)) b.usings=\(ub.map({ program.show($0) }))\n"
+-          .data(using: .utf8)!)
+-    }
+-
+-    // The heads must match. For term abstractions only the parameters take part: two overloads
+-    // of an algorithm are ordered by what they accept, not by what they return.
+-    guard var s = matchingHeads(hb, ha) else {
+-      if dbg { FileHandle.standardError.write("    heads not unifiable\n".data(using: .utf8)!) }
+-      return false
+-    }
++    // The heads must match. For term abstractions only the parameters take part: two overloads of
++    // an algorithm are ordered by what they accept, not by what they return.
++    guard var s = matchingHeads(hb, ha) else { return false }
+ 
+     // Every requirement of `b` must hold under `a`'s assumptions.
+     for u in ub {
+       let t = program.types.reify(u, applying: s, withVariables: .kept)
+-      let rs = summon(t, in: hypotheses)
+-      guard let r = rs.first else {
+-        if dbg {
+-          FileHandle.standardError.write("    cannot derive \(program.show(t))\n".data(using: .utf8)!)
+-        }
+-        return false
+-      }
++      guard let r = summon(t, in: hypotheses).first else { return false }
+       s = s.union(r.substitutions)
+     }
+-    if dbg { FileHandle.standardError.write("    YES\n".data(using: .utf8)!) }
+     return true
+   }
+ 
+diff --git a/Tests/CompilerTests/negative/specialization-incomparable-givens.diagnostics.expected b/Tests/CompilerTests/negative/specialization-incomparable-givens.diagnostics.expected
+index 360cf95..a8da573 100644
+--- a/Tests/CompilerTests/negative/specialization-incomparable-givens.diagnostics.expected
++++ b/Tests/CompilerTests/negative/specialization-incomparable-givens.diagnostics.expected
+@@ -1,6 +1,21 @@
+-negative/specialization-incomparable-givens.hylo:24.14-24: error: ambiguous use of 'Selected'
++negative/specialization-incomparable-givens.hylo:28.14-24: error: ambiguous use of 'Selected'
+ fun check(x: S.Selected) {}
+              ~~~~~~~~~~
+-negative/specialization-incomparable-givens.hylo:24.14-24: error: expression does not denote a type
++negative/specialization-incomparable-givens.hylo:28.14-24: error: expression does not denote a type
+ fun check(x: S.Selected) {}
+              ~~~~~~~~~~
++negative/specialization-incomparable-givens.hylo:31.17-23: error: no coercion from '<T> P<T> ==> [Void](let T) let -> Void' to '[Void](let S) let -> Void'
++fun use(s: S) { client(s) }
++                ~~~~~~
++negative/specialization-incomparable-givens.hylo:31.17-23: note: multiple given instance of 'P<S>' in this scope
++fun use(s: S) { client(s) }
++                ~~~~~~
++negative/specialization-incomparable-givens.hylo:25.1-6: note: candidate given is declared here
++given via_q: <T is Q> => T is P { type Selected = ViaQ }
++~~~~~
++negative/specialization-incomparable-givens.hylo:26.1-6: note: candidate given is declared here
++given via_r: <T is R> => T is P { type Selected = ViaR }
++~~~~~
++negative/specialization-incomparable-givens.hylo:31.17-23: note: neither candidate is more specific than the other, so no choice can be made between them
++fun use(s: S) { client(s) }
++                ~~~~~~
+diff --git a/Tests/CompilerTests/negative/specialization-incomparable-givens.hylo b/Tests/CompilerTests/negative/specialization-incomparable-givens.hylo
+index da6afb1..222d6f3 100644
+--- a/Tests/CompilerTests/negative/specialization-incomparable-givens.hylo
++++ b/Tests/CompilerTests/negative/specialization-incomparable-givens.hylo
+@@ -4,8 +4,12 @@
+ //
+ // `S` conforms to both `Q` and `R`, so both givens apply. Neither set of requirements entails the
+ // other -- `Q` and `R` are unrelated traits -- so neither given applies to fewer types than the
+-// other, and the use is ambiguous. This is the case a most-specific-wins rule must leave alone:
+-// resolving it either way would be an arbitrary choice.
++// other, and both uses below are ambiguous. This is the case a most-specific-wins rule must leave
++// alone: resolving it either way would be an arbitrary choice.
++//
++// The two uses reach the ambiguity by different routes. `check` selects a type member, which is
++// reported as an ambiguous name; `use` needs a witness for the context clause of `client`, which is
++// reported as an ambiguous implicit search whose notes point at the candidates.
+ 
+ trait P { type Selected }
+ trait Q {}
+@@ -18,7 +22,10 @@ given S is R {}
+ struct ViaQ {}
+ struct ViaR {}
+ 
+-given <T is Q> => T is P { type Selected = ViaQ }
+-given <T is R> => T is P { type Selected = ViaR }
++given via_q: <T is Q> => T is P { type Selected = ViaQ }
++given via_r: <T is R> => T is P { type Selected = ViaR }
+ 
+ fun check(x: S.Selected) {}
++
++fun client<T is P>(x: T) {}
++fun use(s: S) { client(s) }
+diff --git a/Tests/CompilerTests/negative/specialization-underivable-equality.diagnostics.expected b/Tests/CompilerTests/negative/specialization-underivable-equality.diagnostics.expected
+new file mode 100644
+index 0000000..6a12065
+--- /dev/null
++++ b/Tests/CompilerTests/negative/specialization-underivable-equality.diagnostics.expected
+@@ -0,0 +1,3 @@
++negative/specialization-underivable-equality.hylo:33.19-27: error: type 'Fast' has no static member 'Selected'
++fun check(x: Fast.Selected) {}
++                  ~~~~~~~~
+diff --git a/Tests/CompilerTests/negative/specialization-underivable-equality.hylo b/Tests/CompilerTests/negative/specialization-underivable-equality.hylo
+new file mode 100644
+index 0000000..a29f392
+--- /dev/null
++++ b/Tests/CompilerTests/negative/specialization-underivable-equality.hylo
+@@ -0,0 +1,33 @@
++//! stage:typing no-std
++
++// A given guarded by an equality between an associated type and a concrete type.
++//
++// `specialized` would be the more specific of any pair it competes with -- its requirements include
++// theirs and add one. It applies to nothing, though, because Hylo cannot currently derive
++// `T.Position == Idx` from a conformance that defines `type Position = Idx`; the equality has to be
++// assumed. So nothing witnesses `LowerBound<Fast>` and the member selection fails. Add a second,
++// unguarded given and `Fast.Selected` resolves to that one instead.
++//
++// The test is here because this is the shape that used to make implicit resolution run away rather
++// than fail: searching for an equality it cannot prove, resolution reaches the built-in
++// reflexivity, symmetry and transitivity givens, whose derivations multiply with the depth of the
++// search. The compiler hung, and hung on an unmodified compiler too -- the divergence is in how
++// equalities are searched, not in how candidates are ordered. What stops it now is the budget on
++// `takeSummonResults`, and what this test really pins is that the program fails instead of hanging.
++//
++// When deriving that equality is implemented, this test stops being negative.
++
++trait Coll { type Position }
++
++struct Idx {}
++struct Fast {}
++
++given Fast is Coll { type Position = Idx }
++
++struct Specialized {}
++
++trait LowerBound { type Selected }
++
++given specialized: <T is Coll where T.Position == Idx> => T is LowerBound { type Selected = Specialized }
++
++fun check(x: Fast.Selected) {}
+-- 
+2.43.0
+

@@ -1,0 +1,725 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>The Third Axis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;0,700;1,400;1,500&family=Archivo:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --paper:    #eef0ec;
+    --sheet:    #fbfbf9;
+    --sheet-2:  #f2f1ea;
+    --ink:      #14171a;
+    --ink-2:    #3b4045;
+    --muted:    #6b7278;
+    --rule:     #cbd0c9;
+    --rule-2:   #dde1db;
+
+    --axis1:    #3f6690;   /* data types      */
+    --axis1-bg: #e2eaf1;
+    --axis2:    #9c6a1e;   /* operations      */
+    --axis2-bg: #f3e9d6;
+    --axis3:    #6a3f96;   /* specificity     */
+    --axis3-bg: #ece2f5;
+    --gap:      #a1442e;   /* honest limits   */
+    --gap-bg:   #f5e3de;
+
+    --lift: 0 1px 0 rgba(20,23,26,.05), 0 16px 38px -26px rgba(20,23,26,.4);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#101214; --sheet:#16191c; --sheet-2:#1c2023;
+      --ink:#e7e9e6; --ink-2:#b8bcb8; --muted:#82877f;
+      --rule:#2b302c; --rule-2:#232723;
+      --axis1:#7fa6cf; --axis1-bg:#16222d;
+      --axis2:#d1a355; --axis2-bg:#2b2213;
+      --axis3:#a97fd6; --axis3-bg:#241a30;
+      --gap:#d6836c; --gap-bg:#2c1712;
+      --lift: 0 1px 0 rgba(0,0,0,.5), 0 16px 38px -26px rgba(0,0,0,.95);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#101214; --sheet:#16191c; --sheet-2:#1c2023;
+    --ink:#e7e9e6; --ink-2:#b8bcb8; --muted:#82877f;
+    --rule:#2b302c; --rule-2:#232723;
+    --axis1:#7fa6cf; --axis1-bg:#16222d;
+    --axis2:#d1a355; --axis2-bg:#2b2213;
+    --axis3:#a97fd6; --axis3-bg:#241a30;
+    --gap:#d6836c; --gap-bg:#2c1712;
+    --lift: 0 1px 0 rgba(0,0,0,.5), 0 16px 38px -26px rgba(0,0,0,.95);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink-2);
+    font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 68rem; margin: 0 auto; padding: clamp(1rem,3vw,3rem) clamp(.75rem,3vw,2rem) 6rem; }
+
+  a { color: var(--axis3); text-underline-offset: .18em; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--axis3); outline-offset: 3px; border-radius: 2px; }
+
+  code {
+    font-family: "Spline Sans Mono", ui-monospace, monospace; font-size: .86em;
+    background: var(--sheet-2); border: 1px solid var(--rule-2); border-radius: 3px; padding: .05em .34em;
+    color: var(--ink);
+  }
+  pre {
+    margin: 0; background: var(--sheet-2); border: 1px solid var(--rule-2);
+    border-radius: 4px; padding: .95rem 1.1rem; overflow-x: auto;
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-size: .78rem; line-height: 1.68; color: var(--ink); tab-size: 2;
+  }
+  pre b { font-weight: 600; color: var(--axis3); }
+  pre i { font-style: normal; color: var(--muted); }
+
+  em { font-style: italic; }
+  strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- masthead ---------- */
+  .cover {
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
+    box-shadow: var(--lift); padding: clamp(1.5rem,4vw,3.25rem);
+    display: grid; gap: 1.5rem;
+  }
+  .eyebrow {
+    font-family: "Spline Sans Mono", monospace; font-size: .7rem; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--axis3); font-weight: 500;
+  }
+  h1 {
+    font-family: Newsreader, ui-serif, Georgia, serif; font-weight: 600; font-style: normal;
+    font-size: clamp(2.1rem,6vw,3.5rem); line-height: 1.05; letter-spacing: -.015em;
+    margin: 0; color: var(--ink); text-wrap: balance;
+  }
+  .standfirst {
+    font-family: Newsreader, ui-serif, serif; font-style: italic; font-weight: 400;
+    font-size: clamp(1.08rem,2.2vw,1.28rem); color: var(--ink-2); margin: 0; max-width: 56ch;
+  }
+
+  /* ---------- the recurring diagram ---------- */
+  .matrix-wrap { display: grid; gap: .6rem; }
+  .matrix-legend {
+    display: flex; flex-wrap: wrap; gap: 1.1rem;
+    font-family: "Spline Sans Mono", monospace; font-size: .74rem; color: var(--muted);
+  }
+  .matrix-legend .sw { display: inline-flex; align-items: center; gap: .4rem; }
+  .matrix-legend .dot { width: .6rem; height: .6rem; border-radius: 2px; display: inline-block; }
+
+  /* ---------- monograph body ---------- */
+  .study {
+    display: grid; grid-template-columns: minmax(0,1fr) 15.5rem; gap: 0 2.2rem;
+    margin-top: 2.2rem;
+  }
+  @media (max-width: 58rem) { .study { grid-template-columns: minmax(0,1fr); } }
+
+  .main { min-width: 0; display: grid; gap: 2.4rem; }
+  .rail { display: grid; gap: 2.4rem; }
+  @media (max-width: 58rem) { .rail { display: none; } }
+
+  section.sec { display: grid; gap: 1.05rem; }
+
+  .sechead { display: grid; gap: .25rem; }
+  .sechead .tag {
+    font-family: "Spline Sans Mono", monospace; font-size: .72rem; letter-spacing: .1em;
+    color: var(--muted); font-weight: 500;
+  }
+  h2 {
+    font-family: Newsreader, ui-serif, serif; font-weight: 600; font-size: clamp(1.5rem,3.2vw,1.95rem);
+    line-height: 1.16; letter-spacing: -.01em; margin: 0; color: var(--ink); text-wrap: balance;
+  }
+  h3 {
+    font-family: Archivo, sans-serif; font-weight: 700; font-size: 1rem; margin: 0; color: var(--ink);
+  }
+  p { margin: 0; max-width: 68ch; }
+  .main > section.sec > p, .main li { max-width: 66ch; }
+
+  ul, ol { margin: 0; padding-left: 1.15rem; display: grid; gap: .5rem; }
+
+  blockquote {
+    margin: 0; padding: .1rem 0 .1rem 1.05rem; border-left: 3px solid var(--axis3);
+    font-family: Newsreader, serif; font-style: italic; font-size: 1.04rem; color: var(--ink);
+    max-width: 62ch;
+  }
+  blockquote cite {
+    display: block; margin-top: .5rem; font-style: normal; font-family: "Spline Sans Mono", monospace;
+    font-size: .72rem; color: var(--muted); letter-spacing: .02em;
+  }
+
+  /* gloss items, right rail on wide, inline card on narrow */
+  .gloss {
+    border-left: 2px solid var(--rule); padding-left: .85rem;
+    font-size: .82rem; color: var(--muted); display: grid; gap: .25rem;
+  }
+  .gloss .n {
+    font-family: "Spline Sans Mono", monospace; font-size: .68rem; color: var(--axis3);
+    letter-spacing: .06em;
+  }
+  .gloss b { color: var(--ink-2); font-weight: 600; }
+  .inline-gloss {
+    display: none; margin-top: .3rem;
+  }
+  @media (max-width: 58rem) {
+    .inline-gloss { display: grid; }
+  }
+
+  /* small panels */
+  .panel {
+    border: 1px solid var(--rule-2); border-radius: 4px; background: var(--sheet-2);
+    padding: .95rem 1.1rem; display: grid; gap: .5rem;
+  }
+  .panel .tag {
+    font-family: "Spline Sans Mono", monospace; font-size: .66rem; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .panel p, .panel li { font-size: .92rem; }
+
+  .synth { border-left: 3px solid var(--axis3); background: var(--axis3-bg); }
+  .synth .tag { color: var(--axis3); }
+  .synth p { color: var(--ink); }
+
+  .measured { border-left: 3px solid var(--axis1); background: var(--axis1-bg); }
+  .measured .tag { color: var(--axis1); }
+  .measured p { color: var(--ink); }
+
+  .honest { border-left: 3px solid var(--gap); background: var(--gap-bg); }
+  .honest .tag { color: var(--gap); }
+  .honest p { color: var(--ink); }
+
+  /* tables */
+  .scroller { overflow-x: auto; border: 1px solid var(--rule-2); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; min-width: 40rem; font-size: .87rem; }
+  th, td { text-align: left; padding: .6rem .8rem; vertical-align: top; border-bottom: 1px solid var(--rule-2); }
+  thead th {
+    font-family: "Spline Sans Mono", monospace; font-size: .64rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted); font-weight: 500;
+    background: var(--sheet-2); border-bottom: 1px solid var(--rule); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.h { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .yes { color: var(--axis1); font-weight: 700; }
+  .no  { color: var(--gap); font-weight: 700; }
+  .part { color: var(--axis2); font-weight: 700; }
+
+  figure { margin: 0; }
+  figcaption { font-size: .83rem; color: var(--muted); margin-top: .65rem; max-width: 62ch; }
+
+  footer {
+    margin-top: 2.6rem; padding-top: 1.2rem; border-top: 1px solid var(--rule);
+    font-family: "Spline Sans Mono", monospace; font-size: .76rem; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: .4rem 1.5rem;
+  }
+  @media (prefers-reduced-motion: no-preference) { a { transition: color .15s ease; } }
+</style>
+
+<div class="wrap">
+
+  <header class="cover">
+    <span class="eyebrow">A study · programming-language theory</span>
+    <h1>The Third Axis</h1>
+    <p class="standfirst">
+      Wadler's expression problem has two axes: new data variants, new operations. Hylo's algorithm
+      specialization needed a third — a way to add a <em>better</em> implementation of an existing
+      operation for an existing type, chosen automatically. The literature has answered that third
+      question twice before, for a dynamically-typed world and a monomorphized one. Neither answer
+      fits a language that passes conformances as values.
+    </p>
+
+    <div class="matrix-wrap">
+      <figure>
+        <svg viewBox="0 0 700 300" width="100%" role="img"
+             aria-label="A grid of two operations by three types ordered by refinement, with each cell containing a stack of candidate implementations; the top, outlined token in each stack is the one selected."
+             style="max-width:700px;display:block;overflow:visible;">
+
+          <!-- axis labels -->
+          <text x="0" y="18" font-family="Spline Sans Mono, monospace" font-size="10.5" letter-spacing="1.4" fill="var(--axis2)">OPERATIONS →</text>
+          <text x="0" y="285" font-family="Spline Sans Mono, monospace" font-size="10.5" letter-spacing="1.4" fill="var(--axis1)" transform="rotate(-90 12 260)">TYPES, BY REFINEMENT ↓</text>
+
+          <!-- column headers -->
+          <text x="220" y="40" font-family="Newsreader, serif" font-size="15" fill="var(--ink)">Op A</text>
+          <text x="430" y="40" font-family="Newsreader, serif" font-size="15" fill="var(--ink)">Op B</text>
+
+          <!-- row headers with refinement arrows -->
+          <text x="20" y="95"  font-family="Newsreader, serif" font-style="italic" font-size="14" fill="var(--ink)">T1</text>
+          <text x="20" y="175" font-family="Newsreader, serif" font-style="italic" font-size="14" fill="var(--ink)">T2</text>
+          <text x="20" y="255" font-family="Newsreader, serif" font-style="italic" font-size="14" fill="var(--ink)">T3</text>
+          <path d="M28 100 V150" stroke="var(--axis1)" stroke-width="1.3" fill="none" marker-end="url(#rr)"/>
+          <path d="M28 180 V230" stroke="var(--axis1)" stroke-width="1.3" fill="none" marker-end="url(#rr)"/>
+          <text x="34" y="128" font-family="Newsreader, serif" font-size="13" fill="var(--axis1)">≺</text>
+          <text x="34" y="208" font-family="Newsreader, serif" font-size="13" fill="var(--axis1)">≺</text>
+          <defs>
+            <marker id="rr" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0 0 L8 4 L0 8 z" fill="var(--axis1)"/>
+            </marker>
+          </defs>
+
+          <!-- grid lines -->
+          <g stroke="var(--rule-2)" stroke-width="1">
+            <line x1="0" y1="58" x2="700" y2="58"/>
+            <line x1="0" y1="138" x2="700" y2="138"/>
+            <line x1="0" y1="218" x2="700" y2="218"/>
+            <line x1="180" y1="0" x2="180" y2="298" transform="translate(0,10)"/>
+            <line x1="390" y1="10" x2="390" y2="308"/>
+          </g>
+
+          <!-- helper: cell(cx,cy,n,winnerIdx,color) drawn manually as stacks -->
+          <!-- T1 x OpA: 1 candidate -->
+          <g>
+            <rect x="205" y="75" width="88" height="26" rx="3" fill="var(--axis3-bg)" stroke="var(--axis3)" stroke-width="1.6"/>
+            <text x="249" y="92" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="10" fill="var(--axis3)">generic</text>
+          </g>
+
+          <!-- T2 x OpA: 2 candidates, top (more specific) wins -->
+          <g>
+            <rect x="205" y="163" width="88" height="24" rx="3" fill="var(--sheet-2)" stroke="var(--rule)" stroke-width="1"/>
+            <text x="249" y="179" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="9.5" fill="var(--muted)">generic</text>
+            <rect x="205" y="135" width="88" height="26" rx="3" fill="var(--axis3-bg)" stroke="var(--axis3)" stroke-width="1.8"/>
+            <text x="249" y="152" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="10" fill="var(--axis3)">specialized</text>
+          </g>
+
+          <!-- T3 x OpA: 3 candidates, most specific wins -->
+          <g>
+            <rect x="205" y="243" width="88" height="22" rx="3" fill="var(--sheet-2)" stroke="var(--rule)" stroke-width="1"/>
+            <text x="249" y="258" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="9" fill="var(--muted)">generic</text>
+            <rect x="205" y="218" width="88" height="22" rx="3" fill="var(--sheet-2)" stroke="var(--rule)" stroke-width="1"/>
+            <text x="249" y="233" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="9" fill="var(--muted)">specialized</text>
+            <rect x="205" y="190" width="88" height="26" rx="3" fill="var(--axis3-bg)" stroke="var(--axis3)" stroke-width="1.8"/>
+            <text x="249" y="207" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="10" fill="var(--axis3)">most specific</text>
+          </g>
+
+          <!-- T2 x OpB: 1 candidate -->
+          <g>
+            <rect x="415" y="147" width="88" height="26" rx="3" fill="var(--axis3-bg)" stroke="var(--axis3)" stroke-width="1.6"/>
+            <text x="459" y="164" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="10" fill="var(--axis3)">generic</text>
+          </g>
+
+          <!-- T1 x OpB, T3 x OpB: empty, dashed -->
+          <rect x="415" y="75" width="88" height="26" rx="3" fill="none" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x="459" y="92" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="9" fill="var(--muted)">unimplemented</text>
+          <rect x="415" y="227" width="88" height="26" rx="3" fill="none" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x="459" y="244" text-anchor="middle" font-family="Spline Sans Mono, monospace" font-size="9" fill="var(--muted)">unimplemented</text>
+
+        </svg>
+      </figure>
+      <div class="matrix-legend">
+        <span class="sw"><span class="dot" style="background:var(--axis1)"></span>axis 1 — new types (rows)</span>
+        <span class="sw"><span class="dot" style="background:var(--axis2)"></span>axis 2 — new operations (columns)</span>
+        <span class="sw"><span class="dot" style="background:var(--axis3)"></span>axis 3 — new implementations, ranked by specificity (stack depth)</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="study">
+    <main class="main">
+
+      <!-- ============================================================ -->
+      <section class="sec" id="s1">
+        <div class="sechead"><span class="tag">§1</span><h2>The problem, as stated in 1998</h2></div>
+
+        <p>
+          Philip Wadler named it in a one-paragraph note to a mailing list, and the paragraph has
+          outlived most papers written about it:
+        </p>
+
+        <blockquote>
+          "The goal is to define a datatype by cases, where one can add new cases to the datatype and
+          new functions over the datatype, without recompiling existing code, and while retaining
+          static type safety."
+          <cite>Philip Wadler, <em>The Expression Problem</em>, note to the Java Genericity mailing list, 12 Nov 1998</cite>
+        </blockquote>
+
+        <p>
+          Two axes, four demands. You can add a data variant (a new kind of expression). You can add
+          an operation (a new function over expressions). Neither should require touching or
+          recompiling code that already exists. And the compiler should still catch a missing case —
+          no casts standing in for a check the type system used to do.
+        </p>
+
+        <p>
+          Functional languages nail the second axis and miss the first: <code>match</code> makes a new
+          function trivial, but every existing <code>match</code> needs a new arm the day someone adds
+          a variant. Object-oriented languages have the mirror problem: a new subclass slots in
+          without touching anything, but a new virtual method means editing every class in the
+          hierarchy.
+        </p>
+
+        <p>
+          Zenger and Odersky sharpened the criteria in 2005 with the one that turns out to matter most
+          for this study:
+        </p>
+        <blockquote>
+          "Independent extensibility: it should be possible to combine independently developed
+          extensions so that they can be used jointly."
+          <cite>Christoph Zenger &amp; Martin Odersky, <em>Independently Extensible Solutions to the Expression Problem</em>, FOOL 2005</cite>
+        </blockquote>
+        <p>
+          Not just "can I add a row" and "can I add a column" in isolation — can two people, who have
+          never spoken to each other, each add one, and have the results compose? That is the
+          criterion this study will actually run against Hylo's design in <a href="#s5">§5</a>, with
+          numbers from two real modules rather than an argument.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="sec" id="s2">
+        <div class="sechead"><span class="tag">§2</span><h2>What every canonical solution assumes</h2></div>
+
+        <p>
+          The 2000s produced two solutions elegant enough to become the standard answers, one per
+          paradigm — and both quietly assume something this study is about to break.
+        </p>
+
+        <h3>Object algebras</h3>
+        <p>
+          Oliveira and Cook showed that ordinary generics — no F-bounded polymorphism, no wildcards —
+          are enough. An "algebra" is a factory interface parameterized over its own result type;
+          extending the data side means extending the factory interface, extending the operation side
+          means writing a new algebra implementation, and neither touches the other.
+        </p>
+
+        <h3>Data types à la carte</h3>
+        <p>
+          Swierstra's dual, on the Haskell side: represent a datatype as the fixed point of a
+          <strong>coproduct of functors</strong>. New variants are new summands, combined with a
+          <code>:+:</code> operator; new operations are new typeclass-dispatched folds over the
+          functor. Same two axes, opposite direction.
+        </p>
+
+        <div class="panel">
+          <span class="tag">The shared assumption</span>
+          <p>
+            Both constructions guarantee, by how they are built, that <strong>every populated cell of
+            the (type × operation) grid has exactly one definition.</strong> There is no notion of two
+            <em>different, both-applicable</em> answers for the same cell. Dispatch is a lookup in a
+            table that is already complete and unambiguous by the time you ask it a question — not a
+            choice among candidates. Extending the classical expression problem never has to ask "which
+            of these several implementations applies best," because the constructions make that
+            question impossible to pose.
+          </p>
+        </div>
+
+        <p>
+          That is the assumption a third axis breaks. Once an operation can have more than one
+          candidate implementation for the same type — one written for a coarse description of it, a
+          better one written for a finer description — dispatch stops being a lookup and starts being a
+          choice.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="sec" id="s3">
+        <div class="sechead"><span class="tag">§3</span><h2>A third axis, and where it has been solved before</h2></div>
+
+        <div class="panel synth">
+          <span class="tag">This framing is mine, not the literature's</span>
+          <p>
+            No paper treats "new types × new operations × new specialized implementations of an
+            existing operation" as one combined problem. What follows borrows real, load-bearing
+            precedent for the third axis on its own — from two settings that predate the expression
+            problem's canonical solutions — and combines it with the first two axes myself. Say so
+            plainly rather than dressing a synthesis up as a citation.
+          </p>
+        </div>
+
+        <p>The axis itself, stated precisely: for a single (type, operation) cell, allow more than one
+        candidate implementation, differing in how narrowly each describes the type, and require the
+        system to select the <strong>most specific applicable one</strong> — or refuse, if none
+        dominates the others. Two systems built exactly this, decades apart, for very different
+        purposes.</p>
+
+        <h3>Common Lisp's generic functions</h3>
+        <p>
+          CLOS orders applicable methods by each argument's <strong>class precedence list</strong> —
+          most-specific-first — and if two methods tie for most specific, calling the generic function
+          is a runtime error: <code>message ambiguous</code>. The order is recomputed by the dispatcher
+          at every call, dynamically, over whatever methods happen to be loaded.
+        </p>
+
+        <h3>Predicate dispatch</h3>
+        <p>
+          Ernst, Kaplan and Chambers generalized method specificity to arbitrary boolean predicates in
+          1998, and stated the ordering rule in words that could describe Hylo's <code>entails</code>
+          check verbatim:
+        </p>
+        <blockquote>
+          "Predicate dispatching considers one method m1 to override another method m2 exactly when
+          m1's predicate implies m2's predicate and not vice versa."
+          <cite>Michael Ernst, Craig Kaplan &amp; Craig Chambers, <em>Predicate Dispatching: A Unified Theory of Dispatch</em>, ECOOP 1998</cite>
+        </blockquote>
+        <p>
+          What they add that CLOS does not: static <strong>completeness</strong> and
+          <strong>uniqueness</strong> checks, proved once at definition time, that guarantee no call
+          site can ever hit the runtime "ambiguous" or "not understood" error. That guarantee is the
+          benchmark the rest of this study measures against, and it is the one place Hylo's design
+          falls short — see <a href="#s6">§6</a>.
+        </p>
+
+        <h3>C++ partial specialization</h3>
+        <p>
+          The statically-typed, ahead-of-time analogue uses the identical implication-shaped rule —
+          synthesize fictitious arguments for each specialization, convert both to function templates,
+          and ask which one the other's arguments could deduce ([temp.class.order],
+          [temp.func.order]). The difference is where the question gets answered: partial ordering is
+          resolved at the point a specialization is <strong>selected for instantiation</strong> —
+          structurally the same moment as monomorphization. A specialization not visible in the
+          translation unit doing the instantiating simply does not exist for it; two translation units
+          that disagree do not get an error, they get an ODR violation.
+        </p>
+
+        <div class="scroller">
+          <table>
+            <caption style="caption-side:top; text-align:left; font-size:.82rem; color:var(--muted); padding-bottom:.5rem;">
+              Four systems, one ordering rule, four very different guarantees.
+            </caption>
+            <thead><tr><th>System</th><th>When resolved</th><th>Across separate compilation?</th><th>On ambiguity</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="h">CLOS</td><td>Dynamically, per call</td><td>Open — any file may load a method</td>
+                <td>Runtime error at the call</td>
+              </tr>
+              <tr>
+                <td class="h">Predicate dispatch</td><td>Statically, at definition</td><td>Assumes a closed, whole-program view</td>
+                <td>Rejected before it can happen</td>
+              </tr>
+              <tr>
+                <td class="h">C++ specialization</td><td>Statically, at instantiation</td><td>Closed per translation unit</td>
+                <td>Undefined behavior (ODR) across units</td>
+              </tr>
+              <tr>
+                <td class="h">Hylo</td><td>Statically, at typing</td><td>Open — separate modules, separately compiled</td>
+                <td>Compile-time error, naming the candidates</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="sec" id="s4">
+        <div class="sechead"><span class="tag">§4</span><h2>The combined model</h2></div>
+
+        <p>
+          Put the two classical axes and the third one in the same frame: a grid of (type, operation)
+          cells, where each cell holds not one definition but a <strong>set of candidates</strong>
+          ordered by specificity, and dispatch means finding that set's maximum.
+        </p>
+
+        <div class="panel">
+          <span class="tag">A clean reduction</span>
+          <p>
+            The classical expression problem is exactly this generalized one, restricted to the case
+            where every cell holds at most one candidate. When a cell can hold more, the design needs
+            three new things a single-candidate world never had to build: a specificity order over
+            candidates (the entailment rule shared by §3's three precedents), a rule for what happens
+            when two candidates are incomparable (refuse, per predicate dispatch and CLOS — never guess),
+            and — because axis 1 and axis 2 are already open across separately compiled modules — a way
+            to evaluate that order <em>without a whole-program view</em>, which is precisely where C++
+            and predicate dispatch stop applying and Hylo's design has to do something new.
+          </p>
+        </div>
+
+        <p>
+          This also explains a term from earlier in this project's own research. Racordon,
+          Flesselle and Pham's survey of coherence in type-class systems treats "global uniqueness of
+          instances" — Haskell, Swift and Rust's shared answer to overlapping conformances — as a
+          design stance in its own right. Under this frame it is simpler than that: <strong>global
+          uniqueness is exactly the assumption that every cell has depth at most one</strong>, asserted
+          for a system that, unlike CLOS or predicate dispatch, never intended to have a third axis at
+          all. Coherence is axis-3-depth-one, wearing different clothes.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="sec" id="s5">
+        <div class="sechead"><span class="tag">§5</span><h2>Scoring Hylo's design, axis by axis</h2></div>
+
+        <p>
+          Hylo fills the grid with three mechanisms, one per axis, each already measured in this
+          project's compiler work:
+        </p>
+        <ul>
+          <li><strong>Axis 1, new types</strong> — a downstream module declares <code>given MyArray is
+            RA {}</code>. Ordinary trait conformance; the library never sees the type.</li>
+          <li><strong>Axis 2, new operations</strong> — either a plain overload (closed: bound at the
+            caller's own constraints, cannot cross into a generic function that does not name it) or an
+            algorithm named as its own trait (open: anyone can add a <code>given</code> for it, exactly
+            the object-algebra move).</li>
+          <li><strong>Axis 3, new implementations</strong> — the specificity order from <a
+            href="#s3">§3</a>, adapted to Hylo's witness-passing rather than instantiation.</li>
+        </ul>
+
+        <div class="scroller">
+          <table>
+            <thead><tr><th>Axis</th><th>New cases addable</th><th>No modification of existing code</th><th>Static type safety</th><th>Independent extensibility</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="h">1 · types</td>
+                <td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td>
+              </tr>
+              <tr>
+                <td class="h">2 · operations (open shape)</td>
+                <td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td>
+              </tr>
+              <tr>
+                <td class="h">2 · operations (closed shape)</td>
+                <td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td>
+              </tr>
+              <tr>
+                <td class="h">3 · implementations</td>
+                <td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td><td class="part">partial</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          The closed shape's "no" is structural, not measured this session: a plain top-level
+          <code>fun</code> is not an open extension point the way a trait is — its overload set belongs
+          to the scope that declares it, and nothing lets a downstream module add a case to somebody
+          else's function the way it can add a conformance to somebody else's trait.
+        </p>
+
+        <h3>Axis 3's "partial," with numbers</h3>
+        <p>
+          This is the one worth showing rather than asserting. Two independent modules,
+          <code>Collections</code> and <code>Turbo</code>, each add a given for the same random-access
+          case:
+        </p>
+<pre><i>// Collections.hylo</i>          <i>// Turbo.hylo (a different author, imports Collections)</i>
+<b>given</b> binary_search:            <b>given</b> turbo_search:
+  &lt;T is RA&gt; =&gt; T is LowerBound   &lt;T is RA&gt; =&gt; T is LowerBound</pre>
+        <p>A client importing both:</p>
+<pre>error: multiple given instance of 'LowerBound&lt;MyArray&gt;' in this scope
+  note: candidate given is declared here     Collections.hylo:10
+  note: candidate given is declared here     Turbo.hylo:2
+  note: neither candidate is more specific than the other,
+        so no choice can be made between them</pre>
+        <p>
+          Composition <em>can</em> fail — that is the honest half of "partial." But it fails the way
+          Zenger and Odersky's criterion, taken seriously, demands it fail if it must fail at all: loud,
+          naming both candidates, localized to the one client that imported both, and locally repairable
+          — the client adds one given with a concrete head and the conflict is gone for its own code.
+          Nothing is silently picked. That is a materially different answer from Hylo's own coherence
+          study's verdict on Haskell, Swift and Rust, all three of which either reject the two
+          definitions outright (closing axis 3 to third parties) or leave the choice to link order.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="sec" id="s6">
+        <div class="sechead"><span class="tag">§6</span><h2>What is actually new here</h2></div>
+
+        <p>
+          No single piece of this is new. The specificity order is predicate dispatch's, named in 1998.
+          Resolving it statically and safely is what type classes have done for decades. Open,
+          separately-compiled extension is the entire point of every expression-problem solution since
+          Cook's. What is specific to combining them for Hylo is a point in a space no one precedent
+          occupies alone: <strong>open across separately compiled modules, resolved statically with a
+          named refusal rather than a runtime ambiguity, and requiring no global-uniqueness
+          assumption</strong> — open like CLOS, static like predicate dispatch and C++, but without
+          either predicate dispatch's closed-world view or C++'s reliance on a single instantiation
+          site.
+        </p>
+
+        <div class="panel honest">
+          <span class="tag">The gap this leaves open</span>
+          <p>
+            Predicate dispatch's completeness and uniqueness checks prove, once, that no call site can
+            ever hit an ambiguity or a missing case. Hylo's design has neither proof — it discovers
+            ambiguity at each use site, the way CLOS discovers it at each call, just earlier: at
+            compile time instead of run time. That may not be a gap this design can close, not just one
+            it has not gotten to yet. Predicate dispatch's proofs work because the set of predicates is
+            fixed and known when the check runs. Openness is precisely what Hylo's design keeps that
+            predicate dispatch gives up — and completeness, in the classical sense, may need a closed
+            world to even ask the question. Whether a weaker, still-useful completeness guarantee
+            survives under separate compilation is the real open problem this study leaves on the table,
+            not an implementation detail to fill in later.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="sec">
+        <div class="sechead"><span class="tag">Recap</span><h2>Five sentences worth keeping</h2></div>
+        <ol>
+          <li>The classical expression problem has two axes and one hidden assumption: every (type,
+            operation) cell has at most one definition.</li>
+          <li>A third axis — several candidate implementations per cell, ranked by specificity — has
+            real precedent, but only ever solved half of what this project needed: CLOS is open but
+            dynamic, predicate dispatch is static but closed-world, C++ is static but tied to a single
+            instantiation site.</li>
+          <li>Hylo's design is the first point in that space that is open, static, and requires no
+            global-uniqueness assumption, all three at once.</li>
+          <li>Measured directly: independent extensions can still conflict, but the conflict is a named,
+            localized, compile-time refusal — never a silent pick.</li>
+          <li>What it does not have, and may not be able to have without giving up openness, is
+            predicate dispatch's proof that no such conflict can occur before anyone hits one.</li>
+        </ol>
+      </section>
+
+    </main>
+
+    <aside class="rail">
+      <div class="gloss">
+        <span class="n">§1</span>
+        <p>Philip Wadler, <b>The Expression Problem</b>, note to the Java Genericity mailing list, 12 Nov 1998.</p>
+      </div>
+      <div class="gloss">
+        <span class="n">§1</span>
+        <p>Christoph Zenger &amp; Martin Odersky, <b>Independently Extensible Solutions to the Expression Problem</b>, FOOL 2005.</p>
+      </div>
+      <div class="gloss">
+        <span class="n">§2</span>
+        <p>Bruno C. d. S. Oliveira &amp; William R. Cook, <b>Extensibility for the Masses: Practical Extensibility with Object Algebras</b>, ECOOP 2012.</p>
+      </div>
+      <div class="gloss">
+        <span class="n">§2</span>
+        <p>Wouter Swierstra, <b>Data Types à la Carte</b>, Journal of Functional Programming 18(4), 2008.</p>
+      </div>
+      <div class="gloss">
+        <span class="n">§3</span>
+        <p>Gregor Kiczales, Jim des Rivières &amp; Daniel G. Bobrow, <b>The Art of the Metaobject Protocol</b>, MIT Press, 1991 — class precedence lists.</p>
+      </div>
+      <div class="gloss">
+        <span class="n">§3</span>
+        <p>Michael Ernst, Craig Kaplan &amp; Craig Chambers, <b>Predicate Dispatching: A Unified Theory of Dispatch</b>, ECOOP 1998.</p>
+      </div>
+      <div class="gloss">
+        <span class="n">§3</span>
+        <p>ISO/IEC 14882, <b>[temp.class.order]</b> / <b>[temp.func.order]</b> — partial ordering of template specializations.</p>
+      </div>
+      <div class="gloss">
+        <span class="n">§4</span>
+        <p>Dimi Racordon, Eugene Flesselle &amp; Cao Nguyen Pham, <b>On the State of Coherence in the Land of Type Classes</b>, arXiv:2502.20546.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- inline glosses for narrow viewports -->
+  <div class="inline-gloss panel" style="margin-top:2rem;">
+    <span class="tag">Sources</span>
+    <p style="font-size:.82rem;">
+      Wadler, <em>The Expression Problem</em> (1998) · Zenger &amp; Odersky, FOOL 2005 · Oliveira &amp;
+      Cook, ECOOP 2012 · Swierstra, JFP 18(4) 2008 · Kiczales, des Rivières &amp; Bobrow, <em>AMOP</em>
+      (1991) · Ernst, Kaplan &amp; Chambers, ECOOP 1998 · ISO/IEC 14882 [temp.class.order] ·
+      Racordon, Flesselle &amp; Pham, arXiv:2502.20546.
+    </p>
+  </div>
+
+  <footer>
+    <span>hylo-new @ c0909d7</span>
+    <span>8 primary sources</span>
+    <span>3 axes, 1 open question</span>
+  </footer>
+
+</div>
+
+</body></html>

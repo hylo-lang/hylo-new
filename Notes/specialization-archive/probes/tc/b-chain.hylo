@@ -1,0 +1,19 @@
+//! stage:typing no-std
+trait Fwd {}
+trait Bidi refines Fwd {}
+trait RA refines Bidi {}
+struct Arr {}
+given Arr is Fwd {}
+given Arr is Bidi {}
+given Arr is RA {}
+
+struct ViaFwd {}
+struct ViaBidi {}
+struct ViaRA {}
+
+trait LowerBound { type Selected }
+given <T is Fwd>  => T is LowerBound { type Selected = ViaFwd }
+given <T is Bidi> => T is LowerBound { type Selected = ViaBidi }
+given <T is RA>   => T is LowerBound { type Selected = ViaRA }
+
+fun check(x: Arr.Selected) -> ViaRA { x }

@@ -1,0 +1,15 @@
+trait Fwd {}
+trait Bidi refines Fwd {}
+trait RA refines Bidi {}
+
+struct Arr is Deinitializable & Movable { public memberwise init }
+
+given Arr is Fwd {}
+given Arr is RA { given Arr is Bidi {} }
+
+trait LowerBoundable { fun lb() -> Int32 }
+
+given <T is Bidi> => T is LowerBoundable { fun lb() -> Int32 { 1 } }
+given <T is RA> => T is LowerBoundable { fun lb() -> Int32 { 2 } }
+
+public fun main() -> Int32 { Arr().lb() }

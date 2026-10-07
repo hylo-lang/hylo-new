@@ -1,0 +1,4 @@
+import Lifted
+public struct MyArray is Deinitializable & Movable { public memberwise init }
+given MyArray is RA {}                       // conforms only to the finer trait
+public fun main() -> Int32 { sort_all(MyArray()) }

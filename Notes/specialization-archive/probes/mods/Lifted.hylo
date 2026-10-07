@@ -1,0 +1,9 @@
+// The algorithm is a requirement of the data-structure trait, with a default.
+public trait Bidi { fun sort() -> Int32 { 1 } }
+public trait RA {}
+
+// A lifting given: every random-access type gets `Bidi`, and a better `sort` with it.
+public given ra_is_bidi: <T is RA> => T is Bidi { fun sort() -> Int32 { 2 } }
+
+// Compiled once, constrained on the data structure only.
+public fun sort_all<T is Bidi>(c: T) -> Int32 { c.sort() }

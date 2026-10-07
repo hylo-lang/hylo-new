@@ -1,0 +1,33 @@
+trait Bidi {
+}
+trait RA {
+  given RA.Self is Bidi
+}
+struct Arr {
+}
+given Arr is Bidi {
+}
+given Arr is RA {
+}
+struct Linear {
+}
+struct Binary {
+}
+trait LowerBound {
+  type Selected
+}
+given <T where let $n: Bidi<T>> T is LowerBound {
+  type Selected = Linear
+}
+given <T where let $10: RA<T>> T is LowerBound {
+  type Selected = Binary
+}
+fun in_bidi_context<T where let $1d: Bidi<T>>[](_ x: let T.Selected) let -> Linear {
+  return x
+}
+fun in_ra_context<T where let $1s: RA<T>>[](_ x: let T.Selected) let -> Binary {
+  return x
+}
+fun in_concrete_context[](_ x: let Arr.Selected) let -> Binary {
+  return x
+}

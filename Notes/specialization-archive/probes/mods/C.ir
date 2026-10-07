@@ -1,0 +1,152 @@
+global #witness(MyArray) as Type, #preferred
+
+fun MyArray.$<ConformanceDeclaration at Client:2.26>() let <: Deinitializable<MyArray> {
+%b0:
+  %r0 = alloca Deinitializable<MyArray>, #preferred
+  %r1 = witnesstable {Deinitializable.deinit$synthesized<Self: MyArray>} as Deinitializable<MyArray>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Deinitializable.deinit$synthesized<Self: MyArray>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = access [sink] %p1
+  %r1 = assume_state %r0 uninitialized
+  %r2 = end %r0
+  %r3 = access [set] %p2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = return
+}
+
+fun MyArray.$<ConformanceDeclaration at Client:2.44>() let <: Movable<MyArray> {
+%b0:
+  %r0 = alloca Movable<MyArray>, #preferred
+  %r1 = witnesstable {Movable.take_value.take_value@set$synthesized<Self: MyArray>, Movable.take_value.take_value@inout$synthesized<Self: MyArray>} as Movable<MyArray>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun Movable.take_value.take_value@set$synthesized<Self: MyArray>(let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun Movable.take_value.take_value@inout$synthesized<Self: MyArray>(let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void)
+
+fun MyArray.init(set %p0: MyArray, set %p1: Void)
+
+fun $<ConformanceDeclaration at Client:3.1>() let <: Bidi<MyArray> {
+%b0:
+  %r0 = alloca Bidi<MyArray>, #preferred
+  %r1 = witnesstable {} as Bidi<MyArray>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun $<ConformanceDeclaration at Client:4.1>() let <: RA<MyArray> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at Client:3.1>[]
+  %r1 = alloca RA<MyArray>, #preferred
+  %r2 = witnesstable {%r0} as RA<MyArray>
+  %r13 = end %r0
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun my_array_tuned.run(let %p0: MyArray, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 3 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun my_array_tuned() let <: LowerBound<MyArray> {
+%b0:
+  %r0 = alloca LowerBound<MyArray>, #preferred
+  %r1 = witnesstable {LowerBound.run<Self: MyArray>} as LowerBound<MyArray>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun LowerBound.run<Self: MyArray>(let %p0: LowerBound<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let MyArray
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply my_array_tuned.run(%r1) => %r2
+  %r7 = end %r2
+  %r6 = end %r1
+  %r5 = end %r0
+  %r4 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r18 = global_access #witness(MyArray)
+  %r0 = project my_array_tuned[]
+  %r19 = access [let] %r18
+  %r2 = alloca MyArray, #preferred
+  %r3 = access [set] %r2
+  %r4 = assume_state %r3 initialized
+  %r5 = end %r3
+  %r6 = access [let] %r0
+  %r7 = access [let] %r2
+  %r8 = access [set] %p0
+  %r20 = place_cast %r6 as let LowerBound<T>
+  %r21 = place_cast %r7 as let T
+  %r22 = access [set] %r8
+  %r9 = apply search(_:)$existentialized(%r19, %r20, %r21) => %r22
+  %r1 = end %r19
+  %r14 = end %r8
+  %r13 = end %r7
+  %r12 = end %r6
+  %r11 = end %r0
+  %r15 = access [sink] %r2
+  %r16 = assume_state %r15 uninitialized
+  %r17 = end %r15
+  %r10 = return
+}
+
+fun search(_:)<T>(let %p0: LowerBound<T>, let %p1: T, set %p2: Int32)
+
+fun search(_:)$existentialized(let %p0: Type, let %p1: LowerBound<T>, let %p2: T, set %p3: Int32)

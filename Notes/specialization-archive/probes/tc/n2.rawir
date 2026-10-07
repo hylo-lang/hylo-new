@@ -1,0 +1,138 @@
+fun RA.$<ConformanceDeclaration at n2:3.18><Self>(let %p0: RA<Self>) let <: Bidi<Self> {
+%b0:
+  %r0 = property "$<ConformanceDeclaration at n2:3.18>" of %p0 as Bidi<Self>
+  %r1 = access [let] %r0
+  %r2 = yield %r1
+  %r3 = return
+}
+
+fun $<ConformanceDeclaration at n2:4.1>() let <: Bidi<Void> {
+%b0:
+  %r0 = alloca Bidi<Void>, #preferred
+  %r1 = witnesstable {} as Bidi<Void>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun $<ConformanceDeclaration at n2:5.1>() let <: RA<Void> {
+%b0:
+  %r0 = project $<ConformanceDeclaration at n2:4.1>[]
+  %r1 = alloca RA<Void>, #preferred
+  %r2 = witnesstable {%r0} as RA<Void>
+  %r3 = access [set] %r1
+  %r4 = store %r2 to %r3
+  %r5 = end %r3
+  %r6 = access [let] %r1
+  %r7 = yield %r6
+  %r8 = end %r6
+  %r9 = access [sink] %r1
+  %r10 = assume_state %r9 uninitialized
+  %r11 = end %r9
+  %r12 = return
+}
+
+fun LowerBound.run<Self>(let %p0: LowerBound<Self>, let %p1: Self, set %p2: Int32)
+
+fun $<ConformanceDeclaration at n2:7.1>.run<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 1 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at n2:7.1><T>(let %p0: Bidi<T>) let <: LowerBound<T> {
+%b0:
+  %r0 = alloca LowerBound<T>, #preferred
+  %r1 = witnesstable {LowerBound.run<Self: T>} as LowerBound<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun LowerBound.run<Self: T>(let %p0: LowerBound<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at n2:7.1>.run(%r1) => %r2
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at n2:8.1>.run<T>(let %p0: T, set %p1: Int32) {
+%b0:
+  %r0 = subfield %p1 at 0 as i32
+  %r1 = access [set] %r0
+  %r2 = store i32 2 to %r1
+  %r3 = end %r1
+  %r4 = return
+}
+
+fun $<ConformanceDeclaration at n2:8.1><T>(let %p0: RA<T>) let <: LowerBound<T> {
+%b0:
+  %r0 = alloca LowerBound<T>, #preferred
+  %r1 = witnesstable {LowerBound.run<Self: T>} as LowerBound<T>
+  %r2 = access [set] %r0
+  %r3 = store %r1 to %r2
+  %r4 = end %r2
+  %r5 = access [let] %r0
+  %r6 = yield %r5
+  %r7 = end %r5
+  %r8 = access [sink] %r0
+  %r9 = assume_state %r8 uninitialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun LowerBound.run<Self: T>(let %p0: LowerBound<Self>, let %p1: Self, set %p2: Int32) {
+%b0:
+  %r0 = place_cast %p1 as let T
+  %r1 = access [let] %r0
+  %r2 = access [set] %p2
+  %r3 = apply $<ConformanceDeclaration at n2:8.1>.run(%r1) => %r2
+  %r4 = return
+}
+
+fun client(_:)<T>(let %p0: LowerBound<T>, let %p1: T, set %p2: Int32) {
+%b0:
+  %r0 = property "run" of %p0 as [Void](let LowerBound<Self>, self: let Self) let -> Int32
+  %r1 = access [let] %p0
+  %r2 = access [let] %p1
+  %r3 = access [set] %p2
+  %r4 = apply %r0(%r1, %r2) => %r3
+  %r5 = return
+}
+
+fun main(set %p0: Int32) {
+%b0:
+  %r0 = project $<ConformanceDeclaration at n2:5.1>[]
+  %r1 = type_apply $<ConformanceDeclaration at n2:8.1><Void>
+  %r2 = access [let] %r0
+  %r3 = project %r1[%r2]
+  %r4 = type_apply client(_:)<Void>
+  %r5 = alloca Void, #preferred
+  %r6 = access [set] %r5
+  %r7 = assume_state %r6 initialized
+  %r8 = end %r6
+  %r9 = access [let] %r3
+  %r10 = access [let] %r5
+  %r11 = access [set] %p0
+  %r12 = apply %r4(%r9, %r10) => %r11
+  %r13 = return
+}
