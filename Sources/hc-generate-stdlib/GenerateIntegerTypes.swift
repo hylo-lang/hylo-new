@@ -175,6 +175,17 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
+  /// The number of bits in the representation of an instance of `self`.
+  var bitWidth: String {
+    switch size {
+    case .fittingLargestObjectSize:
+      // TODO emit Builtin constant for the platform's size_t.
+      return "64"
+    case .fixedWidth(let bits):
+      return String(describing: bits)
+    }
+  }
+
   /// The source code representation of this type.
   var description: String {
     """
@@ -203,6 +214,12 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       @inline(always)
       public static fun max() -> Self {
         \(maximumValue) as Self
+      }
+
+      /// Returns the number of bits in the representation of an instance of `Self`.
+      @inline(always)
+      public static fun bit_width() -> Int {
+        \(bitWidth)
       }
 
       /// Returns the result of performing a bitwise AND operation on `self` and `other`.
