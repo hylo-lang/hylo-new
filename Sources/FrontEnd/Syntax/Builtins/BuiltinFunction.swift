@@ -150,6 +150,8 @@ public enum BuiltinFunction: Hashable, Sendable {
   //
   //  case cttz(MachineType.ID)
 
+  case sizeof(MachineType.ID)
+
   case zeroinitializer(MachineType.ID)
 
   /// In LLVM: `getelementptr inbounds` on a base of type `i8`.
@@ -399,6 +401,7 @@ extension BuiltinFunction {
 
   /// Returns the type of the function, using `s` to create unique type identities.
   public func type(uniquingTypesWith s: inout TypeStore) -> AnyTypeIdentity {
+    let word = s.demand(MachineType.word)
     let i1 = s.demand(MachineType.i(1))
 
     switch self {
@@ -507,6 +510,8 @@ extension BuiltinFunction {
     //      return .init(^t, to: ^t)
     //    case .cttz(let t):
     //      return .init(^t, to: ^t)
+    case .sizeof:
+      return s.demand(Arrow(inputs: [], output: word.erased)).erased
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
     case .advancedByBytes(let byteOffset):
@@ -852,6 +857,8 @@ extension BuiltinFunction: Showable {
     //      return "ctlz_\(t)"
     //    case .cttz(let t):
     //      return "cttz_\(t)"
+    case .sizeof(let t):
+      return printer.format("sizeof_%T", [t.erased])
     case .zeroinitializer(let t):
       return printer.format("zeroinitializer_%T", [t.erased])
     case .advancedByBytes(let t):
@@ -1270,6 +1277,10 @@ extension BuiltinFunction {
     //    case "cttz":
     //      guard let t = machineType(&tokens) else { return nil }
     //      self = .cttz(t)
+
+    case "sizeof":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .sizeof(s.demand(t))
 
     case "zeroinitializer":
       guard let t = machineType(&tokens) else { return nil }

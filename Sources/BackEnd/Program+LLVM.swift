@@ -290,10 +290,17 @@ extension Program {
     switch s.callee {
     case .trap:
       insertTrap(in: &ctx)
+
     case .addressOf:
       ctx.value[v] = ctx.value[s.arguments[0]]!
+
+    case .sizeof(let t):
+      let s = metadata(of: t, in: &ctx.module).layout.size.fixed!
+      ctx.value[v] = ctx.module.llvm.iptr.unsafe[].constant(s).v
+
     case .zeroinitializer(let t):
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
+
     case .advancedByBytes(let t):
       let p = insertLoad([s.arguments[0]], of: types.demand(MachineType.ptr), in: &ctx)[0]
       let offsets = insertLoad([s.arguments[1]], of: t, in: &ctx)
