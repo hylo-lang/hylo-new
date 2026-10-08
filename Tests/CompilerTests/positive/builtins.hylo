@@ -577,6 +577,17 @@ fun test_Builtin_urem() {
     (1 as UInt64).value))
 }
 
+// MARK: Testing Builtin.lshr_*()
+
+fun test_Builtin_lhsr() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.lshr_i64((8 as UInt64).value, (2 as UInt64).value),
+    (2 as UInt64).value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.lshr_i8((-1 as Int8).value, (1 as Int8).value),
+    (127 as Int8).value))
+}
+
 // MARK: Testing Builtin.usub_with_overflow_*()
 
 fun test_Builtin_usub_with_overflow() {
@@ -679,6 +690,7 @@ public fun main() {
   test_Builtin_uitofp()
   test_Builtin_umul_with_overflow()
   test_Builtin_urem()
+  test_Builtin_lhsr()
   test_Builtin_usub_with_overflow()
   test_Builtin_xor()
   test_Builtin_sizeof()

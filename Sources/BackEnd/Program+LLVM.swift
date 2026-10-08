@@ -369,6 +369,10 @@ extension Program {
       ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
       ctx.value[v] = i.v
 
+    case .lshr(let t):
+      let xs = insertLoad(s.arguments, of: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertLShr(xs[0], xs[1], at: ctx.insertionPoint!).v
+
     case .urem(let t):
       let xs = insertLoad(s.arguments, of: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertUnsignedRem(xs[0], xs[1], at: ctx.insertionPoint!).v

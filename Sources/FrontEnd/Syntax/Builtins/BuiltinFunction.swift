@@ -66,8 +66,8 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case sdiv(exact: Bool, MachineType.ID)
 
-  //  case lshr(exact: Bool, MachineType.ID)
-  //
+  case lshr(MachineType.ID)
+
   //  case ashr(exact: Bool, MachineType.ID)
 
   case urem(MachineType.ID)
@@ -436,8 +436,8 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: t)).erased
     case .sdiv(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
-    //    case .lshr(_, let t):
-    //      return .init(^t, ^t, to: ^t)
+    case .lshr(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
     //    case .ashr(_, let t):
     //      return .init(^t, ^t, to: ^t)
     case .urem(let t):
@@ -789,8 +789,8 @@ extension BuiltinFunction: Showable {
       return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
     case .sdiv(let e, let t):
       return printer.format(e ? "sdiv_exact_%T" : "sdiv_%T", [t.erased])
-    //    case .lshr(let e, let t):
-    //      return e ? "lshr_exact_\(t)" : "lshr_\(t)"
+    case .lshr(let t):
+      return "lshr_\(t)"
     //    case .ashr(let e, let t):
     //      return e ? "ashr_exact_\(t)" : "ashr_\(t)"
     case .urem(let t):
@@ -1151,10 +1151,10 @@ extension BuiltinFunction {
       guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
       self = .sdiv(exact: p != nil, s.demand(t))
 
-    //    case "lshr":
-    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
-    //      self = .lshr(exact: p != nil, t)
-    //
+    case "lshr":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .lshr(s.demand(t))
+
     //    case "ashr":
     //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
     //      self = .ashr(exact: p != nil, t)
