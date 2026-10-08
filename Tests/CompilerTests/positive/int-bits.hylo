@@ -1,0 +1,11 @@
+public fun main() {
+  // Bitwise AND
+  precondition((( 3 as Int32) & (5 as Int32)) == (1 as Int32))
+  precondition((( 3 as UInt8) & (5 as UInt8)) == (1 as UInt8))
+  precondition(((-1 as Int8)  & (5 as Int8))  == (5 as Int8))
+
+  // Bitwise OR
+  precondition((( 3 as Int32) | (5 as Int32)) == ( 7 as Int32))
+  precondition((( 3 as UInt8) | (5 as UInt8)) == ( 7 as UInt8))
+  precondition(((-1 as Int8)  | (5 as Int8))  == (-1 as Int8))
+}

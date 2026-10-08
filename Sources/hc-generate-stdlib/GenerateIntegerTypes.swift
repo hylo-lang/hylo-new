@@ -205,6 +205,18 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
         \(maximumValue) as Self
       }
 
+      /// Returns the result of performing a bitwise AND operation on `self` and `other`.
+      @inline(always)
+      public fun infix& (other: Self) -> Self {
+        .new(value: Builtin.and_\(builtinType)(self.value, other.value))
+      }
+
+      /// Returns the result of performing a bitwise OR operation on `self` and `other`.
+      @inline(always)
+      public fun infix| (other: Self) -> Self {
+        .new(value: Builtin.or_\(builtinType)(self.value, other.value))
+      }
+
       // MARK: Equatable conformance
 
       /// Returns `true` iff `self` is equal to `other`.
