@@ -140,38 +140,31 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       """
   }
 
-  /// The smallest integer `self` can represent.
+  /// An expression denoting the smallest value `self` can represent, as an instance of `Self`.
   var minimumValue: String {
-    let bits =
-      switch size {
-      case .fittingLargestObjectSize:
-        // TODO emit Builtin constant for the platform's size_t.
-        // See: https://github.com/hylo-lang/hylo-new/issues/331
-        64
-      case .fixedWidth(let bits):
-        bits
-      }
+    // Trivial if the type is unsigned.
+    if signedness == .unsigned { return "0" }
 
-    return switch signedness {
-    case .signed: "\(-(Int128(1) << (bits - 1)))"
-    case .unsigned: "0"
+    // Otherwise, the result depends on the bit width.
+    switch size {
+    case .fixedWidth(let bits):
+      return "\(-(Int128(1) << (bits - 1))) as Self"
+
+    case .fittingLargestObjectSize:
+      let x = "Builtin.lshr_\(builtinType)((-1 as Self).value, (1 as Self).value)"
+      let y = "Builtin.xor_\(builtinType)(\(x), (-1 as Self).value)"
+      return "Self.new(value: \(y))"
     }
   }
 
-  /// The largest integer `self` can represent.
+  /// An expression denoting the largest value `self` can represent, as an instance of `Self`.
   var maximumValue: String {
-    let bits =
-      switch size {
-      case .fittingLargestObjectSize:
-        // TODO emit Builtin constant for the platform's size_t.
-        64
-      case .fixedWidth(let bits):
-        bits
-      }
-
-    return switch signedness {
-    case .signed: "\((Int128(1) << (bits - 1)) - 1)"
-    case .unsigned: "\((Int128(1) << bits) - 1)"
+    if signedness == .signed {
+      let x = "Builtin.lshr_\(builtinType)((-1 as Self).value, (1 as Self).value)"
+      return "Self.new(value: \(x))"
+    } else {
+      let s = String(declarationName.dropFirst())
+      return "Self.new(value: (-1 as \(s)).value)"
     }
   }
 
@@ -208,12 +201,12 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
 
       @inline(always)
       public static fun min() -> Self {
-        \(minimumValue) as Self
+        \(minimumValue)
       }
 
       @inline(always)
       public static fun max() -> Self {
-        \(maximumValue) as Self
+        \(maximumValue)
       }
 
       /// Returns the number of bits in the representation of an instance of `Self`.
@@ -347,7 +340,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       /// - Requires: `other` is not `0`, and the result is representable without overflow.
       @inline(always)
       public fun infix/ (other: Self) -> Self {
-        if \(divisionIllegal("self", "other", type: "Self")) {
+        if \(illegalDivision("self", by: "other")) {
           Builtin.trap()
         } else {
           return .new(value: \
@@ -360,13 +353,14 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     """
   }
 
-  /// Returns an expression that's `true` iff `x` would be illegal to divide by `d` in type `t`.
-  func divisionIllegal(_ x: String, _ d: String, type t: String) -> String {
+  /// Returns an expression that's `true` if the result of dividing `x` by `d` results in a value
+  /// that is not representable as an instance of `Self`.
+  func illegalDivision(_ x: String, by d: String) -> String {
     switch signedness {
     case .signed:
-      "\(d) == (0 as \(t)) || (\(x) == (\(minimumValue) as \(t)) && \(d) == (-1 as \(t)))"
+      "\(d) == Self.new() || (\(x) == Self.min() && \(d) == (-1 as Self))"
     case .unsigned:
-      "\(d) == (0 as \(t))"
+      "\(d) == Self.new()"
     }
   }
 
