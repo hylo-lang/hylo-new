@@ -203,12 +203,12 @@ internal struct ManglingContext {
     }
   }
 
-  /// If `q` is a scope that is reserved, recorded, or is the latest recorded qualification,
-  /// writes a lookup reference to it.
-  internal mutating func addIf(reservedOrRecordedOrCurrentQualification q: ScopeIdentity) -> Bool {
+  /// If `q` known and we can trivially reference it without emitting more qualifications
+  /// manually, writes a lookup reference to it.
+  internal mutating func addIf(referenceable q: ScopeIdentity) -> Bool {
     (q.node != nil && addIf(reservedOrRecorded: .node(q.node!))) || 
       addIf(reservedOrRecorded: q.asSymbol) ||
-      addIf(qualification: q) // todo see why we don't addIf(qualification: q.asSymbol)
+      addIf(qualification: q)
   }
 
 }

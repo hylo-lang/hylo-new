@@ -406,6 +406,31 @@ final class ManglingTests: XCTestCase {
     }
   }
 
+  /// Tests that the initializers of bindings declaring the same names in different modules are
+  /// mangled differently.
+  func testInitializerNamesAreQualified() async {
+    var p = await Program.withMinimalStandardLibrary()
+    let m0 = p.addUserModule(named: "M0", source: "let origin = Int()")
+    let m1 = p.addUserModule(named: "M1", source: "let origin = Int()")
+
+    p = await p.typeChecked()
+    failIfContainsError(p)
+
+    let names = [m0, m1].map { (m) in
+      IRFunction.Name.initializer(
+        BindingDeclaration.ID(
+          uncheckedFrom: findDeclaration(
+            BindingDeclaration.self, in: m, of: p, nameMatching: { _ in true })!.erased))
+    }
+    let mangled = names.map { (n) in p.mangled(n) }
+    XCTAssertNotEqual(mangled[0], mangled[1])
+
+    for (m, s) in zip(["M0", "M1"], mangled) {
+      assertDemanglingIsOk(mangled: s, of: "initializer in \(m)")
+      XCTAssert(DemangledSymbol(s).description.hasPrefix("init \(m)."), "(demangled: \(DemangledSymbol(s)))")
+    }
+  }
+
   func testDemangling() {
     let d = DemangledSymbol("$hmFM4M0vUqvirtual15k4fk1dd2zcrC9GreeterF07greetlT01tR516selfgcTK20tR5cDpTcTK21L3sTK1S7Robot00$gP71L1L1L")
     XCTAssertNotEqual(d.description, "#!")

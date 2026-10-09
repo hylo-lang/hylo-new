@@ -231,7 +231,7 @@ internal struct ManglingEncoding: Sendable {
     var qs: [ScopeIdentity] = []
     var rootedAtExisting = false
     for s in program.scopes(from: p) {
-      if output.addIf(reservedOrRecordedOrCurrentQualification: s) { 
+      if output.addIf(referenceable: s) { 
         rootedAtExisting = true
         break
       }
@@ -547,9 +547,7 @@ internal struct ManglingEncoding: Sendable {
       append(decl: d, to: &output)
     case .initializer(let d):
       output.add(operator: .initializerDeclaration)
-      append(unqualified: d, to: &output)
-      // `d` is demangled by a chain of its own, nested in the one containing the initializer.
-      output.endDeclaration()
+      append(decl: .init(d), to: &output)
       output.endDeclaration()
     case .synthesized(let d, let a):
       output.add(operator: .synthesizedFunctionDeclaration)
