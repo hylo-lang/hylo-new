@@ -1,0 +1,10 @@
+public fun f() {}
+
+public fun identity(x: sink Int) -> Int {
+  return x
+}
+
+public fun main() {
+  f()
+  precondition(identity(2) == 2)
+}
