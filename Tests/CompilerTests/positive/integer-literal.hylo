@@ -1,11 +1,26 @@
-//! stage:typing
-
 fun check<T>(x: T) {}
 
 public fun main() {
+  // Default type is `Int`.
   let x0 = 10
   check<Int>(x0)
 
-  let x1 = 10 as Int32
-  check<Int32>(x1)
+  // Expected type provided by a conversion expression.
+  let x1 = 10 as Int16
+  check<Int16>(x1)
+
+  // Expected type provided by an ascription.
+  let x2: Int32 = 10
+  check<Int32>(x2)
+
+  let _: Int8 = 1
+  let _: UInt8 = 1
+  let _: Int16 = 1
+  let _: UInt16 = 1
+  let _: Int32 = 1
+  let _: UInt32 = 1
+  let _: Int64 = 1
+  let _: UInt64 = 1
+  let _: Int = 1
+  let _: UInt = 1
 }
