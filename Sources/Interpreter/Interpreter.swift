@@ -121,15 +121,14 @@ private struct Stack {
   /// Local variables, parameters, and return addresses.
   private var frames: [StackFrame] = []
 
-  /// Adds a frame for a call to `callee`, defined in `p`, passing `arguments`.
+  /// Adds a frame for a call to `f`, defined in `p`, passing `ps`.
   public mutating func enter(
-    _ callee: GlobalFunctionIdentity,
+    _ f: GlobalFunctionIdentity,
     definedIn p: Program,
-    passing arguments: [Access<Memory.TypedAddress>]
+    passing ps: [Access<Memory.TypedAddress>]
   ) {
-    let s = InstructionPointer(interpreting: callee, definedIn: p)
-    let f = StackFrame(currentStep: s, parameters: arguments)
-    frames.append(f)
+    let s = InstructionPointer(interpreting: f, definedIn: p)
+    frames.append(.init(currentStep: s, parameters: ps))
   }
 
   /// Removes the top frame.
@@ -213,8 +212,10 @@ public struct Interpreter {
 
     // `main` takes a `set` access to a `Void` value, so create the
     // corresponding storage and access.
-    let l = memory.allocate(storageFor: .void)
-    let a = Access(to: l.asTypedAddress(.void), effect: .set)
+    let a = Access(
+      to: memory.allocate(storageFor: .void).asTypedAddress(.void),
+      effect: .set
+    )
     callStack.enter(p.entry, definedIn: p, passing: [a])
   }
 
@@ -251,7 +252,7 @@ public struct Interpreter {
       let p = allocate(storageFor: x.storage)
       return register(p)
     case let x as IRApply:
-      return try call(x.callee, passing: x.callArguments)
+      return try apply(x.callee, passing: x.callArguments)
     case let x as IRApplyBuiltin:
       let v = try call(x.callee, passing: x.arguments)
       return register(v)
@@ -388,7 +389,7 @@ public struct Interpreter {
     }
   }
 
-  /// Returns the function corresponding to `f`.
+  /// Returns the function referred to by `f`.
   private subscript(function f: IRValue) -> GlobalFunctionIdentity {
     switch f {
     case .function(let name, _):
@@ -466,7 +467,7 @@ public struct Interpreter {
   }
 
   /// Returns an epilogue that calls the function `f` passing `arguments`.
-  private func call(
+  private func apply(
     _ f: IRValue,
     passing arguments: ArraySlice<IRValue>
   ) throws -> InstructionEpilogue {
