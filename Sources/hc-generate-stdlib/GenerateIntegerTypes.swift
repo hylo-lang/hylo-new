@@ -237,9 +237,6 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
 
   /// The body of `init(_:)`, which converts instances of `Hylo.Int`.
   var initializeFromInt: String {
-    // TODO: Use conditional compilation to handle conversions.
-    // The following implementation assumes `Int.bit_width() == 64`. Removing this assumption
-    // requires conditional compilation.
     if signedness == .signed {
       initializeSignedFromInt
     } else {
@@ -250,10 +247,10 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   /// The body of an `init(_:)`, which converts instances of `Hylo.Int`, assuming `Self` describes
   /// a signed type.
   var initializeSignedFromInt: String {
-    if (builtinType == "word") || (size == .fixedWidth(bits: 64)) {
+    if builtinType == "word" {
       """
 
-          &self = Self(value: Builtin.bitcast_word_\(builtinType)(other.value))
+          &self = Self(value: other.value)
       """
     } else {
       """
@@ -261,10 +258,12 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
           let source_width = Int.bit_width()
           let target_width = Self.bit_width()
           let n = if other < 0 { ~other } else { other + 0 }
-          var d = Int(value: Builtin.sub_word(source_width.value, Builtin.ctlz_word(n.value)))
-          if other >= 0 { &d += 1 }
+          let d = Int(
+            value: Builtin.sub_word(
+              source_width.value,
+              Builtin.ctlz_word(Builtin.shl_word(n.value, 1.value))))
           if d > target_width { Builtin.trap() }
-          &self = Self(value: Builtin.trunc_word_\(builtinType)(other.value))
+          &self = Self(value: Builtin.trunc_or_sext_word_\(builtinType)(other.value))
       """
     }
   }
@@ -272,36 +271,39 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   /// The body of an `init(_:)`, which converts instances of `Hylo.Int`, assuming `Self` describes
   /// an unsigned type.
   var initializeUnsignedFromInt: String {
-    if (builtinType == "word") || (size == .fixedWidth(bits: 64)) {
+    if builtinType == "word" {
       """
 
           if other < 0 { Builtin.trap() }
-          &self = Self(value: Builtin.bitcast_word_\(builtinType)(other.value))
+          &self = Self(value: other.value)
       """
     } else {
       """
 
+          if other < 0 { Builtin.trap() }
           let source_width = Int.bit_width()
           let target_width = Self.bit_width()
-          let d = Int(value: Builtin.sub_word(source_width.value, Builtin.ctlz_word(other.value)))
+          let d = Int(
+            value: Builtin.sub_word(
+              source_width.value,
+              Builtin.ctlz_word(Builtin.shl_word(other.value, 1.value))))
           if d > target_width { Builtin.trap() }
-          &self = Self(value: Builtin.trunc_word_\(builtinType)(other.value))
+          &self = Self(value: Builtin.trunc_or_zext_word_\(builtinType)(other.value))
       """
     }
   }
 
   /// Returns an expression denoting the value of `n`, which is an instance of `builtinType`, as an
   /// instance of `Builtin.word`.
+  ///
+  /// - Requires: The value denoted by `n` is representable as an instance of `Builtin.word`.
   func asInstanceOfWord(_ n: String) -> String {
-    // TODO: Use conditional compilation to handle conversions.
-    // The following implementation assumes `Int.bit_width() == 64`. Removing this assumption
-    // requires conditional compilation.
     if builtinType == "word" {
       n
-    } else if size == .fixedWidth(bits: 64) {
-      "Builtin.bitcast_\(builtinType)_word(\(n))"
+    } else if signedness == .signed {
+      "Builtin.trunc_or_sext_\(builtinType)_word(\(n))"
     } else {
-      "Builtin.zext_\(builtinType)_word(\(n))"
+      "Builtin.trunc_or_zext_\(builtinType)_word(\(n))"
     }
   }
 

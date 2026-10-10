@@ -52,6 +52,36 @@ public enum BuiltinFunction: Hashable, Sendable {
   /// state of `x` before the instruction is applied.
   case assumeInitialized(Bool)
 
+  /// `Builtin.trunc_or_zext_T_U(x: T) -> U`
+  ///
+  /// Returns `x` as an instance of `U`.
+  ///
+  /// This function is essentially an alias for either `trunc`, `zext`, or `bitcast` depending on
+  /// the widths of the source and target during code generation. The result is the application of
+  /// one of the following operations, where `T` and `U` identify integer types (e.g., `i64`):
+  ///
+  /// - truncation if `T` is wider than `U`
+  /// - zero-extension if `T` is narrower than `U`
+  /// - identity if `T` is equal to `U`
+  ///
+  /// - Requires: The value of `x` must be representable as an instance of `U`.
+  case truncateOrZeroExtend(MachineType.ID, MachineType.ID)
+
+  /// `Builtin.trunc_or_sext_T_U(x: T) -> U`
+  ///
+  /// Returns `x` as an instance of `U`.
+  ///
+  /// This function is essentially an alias for either `trunc`, `sext`, or `bitcast` depending on
+  /// the widths of the source and target during code generation. The result is the application of
+  /// one of the following operations, where `T` and `U` identify integer types (e.g., `i64`):
+  ///
+  /// - truncation if `T` is wider than `U`
+  /// - sign-extension if `T` is narrower than `U`
+  /// - identity if `T` is equal to `U`
+  ///
+  /// - Requires: The value of `x` must be representable as an instance of `U`.
+  case truncateOrSignExtend(MachineType.ID, MachineType.ID)
+
   // MARK: Functions with a counterpart LLVM instruction.
 
   case add(OverflowBehavior, MachineType.ID)
@@ -474,6 +504,10 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: i1)).erased
     case .trunc(let f, let d):
       return s.demand(Arrow(f, to: d)).erased
+    case .truncateOrSignExtend(let f, let d):
+      return s.demand(Arrow(f, to: d)).erased
+    case .truncateOrZeroExtend(let f, let d):
+      return s.demand(Arrow(f, to: d)).erased
     case .zext(let f, let d):
       return s.demand(Arrow(f, to: d)).erased
     case .sext(let f, let d):
@@ -823,6 +857,10 @@ extension BuiltinFunction: Showable {
       return printer.format("icmp_%S_%T", [p, t.erased])
     case .trunc(let l, let r):
       return printer.format("trunc_%T_%T", [l.erased, r.erased])
+    case .truncateOrZeroExtend(let l, let r):
+      return printer.format("trunc_or_zext_%T_%T", [l.erased, r.erased])
+    case .truncateOrSignExtend(let l, let r):
+      return printer.format("trunc_or_sext_%T_%T", [l.erased, r.erased])
     case .zext(let l, let r):
       return printer.format("zext_%T_%T", [l.erased, r.erased])
     case .sext(let l, let r):
@@ -1200,8 +1238,15 @@ extension BuiltinFunction {
       self = .icmp(p, s.demand(t))
 
     case "trunc":
-      guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
-      self = .trunc(s.demand(f), s.demand(d))
+      guard let (o, f, d) = integerTruncationTail(&tokens) else { return nil }
+      switch o {
+      case .truncate:
+        self = .trunc(s.demand(f), s.demand(d))
+      case .truncateOrZeroExtend:
+        self = .truncateOrZeroExtend(s.demand(f), s.demand(d))
+      case .truncateOrSignExtend:
+        self = .truncateOrSignExtend(s.demand(f), s.demand(d))
+      }
 
     case "zext":
       guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
@@ -1567,6 +1612,20 @@ extension BuiltinFunction {
 
 }
 
+/// The semantics of an integer conversion.
+private enum IntegerConversion {
+
+  /// Truncation.
+  case truncate
+
+  /// Truncation or zero-extension.
+  case truncateOrZeroExtend
+
+  /// Truncation of sign-extension.
+  case truncateOrSignExtend
+
+}
+
 /// A function that parses an instance of `T` by consuming a prefix of tokens from `stream`, or
 /// returns `nil` if such instance cannot be parsed.
 ///
@@ -1646,6 +1705,27 @@ private func integerArithmeticWithOverflowTail(
 ) -> MachineType? {
   let p = exactly("with") + exactly("overflow") + machineType
   return p(&stream).map(\.1)
+}
+
+/// Parses the parameters and type of an integer truncation instruction.
+private func integerTruncationTail(
+  _ stream: inout ArraySlice<Substring>
+) -> (IntegerConversion, MachineType, MachineType)? {
+  var conversion = IntegerConversion.truncate
+  if stream.first == "or" {
+    stream.removeFirst()
+    switch stream.popFirst() {
+    case "zext":
+      conversion = .truncateOrZeroExtend
+    case "sext":
+      conversion = .truncateOrSignExtend
+    default:
+      return nil
+    }
+  }
+
+  let tail = machineType + machineType
+  return tail(&stream).map({ (t, u) in (conversion, t, u) })
 }
 
 /// Parses the parameters and type of `advanced_by_bytes`.
