@@ -227,6 +227,12 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
         .new(value: Builtin.or_\(builtinType)(self.value, other.value))
       }
 
+      /// Returns the result of performing a bitwise XOR operation on `self` and `other`.
+      @inline(always)
+      public fun infix^ (other: Self) -> Self {
+        .new(value: Builtin.xor_\(builtinType)(self.value, other.value))
+      }
+
       // MARK: Equatable conformance
 
       /// Returns `true` iff `self` is equal to `other`.
