@@ -22,8 +22,6 @@ extension Program {
   func interpret() throws {
     var executor = Interpreter(self)
     while executor.isRunning {
-      // TODO: Kept for debugging and observability; remove when no longer needed.
-      print(show(executor.currentInstruction))
       try executor.step()
     }
   }
