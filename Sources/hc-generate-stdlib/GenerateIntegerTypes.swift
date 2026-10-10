@@ -140,7 +140,23 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       """
   }
 
-  /// An expression denoting the smallest value `self` can represent, as an instance of `Self`.
+  /// An expression denoting the number of leading zeros the representation of the receiver.
+  ///
+  /// The result of the expression is an instance of `Hylo.Int`.
+  var leadingZeroBitCount: String {
+    // TODO: Use conditional compilation to handle conversions.
+    // The following implementation assumes `Int.bit_width() == 64`. Removing this assumption
+    // requires conditional compilation.
+    let n = "Builtin.ctlz_\(builtinType)(self.value)"
+    if size == .fittingLargestObjectSize {
+      return "Int(value: \(n))"
+    } else if size == .fixedWidth(bits: 64) {
+      return "Int(value: Builtin.bitcast_\(builtinType)_word(\(n)))"
+    } else {
+      return "Int(value: Builtin.zext_\(builtinType)_word(\(n)))"
+    }
+  }
+
   var minimumValue: String {
     // Trivial if the type is unsigned.
     if signedness == .unsigned { return "0" }
@@ -270,6 +286,12 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       @inline(always)
       public init(other: Int) {\(initializeFromInt)
       }\(absMethod ?? "")
+
+      /// Returns the number of leading zeros in the representation of `self`.
+      @inline(always)
+      public fun leading_zero_bit_count() -> Int {
+        \(leadingZeroBitCount)
+      }
 
       @inline(always)
       public static fun min() -> Self {

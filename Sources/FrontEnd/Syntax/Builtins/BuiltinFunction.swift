@@ -147,9 +147,9 @@ public enum BuiltinFunction: Hashable, Sendable {
   case fptosi(MachineType.ID, MachineType.ID)
 
   //  case ctpop(MachineType.ID)
-  //
-  //  case ctlz(MachineType.ID)
-  //
+
+  case ctlz(MachineType.ID)
+
   //  case cttz(MachineType.ID)
 
   case sizeof(MachineType.ID)
@@ -510,8 +510,8 @@ extension BuiltinFunction {
       return s.demand(Arrow(f, to: d)).erased
     //    case .ctpop(let t):
     //      return .init(^t, to: ^t)
-    //    case .ctlz(let t):
-    //      return .init(^t, to: ^t)
+    case .ctlz(let t):
+      return s.demand(Arrow(t, to: t)).erased
     //    case .cttz(let t):
     //      return .init(^t, to: ^t)
     case .sizeof:
@@ -859,8 +859,8 @@ extension BuiltinFunction: Showable {
       return "fptosi_\(l)_\(r)"
     //    case .ctpop(let t):
     //      return "ctpop_\(t)"
-    //    case .ctlz(let t):
-    //      return "ctlz_\(t)"
+    case .ctlz(let t):
+      return printer.format("ctlz_%T", [t.erased])
     //    case .cttz(let t):
     //      return "cttz_\(t)"
     case .sizeof(let t):
@@ -1279,11 +1279,11 @@ extension BuiltinFunction {
     //    case "ctpop":
     //      guard let t = machineType(&tokens) else { return nil }
     //      self = .ctpop(t)
-    //
-    //    case "ctlz":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .ctlz(t)
-    //
+
+    case "ctlz":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .ctlz(s.demand(t))
+
     //    case "cttz":
     //      guard let t = machineType(&tokens) else { return nil }
     //      self = .cttz(t)

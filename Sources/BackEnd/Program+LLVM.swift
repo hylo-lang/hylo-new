@@ -425,6 +425,15 @@ extension Program {
       ctx.value[v] = ctx.module.llvm.insertFPToSI(
         xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
 
+    case .ctlz(let t):
+      let integer = metadata(of: t, in: &ctx.module)
+      let xs = [
+        insertLoad(ctx.value[s.arguments[0]]!, instanceOf: integer.llvm, in: &ctx),
+        ctx.module.llvm.i1.unsafe[].null,
+      ]
+      let f = ctx.module.llvm.intrinsic(named: IntrinsicFunction.llvm.ctlz, for: [integer.llvm])!
+      ctx.value[v] = ctx.module.llvm.insertCall(f, on: xs, at: ctx.insertionPoint!).v
+
     case .trunc(let from, let to):
       let xs = insertLoad(s.arguments, instancesOf: from, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertTrunc(

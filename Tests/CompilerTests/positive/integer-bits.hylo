@@ -21,4 +21,13 @@ public fun main() {
   // Bit pattern inversion.
   precondition(~(3 as Int32) == (-4 as Int32))
   precondition(~(3 as UInt8) == (252 as UInt8))
+
+  // Leading zeros.
+  precondition((10 as UInt8).leading_zero_bit_count() == 4)
+  precondition((10 as Int8).leading_zero_bit_count() == 4)
+  precondition((-1 as Int8).leading_zero_bit_count() == 0)
+
+  precondition((10 as UInt16).leading_zero_bit_count() == 12)
+  precondition((10 as Int16).leading_zero_bit_count() == 12)
+  precondition((-1 as Int16).leading_zero_bit_count() == 0)
 }
