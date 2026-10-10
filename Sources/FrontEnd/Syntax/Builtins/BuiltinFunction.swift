@@ -64,15 +64,15 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case sdiv(exact: Bool, MachineType.ID)
 
+  case urem(MachineType.ID)
+
+  case srem(MachineType.ID)
+
   case shl(MachineType.ID)
 
   case ashr(MachineType.ID)
 
   case lshr(MachineType.ID)
-
-  case urem(MachineType.ID)
-
-  case srem(MachineType.ID)
 
   case and(MachineType.ID)
 
@@ -436,15 +436,15 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: t)).erased
     case .sdiv(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
+    case .urem(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
+    case .srem(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
     case .shl(let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .ashr(let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .lshr(let t):
-      return s.demand(Arrow(t, t, to: t)).erased
-    case .urem(let t):
-      return s.demand(Arrow(t, t, to: t)).erased
-    case .srem(let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .and(let t):
       return s.demand(Arrow(t, t, to: t)).erased
@@ -791,16 +791,16 @@ extension BuiltinFunction: Showable {
       return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
     case .sdiv(let e, let t):
       return printer.format(e ? "sdiv_exact_%T" : "sdiv_%T", [t.erased])
+    case .urem(let t):
+      return printer.format("urem_%T", [t.erased])
+    case .srem(let t):
+      return printer.format("srem_%T", [t.erased])
     case .shl(let t):
       return printer.format("shl_%T", [t.erased])
     case .ashr(let t):
       return printer.format("ashr_%T", [t.erased])
     case .lshr(let t):
       return printer.format("lshr_%T", [t.erased])
-    case .urem(let t):
-      return printer.format("urem_%T", [t.erased])
-    case .srem(let t):
-      return printer.format("srem_%T", [t.erased])
     case .and(let t):
       return printer.format("and_%T", [t.erased])
     case .or(let t):
@@ -1151,6 +1151,13 @@ extension BuiltinFunction {
     case "sdiv":
       guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
       self = .sdiv(exact: p != nil, s.demand(t))
+    case "urem":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .urem(s.demand(t))
+    case "srem":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .srem(s.demand(t))
+
     case "shl":
       guard let t = machineType(&tokens) else { return nil }
       self = .shl(s.demand(t))
@@ -1160,14 +1167,6 @@ extension BuiltinFunction {
     case "lshr":
       guard let t = machineType(&tokens) else { return nil }
       self = .lshr(s.demand(t))
-
-    case "urem":
-      guard let t = machineType(&tokens) else { return nil }
-      self = .urem(s.demand(t))
-    case "srem":
-      guard let t = machineType(&tokens) else { return nil }
-      self = .srem(s.demand(t))
-
     case "and":
       guard let t = machineType(&tokens) else { return nil }
       self = .and(s.demand(t))
@@ -1177,6 +1176,7 @@ extension BuiltinFunction {
     case "xor":
       guard let t = machineType(&tokens) else { return nil }
       self = .xor(s.demand(t))
+
     case "sadd":
       guard let t = integerArithmeticWithOverflowTail(&tokens) else { return nil }
       self = .signedAdditionWithOverflow(s.demand(t))

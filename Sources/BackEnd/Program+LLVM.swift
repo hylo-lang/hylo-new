@@ -369,16 +369,6 @@ extension Program {
       ctx.module.llvm.setFastMathFlags(f.llvm, for: i)
       ctx.value[v] = i.v
 
-    case .shl(let t):
-      let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
-      ctx.value[v] = ctx.module.llvm.insertShl(xs[0], xs[1], at: ctx.insertionPoint!).v
-    case .ashr(let t):
-      let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
-      ctx.value[v] = ctx.module.llvm.insertAShr(xs[0], xs[1], at: ctx.insertionPoint!).v
-    case .lshr(let t):
-      let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
-      ctx.value[v] = ctx.module.llvm.insertLShr(xs[0], xs[1], at: ctx.insertionPoint!).v
-
     case .urem(let t):
       let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertUnsignedRem(xs[0], xs[1], at: ctx.insertionPoint!).v
@@ -397,6 +387,15 @@ extension Program {
     case .assumeInitialized(_):
       unreachable("assume_initialized must have been lowered as IRAssumeState.")
 
+    case .shl(let t):
+      let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertShl(xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .ashr(let t):
+      let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertAShr(xs[0], xs[1], at: ctx.insertionPoint!).v
+    case .lshr(let t):
+      let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertLShr(xs[0], xs[1], at: ctx.insertionPoint!).v
     case .and(let t):
       let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertBitwiseAnd(xs[0].v, xs[1].v, at: ctx.insertionPoint!).v

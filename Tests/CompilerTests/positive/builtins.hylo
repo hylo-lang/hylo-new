@@ -81,6 +81,28 @@ fun test_Builtin_advanced_by_bytes() {
   precondition(q.b == (7 as UInt8))
 }
 
+// MARK: Testing Builtin.shl_*()
+
+fun test_Builtin_shl() {
+  expect(Builtin.icmp_eq_word(Builtin.shl_word(12.value, 2.value), 48.value))
+}
+
+// MARK: Testing Builtin.ashr_*()
+
+fun test_Builtin_ashr() {
+  expect(Builtin.icmp_eq_word(Builtin.ashr_word(-8.value, 2.value), -2.value))
+  expect(Builtin.icmp_eq_word(Builtin.ashr_word(8.value, 2.value), 2.value))
+}
+
+// MARK: Testing Builtin.lshr_*()
+
+fun test_Builtin_lshr() {
+  expect(Builtin.icmp_eq_i8(
+    Builtin.lshr_i8((-8 as Int8).value, (2 as Int8).value), (62 as Int8).value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.lshr_i8((8 as Int8).value, (2 as Int8).value), (2 as Int8).value))
+}
+
 // MARK: Testing Builtin.and_*()
 
 fun test_Builtin_and() {
@@ -677,6 +699,9 @@ public fun main() {
   test_Builtin_add()
   test_Builtin_address()
   test_Builtin_advanced_by_bytes()
+  test_Builtin_shl()
+  test_Builtin_ashr()
+  test_Builtin_lshr()
   test_Builtin_and()
   test_Builtin_assume_initialized()
   test_Builtin_fadd()
