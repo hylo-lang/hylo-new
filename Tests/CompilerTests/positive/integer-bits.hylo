@@ -17,4 +17,8 @@ public fun main() {
   precondition((( 3 as Int32) ^ (5 as Int32)) == ( 6 as Int32))
   precondition((( 3 as UInt8) ^ (5 as UInt8)) == ( 6 as UInt8))
   precondition(((-1 as Int8)  ^ (5 as Int8))  == (-6 as Int8))
+
+  // Bit pattern inversion.
+  precondition(~(3 as Int32) == (-4 as Int32))
+  precondition(~(3 as UInt8) == (252 as UInt8))
 }

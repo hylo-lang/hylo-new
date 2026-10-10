@@ -179,6 +179,11 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
+  /// The body of `Self.prefix^`, which computes the inverse of a bit pattern.
+  var inversed: String {
+    ".new(value: Builtin.xor_\(builtinType)(self.value, (-1 as Self).value))"
+  }
+
   /// The source code representation of this type.
   var description: String {
     """
@@ -213,6 +218,12 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       @inline(always)
       public static fun bit_width() -> Int {
         \(bitWidth)
+      }
+
+      /// Returns `self` with the bits of its representation inversed.
+      @inline(always)
+      public fun prefix~ () -> Self {
+        \(inversed)
       }
 
       /// Returns the result of performing a bitwise AND operation on `self` and `other`.
