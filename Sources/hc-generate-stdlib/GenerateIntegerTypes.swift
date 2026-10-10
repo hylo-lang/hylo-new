@@ -112,8 +112,9 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
 
   /// Constructs an instance from its parts.
   init(
-    name: String, documentation: String, builtinType: String, _ signedness: Signedness,
-    _ size: Size, includedConformances: Conformances
+    name: String, documentation: String,
+    builtinType: String, _ signedness: Signedness, _ size: Size,
+    includedConformances: Conformances
   ) {
     self.declarationName = name
     self.declarationDocumentation = documentation
@@ -140,6 +141,13 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       """
   }
 
+  /// An expression denoting the bit pattern of the receiver with each bit inversed.
+  ///
+  /// The result of the expression is an instance of the type described by `Self`.
+  var inversed: String {
+    ".new(value: Builtin.xor_\(builtinType)(self.value, (-1 as Self).value))"
+  }
+
   /// An expression denoting the number of leading zeros the representation of the receiver.
   ///
   /// The result of the expression is an instance of `Hylo.Int`.
@@ -157,6 +165,9 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
+  /// An expression denoting the smallest instance of the type that `Self` describes.
+  ///
+  /// The result of the expression is an instance of the type described by `Self`.
   var minimumValue: String {
     // Trivial if the type is unsigned.
     if signedness == .unsigned { return "0" }
@@ -173,7 +184,9 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
-  /// An expression denoting the largest value `self` can represent, as an instance of `Self`.
+  /// An expression denoting the largest instance of the type that `Self` describes.
+  ///
+  /// The result of the expression is an instance of the type described by `Self`.
   var maximumValue: String {
     if signedness == .signed {
       let x = "Builtin.lshr_\(builtinType)((-1 as Self).value, (1 as Self).value)"
@@ -184,15 +197,8 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
-  /// An expression denoting the bit pattern of the receiver with each bit inversed.
-  ///
-  /// The result of the expression is an instance of the type described by `Self`.
-  var inversed: String {
-    ".new(value: Builtin.xor_\(builtinType)(self.value, (-1 as Self).value))"
-  }
-
-  /// An expression denoting the number of bits in the representation of an instance of the
-  /// represented by `Self`.
+  /// An expression denoting the number of bits in the representation of an instance of the type
+  /// that `Self` describes.
   ///
   /// The result of the expression is an instance of `Hylo.Int`.
   var bitWidth: String {
@@ -207,9 +213,9 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
-  /// The body of an initializer converting instances of `Hylo.Int`.
+  /// The body of `init(_:)`, which converts instances of `Hylo.Int`.
   var initializeFromInt: String {
-    // TODO: Use conditional compilation
+    // TODO: Use conditional compilation to handle conversions.
     // The following implementation assumes `Int.bit_width() == 64`. Removing this assumption
     // requires conditional compilation.
     if signedness == .signed {
@@ -219,8 +225,8 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
-  /// The body of an initializer converting instances of `Hylo.Int`, assuming `Self` describes a
-  /// signed type.
+  /// The body of an `init(_:)`, which converts instances of `Hylo.Int`, assuming `Self` describes
+  /// a signed type.
   var initializeSignedFromInt: String {
     if (size == .fittingLargestObjectSize) || (size == .fixedWidth(bits: 64)) {
       """
@@ -241,8 +247,8 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
-  /// The body of an initializer converting instances of `Hylo.Int`, assuming `Self` describes an
-  /// unsigned type.
+  /// The body of an `init(_:)`, which converts instances of `Hylo.Int`, assuming `Self` describes
+  /// an unsigned type.
   var initializeUnsignedFromInt: String {
     if (size == .fittingLargestObjectSize) || (size == .fixedWidth(bits: 64)) {
       """
