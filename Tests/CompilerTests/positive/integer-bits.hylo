@@ -22,6 +22,46 @@ public fun main() {
   precondition(~(3 as Int32) == (-4 as Int32))
   precondition(~(3 as UInt8) == (252 as UInt8))
 
+  // Shift left.
+  precondition(((-3 as Int8) << 2) == (-12 as Int8))
+  precondition(((3 as Int8) << 2) == (12 as Int8))
+  precondition(((3 as UInt8) << 2) == (12 as UInt8))
+
+  // Shift left pushing bits out.
+  precondition((Int8.min() << 2) == (0 as Int8))
+  precondition((Int8.max() << 2) == (-4 as Int8))
+  precondition((UInt8.max() << 2) == (252 as UInt8))
+
+  // Shift left with overshift.
+  precondition((Int8.min() << 10) == (0 as Int8))
+  precondition((Int8.max() << 10) == (0 as Int8))
+  precondition((UInt8.max() << 10) == (0 as UInt8))
+
+  // Shift left with negative offset.
+  precondition(((-12 as Int8) << -2) == (-3 as Int8))
+  precondition(((12 as Int8) << -2) == (3 as Int8))
+  precondition(((12 as UInt8) << -2) == (3 as UInt8))
+
+  // Shift right.
+  precondition(((-12 as Int8) >> 2) == (-3 as Int8))
+  precondition(((12 as Int8) >> 2) == (3 as Int8))
+  precondition(((12 as UInt8) >> 2) == (3 as UInt8))
+
+  // Shift right pushing bits out.
+  precondition((Int8.min() >> 2) == (-32 as Int8))
+  precondition((Int8.max() >> 2) == (31 as Int8))
+  precondition((UInt8.max() >> 2) == (63 as UInt8))
+
+  // Shift right with overshift.
+  precondition((Int8.min() >> 10) == (-1 as Int8))
+  precondition((Int8.max() >> 10) == (0 as Int8))
+  precondition((UInt8.max() >> 10) == (0 as UInt8))
+
+  // Shift right with negative offset.
+  precondition(((3 as Int8) >> -2) == (12 as Int8))
+  precondition(((-3 as Int8) >> -2) == (-12 as Int8))
+  precondition(((3 as UInt8) >> -2) == (12 as UInt8))
+
   // Leading zeros.
   precondition((10 as UInt8).leading_zero_bit_count() == 4)
   precondition((10 as Int8).leading_zero_bit_count() == 4)

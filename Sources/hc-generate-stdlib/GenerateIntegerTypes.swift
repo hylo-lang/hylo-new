@@ -152,17 +152,8 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   ///
   /// The result of the expression is an instance of `Hylo.Int`.
   var leadingZeroBitCount: String {
-    // TODO: Use conditional compilation to handle conversions.
-    // The following implementation assumes `Int.bit_width() == 64`. Removing this assumption
-    // requires conditional compilation.
-    let n = "Builtin.ctlz_\(builtinType)(self.value)"
-    if size == .fittingLargestObjectSize {
-      return "Int(value: \(n))"
-    } else if size == .fixedWidth(bits: 64) {
-      return "Int(value: Builtin.bitcast_\(builtinType)_word(\(n)))"
-    } else {
-      return "Int(value: Builtin.zext_\(builtinType)_word(\(n)))"
-    }
+    let n = asInstanceOfWord("Builtin.ctlz_\(builtinType)(self.value)")
+    return "Int(value: \(n))"
   }
 
   /// An expression denoting the smallest instance of the type that `Self` describes.
@@ -213,6 +204,37 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
+  /// The body of `infix>>(_:)`, which shifts the bit representation to the right.
+  var shiftRight: String {
+    if signedness == .signed {
+      """
+
+          if other >= Self.bit_width() {
+            if self < Self.zero() { (-1 as Self) } else { Self.zero() }
+          } else if other >= 0 {
+            Self.new(value: Builtin.ashr_\(builtinType)(self.value, Self(other).value))
+          } else if (0 - other) < Self.bit_width() {
+            Self.new(value: Builtin.shl_\(builtinType)(self.value, Self(0 - other).value))
+          } else {
+            Self.zero()
+          }
+      """
+    } else {
+      """
+
+          if other >= Self.bit_width() {
+            Self.zero()
+          } else if other >= 0 {
+            Self.new(value: Builtin.lshr_\(builtinType)(self.value, Self(other).value))
+          } else if (0 - other) < Self.bit_width() {
+            Self.new(value: Builtin.shl_\(builtinType)(self.value, Self(0 - other).value))
+          } else {
+            Self.zero()
+          }
+      """
+    }
+  }
+
   /// The body of `init(_:)`, which converts instances of `Hylo.Int`.
   var initializeFromInt: String {
     // TODO: Use conditional compilation to handle conversions.
@@ -228,7 +250,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   /// The body of an `init(_:)`, which converts instances of `Hylo.Int`, assuming `Self` describes
   /// a signed type.
   var initializeSignedFromInt: String {
-    if (size == .fittingLargestObjectSize) || (size == .fixedWidth(bits: 64)) {
+    if (builtinType == "word") || (size == .fixedWidth(bits: 64)) {
       """
 
           &self = Self(value: Builtin.bitcast_word_\(builtinType)(other.value))
@@ -250,7 +272,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   /// The body of an `init(_:)`, which converts instances of `Hylo.Int`, assuming `Self` describes
   /// an unsigned type.
   var initializeUnsignedFromInt: String {
-    if (size == .fittingLargestObjectSize) || (size == .fixedWidth(bits: 64)) {
+    if (builtinType == "word") || (size == .fixedWidth(bits: 64)) {
       """
 
           if other < 0 { Builtin.trap() }
@@ -265,6 +287,21 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
           if d > target_width { Builtin.trap() }
           &self = Self(value: Builtin.trunc_word_\(builtinType)(other.value))
       """
+    }
+  }
+
+  /// Returns an expression denoting the value of `n`, which is an instance of `builtinType`, as an
+  /// instance of `Builtin.word`.
+  func asInstanceOfWord(_ n: String) -> String {
+    // TODO: Use conditional compilation to handle conversions.
+    // The following implementation assumes `Int.bit_width() == 64`. Removing this assumption
+    // requires conditional compilation.
+    if builtinType == "word" {
+      n
+    } else if size == .fixedWidth(bits: 64) {
+      "Builtin.bitcast_\(builtinType)_word(\(n))"
+    } else {
+      "Builtin.zext_\(builtinType)_word(\(n))"
     }
   }
 
@@ -337,6 +374,35 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       @inline(always)
       public fun infix^ (other: Self) -> Self {
         .new(value: Builtin.xor_\(builtinType)(self.value, other.value))
+      }
+
+      /// Returns the result of shifting `self`'s representation `other` digits to the left.
+      ///
+      /// If `other` is non-negative, each bit in the representation of `self` is moved by `other`
+      /// positions to the left, inserting zeros to the right and discarding any bit ending up at a
+      /// position greater than that of the most significant bit.
+      ///
+      /// If `other` is negative, the result is the same as `self >> other.abs()`.
+      @inline(always)
+      public fun infix<< (other: Int) -> Self {
+        if other >= Self.bit_width() {
+          Self.new()
+        } else if other >= 0 {
+          Self.new(value: Builtin.shl_\(builtinType)(self.value, Self(other).value))
+        } else {
+          self >> (0 - other)
+        }
+      }
+
+      /// Returns the result of shifting `self`'s representation `other` digits to the right.
+      ///
+      /// If `other` is non-negative, each bit in the representation of `self` is moved by `other`
+      /// positions to the right, inserting copies of the most significant bit to the left and
+      /// discarding any bit ending at a negative position.
+      ///
+      /// If `other` is negative, the result is the same as `self << other.abs()`.
+      @inline(always)
+      public fun infix>> (other: Int) -> Self {\(shiftRight)
       }
 
       // MARK: Equatable conformance
