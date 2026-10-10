@@ -302,6 +302,22 @@ fun test_Builtin_icmp() {
   expect(Builtin.icmp_ugt_i64(Int64.min().value, Int64.max().value))
 }
 
+fun test_Builtin_icmp_ptr() {
+  sink let x = (1, 2)
+  let one = Builtin.address(of: x.0)
+  let two = Builtin.address(of: x.1)
+
+  expect(Builtin.icmp_eq_ptr(one, one))
+  expect(Builtin.icmp_eq_ptr(two, two))
+  expect(Builtin.icmp_ne_ptr(one, two))
+  expect(Builtin.icmp_ne_ptr(two, one))
+  expect(Builtin.icmp_ult_ptr(one, two))
+  expect(Builtin.icmp_ugt_ptr(two, one))
+
+  // Guarantees the lifetime of `x`.
+  _ = x
+}
+
 // MARK: Testing Builtin.mul_*_*()
 
 fun test_Builtin_mul() {
@@ -674,6 +690,7 @@ public fun main() {
   test_Builtin_frem()
   test_Builtin_fsub()
   test_Builtin_icmp()
+  test_Builtin_icmp_ptr()
   test_Builtin_mul()
   test_Builtin_or()
   test_Builtin_sadd_with_overflow()
