@@ -326,6 +326,8 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       }
 
       /// Creates an instance whose value is the same as that of `other`.
+      ///
+      /// - Requires: the value of `other` is representable as an instance of `Self`.
       @inline(always)
       public init(other: Int) {\(initializeFromInt)
       }\(absMethod ?? "")
