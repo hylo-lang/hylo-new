@@ -114,6 +114,8 @@ public enum BuiltinFunction: Hashable, Sendable {
 //
 //  case ptrtoint(MachineType.ID)
 
+  case bitcast(MachineType.ID, MachineType.ID)
+
   /// In LLVM: `fadd`.
   case fadd(MathFlags, MachineType.ID)
 
@@ -484,6 +486,8 @@ extension BuiltinFunction {
     //      return .init(^t, to: .builtin(.ptr))
     //    case .ptrtoint(let t):
     //      return .init(.builtin(.ptr), to: ^t)
+    case .bitcast(let t, let u):
+      return s.demand(Arrow(t, to: u)).erased
     case .fadd(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .fsub(_, let t):
@@ -831,6 +835,8 @@ extension BuiltinFunction: Showable {
     //      return "inttoptr_\(t)"
     //    case .ptrtoint(let t):
     //      return "ptrtoint_\(t)"
+    case .bitcast(let t, let u):
+      return printer.format("bitcast_%T_%T", [t.erased, u.erased])
     case .fadd(let f, let t):
       return f.isEmpty ? "fadd_\(t)" : "fadd_\(f)_\(t)"
     case .fsub(let f, let t):
@@ -1224,7 +1230,11 @@ extension BuiltinFunction {
     //    case "ptrtoint":
     //      guard let t = machineType(&tokens) else { return nil }
     //      self = .ptrtoint(t)
-    //
+
+    case "bitcast":
+      guard let (t, u) = (machineType + machineType)(&tokens) else { return nil }
+      self = .bitcast(s.demand(t), s.demand(u))
+
     case "fadd":
       guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
       self = .fadd(p, s.demand(t))

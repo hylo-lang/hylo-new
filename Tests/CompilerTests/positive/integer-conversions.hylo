@@ -1,0 +1,16 @@
+public fun main() {
+  // Int to signed.
+  precondition(Int(-2) == -2)
+  precondition(Int(12) == 12)
+
+  precondition(Int16(-2) == (-2 as Int16))
+  precondition(Int16(12) == (12 as Int16))
+
+  precondition(Int64(-2) == (-2 as Int64))
+  precondition(Int64(12) == (12 as Int64))
+
+  // Int to unsigned.
+  precondition(UInt(12) == (12 as UInt))
+  precondition(UInt16(2) == (2 as UInt16))
+  precondition(UInt64(2) == (2 as UInt64))
+}

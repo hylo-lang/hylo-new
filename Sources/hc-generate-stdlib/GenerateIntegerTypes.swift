@@ -66,7 +66,7 @@ private enum Signedness: String, CustomStringConvertible {
 }
 
 /// The size of an integer type.
-private enum Size {
+private enum Size: Equatable {
 
   /// The type can represent the size of the largest object in memory on the target platform.
   ///
@@ -168,7 +168,17 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
-  /// The number of bits in the representation of an instance of `self`.
+  /// An expression denoting the bit pattern of the receiver with each bit inversed.
+  ///
+  /// The result of the expression is an instance of the type described by `Self`.
+  var inversed: String {
+    ".new(value: Builtin.xor_\(builtinType)(self.value, (-1 as Self).value))"
+  }
+
+  /// An expression denoting the number of bits in the representation of an instance of the
+  /// represented by `Self`.
+  ///
+  /// The result of the expression is an instance of `Hylo.Int`.
   var bitWidth: String {
     switch size {
     case .fittingLargestObjectSize:
@@ -179,9 +189,59 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
-  /// The body of `Self.prefix^`, which computes the inverse of a bit pattern.
-  var inversed: String {
-    ".new(value: Builtin.xor_\(builtinType)(self.value, (-1 as Self).value))"
+  /// The body of an initializer converting instances of `Hylo.Int`.
+  var initializeFromInt: String {
+    // TODO: Use conditional compilation
+    // The following implementation assumes `Int.bit_width() == 64`. Removing this assumption
+    // requires conditional compilation.
+    if signedness == .signed {
+      initializeSignedFromInt
+    } else {
+      initializeUnsignedFromInt
+    }
+  }
+
+  /// The body of an initializer converting instances of `Hylo.Int`, assuming `Self` describes a
+  /// signed type.
+  var initializeSignedFromInt: String {
+    if (size == .fittingLargestObjectSize) || (size == .fixedWidth(bits: 64)) {
+      """
+
+          &self = Self(value: Builtin.bitcast_word_\(builtinType)(other.value))
+      """
+    } else {
+      """
+
+          let source_width = Int.bit_width()
+          let target_width = Self.bit_width()
+          let n = if other < 0 { ~other } else { other + 0 }
+          var d = Int(value: Builtin.sub_word(source_width.value, Builtin.ctlz_word(n.value)))
+          if other >= 0 { &d += 1 }
+          if d > target_width { Builtin.trap() }
+          &self = Self(value: Builtin.trunc_word_\(builtinType)(other.value))
+      """
+    }
+  }
+
+  /// The body of an initializer converting instances of `Hylo.Int`, assuming `Self` describes an
+  /// unsigned type.
+  var initializeUnsignedFromInt: String {
+    if (size == .fittingLargestObjectSize) || (size == .fixedWidth(bits: 64)) {
+      """
+
+          if other < 0 { Builtin.trap() }
+          &self = Self(value: Builtin.bitcast_word_\(builtinType)(other.value))
+      """
+    } else {
+      """
+
+          let source_width = Int.bit_width()
+          let target_width = Self.bit_width()
+          let d = Int(value: Builtin.sub_word(source_width.value, Builtin.ctlz_word(other.value)))
+          if d > target_width { Builtin.trap() }
+          &self = Self(value: Builtin.trunc_word_\(builtinType)(other.value))
+      """
+    }
   }
 
   /// The source code representation of this type.
@@ -202,6 +262,11 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       @inline(always)
       public init() {
         &self.value = Builtin.zeroinitializer_\(builtinType)()
+      }
+
+      /// Creates an instance whose value is the same as that of `other`.
+      @inline(always)
+      public init(other: Int) {\(initializeFromInt)
       }\(absMethod ?? "")
 
       @inline(always)
