@@ -179,19 +179,14 @@ final class ManglingTests: XCTestCase {
     ]
 
     for (n, (t, r)) in expected {
-      guard let d = findDeclaration(t, named: n, in: m0, of: p) else {
+      guard let d = p.findDeclaration(t, named: n, in: m0) else {
         XCTFail("unable to find declaration \(n)")
         continue
       }
       assertManglingOf(declaration: d, in: p, is: r)
     }
     for (n, (t, r)) in expected2 {
-      guard
-        let d = findDeclaration(
-          t, in: m0, of: p,
-          nameMatching: { (name) in name.contains(n) }
-        )
-      else {
+      guard let d = p.findDeclaration(t, in: m0, nameMatching: { $0.contains(n) }) else {
         XCTFail("unable to find declaration with name containing \(n)")
         continue
       }
@@ -362,7 +357,7 @@ final class ManglingTests: XCTestCase {
     ]
 
     for (n, (t, r)) in expected {
-      guard let d = findDeclaration(t, named: n, in: m0, of: p) else {
+      guard let d = p.findDeclaration(t, named: n, in: m0) else {
         XCTFail("unable to find declaration \(n)")
         continue
       }
@@ -378,13 +373,9 @@ final class ManglingTests: XCTestCase {
     p = await p.typeChecked()
     failIfContainsError(p)
 
-    let greet = findDeclaration(FunctionDeclaration.self, named: "Greeter.greet", in: m0, of: p)!
-    let conformance = ConformanceDeclaration.ID(
-      uncheckedFrom: findDeclaration(
-        ConformanceDeclaration.self, in: m0, of: p, nameMatching: { _ in true })!.erased)
-    let origin = BindingDeclaration.ID(
-      uncheckedFrom: findDeclaration(
-        BindingDeclaration.self, in: m0, of: p, nameMatching: { _ in true })!.erased)
+    let greet = p.findDeclaration(FunctionDeclaration.self, named: "Greeter.greet", in: m0)!
+    let conformance = p.firstDeclaration(ConformanceDeclaration.self, in: m0)!
+    let origin = p.firstDeclaration(BindingDeclaration.self, in: m0)!
 
     let names: [IRFunction.Name] = [
       .lowered(greet),
@@ -394,7 +385,7 @@ final class ManglingTests: XCTestCase {
       .existentialized(.lowered(greet)),
       .slide(.lowered(greet), 0),
       .plateau(.lowered(greet), 0),
-      .applied(.lowered(greet), 0)
+      .applied(.lowered(greet), 0),
     ]
 
     XCTAssertEqual(
@@ -416,24 +407,17 @@ final class ManglingTests: XCTestCase {
     p = await p.typeChecked()
     failIfContainsError(p)
 
-    let names = [m0, m1].map { (m) in
-      IRFunction.Name.initializer(
-        BindingDeclaration.ID(
-          uncheckedFrom: findDeclaration(
-            BindingDeclaration.self, in: m, of: p, nameMatching: { _ in true })!.erased))
+    let mangled = [m0, m1].map { (m) in
+      let origin = p.firstDeclaration(BindingDeclaration.self, in: m)!
+      return p.mangled(.initializer(origin))
     }
-    let mangled = names.map { (n) in p.mangled(n) }
     XCTAssertNotEqual(mangled[0], mangled[1])
 
     for (m, s) in zip(["M0", "M1"], mangled) {
       assertDemanglingIsOk(mangled: s, of: "initializer in \(m)")
-      XCTAssert(DemangledSymbol(s).description.hasPrefix("init \(m)."), "(demangled: \(DemangledSymbol(s)))")
+      let demangled = DemangledSymbol(s).description
+      XCTAssert(demangled.hasPrefix("init \(m)."), "(demangled: \(demangled))")
     }
-  }
-
-  func testDemangling() {
-    let d = DemangledSymbol("$hmFM4M0vUqvirtual15k4fk1dd2zcrC9GreeterF07greetlT01tR516selfgcTK20tR5cDpTcTK21L3sTK1S7Robot00$gP71L1L1L")
-    XCTAssertNotEqual(d.description, "#!")
   }
 
   /// Tests the mangling and demangling of the names of IR globals.
@@ -444,10 +428,8 @@ final class ManglingTests: XCTestCase {
     p = await p.typeChecked()
     failIfContainsError(p)
 
-    let robot = findDeclaration(StructDeclaration.self, named: "Robot", in: m0, of: p)!
-    let origin = BindingDeclaration.ID(
-      uncheckedFrom: findDeclaration(
-        BindingDeclaration.self, in: m0, of: p, nameMatching: { _ in true })!.erased)
+    let robot = p.firstDeclaration(StructDeclaration.self, named: "Robot", in: m0)!
+    let origin = p.firstDeclaration(BindingDeclaration.self, in: m0)!
 
     let names: [IRGlobal.Name] = [
       .lowered(origin),
@@ -531,7 +513,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of associated types in `program`.
   private func testAssociatedTypeMangling(module m: Module.ID, program: inout Program) {
-    let provider = findTopLevelDeclaration(named: "Provider", in: m, of: program)!
+    let provider = program.firstTopLevelDeclaration(named: "Provider", in: m)!
     let traitDeclaration = TraitDeclaration.ID(uncheckedFrom: provider.erased)
     let providerRequirement = program.types.demand(Trait(declaration: traitDeclaration))
     let providerType = providerRequirement.erased
@@ -558,7 +540,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of enum types in `program`.
   private func testEnumTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "MyEnum", in: m)!
     assertManglingOf(
       type: program.types.demand(
         Enum(declaration: .init(uncheckedFrom: d.erased))
@@ -667,14 +649,14 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of opaque environment types in `program`.
   private func testOpaqueEnvironmentTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "MyEnum", in: m)!
     let t = OpaqueType.environment(d)
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "some M0.#.MyEnum")
   }
 
   /// Tests the mangling and demangling of opaque environment types in `program`.
   private func testOpaquePayloadTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "MyEnum", in: m)!
     let t = OpaqueType.payload(program.castUnchecked(d, to: EnumDeclaration.self))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "some M0.#.MyEnum")
   }
@@ -688,14 +670,14 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of struct types in `program`.
   private func testStructTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "A", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "A", in: m)!
     let t = Struct(declaration: .init(uncheckedFrom: d.erased))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "M0.#.A")
   }
 
   /// Tests the mangling and demangling of trait types in `program`.
   private func testTraitTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "Provider", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "Provider", in: m)!
     let t = Trait(declaration: .init(uncheckedFrom: d.erased))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "M0.#.Provider")
   }
@@ -740,7 +722,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of type alias types in `program`.
   private func testTypeAliasMangling(module m: Module.ID, program: inout Program) {
-    let c = findTopLevelDeclaration(named: "C", in: m, of: program)!
+    let c = program.firstTopLevelDeclaration(named: "C", in: m)!
     let output = (program[c] as! StructDeclaration).members[0]
     assertManglingOf(
       type: program.type(assignedTo: output),
@@ -768,76 +750,6 @@ final class ManglingTests: XCTestCase {
       demangled, expected,
       "demangling of declaration \(d) is incorrect (mangled: \(m))"
     )
-  }
-
-  /// Asserts that the mangling of `t` in `p` equals `expected`.
-  private func assertDemanglingIsOk(
-    mangled m: String, file: StaticString = #filePath, line: UInt = #line
-  ) {
-    let demangled = DemangledSymbol(m).description
-    XCTAssertFalse(
-      demangled.contains("#!"), "demangling of \(m) contains errors: \(demangled)", 
-      file: file, line: line)
-  }
-
-  /// Asserts that `m`, which is the mangling of the symbol described by `subject`, demangles
-  /// without error.
-  private func assertDemanglingIsOk(
-    mangled m: String, of subject: String, file: StaticString = #filePath, line: UInt = #line
-  ) {
-    let demangled = DemangledSymbol(m).description
-    XCTAssertFalse(
-      demangled.contains("#!"),
-      "demangling of \(subject) contains errors: \(demangled)\n(mangled: \(m))",
-      file: file,
-      line: line
-    )
-  }
-
-  /// Finds the first top-level declaration of `m` named `n`, returning its identity, or `nil` if
-  /// no such declaration exists.
-  private func findTopLevelDeclaration(
-    named n: String, in m: Module.ID, of program: Program
-  ) -> DeclarationIdentity? {
-    program[m].topLevelDeclarations.first { d in
-      return program.debugName(of: d) == n
-    }
-  }
-
-  /// Finds the first declaration of `m` of type `t`, named `n`, returning its identity, or
-  /// `nil` if no such declaration exists.
-  private func findDeclaration<T: Syntax>(
-    _ t: T.Type, named n: String, in m: Module.ID, of program: Program
-  ) -> DeclarationIdentity? {
-    findDeclaration(t, in: m, of: program) { $0 == n }
-  }
-
-  /// Finds the first declaration of `m` of type `t`, that has a name for which `predicate` returns
-  /// `true`, returning its identity, or `nil` if no such declaration exists.
-  private func findDeclaration<T: Syntax>(
-    _ t: T.Type, in m: Module.ID, of program: Program, nameMatching predicate: (String) -> Bool
-  ) -> DeclarationIdentity? {
-    let u = SyntaxTag(t)
-    for s in program[m].syntax {
-      if program.tag(of: s) == u && program.isDeclaration(s) {
-        let d = DeclarationIdentity(uncheckedFrom: s)
-        if predicate(program.debugName(of: d)) {
-          return d
-        }
-      }
-    }
-    return nil
-  }
-
-
-  /// Fail the tests if `p` contains errors.
-  private func failIfContainsError(_ p: Program) {
-    if p.containsError {
-      for d in p.diagnostics {
-        print(d)
-      }
-      XCTFail("Unexpected error(s) in test program: \(p.diagnostics)")
-    }
   }
 
 }

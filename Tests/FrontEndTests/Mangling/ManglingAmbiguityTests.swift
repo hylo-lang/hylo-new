@@ -2,15 +2,16 @@ import XCTest
 
 @testable import FrontEnd
 
-/// Reproducers for mangled symbols in which the end of a declaration chain is ambiguous.
+/// Tests for mangled symbols in which the end of a declaration chain could be ambiguous.
 ///
 /// After demangling a component, `takeEntity` continues the current qualification chain if the
 /// next characters read as an entity operator (other than `R`, `M`, or `rK`). Each test below
 /// exercises one situation in which the mangler writes such characters right after the end of a
-/// declaration, without a `declarationEnd` separating them.
+/// declaration, which must therefore be followed by a `declarationEnd`.
 ///
-/// Most of these symbols demangle without any error but into the wrong structure, so the tests
-/// check the shape of the demangled symbol rather than the absence of `#!`.
+/// Getting this wrong typically produces symbols that demangle without any error but into the
+/// wrong structure, so the tests check the shape of the demangled symbol rather than the absence
+/// of `#!`.
 final class ManglingAmbiguityTests: XCTestCase {
 
   /// A function whose signature ends with a nominal type mangled for the first time, followed by
@@ -18,12 +19,12 @@ final class ManglingAmbiguityTests: XCTestCase {
   ///
   /// `…F f lT… sT K1 S3A P3y`: the chain of `A` (in the output type) swallows `P3y`.
   func testDeclarationAfterFunctionReturningNominalType() async {
-    let p = await typeChecked(
+    let (p, m0) = await typeChecked(
       """
       struct A { public memberwise init }
       struct B { fun f(y: Int) -> A { A() } }
       """)
-    let y = findDeclaration(ParameterDeclaration.self, in: p) { $0.hasSuffix(".y") }!
+    let y = p.findDeclaration(ParameterDeclaration.self, in: m0) { $0.hasSuffix(".y") }!
     assertInnermostComponent(of: p.mangled(y), is: .scope("y"))
   }
 
@@ -31,11 +32,11 @@ final class ManglingAmbiguityTests: XCTestCase {
   ///
   /// `…F g lT… sT R2 P3z`: the chain of `Int` (in the output type) swallows `P3z`.
   func testDeclarationAfterFunctionReturningReservedType() async {
-    let p = await typeChecked(
+    let (p, m0) = await typeChecked(
       """
       fun g(z: Bool) -> Int { Int() }
       """)
-    let z = findDeclaration(ParameterDeclaration.self, in: p) { $0.hasSuffix(".z") }!
+    let z = p.findDeclaration(ParameterDeclaration.self, in: m0) { $0.hasSuffix(".z") }!
     assertInnermostComponent(of: p.mangled(z), is: .scope("z"))
   }
 
@@ -43,15 +44,14 @@ final class ManglingAmbiguityTests: XCTestCase {
   ///
   /// `mF <greet> cD …`: the chain of `greet` swallows the conformance.
   func testImplementationName() async {
-    let p = await typeChecked(
+    let (p, m0) = await typeChecked(
       """
       struct Robot { public memberwise init }
       trait Greeter { fun greet() }
       given Robot is Greeter { fun greet() {} }
       """)
-    let greet = findDeclaration(FunctionDeclaration.self, in: p) { $0 == "Greeter.greet" }!
-    let c = ConformanceDeclaration.ID(
-      uncheckedFrom: findDeclaration(ConformanceDeclaration.self, in: p) { _ in true }!.erased)
+    let greet = p.findDeclaration(FunctionDeclaration.self, named: "Greeter.greet", in: m0)!
+    let c = p.firstDeclaration(ConformanceDeclaration.self, in: m0)!
 
     let m = p.mangled(IRFunction.Name.implementation(greet, c, TypeArguments()))
     guard
@@ -73,7 +73,7 @@ final class ManglingAmbiguityTests: XCTestCase {
   /// symbol is also affected by `testImplementationName` and
   /// `testDeclarationAfterLastUsing`.
   func testUsingFollowedByLookup() async {
-    let p = await typeChecked(
+    let (p, m0) = await typeChecked(
       """
       trait P {}
       trait Q {}
@@ -81,11 +81,10 @@ final class ManglingAmbiguityTests: XCTestCase {
       trait Greeter { fun greet() }
       given <T is P, U is Q> => A<T, U> is Greeter { fun greet() {} }
       """)
-    let greet = findDeclaration(FunctionDeclaration.self, in: p) {
+    let greet = p.findDeclaration(FunctionDeclaration.self, in: m0) {
       $0.hasPrefix("$<ConformanceDeclaration") && $0.hasSuffix(".greet")
     }!
-    let c = ConformanceDeclaration.ID(
-      uncheckedFrom: findDeclaration(ConformanceDeclaration.self, in: p) { _ in true }!.erased)
+    let c = p.firstDeclaration(ConformanceDeclaration.self, in: m0)!
 
     let m = p.mangled(IRFunction.Name.implementation(greet, c, TypeArguments()))
     guard
@@ -101,12 +100,12 @@ final class ManglingAmbiguityTests: XCTestCase {
   ///
   /// `…xD <type> 1 rK cD… 0 F f …`: the chain of the using swallows `F f`.
   func testDeclarationAfterLastUsing() async {
-    let p = await typeChecked(
+    let (p, m0) = await typeChecked(
       """
       trait Q {}
       extension <T is Q> T { fun f() {} }
       """)
-    let f = findDeclaration(FunctionDeclaration.self, in: p) { $0.hasSuffix("f") }!
+    let f = p.findDeclaration(FunctionDeclaration.self, in: m0) { $0.hasSuffix("f") }!
     assertInnermostName(of: p.mangled(f), is: "f")
   }
 
@@ -115,11 +114,11 @@ final class ManglingAmbiguityTests: XCTestCase {
   /// The tag of a slide is written right after the function. 36 is `A` (type alias declaration),
   /// 46 is `K` (lookup), and 51...114 start with `P` (parameter declaration).
   func testIntegerAfterDeclaration() async {
-    let p = await typeChecked(
+    let (p, m0) = await typeChecked(
       """
       fun g(z: Bool) -> Int { Int() }
       """)
-    let g = findDeclaration(FunctionDeclaration.self, in: p) { $0.hasPrefix("g") }!
+    let g = p.findDeclaration(FunctionDeclaration.self, in: m0) { $0.hasPrefix("g") }!
 
     for i in [0, 10, 35, 36, 38, 41, 42, 46, 50, 51, 114, 115] {
       let m = p.mangled(IRFunction.Name.slide(.lowered(g), i))
@@ -138,12 +137,12 @@ final class ManglingAmbiguityTests: XCTestCase {
   /// The label `Fabcdefgh` has length 9, encoded as `b`, so it would read as `bF` (function
   /// bundle declaration). This case is guarded by `declarationEnd` and is expected to pass.
   func testStringAfterDeclaration() async {
-    let p = await typeChecked(
+    let (p, m0) = await typeChecked(
       """
       struct A { public memberwise init }
       fun k(a: A, Fabcdefgh b: Int) {}
       """)
-    let k = findDeclaration(FunctionDeclaration.self, in: p) { $0.hasPrefix("k") }!
+    let k = p.findDeclaration(FunctionDeclaration.self, in: m0) { $0.hasPrefix("k") }!
     let m = p.mangled(k)
     guard
       case .entity(let e) = DemangledSymbol(m),
@@ -154,29 +153,46 @@ final class ManglingAmbiguityTests: XCTestCase {
     XCTAssertEqual(inputs.map(\.label), [nil, "Fabcdefgh"], "(mangled: \(m))")
   }
 
-  // MARK: Helpers
+  /// Integers written after the end of nested wrapped names.
+  ///
+  /// Each wrapper (e.g., a slide) writes its tag after the name it wraps, so a tag that reads as
+  /// an entity operator must not be absorbed by the chain of the wrapped declaration, nor be
+  /// confused with the tag of an inner wrapper.
+  func testIntegerAfterWrappedName() async {
+    let (p, m0) = await typeChecked(
+      """
+      fun g(z: Bool) -> Int { Int() }
+      let origin = Int()
+      """)
+    let g = p.findDeclaration(FunctionDeclaration.self, in: m0) { $0.hasPrefix("g") }!
+    let origin = p.firstDeclaration(BindingDeclaration.self, in: m0)!
 
-  /// Returns a type checked program containing `source` in a module named `M0`.
-  private func typeChecked(_ source: SourceFile) async -> Program {
-    var p = await Program.withMinimalStandardLibrary()
-    _ = p.addUserModule(named: "M0", source: source)
-    p = await p.typeChecked()
-    if p.containsError {
-      XCTFail("Unexpected error(s) in test program: \(p.diagnostics)")
+    let f = "M0.#.fun g: [Void](Hylo.Bool) let -> Hylo.Int"
+    let names: [(IRFunction.Name, String)] = [
+      (.applied(.existentialized(.lowered(g)), 36), "applied some \(f) 36"),
+      (.applied(.existentialized(.lowered(g)), 46), "applied some \(f) 46"),
+      (.slide(.slide(.lowered(g), 5), 36), "slide slide \(f) 5 36"),
+      (.slide(.slide(.lowered(g), 36), 46), "slide slide \(f) 36 46"),
+      (.slide(.synthesized(g, TypeArguments()), 51), "slide \(f)<> 51"),
+      (.slide(.initializer(origin), 36), "slide init M0.#.[origin] 36"),
+      (.applied(.slide(.initializer(origin), 5), 46), "applied slide init M0.#.[origin] 5 46"),
+    ]
+    for (n, expected) in names {
+      let m = p.mangled(n)
+      XCTAssertEqual(DemangledSymbol(m).description, expected, "(mangled: \(m))")
     }
-    return p
   }
 
-  /// Returns the first declaration of type `t` in `M0` whose debug name satisfies `predicate`.
-  private func findDeclaration<T: Syntax>(
-    _ t: T.Type, in p: Program, nameMatching predicate: (String) -> Bool
-  ) -> DeclarationIdentity? {
-    let m = p.modules.values.first(where: { (m) in m.name.description == "M0" })!.identity
-    for s in p[m].syntax where p.tag(of: s) == SyntaxTag(t) && p.isDeclaration(s) {
-      let d = DeclarationIdentity(uncheckedFrom: s)
-      if predicate(p.debugName(of: d)) { return d }
-    }
-    return nil
+  // MARK: Helpers
+
+  /// Returns a type checked program containing `source` in a module named `M0`, along with the
+  /// identity of that module.
+  private func typeChecked(_ source: SourceFile) async -> (Program, Module.ID) {
+    var p = await Program.withMinimalStandardLibrary()
+    let m0 = p.addUserModule(named: "M0", source: source)
+    p = await p.typeChecked()
+    failIfContainsError(p)
+    return (p, m0)
   }
 
   /// Returns the components of the qualification chain `e`, from outermost to innermost.
