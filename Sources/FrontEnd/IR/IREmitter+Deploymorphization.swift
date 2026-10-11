@@ -350,7 +350,14 @@ extension IREmitter {
         default:
           let s = poly.at(i)
           lowering(p, anchoredTo: s.anchor, in: &target) { (me) in
-            if let clone = me.insert(s.substituting(properties)) {
+            // If `s` stores a type witness that depends on generic parameters, the constant must
+            // be replaced by a witness computed at run-time.
+            if let store = s as? IRStore, case .type(let t, _) = store.value,
+              !me.program.types.parameters(freeIn: t).isEmpty
+            {
+              let w = me._emitAccessTypeWitness(of: t, reusing: &witnesses)
+              me._memory_copy(w, to: properties[store.target])
+            } else if let clone = me.insert(s.substituting(properties)) {
               properties[.register(i)] = clone
             }
           }
