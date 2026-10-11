@@ -148,14 +148,6 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     ".new(value: Builtin.xor_\(builtinType)(self.value, (-1 as Self).value))"
   }
 
-  /// An expression denoting the number of leading zeros the representation of the receiver.
-  ///
-  /// The result of the expression is an instance of `Hylo.Int`.
-  var leadingZeroBitCount: String {
-    let n = asInstanceOfWord("Builtin.ctlz_\(builtinType)(self.value)")
-    return "Int(value: \(n))"
-  }
-
   /// An expression denoting the smallest instance of the type that `Self` describes.
   ///
   /// The result of the expression is an instance of the type described by `Self`.
@@ -331,10 +323,16 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       public init(other: Int) {\(initializeFromInt)
       }\(absMethod ?? "")
 
+      /// Returns the number of bits that are set in the representation of `self`.
+      @inline(always)
+      public fun nonzero_bit_count() -> Int {
+        Int(value: \(asInstanceOfWord("Builtin.ctpop_\(builtinType)(self.value)")))
+      }
+
       /// Returns the number of leading zeros in the representation of `self`.
       @inline(always)
       public fun leading_zero_bit_count() -> Int {
-        \(leadingZeroBitCount)
+        Int(value: \(asInstanceOfWord("Builtin.ctlz_\(builtinType)(self.value)")))
       }
 
       @inline(always)

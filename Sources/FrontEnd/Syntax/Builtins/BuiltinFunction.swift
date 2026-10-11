@@ -174,7 +174,7 @@ public enum BuiltinFunction: Hashable, Sendable {
   /// In LLVM: `fptosi`.
   case fptosi(MachineType.ID, MachineType.ID)
 
-  //  case ctpop(MachineType.ID)
+  case ctpop(MachineType.ID)
 
   case ctlz(MachineType.ID)
 
@@ -535,8 +535,8 @@ extension BuiltinFunction {
       return s.demand(Arrow(f, to: d)).erased
     case .fptosi(let f, let d):
       return s.demand(Arrow(f, to: d)).erased
-    //    case .ctpop(let t):
-    //      return .init(^t, to: ^t)
+    case .ctpop(let t):
+      return s.demand(Arrow(t, to: t)).erased
     case .ctlz(let t):
       return s.demand(Arrow(t, to: t)).erased
     //    case .cttz(let t):
@@ -884,8 +884,8 @@ extension BuiltinFunction: Showable {
       return "fptoui_\(l)_\(r)"
     case .fptosi(let l, let r):
       return "fptosi_\(l)_\(r)"
-    //    case .ctpop(let t):
-    //      return "ctpop_\(t)"
+    case .ctpop(let t):
+      return printer.format("ctpop_%T", [t.erased])
     case .ctlz(let t):
       return printer.format("ctlz_%T", [t.erased])
     //    case .cttz(let t):
@@ -1299,10 +1299,9 @@ extension BuiltinFunction {
       guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
       self = .fptosi(s.demand(f), s.demand(d))
 
-    //
-    //    case "ctpop":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .ctpop(t)
+    case "ctpop":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .ctpop(s.demand(t))
 
     case "ctlz":
       guard let t = machineType(&tokens) else { return nil }
@@ -1315,7 +1314,7 @@ extension BuiltinFunction {
     case "zeroinitializer":
       guard let t = machineType(&tokens) else { return nil }
       self = .zeroinitializer(s.demand(t))
-    //
+
     //    case "atomic":
     //      if let t = tokens.first, t.contains("fence") {
     //        self.init(fence: n)
