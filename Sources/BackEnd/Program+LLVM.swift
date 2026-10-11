@@ -487,16 +487,6 @@ extension Program {
       let xs = insertLoad(s.arguments, instancesOf: from, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertSIToFP(
         xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
-
-    case .bitcast(let from, let to):
-      let t = metadata(of: from, in: &ctx.module)
-      let u = metadata(of: to, in: &ctx.module)
-      let a = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: t.llvm, in: &ctx)
-      if (t.llvm == u.llvm) {
-        ctx.value[v] = a
-      } else {
-        ctx.value[v] = ctx.module.llvm.insertBitCast(a, to: u.llvm, at: ctx.insertionPoint!).v
-      }
     }
 
     return ctx.ir.instruction(after: i.erased)
