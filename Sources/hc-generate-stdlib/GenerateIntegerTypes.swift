@@ -335,6 +335,12 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
         Int(value: \(asInstanceOfWord("Builtin.ctlz_\(builtinType)(self.value)")))
       }
 
+      /// Returns the number of trailing zeros in the representation of `self`.
+      @inline(always)
+      public fun trailing_zero_bit_count() -> Int {
+        Int(value: \(asInstanceOfWord("Builtin.cttz_\(builtinType)(self.value)")))
+      }
+
       @inline(always)
       public static fun min() -> Self {
         \(minimumValue)

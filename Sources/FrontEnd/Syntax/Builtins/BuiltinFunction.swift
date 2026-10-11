@@ -178,7 +178,7 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case ctlz(MachineType.ID)
 
-  //  case cttz(MachineType.ID)
+  case cttz(MachineType.ID)
 
   case zeroinitializer(MachineType.ID)
 
@@ -539,8 +539,8 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, to: t)).erased
     case .ctlz(let t):
       return s.demand(Arrow(t, to: t)).erased
-    //    case .cttz(let t):
-    //      return .init(^t, to: ^t)
+    case .cttz(let t):
+      return s.demand(Arrow(t, to: t)).erased
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
     case .advancedByBytes(let byteOffset):
@@ -888,8 +888,8 @@ extension BuiltinFunction: Showable {
       return printer.format("ctpop_%T", [t.erased])
     case .ctlz(let t):
       return printer.format("ctlz_%T", [t.erased])
-    //    case .cttz(let t):
-    //      return "cttz_\(t)"
+    case .cttz(let t):
+      return printer.format("cttz_%T", [t.erased])
     case .zeroinitializer(let t):
       return printer.format("zeroinitializer_%T", [t.erased])
     case .advancedByBytes(let t):
@@ -1307,9 +1307,9 @@ extension BuiltinFunction {
       guard let t = machineType(&tokens) else { return nil }
       self = .ctlz(s.demand(t))
 
-    //    case "cttz":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .cttz(t)
+    case "cttz":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .cttz(s.demand(t))
 
     case "zeroinitializer":
       guard let t = machineType(&tokens) else { return nil }

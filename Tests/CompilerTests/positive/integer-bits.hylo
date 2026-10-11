@@ -79,4 +79,13 @@ public fun main() {
   precondition((-12 as Int16) .leading_zero_bit_count() == 0)
   precondition(( 12 as Int16) .leading_zero_bit_count() == 12)
   precondition(( 12 as UInt16).leading_zero_bit_count() == 12)
+
+  // Trailing zeros.
+  precondition((-12 as Int8)  .trailing_zero_bit_count() == 2)
+  precondition(( 12 as Int8)  .trailing_zero_bit_count() == 2)
+  precondition(( 12 as UInt8) .trailing_zero_bit_count() == 2)
+
+  precondition((-12 as Int16) .trailing_zero_bit_count() == 2)
+  precondition(( 12 as Int16) .trailing_zero_bit_count() == 2)
+  precondition(( 12 as UInt16).trailing_zero_bit_count() == 2)
 }
