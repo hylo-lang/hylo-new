@@ -655,15 +655,6 @@ fun test_Builtin_xor() {
     (0 as Int64).value))
 }
 
-// MARK: Testing Builtin.sizeof_*()
-
-fun test_Builtin_sizeof() {
-  expect(Builtin.icmp_eq_word(Builtin.sizeof_i8(), 1.value))
-  expect(Builtin.icmp_eq_word(Builtin.sizeof_i16(), 2.value))
-  expect(Builtin.icmp_eq_word(Builtin.sizeof_i32(), 4.value))
-  expect(Builtin.icmp_eq_word(Builtin.sizeof_word(), Builtin.sizeof_ptr()))
-}
-
 // MARK: Testing Builtin.zeroinitializer_*()
 
 fun test_Builtin_zeroinitializer() {
@@ -735,7 +726,6 @@ public fun main() {
   test_Builtin_lhsr()
   test_Builtin_usub_with_overflow()
   test_Builtin_xor()
-  test_Builtin_sizeof()
   test_Builtin_zeroinitializer()
   test_Builtin_zext()
 }

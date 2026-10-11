@@ -294,10 +294,6 @@ extension Program {
     case .addressOf:
       ctx.value[v] = ctx.value[s.arguments[0]]!
 
-    case .sizeof(let t):
-      let s = metadata(of: t, in: &ctx.module).layout.size.fixed!
-      ctx.value[v] = ctx.module.llvm.iptr.unsafe[].constant(s).v
-
     case .zeroinitializer(let t):
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
 

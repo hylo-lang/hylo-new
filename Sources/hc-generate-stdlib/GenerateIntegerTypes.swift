@@ -195,12 +195,9 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   var bitWidth: String {
     switch size {
     case .fittingLargestObjectSize:
-      let x = "Builtin.sizeof_\(builtinType)()"
-      let y = "Builtin.mul_word(\(x), 8.value)"
-      return "Int(value: \(y))"
-
+      "Int(value: Builtin.ctlz_word(0.value))"
     case .fixedWidth(let bits):
-      return String(describing: bits)
+      String(describing: bits)
     }
   }
 
