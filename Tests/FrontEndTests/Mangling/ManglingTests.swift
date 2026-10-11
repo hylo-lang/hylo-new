@@ -445,28 +445,6 @@ final class ManglingTests: XCTestCase {
     }
   }
 
-  /// Tests that a declaration written immediately before a parameter label is demangled as a
-  /// complete declaration.
-  func testParameterLabelFollowingDeclaration() async {
-    // Labels start with an uppercase letter so that, whenever the length prefix is a lowercase
-    // digit, the two characters together are as likely as possible to form an operator.
-    let labels = (1 ... 24).map({ (n) in "F" + String(repeating: "x", count: n - 1) })
-
-    var source = "struct Robot { public memberwise init }\n"
-    for (i, l) in labels.enumerated() {
-      source += "fun f\(i)(a: Robot, \(l) b: Robot) {}\n"
-    }
-
-    var p = await Program.withMinimalStandardLibrary()
-    let m0 = p.addUserModule(named: "M0", source: .init(contents: source))
-    p = await p.typeChecked()
-    failIfContainsError(p)
-
-    for d in p[m0].topLevelDeclarations {
-      assertDemanglingIsOk(mangled: p.mangled(d), of: p.debugName(of: d))
-    }
-  }
-
   /// A program declaring a struct, a trait, a conformance of the former to the latter, and a
   /// global binding.
   private var conformingProgram: SourceFile {

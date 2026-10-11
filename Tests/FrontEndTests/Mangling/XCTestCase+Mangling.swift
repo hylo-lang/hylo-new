@@ -17,7 +17,7 @@ extension XCTestCase {
       file: file, line: line)
   }
 
-  /// Fail the tests if `p` contains errors.
+  /// Fails the current test if `p` contains errors.
   func failIfContainsError(_ p: Program, file: StaticString = #filePath, line: UInt = #line) {
     if p.containsError {
       for d in p.diagnostics {

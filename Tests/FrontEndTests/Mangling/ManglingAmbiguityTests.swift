@@ -2,240 +2,131 @@ import XCTest
 
 @testable import FrontEnd
 
-/// Tests for mangled symbols in which the end of a declaration chain could be ambiguous.
-///
-/// After demangling a component, `takeEntity` continues the current qualification chain if the
-/// next characters read as an entity operator (other than `R`, `M`, or `rK`). Each test below
-/// exercises one situation in which the mangler writes such characters right after the end of a
-/// declaration, which must therefore be followed by a `declarationEnd`.
-///
-/// Getting this wrong typically produces symbols that demangle without any error but into the
-/// wrong structure, so the tests check the shape of the demangled symbol rather than the absence
-/// of `#!`.
+/// Tests that demangling recovers the structure of mangled symbols.
 final class ManglingAmbiguityTests: XCTestCase {
 
-  /// A function whose signature ends with a nominal type mangled for the first time, followed by
-  /// a component nested in that function.
-  ///
-  /// `…F f lT… sT K1 S3A P3y`: the chain of `A` (in the output type) swallows `P3y`.
-  func testDeclarationAfterFunctionReturningNominalType() async {
-    let (p, m0) = await typeChecked(
-      """
-      struct A { public memberwise init }
-      struct B { fun f(y: Int) -> A { A() } }
-      """)
-    let y = p.findDeclaration(ParameterDeclaration.self, in: m0) { $0.hasSuffix(".y") }!
-    assertInnermostComponent(of: p.mangled(y), is: .scope("y"))
-  }
-
-  /// Same as above with a reserved type: `R x` does not end a chain either.
-  ///
-  /// `…F g lT… sT R2 P3z`: the chain of `Int` (in the output type) swallows `P3z`.
-  func testDeclarationAfterFunctionReturningReservedType() async {
-    let (p, m0) = await typeChecked(
-      """
-      fun g(z: Bool) -> Int { Int() }
-      """)
-    let z = p.findDeclaration(ParameterDeclaration.self, in: m0) { $0.hasSuffix(".z") }!
-    assertInnermostComponent(of: p.mangled(z), is: .scope("z"))
-  }
-
-  /// An entity operator written immediately after a declaration.
-  ///
-  /// `mF <greet> cD …`: the chain of `greet` swallows the conformance.
-  func testImplementationName() async {
-    let (p, m0) = await typeChecked(
-      """
-      struct Robot { public memberwise init }
-      trait Greeter { fun greet() }
-      given Robot is Greeter { fun greet() {} }
-      """)
-    let greet = p.findDeclaration(FunctionDeclaration.self, named: "Greeter.greet", in: m0)!
-    let c = p.firstDeclaration(ConformanceDeclaration.self, in: m0)!
-
-    let m = p.mangled(IRFunction.Name.implementation(greet, c, TypeArguments()))
-    guard
-      case .entity(.implementation(let e, .conformanceDeclaration(_, let usings), let a)) =
-        DemangledSymbol(m)
-    else {
-      return XCTFail("expected an implementation, got: \(DemangledSymbol(m))\n(mangled: \(m))")
+  /// Tests that each declaration of `program` demangles to the declaration containing it,
+  /// qualified by one more component.
+  func testDeclarationNames() async {
+    let (p, m0) = await typeChecked(program + labels)
+    var demangled: [AnySyntaxIdentity: DemangledEntity] = [:]
+    for n in p.select(from: m0, .satisfies({ (n) in p.isDeclaration(n) })) {
+      demangled[n] = entity(p.mangled(DeclarationIdentity(uncheckedFrom: n)))
     }
-    XCTAssertEqual(innermostName(of: e), "greet", "(mangled: \(m))")
-    XCTAssertEqual(usings.count, 0, "(mangled: \(m))")
-    XCTAssertEqual(a.count, 0, "(mangled: \(m))")
-  }
 
-  /// A using of a conformance followed by another using starting with a lookup.
-  ///
-  /// The usings of the conformance are mangled twice in the name of an implementation: once in the
-  /// qualification of `greet` and once for the conformance itself. The second time, each using is
-  /// recorded and mangled as `K n`, so the first using swallows the second one. Note that this
-  /// symbol is also affected by `testImplementationName` and
-  /// `testDeclarationAfterLastUsing`.
-  func testUsingFollowedByLookup() async {
-    let (p, m0) = await typeChecked(
-      """
-      trait P {}
-      trait Q {}
-      struct A<T, U> {}
-      trait Greeter { fun greet() }
-      given <T is P, U is Q> => A<T, U> is Greeter { fun greet() {} }
-      """)
-    let greet = p.findDeclaration(FunctionDeclaration.self, in: m0) {
-      $0.hasPrefix("$<ConformanceDeclaration") && $0.hasSuffix(".greet")
-    }!
-    let c = p.firstDeclaration(ConformanceDeclaration.self, in: m0)!
-
-    let m = p.mangled(IRFunction.Name.implementation(greet, c, TypeArguments()))
-    guard
-      case .entity(.implementation(_, .conformanceDeclaration(_, let usings), _)) =
-        DemangledSymbol(m)
-    else {
-      return XCTFail("expected an implementation, got: \(DemangledSymbol(m))\n(mangled: \(m))")
-    }
-    XCTAssertEqual(usings.count, 2, "(mangled: \(m))")
-  }
-
-  /// The last using of an extension followed by the next component of the enclosing chain.
-  ///
-  /// `…xD <type> 1 rK cD… 0 F f …`: the chain of the using swallows `F f`.
-  func testDeclarationAfterLastUsing() async {
-    let (p, m0) = await typeChecked(
-      """
-      trait Q {}
-      extension <T is Q> T { fun f() {} }
-      """)
-    let f = p.findDeclaration(FunctionDeclaration.self, in: m0) { $0.hasSuffix("f") }!
-    assertInnermostName(of: p.mangled(f), is: "f")
-  }
-
-  /// An integer written after a declaration whose encoding starts with an entity operator.
-  ///
-  /// The tag of a slide is written right after the function. 36 is `A` (type alias declaration),
-  /// 46 is `K` (lookup), and 51...114 start with `P` (parameter declaration).
-  func testIntegerAfterDeclaration() async {
-    let (p, m0) = await typeChecked(
-      """
-      fun g(z: Bool) -> Int { Int() }
-      """)
-    let g = p.findDeclaration(FunctionDeclaration.self, in: m0) { $0.hasPrefix("g") }!
-
-    for i in [0, 10, 35, 36, 38, 41, 42, 46, 50, 51, 114, 115] {
-      let m = p.mangled(IRFunction.Name.slide(.lowered(g), i))
-      guard case .entity(.slide(let e, let j)) = DemangledSymbol(m) else {
-        XCTFail("tag \(i): expected a slide, got: \(DemangledSymbol(m))\n(mangled: \(m))")
+    for (n, e) in demangled {
+      guard let parent = p.parent(containing: n).node.flatMap({ (s) in demangled[s] }) else {
         continue
       }
-      XCTAssertEqual(j, i, "(mangled: \(m))")
-      XCTAssertEqual(innermostName(of: e), "g", "tag \(i) (mangled: \(m))")
+      guard case .qualified(_, let q) = e else {
+        XCTFail("expected a qualified entity, got: \(e)")
+        continue
+      }
+      XCTAssertEqual(q, parent, "(demangled: \(e))")
     }
   }
 
-  /// A string written after a declaration whose length and first character read as an entity
-  /// operator.
-  ///
-  /// The label `Fabcdefgh` has length 9, encoded as `b`, so it would read as `bF` (function
-  /// bundle declaration). This case is guarded by `declarationEnd` and is expected to pass.
-  func testStringAfterDeclaration() async {
-    let (p, m0) = await typeChecked(
-      """
-      struct A { public memberwise init }
-      fun k(a: A, Fabcdefgh b: Int) {}
-      """)
-    let k = p.findDeclaration(FunctionDeclaration.self, in: m0) { $0.hasPrefix("k") }!
-    let m = p.mangled(k)
-    guard
-      case .entity(let e) = DemangledSymbol(m),
-      case .functionDeclaration(_, .arrow(_, _, _, let inputs, _), _) = components(of: e).last!
-    else {
-      return XCTFail("expected a function, got: \(DemangledSymbol(m))\n(mangled: \(m))")
-    }
-    XCTAssertEqual(inputs.map(\.label), [nil, "Fabcdefgh"], "(mangled: \(m))")
-  }
-
-  /// Integers written after the end of nested wrapped names.
-  ///
-  /// Each wrapper (e.g., a slide) writes its tag after the name it wraps, so a tag that reads as
-  /// an entity operator must not be absorbed by the chain of the wrapped declaration, nor be
-  /// confused with the tag of an inner wrapper.
-  func testIntegerAfterWrappedName() async {
-    let (p, m0) = await typeChecked(
-      """
-      fun g(z: Bool) -> Int { Int() }
-      let origin = Int()
-      """)
+  /// Tests that IR function names wrapping other names demangle to the demangling of the names
+  /// they wrap, for every kind of name, wrapped at most twice, with a range of tags.
+  func testWrappedFunctionNames() async {
+    let (p, m0) = await typeChecked(program)
+    let greet = p.findDeclaration(FunctionDeclaration.self, named: "Greeter.greet", in: m0)!
+    let c = p.firstDeclaration(ConformanceDeclaration.self, in: m0)!
     let g = p.findDeclaration(FunctionDeclaration.self, in: m0) { $0.hasPrefix("g") }!
     let origin = p.firstDeclaration(BindingDeclaration.self, in: m0)!
 
-    let f = "M0.#.fun g: [Void](Hylo.Bool) let -> Hylo.Int"
-    let names: [(IRFunction.Name, String)] = [
-      (.applied(.existentialized(.lowered(g)), 36), "applied some \(f) 36"),
-      (.applied(.existentialized(.lowered(g)), 46), "applied some \(f) 46"),
-      (.slide(.slide(.lowered(g), 5), 36), "slide slide \(f) 5 36"),
-      (.slide(.slide(.lowered(g), 36), 46), "slide slide \(f) 36 46"),
-      (.slide(.synthesized(g, TypeArguments()), 51), "slide \(f)<> 51"),
-      (.slide(.initializer(origin), 36), "slide init M0.#.[origin] 36"),
-      (.applied(.slide(.initializer(origin), 5), 46), "applied slide init M0.#.[origin] 5 46"),
+    let bases: [IRFunction.Name] = [
+      .lowered(g),
+      .initializer(origin),
+      .synthesized(g, TypeArguments()),
+      .implementation(greet, c, TypeArguments()),
     ]
-    for (n, expected) in names {
-      let m = p.mangled(n)
-      XCTAssertEqual(DemangledSymbol(m).description, expected, "(mangled: \(m))")
+
+    // Each way of wrapping a name, paired with the entity that the result should demangle to,
+    // given the entity that the wrapped name demangles to.
+    typealias Wrapper = (
+      name: (IRFunction.Name, Int) -> IRFunction.Name,
+      entity: (DemangledEntity, Int) -> DemangledEntity
+    )
+    let wrappers: [Wrapper] = [
+      ({ (n, _) in .existentialized(n) }, { (e, _) in .existentialized(e) }),
+      ({ (n, i) in .slide(n, i) }, { (e, i) in .slide(e, i) }),
+      ({ (n, i) in .plateau(n, i) }, { (e, i) in .plateau(e, i) }),
+      ({ (n, i) in .applied(n, i) }, { (e, i) in .applied(e, i) }),
+    ]
+
+    for b in bases {
+      guard let e = entity(p.mangled(b)) else { continue }
+      for i in 0 ..< 128 {
+        for w in wrappers {
+          let n = w.name(b, i)
+          guard let f = entity(p.mangled(n)) else { continue }
+          XCTAssertEqual(f, w.entity(e, i), "\(n)")
+          for v in wrappers {
+            XCTAssertEqual(entity(p.mangled(v.name(n, i))), v.entity(f, i), "\(v.name(n, i))")
+          }
+        }
+      }
     }
   }
 
-  // MARK: Helpers
+  /// A program declaring a variety of entities.
+  private var program: String {
+    """
+      // Functions returning user-defined and built-in types.
+      struct A { public memberwise init }
+      struct B { fun f(y: Int) -> A { A() } }
+      fun g(z: Bool) -> Int { Int() }
+
+      // A generic extension.
+      trait Q {}
+      extension <T is Q> T { fun h() {} }
+
+      // A generic conformance with several constraints.
+      trait P {}
+      struct C<T, U> {}
+      trait Greeter { fun greet() }
+      given <T is P, U is Q> => C<T, U> is Greeter { fun greet() {} }
+
+      let origin = Int()
+
+      """
+  }
+
+  /// Declarations of functions whose parameter labels have various lengths and initial letters,
+  /// using the struct `A` declared in `program`.
+  private var labels: String {
+    var source = ""
+    for (i, l) in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".enumerated() {
+      for n in 1 ... 120 {
+        source += "fun k\(i)_\(n)(a: A, \(l)\(String(repeating: "x", count: n - 1)) b: A) {}\n"
+      }
+    }
+    return source
+  }
 
   /// Returns a type checked program containing `source` in a module named `M0`, along with the
   /// identity of that module.
-  private func typeChecked(_ source: SourceFile) async -> (Program, Module.ID) {
+  private func typeChecked(_ source: String) async -> (Program, Module.ID) {
     var p = await Program.withMinimalStandardLibrary()
-    let m0 = p.addUserModule(named: "M0", source: source)
+    let m0 = p.addUserModule(named: "M0", source: .init(contents: source))
     p = await p.typeChecked()
     failIfContainsError(p)
     return (p, m0)
   }
 
-  /// Returns the components of the qualification chain `e`, from outermost to innermost.
-  private func components(of e: DemangledEntity) -> [DemangledEntity] {
-    if case .qualified(let h, let q) = e {
-      return components(of: q) + [h]
+  /// Returns the entity demangled from `m`, failing the current test if `m` does not demangle to
+  /// an entity without error.
+  private func entity(
+    _ m: String, file: StaticString = #filePath, line: UInt = #line
+  ) -> DemangledEntity? {
+    assertDemanglingIsOk(mangled: m, file: file, line: line)
+    if case .entity(let e) = DemangledSymbol(m) {
+      return e
     } else {
-      return [e]
-    }
-  }
-
-  /// Returns the name of the innermost component of `e` if it is a function declaration.
-  private func innermostName(of e: DemangledEntity) -> String? {
-    if case .functionDeclaration(let n, _, _) = components(of: e).last! {
-      return n.identifier
-    } else {
+      XCTFail("expected an entity, got: \(DemangledSymbol(m))", file: file, line: line)
       return nil
     }
-  }
-
-  /// Asserts that `m` demangles to an entity whose innermost component is `expected`.
-  private func assertInnermostComponent(
-    of m: String, is expected: DemangledEntity,
-    file: StaticString = #filePath, line: UInt = #line
-  ) {
-    guard case .entity(let e) = DemangledSymbol(m) else {
-      return XCTFail(
-        "expected an entity, got: \(DemangledSymbol(m))\n(mangled: \(m))", file: file, line: line)
-    }
-    XCTAssertEqual(
-      components(of: e).last, expected, "demangled: \(e)\n(mangled: \(m))", file: file, line: line)
-  }
-
-  /// Asserts that `m` demangles to an entity whose innermost component is a function named `n`.
-  private func assertInnermostName(
-    of m: String, is n: String, file: StaticString = #filePath, line: UInt = #line
-  ) {
-    guard case .entity(let e) = DemangledSymbol(m) else {
-      return XCTFail(
-        "expected an entity, got: \(DemangledSymbol(m))\n(mangled: \(m))", file: file, line: line)
-    }
-    XCTAssertEqual(
-      innermostName(of: e), n, "demangled: \(e)\n(mangled: \(m))", file: file, line: line)
   }
 
 }
