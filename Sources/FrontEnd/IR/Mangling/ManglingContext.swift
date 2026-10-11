@@ -213,9 +213,7 @@ internal struct ManglingContext {
   /// If `q` known and we can trivially reference it without emitting more qualifications
   /// manually, writes a lookup reference to it.
   internal mutating func addIf(referenceable q: ScopeIdentity) -> Bool {
-    (q.node != nil && addIf(reservedOrRecorded: .node(q.node!))) || 
-      addIf(reservedOrRecorded: q.asSymbol) ||
-      addIf(qualification: q)
+    addIf(reservedOrRecorded: q.asSymbol) || addIf(qualification: q)
   }
 
 }
