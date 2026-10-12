@@ -17,6 +17,19 @@ extension XCTestCase {
       file: file, line: line)
   }
 
+  /// Returns a type checked program containing the minimal standard library and `source` in a
+  /// module named `M0`, along with the identity of that module, failing the current test if that
+  /// program contains errors.
+  func typeCheckedWithMinimalStandardLibrary(
+    _ source: SourceFile, file: StaticString = #filePath, line: UInt = #line
+  ) async -> (Program, Module.ID) {
+    var p = await Program.withMinimalStandardLibrary()
+    let m0 = p.addUserModule(named: "M0", source: source)
+    p = await p.typeChecked()
+    failIfContainsError(p, file: file, line: line)
+    return (p, m0)
+  }
+
   /// Fails the current test if `p` contains errors.
   func failIfContainsError(_ p: Program, file: StaticString = #filePath, line: UInt = #line) {
     if p.containsError {

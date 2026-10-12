@@ -8,29 +8,23 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of all kinds of types.
   func testTypes() async {
-    var p = await Program.withMinimalStandardLibrary()
+    var (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      public struct A {}
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        public struct A {}
+      public trait Provider {
+        type Output
+      }
 
-        public trait Provider {
-          type Output
-        }
+      public struct C {
+        type Output = Int
+      }
 
-        public struct C {
-          type Output = Int
-        }
-
-        enum MyEnum<T> {
-          case one
-          case two(x: T)
-        }
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      enum MyEnum<T> {
+        case one
+        case two(x: T)
+      }
+      """)
 
     testReservedTypesMangling(program: &p)
     testCoreTypesMangling(program: &p)
@@ -57,56 +51,50 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of specific declarations.
   func testSpecificDeclarations() async {
-    var p = await Program.withMinimalStandardLibrary()
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      trait W { type X }
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        trait W { type X }
+      given Void is W { type X = Void }
 
-        given Void is W { type X = Void }
+      enum MyEnum<T> {
+        case one
+        case two(x: T)
+      }
 
-        enum MyEnum<T> {
-          case one
-          case two(x: T)
+      struct B<X> {
+        let x: X
+        public memberwise init
+      }
+
+      struct P<X, Y> {
+        let x: X
+        let y: Y
+        public memberwise init
+      }
+
+      fun 複雑(サ a: B<Int>, シ b: P<Int, P<Bool, B<Int>>>) -> Int { Int() }
+      static fun 複雑2(ス c: Int, セ: Bool) -> Bool { Bool() }
+
+      extension <T> {Void, T} {
+        fun f() {}
+      }
+
+      public fun f(x: inout Int64) auto -> Int64 {
+        let   { (Int64(), ) }
+        inout { Int64() }
+      }
+
+      fun g() {
+        let x = Int()
+        _ = x
+        let f0 = fun[](a: Void) -> Void {
+          let b = Int()
+          _ = b
         }
+      }
 
-        struct B<X> {
-          let x: X
-          public memberwise init
-        }
-
-        struct P<X, Y> {
-          let x: X
-          let y: Y
-          public memberwise init
-        }
-
-        fun 複雑(サ a: B<Int>, シ b: P<Int, P<Bool, B<Int>>>) -> Int { Int() }
-        static fun 複雑2(ス c: Int, セ: Bool) -> Bool { Bool() }
-
-        extension <T> {Void, T} {
-          fun f() {}
-        }
-
-        public fun f(x: inout Int64) auto -> Int64 {
-          let   { (Int64(), ) }
-          inout { Int64() }
-        }
-
-        fun g() {
-          let x = Int()
-          _ = x
-          let f0 = fun[](a: Void) -> Void {
-            let b = Int()
-            _ = b
-          }
-        }
-
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      """)
 
     // Exact match test cases.
     let expected: [String: (any Syntax.Type, String)] = [
@@ -197,80 +185,74 @@ final class ManglingTests: XCTestCase {
 
   /// Tests that the demangling for a selection of declarations don't contain errors.
   func testDeclarationsSelection() async {
-    var p = await Program.withMinimalStandardLibrary()
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      public struct A {}
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        public struct A {}
+      trait X {}
 
-        trait X {}
+      trait Indexable {
+        type Index
+        fun index(of: Self) -> Index
+        fun size() -> Index
 
-        trait Indexable {
-          type Index
-          fun index(of: Self) -> Index
-          fun size() -> Index
+        given Indexable is X {}
+      }
 
-          given Indexable is X {}
+      struct MyInt {
+        public memberwise init
+        public fun infix+ (other: Self) -> Self { Self() }
+      }
+      struct MyInt64 {
+        public memberwise init
+        public fun infix+ (other: Self) -> Self { Self() }
+      }
+      type Number = MyInt
+
+      struct Angle {
+        public var radians: MyInt64
+        public memberwise init
+        public init(degrees: MyInt64) {
+          &self.radians = MyInt64()
+        }
+      }
+
+      struct B<X> {
+        public memberwise init
+      }
+
+      struct P<X, Y> {
+        public memberwise init
+      }
+
+      fun français(_ x: MyInt, label y: A) -> MyInt {
+        let (bar, ham) = (MyInt(), MyInt())
+        return bar + ham
+      }
+
+      fun 複雑(サ: B<MyInt>, シ: P<MyInt, P<Bool, B<MyInt>>>) -> MyInt { MyInt() }
+      fun 複雑2(ス: MyInt, セ: Bool) -> Bool { Bool() }
+
+      fun foo(y: MyInt) {
+        let local = MyInt()
+        let lambda = fun[let capture = local](x x: MyInt) { capture + x }
+        if Bool() {
+          let z = lambda(x: y)
+          _ = z
         }
 
-        struct MyInt {
-          public memberwise init
-          public fun infix+ (other: Self) -> Self { Self() }
-        }
-        struct MyInt64 {
-          public memberwise init
-          public fun infix+ (other: Self) -> Self { Self() }
-        }
-        type Number = MyInt
-
-        struct Angle {
-          public var radians: MyInt64
-          public memberwise init
-          public init(degrees: MyInt64) {
-            &self.radians = MyInt64()
-          }
+        struct U {
+          fun hammer() {}
         }
 
-        struct B<X> {
-          public memberwise init
-        }
+        given Number is X {}
+      }
 
-        struct P<X, Y> {
-          public memberwise init
-        }
-
-        fun français(_ x: MyInt, label y: A) -> MyInt {
-          let (bar, ham) = (MyInt(), MyInt())
-          return bar + ham
-        }
-
-        fun 複雑(サ: B<MyInt>, シ: P<MyInt, P<Bool, B<MyInt>>>) -> MyInt { MyInt() }
-        fun 複雑2(ス: MyInt, セ: Bool) -> Bool { Bool() }
-
-        fun foo(y: MyInt) {
-          let local = MyInt()
-          let lambda = fun[let capture = local](x x: MyInt) { capture + x }
-          if Bool() {
-            let z = lambda(x: y)
-            _ = z
-          }
-
-          struct U {
-            fun hammer() {}
-          }
-
-          given Number is X {}
-        }
-
-        fun bar() {
-          let f = fun (a: Int) -> Void {}
-          let g = fun (a: Int) -> Void {}
-        }
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      fun bar() {
+        let f = fun (a: Int) -> Void {}
+        let g = fun (a: Int) -> Void {}
+      }
+      """)
 
     for d in p[m0].topLevelDeclarations {
       assertDemanglingIsOk(mangled: p.mangled(d))
@@ -279,34 +261,28 @@ final class ManglingTests: XCTestCase {
 
   /// Tests demangling for declarations with more generics.
   func testDeclarationsWithMoreGenerics() async {
-    var p = await Program.withMinimalStandardLibrary()
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      trait P { type X }
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        trait P { type X }
+      given Void is P { type X = Void }
 
-        given Void is P { type X = Void }
+      fun check<T>(x: T) {}
 
-        fun check<T>(x: T) {}
+      fun f0<T where T == Void>(x: T.X) {
+        check<Void>(x)
+      }
 
-        fun f0<T where T == Void>(x: T.X) {
-          check<Void>(x)
-        }
+      fun f1<T, U where T == U, T is P>(x: U.X) {
+        check<T.X>(x)
+        let y: T.X = x
+      }
 
-        fun f1<T, U where T == U, T is P>(x: U.X) {
-          check<T.X>(x)
-          let y: T.X = x
-        }
-
-        fun f2<T, U where T == U, T is P, U is P, T.X == U.X>(x: U.X) {
-          check<T.X>(x)
-          let y: T.X = x
-        }
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      fun f2<T, U where T == U, T is P, U is P, T.X == U.X>(x: U.X) {
+        check<T.X>(x)
+        let y: T.X = x
+      }
+      """)
 
     for d in p[m0].topLevelDeclarations {
       assertDemanglingIsOk(mangled: p.mangled(d))
@@ -315,31 +291,25 @@ final class ManglingTests: XCTestCase {
 
   /// Tests mangling and demangling in cases where entity lookup is used internally.
   func testReuseScopes() async {
-    var p = await Program.withMinimalStandardLibrary()
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      struct A {
+        public memberwise init
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        struct A {
-          public memberwise init
+        struct X {}
+        struct Y {}
+      }
+      struct B {
+        public memberwise init
 
-          struct X {}
-          struct Y {}
-        }
-        struct B {
-          public memberwise init
+        struct X {}
+        struct Y {}
 
-          struct X {}
-          struct Y {}
+        fun f1(x: X, y: Y) {}
+        fun f2(x: A.X, y: A.Y) {}
+      }
 
-          fun f1(x: X, y: Y) {}
-          fun f2(x: A.X, y: A.Y) {}
-        }
-
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      """)
 
     let expected: [String: (any Syntax.Type, String)] = [
       "A.X": (StructDeclaration.self, "M0.#.A.X"),
@@ -367,11 +337,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of the names of IR functions.
   func testIRFunctionNames() async {
-    var p = await Program.withMinimalStandardLibrary()
-    let m0 = p.addUserModule(named: "M0", source: conformingProgram)
-
-    p = await p.typeChecked()
-    failIfContainsError(p)
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(conformingProgram)
 
     let greet = p.findDeclaration(FunctionDeclaration.self, named: "Greeter.greet", in: m0)!
     let conformance = p.firstDeclaration(ConformanceDeclaration.self, in: m0)!
@@ -422,11 +388,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of the names of IR globals.
   func testIRGlobalNames() async {
-    var p = await Program.withMinimalStandardLibrary()
-    let m0 = p.addUserModule(named: "M0", source: conformingProgram)
-
-    p = await p.typeChecked()
-    failIfContainsError(p)
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(conformingProgram)
 
     let robot = p.firstDeclaration(StructDeclaration.self, named: "Robot", in: m0)!
     let origin = p.firstDeclaration(BindingDeclaration.self, in: m0)!
