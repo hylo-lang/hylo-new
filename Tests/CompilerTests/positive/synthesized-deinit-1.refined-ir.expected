@@ -1,4 +1,4 @@
-fun S0.$<ConformanceDeclaration at synthesized-deinit:8.14>() let <: Deinitializable<S0> {
+fun S0.$<ConformanceDeclaration at synthesized-deinit-1:6.14>() let <: Deinitializable<S0> {
 %b0:
   %r0 = witness_table {$implementation[Deinitializable.deinit for Self: S0]} as Deinitializable<S0>
   %r1 = access [let] %r0
@@ -31,7 +31,7 @@ fun S0.deinit(sink %p0: S0, set %p1: Void) {
   %r7 = return
 }
 
-fun S1.$<ConformanceDeclaration at synthesized-deinit:13.14>() let <: Deinitializable<S1> {
+fun S1.$<ConformanceDeclaration at synthesized-deinit-1:11.14>() let <: Deinitializable<S1> {
 %b0:
   %r0 = witness_table {$implementation[Deinitializable.deinit for Self: S1]} as Deinitializable<S1>
   %r1 = access [let] %r0
@@ -57,7 +57,7 @@ fun S1.deinit(sink %p0: S1, set %p1: Void) {
   %r0 = access [set] %p1
   %r1 = assume_state %r0 initialized
   %r2 = end %r0
-  %r4 = project S1.$<ConformanceDeclaration at synthesized-deinit:13.14>[]
+  %r4 = project S1.$<ConformanceDeclaration at synthesized-deinit-1:11.14>[]
   %r5 = alloca Void, #preferred
   %r6 = access [let] %r4
   %r7 = access [sink] %p0
@@ -83,7 +83,7 @@ fun $synthesized[Deinitializable.deinit for Self: S1](let %p0: Deinitializable<S
   %r8 = return
 }
 
-fun S2.$<ConformanceDeclaration at synthesized-deinit:17.14>() let <: Deinitializable<S2> {
+fun S2.$<ConformanceDeclaration at synthesized-deinit-1:15.14>() let <: Deinitializable<S2> {
 %b0:
   %r0 = witness_table {$synthesized[Deinitializable.deinit for Self: S2]} as Deinitializable<S2>
   %r1 = access [let] %r0
@@ -103,7 +103,7 @@ fun $synthesized[Deinitializable.deinit for Self: S2](let %p0: Deinitializable<S
   %r6 = return
 }
 
-fun S3.$<ConformanceDeclaration at synthesized-deinit:19.14>() let <: Deinitializable<S3> {
+fun S3.$<ConformanceDeclaration at synthesized-deinit-1:17.14>() let <: Deinitializable<S3> {
 %b0:
   %r0 = witness_table {$synthesized[Deinitializable.deinit for Self: S3]} as Deinitializable<S3>
   %r1 = access [let] %r0
@@ -149,7 +149,7 @@ fun $synthesized[Deinitializable.deinit for Self: S3](let %p0: Deinitializable<S
   %r24 = return
 }
 
-fun E0.$<ConformanceDeclaration at synthesized-deinit:26.12>() let <: Deinitializable<E0> {
+fun E0.$<ConformanceDeclaration at synthesized-deinit-1:24.12>() let <: Deinitializable<E0> {
 %b0:
   %r0 = witness_table {$implementation[Deinitializable.deinit for Self: E0]} as Deinitializable<E0>
   %r1 = access [let] %r0
@@ -175,7 +175,7 @@ fun E0.deinit(sink %p0: E0, set %p1: Void) {
   %r0 = access [set] %p1
   %r1 = assume_state %r0 initialized
   %r2 = end %r0
-  %r4 = project E0.$<ConformanceDeclaration at synthesized-deinit:26.12>[]
+  %r4 = project E0.$<ConformanceDeclaration at synthesized-deinit-1:24.12>[]
   %r5 = alloca Void, #preferred
   %r6 = access [let] %r4
   %r7 = access [sink] %p0
@@ -216,17 +216,16 @@ fun $synthesized[Deinitializable.deinit for Self: E0](let %p0: Deinitializable<S
   %r20 = return
 }
 
-
-fun E2.$<ConformanceDeclaration at synthesized-deinit:32.12>() let <: Deinitializable<E2> {
+fun E1.$<ConformanceDeclaration at synthesized-deinit-1:30.12>() let <: Deinitializable<E1> {
 %b0:
-  %r0 = witness_table {$synthesized[Deinitializable.deinit for Self: E2]} as Deinitializable<E2>
+  %r0 = witness_table {$synthesized[Deinitializable.deinit for Self: E1]} as Deinitializable<E1>
   %r1 = access [let] %r0
   %r2 = yield %r1
   %r3 = end %r1
   %r4 = return
 }
 
-fun $synthesized[Deinitializable.deinit for Self: E2](let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+fun $synthesized[Deinitializable.deinit for Self: E1](let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
 %b0:
   %r0 = access [sink] %p1
   %r1 = assume_state %r0 uninitialized
@@ -237,18 +236,18 @@ fun $synthesized[Deinitializable.deinit for Self: E2](let %p0: Deinitializable<S
   %r6 = return
 }
 
-fun E3.$<ConformanceDeclaration at synthesized-deinit:34.12>() let <: Deinitializable<E3> {
+fun E2.$<ConformanceDeclaration at synthesized-deinit-1:32.12>() let <: Deinitializable<E2> {
 %b0:
-  %r0 = witness_table {$synthesized[Deinitializable.deinit for Self: E3]} as Deinitializable<E3>
+  %r0 = witness_table {$synthesized[Deinitializable.deinit for Self: E2]} as Deinitializable<E2>
   %r1 = access [let] %r0
   %r2 = yield %r1
   %r3 = end %r1
   %r4 = return
 }
 
-fun $synthesized[Deinitializable.deinit for Self: E3](let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+fun $synthesized[Deinitializable.deinit for Self: E2](let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
 %b0:
-  %r0 = place_cast %p1 as sink E3
+  %r0 = place_cast %p1 as sink E2
   %r1 = enum_tag %r0
   %r2 = switch %r1, %b1, %b2
 %b1:

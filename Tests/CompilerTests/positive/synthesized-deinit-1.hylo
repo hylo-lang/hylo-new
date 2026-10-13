@@ -1,5 +1,3 @@
-//! stage:lowering
-
 // `S0` has a user-defined deinitializer, meaning that it is not trivially deinitializable.
 // `S1` has a user-defined deinitializer that delegates to memberwise deinitialization.
 // `S2` has a synthesized deinitializer that is no-op.
@@ -29,9 +27,9 @@ enum E0 is Deinitializable {
   fun deinit() sink {}
 }
 
-enum E2 is Deinitializable {}
+enum E1 is Deinitializable {}
 
-enum E3 is Deinitializable {
+enum E2 is Deinitializable {
   case a(i: S0)
   case b(i: S1)
 }
