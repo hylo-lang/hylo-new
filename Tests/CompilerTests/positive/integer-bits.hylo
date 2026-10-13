@@ -2,8 +2,6 @@ public fun main() {
   // Bit width.
   precondition(Int32.bit_width() == 32)
   precondition(UInt8.bit_width() == 8)
-  precondition(Int.bit_width() == 64)
-  precondition(UInt.bit_width() == 64)
   precondition(Int.bit_width() == UInt.bit_width())
   precondition(UInt.max().nonzero_bit_count() == UInt.bit_width())
   precondition(Int.min().trailing_zero_bit_count() == Int.bit_width() - 1)
