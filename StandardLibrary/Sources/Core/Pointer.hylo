@@ -1,13 +1,13 @@
-/// A pointer that may or may notpoint to an object of type `Pointee`.
+/// A pointer to storage capable of holding an instance of `Pointee`.
 public struct Pointer<Pointee> is Deinitializable {
 
-  /// The raw bits of the address.
+  /// The underlying builtin value.
   module var base: Builtin.ptr
 
   /// Creates an instance from its raw value.
   memberwise init
 
-  /// The value at the address represented by `self`.
+  /// The value pointed to by `self`.
   ///
   /// - Requires: the address stores an object of type Pointee.
   @inline(always)
@@ -34,14 +34,6 @@ public struct Pointer<Pointee> is Deinitializable {
   //   &self.base = Builtin.inttoptr_word(address.value)
   // }
 
-  /// Creates an instance with mutable access to the memory pointed to by `p`.
-  ///
-  /// - Warning: while this initializer is not in itself unsafe, it should be used with caution.
-  @inline(always)
-  public init(adding_mutation_to p: Pointer<Pointee>) {
-    &self.base = p.base
-  }
-
   /// Creates an instance referring to the same address as `p`.
   ///
   /// Note that dereferencing type-punned pointers will cause problems unless the rules for
@@ -50,13 +42,6 @@ public struct Pointer<Pointee> is Deinitializable {
   public init<Other>(type_punning p: Pointer<Other>) {
     &self.base = p.base
   }
-
-  // /// Projects a copy of `self` as a raw memory address.
-  // /// TODO design raw memory address representation.
-  // @inline(always)
-  // public subscript raw() -> Pointer<Never> {
-  //   yield Pointer<Never>(base: self.base)
-  // }
 
   // /// Creates an instance with the same memory representation as `address`.
   // ///  TODO design int to pointer semantics. https://github.com/hylo-lang/hylo-new/issues/438
@@ -106,7 +91,6 @@ public struct Pointer<Pointee> is Deinitializable {
   //   }
   // }
 
-
   // MARK: Copyable conformance.
 
   /// Returns an equivalent instance.
@@ -142,7 +126,7 @@ public given <T> => Pointer<T> is Equatable {}
 
 extension <Pointee is Movable> Pointer<Pointee> {
 
-  /// Returns the value at the address represented by `self`, leaving the storage at this address
+  /// Returns the value pointed to by `self`, leaving the storage at this address
   /// uninitialized.
   ///
   /// Note: This method should be deprecated once nonmutating subscripts are implemented.
@@ -155,7 +139,7 @@ extension <Pointee is Movable> Pointer<Pointee> {
 
 extension <Pointee is Movable> Pointer<Pointee> {
 
-  /// Initializes the value at the address represented by `self` to `value`.
+  /// Initializes the value pointed to by `self` to `value`.
   ///
   /// - Requires: the `MemoryLayout<Pointee>.size()` bytes starting at the address are uninitialized
   ///   and suitably aligned for `Pointee`.
@@ -168,7 +152,7 @@ extension <Pointee is Movable> Pointer<Pointee> {
 
 extension <Pointee is Deinitializable> Pointer<Pointee> {
 
-  /// Deinitializes the value at the address represented by `self`.
+  /// Deinitializes the value pointed to by `self`.
   @inline(always)
   public fun unsafe_deinitialize_pointee() {
     (self.base as* (sink Pointee)).deinit()
