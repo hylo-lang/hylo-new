@@ -265,6 +265,15 @@ internal struct IREmitter {
 
   /// Generates the IR of `d`.
   private mutating func lower(_ d: ConformanceDeclaration.ID) {
+    // Built-in conformances to literal traits have no witness because conversions from literals
+    // are lowered inline and literal types have no runtime representation.
+    if !program.isRequirement(d) {
+      let concept = program.types[program.implementations(definedBy: d).concept].declaration
+      if (concept == program.standardLibraryDeclaration(.expressibleByIntegerLiteral))
+        || (concept == program.standardLibraryDeclaration(.expressibleByFloatingPointLiteral))
+      { return }
+    }
+
     // Lower explicit requirement implementations first.
     if let ms = program[d].members {
       for m in ms { lower(m) }
