@@ -1,0 +1,14 @@
+//! stage:llvm
+
+// Conformances to `ExpressibleByIntegerLiteral` have no witness table, as `Builtin.IntegerLiteral`
+// has no runtime representation.
+
+struct N {
+  var v: Int
+}
+
+given N is ExpressibleByIntegerLiteral {
+  init(integer_literal literal: Builtin.IntegerLiteral) { &self.v = 0 }
+}
+
+public fun main() {}
