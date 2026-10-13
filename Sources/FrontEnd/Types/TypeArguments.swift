@@ -97,6 +97,13 @@ public struct TypeArguments: Sendable {
     return .init(cs)
   }
 
+  /// Returns the assignments in `self` for which `isIncluded` returns `true`.
+  public func filter(
+    _ isIncluded: ((GenericParameter.ID, AnyTypeIdentity)) -> Bool
+  ) -> TypeArguments {
+    .init(contents.filter(isIncluded))
+  }
+
 }
 
 extension TypeArguments: ExpressibleByDictionaryLiteral {
