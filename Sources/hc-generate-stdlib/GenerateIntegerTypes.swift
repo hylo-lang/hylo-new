@@ -197,8 +197,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   var shiftRight: String {
     if signedness == .signed {
       """
-
-          if other >= Self.bit_width() {
+      if other >= Self.bit_width() {
             if self < Self.zero() { (-1 as Self) } else { Self.zero() }
           } else if other >= 0 {
             Self.new(value: Builtin.ashr_\(builtinType)(self.value, Self(other).value))
@@ -210,8 +209,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       """
     } else {
       """
-
-          if other >= Self.bit_width() {
+      if other >= Self.bit_width() {
             Self.zero()
           } else if other >= 0 {
             Self.new(value: Builtin.lshr_\(builtinType)(self.value, Self(other).value))
@@ -238,13 +236,11 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   var initializeSignedFromInt: String {
     if builtinType == "word" {
       """
-
-          &self = Self(value: other.value)
+      &self = Self(value: other.value)
       """
     } else {
       """
-
-          let source_width = Int.bit_width()
+      let source_width = Int.bit_width()
           let target_width = Self.bit_width()
           let n = if other < 0 { ~other } else { other + 0 }
           let d = Int(
@@ -262,14 +258,12 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
   var initializeUnsignedFromInt: String {
     if builtinType == "word" {
       """
-
-          if other < 0 { Builtin.trap() }
+      if other < 0 { Builtin.trap() }
           &self = Self(value: other.value)
       """
     } else {
       """
-
-          if other < 0 { Builtin.trap() }
+      if other < 0 { Builtin.trap() }
           let source_width = Int.bit_width()
           let target_width = Self.bit_width()
           let d = Int(
@@ -320,7 +314,8 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       ///
       /// - Requires: the value of `other` is representable as an instance of `Self`.
       @inline(always)
-      public init(other: Int) {\(initializeFromInt)
+      public init(other: Int) {
+        \(initializeFromInt)
       }\(absMethod ?? "")
 
       /// Returns the number of bits that are set in the representation of `self`.
@@ -399,7 +394,8 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
         }
       }
 
-      /// Returns the result of shifting `self`'s representation `other` digits to the right.
+      /// Returns the result of shifting `self`'s representation `other` digits to the right while
+      /// preserving signedness.
       ///
       /// If `other` is non-negative, each bit in the representation of `self` is moved by `other`
       /// positions to the right, inserting copies of the most significant bit to the left and
@@ -407,7 +403,8 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       ///
       /// If `other` is negative, the result is the same as `self << other.abs()`.
       @inline(always)
-      public fun infix>> (other: Int) -> Self {\(shiftRight)
+      public fun infix>> (other: Int) -> Self {
+        \(shiftRight)
       }
 
       // MARK: Equatable conformance
