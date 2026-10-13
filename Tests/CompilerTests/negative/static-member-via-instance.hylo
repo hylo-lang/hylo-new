@@ -1,0 +1,5 @@
+//! no-std
+
+struct A { static fun f() {} }
+
+fun g(a: A) { a.f() }
