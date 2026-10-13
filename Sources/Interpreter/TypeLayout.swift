@@ -87,3 +87,13 @@ extension TypeLayout.StorageRequirements {
   }
 
 }
+
+extension TypeLayout {
+
+  /// The discriminator of an enum layout.
+  var discriminator: TypeLayout.Part {
+    precondition(isEnumLayout)
+    return parts.last!
+  }
+
+}

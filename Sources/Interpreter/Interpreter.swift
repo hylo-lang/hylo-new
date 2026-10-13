@@ -372,7 +372,7 @@ public struct Interpreter {
         return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
         let l = memory.layout(t)
-        return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
+        return .init(integer: n, bitWidth: l.size * 8)
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
@@ -435,8 +435,8 @@ public struct Interpreter {
       let l = memory.layout(t)
       let u = program.types[t]
       return switch u {
-      case .i(_): .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
-      case .word: .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
+      case .i(_): .init(integer: 0, bitWidth: l.size * 8)
+      case .word: .init(integer: 0, bitWidth: l.size * 8)
       default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
