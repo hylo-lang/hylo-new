@@ -1,11 +1,19 @@
-//! stage:typing
-
 fun check<T>(x: T) {}
 
 public fun main() {
+  // Default type is `Float64`.
   let x0 = 3.14
   check<Float64>(x0)
 
-  let x1 = 3.14 as Float32
-  check<Float32>(x1)
+  // Expected type provided by a conversion expression.
+  let x1a = 3.14 as Float64
+  check<Float64>(x1a)
+  let x1b = 3.14 as Float32
+  check<Float32>(x1b)
+
+  // Expected type provided by an ascription.
+  let x2a: Float64 = 3.14
+  check<Float64>(x2a)
+  let x2b: Float32 = 3.14
+  check<Float32>(x2b)
 }

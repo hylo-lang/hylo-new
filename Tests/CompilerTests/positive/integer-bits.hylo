@@ -1,0 +1,91 @@
+public fun main() {
+  // Bit width.
+  precondition(Int32.bit_width() == 32)
+  precondition(UInt8.bit_width() == 8)
+
+  // Bitwise AND.
+  precondition((( 3 as Int32) & (5 as Int32)) == (1 as Int32))
+  precondition((( 3 as UInt8) & (5 as UInt8)) == (1 as UInt8))
+  precondition(((-1 as Int8)  & (5 as Int8))  == (5 as Int8))
+
+  // Bitwise OR.
+  precondition((( 3 as Int32) | (5 as Int32)) == ( 7 as Int32))
+  precondition((( 3 as UInt8) | (5 as UInt8)) == ( 7 as UInt8))
+  precondition(((-1 as Int8)  | (5 as Int8))  == (-1 as Int8))
+
+  // Bitwise XOR.
+  precondition((( 3 as Int32) ^ (5 as Int32)) == ( 6 as Int32))
+  precondition((( 3 as UInt8) ^ (5 as UInt8)) == ( 6 as UInt8))
+  precondition(((-1 as Int8)  ^ (5 as Int8))  == (-6 as Int8))
+
+  // Bit pattern inversion.
+  precondition(~(3 as Int32) == (-4 as Int32))
+  precondition(~(3 as UInt8) == (252 as UInt8))
+
+  // Shift left.
+  precondition(((-3 as Int8)    << 2) == (-12 as Int8))
+  precondition((( 3 as Int8)    << 2) == ( 12 as Int8))
+  precondition((( 3 as UInt8)   << 2) == ( 12 as UInt8))
+
+  // Shift left pushing bits out.
+  precondition((Int8.min()      << 2) == (  0 as Int8))
+  precondition((Int8.max()      << 2) == ( -4 as Int8))
+  precondition((UInt8.max()     << 2) == (252 as UInt8))
+
+  // Shift left with overshift.
+  precondition((Int8.min()      << 10) == (0 as Int8))
+  precondition((Int8.max()      << 10) == (0 as Int8))
+  precondition((UInt8.max()     << 10) == (0 as UInt8))
+
+  // Shift left with negative offset.
+  precondition(((-12 as Int8)   << -2) == (-3 as Int8))
+  precondition((( 12 as Int8)   << -2) == ( 3 as Int8))
+  precondition((( 12 as UInt8)  << -2) == ( 3 as UInt8))
+
+  // Shift right.
+  precondition(((-12 as Int8)   >> 2) == (-3 as Int8))
+  precondition((( 12 as Int8)   >> 2) == ( 3 as Int8))
+  precondition((( 12 as UInt8)  >> 2) == ( 3 as UInt8))
+
+  // Shift right pushing bits out.
+  precondition((Int8.min()      >> 2) == (-32 as Int8))
+  precondition((Int8.max()      >> 2) == ( 31 as Int8))
+  precondition((UInt8.max()     >> 2) == ( 63 as UInt8))
+
+  // Shift right with overshift.
+  precondition((Int8.min()      >> 10) == (-1 as Int8))
+  precondition((Int8.max()      >> 10) == ( 0 as Int8))
+  precondition((UInt8.max()     >> 10) == ( 0 as UInt8))
+
+  // Shift right with negative offset.
+  precondition(((-3 as Int8)    >> -2) == (-12 as Int8))
+  precondition((( 3 as Int8)    >> -2) == ( 12 as Int8))
+  precondition((( 3 as UInt8)   >> -2) == ( 12 as UInt8))
+
+  // Non-zero bits.
+  precondition((-12 as Int8)  .nonzero_bit_count() == 5)
+  precondition(( 12 as Int8)  .nonzero_bit_count() == 2)
+  precondition(( 12 as UInt8) .nonzero_bit_count() == 2)
+
+  precondition((-12 as Int16) .nonzero_bit_count() == 13)
+  precondition(( 12 as Int16) .nonzero_bit_count() == 2)
+  precondition(( 12 as UInt16).nonzero_bit_count() == 2)
+
+  // Leading zeros.
+  precondition((-12 as Int8)  .leading_zero_bit_count() == 0)
+  precondition(( 12 as Int8)  .leading_zero_bit_count() == 4)
+  precondition(( 12 as UInt8) .leading_zero_bit_count() == 4)
+
+  precondition((-12 as Int16) .leading_zero_bit_count() == 0)
+  precondition(( 12 as Int16) .leading_zero_bit_count() == 12)
+  precondition(( 12 as UInt16).leading_zero_bit_count() == 12)
+
+  // Trailing zeros.
+  precondition((-12 as Int8)  .trailing_zero_bit_count() == 2)
+  precondition(( 12 as Int8)  .trailing_zero_bit_count() == 2)
+  precondition(( 12 as UInt8) .trailing_zero_bit_count() == 2)
+
+  precondition((-12 as Int16) .trailing_zero_bit_count() == 2)
+  precondition(( 12 as Int16) .trailing_zero_bit_count() == 2)
+  precondition(( 12 as UInt16).trailing_zero_bit_count() == 2)
+}

@@ -66,7 +66,7 @@ private enum Signedness: String, CustomStringConvertible {
 }
 
 /// The size of an integer type.
-private enum Size {
+private enum Size: Equatable {
 
   /// The type can represent the size of the largest object in memory on the target platform.
   ///
@@ -112,8 +112,9 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
 
   /// Constructs an instance from its parts.
   init(
-    name: String, documentation: String, builtinType: String, _ signedness: Signedness,
-    _ size: Size, includedConformances: Conformances
+    name: String, documentation: String,
+    builtinType: String, _ signedness: Signedness, _ size: Size,
+    includedConformances: Conformances
   ) {
     self.declarationName = name
     self.declarationDocumentation = documentation
@@ -140,38 +141,152 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       """
   }
 
-  /// The smallest integer `self` can represent.
-  var minimumValue: String {
-    let bits =
-      switch size {
-      case .fittingLargestObjectSize:
-        // TODO emit Builtin constant for the platform's size_t.
-        // See: https://github.com/hylo-lang/hylo-new/issues/331
-        64
-      case .fixedWidth(let bits):
-        bits
-      }
+  /// An expression denoting the bit pattern of the receiver with each bit inversed.
+  ///
+  /// The result of the expression is an instance of the type described by `Self`.
+  var inversed: String {
+    ".new(value: Builtin.xor_\(builtinType)(self.value, (-1 as Self).value))"
+  }
 
-    return switch signedness {
-    case .signed: "\(-(Int128(1) << (bits - 1)))"
-    case .unsigned: "0"
+  /// An expression denoting the smallest instance of the type that `Self` describes.
+  ///
+  /// The result of the expression is an instance of the type described by `Self`.
+  var minimumValue: String {
+    // Trivial if the type is unsigned.
+    if signedness == .unsigned { return "0" }
+
+    // Otherwise, the result depends on the bit width.
+    switch size {
+    case .fixedWidth(let bits):
+      return "\(-(Int128(1) << (bits - 1))) as Self"
+
+    case .fittingLargestObjectSize:
+      let x = "Builtin.lshr_\(builtinType)((-1 as Self).value, (1 as Self).value)"
+      let y = "Builtin.xor_\(builtinType)(\(x), (-1 as Self).value)"
+      return "Self.new(value: \(y))"
     }
   }
 
-  /// The largest integer `self` can represent.
+  /// An expression denoting the largest instance of the type that `Self` describes.
+  ///
+  /// The result of the expression is an instance of the type described by `Self`.
   var maximumValue: String {
-    let bits =
-      switch size {
-      case .fittingLargestObjectSize:
-        // TODO emit Builtin constant for the platform's size_t.
-        64
-      case .fixedWidth(let bits):
-        bits
-      }
+    if signedness == .signed {
+      let x = "Builtin.lshr_\(builtinType)((-1 as Self).value, (1 as Self).value)"
+      return "Self.new(value: \(x))"
+    } else {
+      let s = String(declarationName.dropFirst())
+      return "Self.new(value: (-1 as \(s)).value)"
+    }
+  }
 
-    return switch signedness {
-    case .signed: "\((Int128(1) << (bits - 1)) - 1)"
-    case .unsigned: "\((Int128(1) << bits) - 1)"
+  /// An expression denoting the number of bits in the representation of an instance of the type
+  /// that `Self` describes.
+  ///
+  /// The result of the expression is an instance of `Hylo.Int`.
+  var bitWidth: String {
+    switch size {
+    case .fittingLargestObjectSize:
+      "Int(value: Builtin.ctlz_word(0.value))"
+    case .fixedWidth(let bits):
+      String(describing: bits)
+    }
+  }
+
+  /// The body of `infix>>(_:)`, which shifts the bit representation to the right.
+  var shiftRight: String {
+    if signedness == .signed {
+      """
+      if other >= Self.bit_width() {
+            if self < Self.zero() { (-1 as Self) } else { Self.zero() }
+          } else if other >= 0 {
+            Self.new(value: Builtin.ashr_\(builtinType)(self.value, Self(other).value))
+          } else if (0 - other) < Self.bit_width() {
+            Self.new(value: Builtin.shl_\(builtinType)(self.value, Self(0 - other).value))
+          } else {
+            Self.zero()
+          }
+      """
+    } else {
+      """
+      if other >= Self.bit_width() {
+            Self.zero()
+          } else if other >= 0 {
+            Self.new(value: Builtin.lshr_\(builtinType)(self.value, Self(other).value))
+          } else if (0 - other) < Self.bit_width() {
+            Self.new(value: Builtin.shl_\(builtinType)(self.value, Self(0 - other).value))
+          } else {
+            Self.zero()
+          }
+      """
+    }
+  }
+
+  /// The body of `init(_:)`, which converts instances of `Hylo.Int`.
+  var initializeFromInt: String {
+    if signedness == .signed {
+      initializeSignedFromInt
+    } else {
+      initializeUnsignedFromInt
+    }
+  }
+
+  /// The body of an `init(_:)`, which converts instances of `Hylo.Int`, assuming `Self` describes
+  /// a signed type.
+  var initializeSignedFromInt: String {
+    if builtinType == "word" {
+      """
+      &self = Self(value: other.value)
+      """
+    } else {
+      """
+      let source_width = Int.bit_width()
+          let target_width = Self.bit_width()
+          let n = if other < 0 { ~other } else { other + 0 }
+          let d = Int(
+            value: Builtin.sub_word(
+              source_width.value,
+              Builtin.ctlz_word(Builtin.shl_word(n.value, 1.value))))
+          if d > target_width { Builtin.trap() }
+          &self = Self(value: Builtin.trunc_or_sext_word_\(builtinType)(other.value))
+      """
+    }
+  }
+
+  /// The body of an `init(_:)`, which converts instances of `Hylo.Int`, assuming `Self` describes
+  /// an unsigned type.
+  var initializeUnsignedFromInt: String {
+    if builtinType == "word" {
+      """
+      if other < 0 { Builtin.trap() }
+          &self = Self(value: other.value)
+      """
+    } else {
+      """
+      if other < 0 { Builtin.trap() }
+          let source_width = Int.bit_width()
+          let target_width = Self.bit_width()
+          let d = Int(
+            value: Builtin.sub_word(
+              source_width.value,
+              Builtin.ctlz_word(Builtin.shl_word(other.value, 1.value))))
+          if d > target_width { Builtin.trap() }
+          &self = Self(value: Builtin.trunc_or_zext_word_\(builtinType)(other.value))
+      """
+    }
+  }
+
+  /// Returns an expression denoting the value of `n`, which is an instance of `builtinType`, as an
+  /// instance of `Builtin.word`.
+  ///
+  /// - Requires: The value denoted by `n` is representable as an instance of `Builtin.word`.
+  func asInstanceOfWord(_ n: String) -> String {
+    if builtinType == "word" {
+      n
+    } else if signedness == .signed {
+      "Builtin.trunc_or_sext_\(builtinType)_word(\(n))"
+    } else {
+      "Builtin.trunc_or_zext_\(builtinType)_word(\(n))"
     }
   }
 
@@ -193,16 +308,103 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       @inline(always)
       public init() {
         &self.value = Builtin.zeroinitializer_\(builtinType)()
+      }
+
+      /// Creates an instance whose value is the same as that of `other`.
+      ///
+      /// - Requires: the value of `other` is representable as an instance of `Self`.
+      @inline(always)
+      public init(other: Int) {
+        \(initializeFromInt)
       }\(absMethod ?? "")
+
+      /// Returns the number of bits that are set in the representation of `self`.
+      @inline(always)
+      public fun nonzero_bit_count() -> Int {
+        Int(value: \(asInstanceOfWord("Builtin.ctpop_\(builtinType)(self.value)")))
+      }
+
+      /// Returns the number of leading zeros in the representation of `self`.
+      @inline(always)
+      public fun leading_zero_bit_count() -> Int {
+        Int(value: \(asInstanceOfWord("Builtin.ctlz_\(builtinType)(self.value)")))
+      }
+
+      /// Returns the number of trailing zeros in the representation of `self`.
+      @inline(always)
+      public fun trailing_zero_bit_count() -> Int {
+        Int(value: \(asInstanceOfWord("Builtin.cttz_\(builtinType)(self.value)")))
+      }
 
       @inline(always)
       public static fun min() -> Self {
-        \(minimumValue) as Self
+        \(minimumValue)
       }
 
       @inline(always)
       public static fun max() -> Self {
-        \(maximumValue) as Self
+        \(maximumValue)
+      }
+
+      /// Returns the number of bits in the representation of an instance of `Self`.
+      @inline(always)
+      public static fun bit_width() -> Int {
+        \(bitWidth)
+      }
+
+      /// Returns `self` with the bits of its representation inversed.
+      @inline(always)
+      public fun prefix~ () -> Self {
+        \(inversed)
+      }
+
+      /// Returns the result of performing a bitwise AND operation on `self` and `other`.
+      @inline(always)
+      public fun infix& (other: Self) -> Self {
+        .new(value: Builtin.and_\(builtinType)(self.value, other.value))
+      }
+
+      /// Returns the result of performing a bitwise OR operation on `self` and `other`.
+      @inline(always)
+      public fun infix| (other: Self) -> Self {
+        .new(value: Builtin.or_\(builtinType)(self.value, other.value))
+      }
+
+      /// Returns the result of performing a bitwise XOR operation on `self` and `other`.
+      @inline(always)
+      public fun infix^ (other: Self) -> Self {
+        .new(value: Builtin.xor_\(builtinType)(self.value, other.value))
+      }
+
+      /// Returns the result of shifting `self`'s representation `other` digits to the left.
+      ///
+      /// If `other` is non-negative, each bit in the representation of `self` is moved by `other`
+      /// positions to the left, inserting zeros to the right and discarding any bit ending up at a
+      /// position greater than that of the most significant bit.
+      ///
+      /// If `other` is negative, the result is the same as `self >> other.abs()`.
+      @inline(always)
+      public fun infix<< (other: Int) -> Self {
+        if other >= Self.bit_width() {
+          Self.new()
+        } else if other >= 0 {
+          Self.new(value: Builtin.shl_\(builtinType)(self.value, Self(other).value))
+        } else {
+          self >> (0 - other)
+        }
+      }
+
+      /// Returns the result of shifting `self`'s representation `other` digits to the right while
+      /// preserving signedness.
+      ///
+      /// If `other` is non-negative, each bit in the representation of `self` is moved by `other`
+      /// positions to the right, inserting copies of the most significant bit to the left and
+      /// discarding any bit ending at a negative position.
+      ///
+      /// If `other` is negative, the result is the same as `self << other.abs()`.
+      @inline(always)
+      public fun infix>> (other: Int) -> Self {
+        \(shiftRight)
       }
 
       // MARK: Equatable conformance
@@ -318,7 +520,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       /// - Requires: `other` is not `0`, and the result is representable without overflow.
       @inline(always)
       public fun infix/ (other: Self) -> Self {
-        if \(divisionIllegal("self", "other", type: "Self")) {
+        if \(illegalDivision("self", by: "other")) {
           Builtin.trap()
         } else {
           return .new(value: \
@@ -331,13 +533,14 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     """
   }
 
-  /// Returns an expression that's `true` iff `x` would be illegal to divide by `d` in type `t`.
-  func divisionIllegal(_ x: String, _ d: String, type t: String) -> String {
+  /// Returns an expression that's `true` if the result of dividing `x` by `d` results in a value
+  /// that is not representable as an instance of `Self`.
+  func illegalDivision(_ x: String, by d: String) -> String {
     switch signedness {
     case .signed:
-      "\(d) == (0 as \(t)) || (\(x) == (\(minimumValue) as \(t)) && \(d) == (-1 as \(t)))"
+      "\(d) == Self.new() || (\(x) == Self.min() && \(d) == (-1 as Self))"
     case .unsigned:
-      "\(d) == (0 as \(t))"
+      "\(d) == Self.new()"
     }
   }
 
