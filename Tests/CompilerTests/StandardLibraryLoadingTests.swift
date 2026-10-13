@@ -23,4 +23,12 @@ final class StandardLibraryLoadingTests: XCTestCase {
       additionalSources: [SourceFile(contentsOf: generatedStandardLibrarySource)])
   }
 
+  func testStandardLibraryCompilesToLLVM() async throws {
+    var driver = try Driver(targetSpecification: .native())
+    try await driver.loadStandardLibrary()
+    let m = try XCTUnwrap(driver.program.identity(module: Module.standardLibraryName))
+    let r = try driver.compileToLLVM(m)
+    XCTAssertFalse(r.containsError)
+  }
+
 }
