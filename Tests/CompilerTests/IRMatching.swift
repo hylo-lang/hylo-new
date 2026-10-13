@@ -65,13 +65,17 @@ enum IRMatching {
   static func canonicalizingNames(in s: Substring) -> String {
     /// The canonical number of each name seen so far, keyed by its spelling without `%`.
     var renaming: [Substring: Int] = [:]
+
+    /// A refex matching a register/parameter/block name.
     let name = /%(?<register>[A-Za-z0-9_]+)|^(?<label>[0-9]+)(?=:)/.anchorsMatchLineEndings()
 
     return String(s.replacing(name) { (m) in
-      let spelling = m.register ?? m.label!
-      let n = renaming[spelling] ?? renaming.count
-      renaming[spelling] = n
-      return ((m.register == nil) ? "" : "%") + String(n)
+      let originalSpelling = m.register ?? m.label!
+
+      let nextName = renaming.count
+      let renamedAs = renaming[originalSpelling].wrapIfEmpty(nextName)
+      
+      return "\((m.register == nil) ? "" : "%")\(renamedAs)"
     })
   }
 
@@ -82,22 +86,10 @@ enum IRMatching {
   /// LLVM basic block (e.g., `9:`) do not end a section, so that a function's blocks stay in the
   /// same section as its header. Sections are slices of `s`.
   static func sections(of s: String) -> [Substring] {
-    var result: [Substring] = []
-    var previousLineIsBlank = true
-
-    for l in s.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
-      defer { previousLineIsBlank = l.isBlank }
-      if l.isBlank { continue }
-
-      // Extend the current section unless a blank line ended it, or start a new one.
-      if let last = result.last, !previousLineIsBlank || l.isBasicBlockLabel {
-        result[result.count - 1] = s[last.startIndex ..< l.endIndex]
-      } else {
-        result.append(l)
-      }
-    }
-
-    return result
+    /// A non-blank line, followed by any number of lines that are either non-blank or, possibly
+    /// after blank lines, labels of LLVM basic blocks.
+    let section = /^\h*\S.*(?:(?:\n\h*)*\n[0-9]+:.*|\n\h*\S.*)*/.anchorsMatchLineEndings()
+    return s.matches(of: section).map(\.output)
   }
 
 }
@@ -105,19 +97,4 @@ enum IRMatching {
 /// Returns the smallest number of additions and deletions that transform `b` into `a`.
 private func distance(_ a: Substring, _ b: Substring) -> Int {
   a.difference(from: b).count
-}
-
-extension Substring {
-
-  /// `true` iff `self` is empty or contains only whitespace.
-  fileprivate var isBlank: Bool {
-    allSatisfy(\.isWhitespace)
-  }
-
-  /// `true` iff `self` is a line labeling an LLVM basic block, i.e., a line that starts with a
-  /// number followed by a colon (e.g., `9:   ; preds = %4`).
-  fileprivate var isBasicBlockLabel: Bool {
-    prefixMatch(of: /[0-9]+:/) != nil
-  }
-
 }

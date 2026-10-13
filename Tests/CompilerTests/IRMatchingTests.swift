@@ -88,7 +88,7 @@ final class IRMatchingTests: XCTestCase {
     let cs = IRMatching.comparisons(expected: expected, observed: observed)
     XCTAssertEqual(cs.count, 1)
     // The closest observed section is chosen even though it isn't identical to the expected one.
-    XCTAssertEqual(cs[0].observed, "%\"T\" = type { i32. }")
+    XCTAssertEqual(cs[0].observed, "%\"T\" = type <{ i32. }>")
   }
 
   func testPartialUnmatchedWhenObservedHasNoSection() {
