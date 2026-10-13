@@ -1906,6 +1906,9 @@ extension Program {
     /// `Hylo.Copyable`
     case copyable = "Copyable"
 
+    /// `Hylo.Copyable.copy`
+    case copyableCopy = "Copyable.copy(:)"
+
     /// `Hylo.Movable`.
     case movable = "Movable"
 

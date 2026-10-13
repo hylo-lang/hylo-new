@@ -36,18 +36,34 @@ internal struct IREmitter {
 
   /// Generates the definitions of synthesized functions.
   internal mutating func implementSynthesizedFunctions() {
-    // TODO: Remove once the standard library compiles.
-    if program[module].isStandardLibrary { return }
-
     for f in program[module].ir.functions.values.indices {
       guard case .synthesized(let d, let a) =  program[module].ir[f].name else { continue }
 
       switch d {
       case program.standardLibraryDeclaration(.deinitializableDeinit):
         implementSynthesizedDeinitializer(f, for: a)
+      case program.standardLibraryDeclaration(.copyableCopy):
+        implementTrap(f)
+      case _ where program.parent(containing: d).node
+          == program.standardLibraryDeclaration(.movableTakeValue).erased:
+        implementTrap(f)
       default:
         continue // TODO
       }
+    }
+  }
+
+  /// Generates a body for `f` that just traps.
+  ///
+  /// Serves as a stub for synthesized implementations that are not supported yet.
+  private mutating func implementTrap(_ f: IRFunction.ID) {
+    // Nothing to do if the function has already been defined.
+    if program[module].ir[f].isDefined { return }
+
+    // TODO: Synthesize a real implementation.
+    defining(f, at: program[module].ir[f].anchor) { (me) in
+      me._emitTrap()
+      me._unreachable()
     }
   }
 
