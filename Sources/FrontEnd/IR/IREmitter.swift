@@ -562,17 +562,18 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Assignment.ID) -> ControlFlow {
-    // The LHS should be an inout expression.
-    guard let target = program.read(program[s].lhs.erased, \InoutExpression.lvalue) else {
+    // The LHS should be marked for mutation.
+    if !program.isMarkedForMutation(program[s].lhs) {
       report(program.assignmentNotMarkedMutating(s))
       return .next
     }
 
     // If the LHS does not occur in the RHS, we can build the RHS in place.
-    if let n = program.cast(target, to: NameExpression.self) {
+    let lhs = program.read(program[s].lhs.erased, \InoutExpression.lvalue) ?? program[s].lhs
+    if let n = program.cast(lhs, to: NameExpression.self) {
       if case .direct(let d) = program.declaration(referredToBy: n) {
         if !program.occurs(referenceTo: d, in: program[s].rhs) {
-          let target = lowered(lvalue: target)
+          let target = lowered(lvalue: lhs)
           lower(store: program[s].rhs, to: target)
           return .next
         }
