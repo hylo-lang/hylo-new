@@ -2,6 +2,9 @@
 
 fun use<T>(x: T) {}
 
+// TODO remove this once we can add this back to the standard library.
+given <T is Movable, U is Movable> => {T, ...U} is Movable {}
+
 fun foo(p: sink {{Int, Int}, Bool}) {
   sink let ((x, _), y) = p
   use(x)
