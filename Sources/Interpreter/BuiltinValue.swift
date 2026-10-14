@@ -115,14 +115,32 @@ extension BuiltinValue {
 
 extension BuiltinValue {
 
-  /// Returns the byte representation of `self` as a value of type `t`.
+  /// Returns the byte representation of `self` as a value of type `t`,
+  /// ordered by `o`.
   ///
   /// - Precondition: `self` is an instance of `t`.
-  public func byteRepresentation(as t: MachineType) -> [UInt8] {
-    // TODO: Use endianness to figure out the byte representation.
-    switch t {
-    case .i(let n):
-      switch n {
+  public func byteRepresentation(
+    as t: MachineType,
+    usingLayoutsFrom c: inout TypeLayoutCache
+  ) -> [UInt8] {
+    let o = c.abi.byteOrder
+    let w = c.abi.bitsInAPointer
+
+    return switch t {
+    case .i(let n): byteRepresentation(asIntegerHavingBitWidth: n, orderedBy: o)
+    case .word: byteRepresentation(asIntegerHavingBitWidth: UInt8(w), orderedBy: o)
+    default: unimplemented("floats, and ptr are not supported yet.")
+    }
+
+  }
+
+  /// Returns the `w`-bit integer representation of `self`, ordered by `o`.
+  private func byteRepresentation(
+    asIntegerHavingBitWidth w: UInt8,
+    orderedBy o: Endianness
+  ) -> [UInt8] {
+    var r =
+      switch w {
       case 1: withUnsafeBytes(of: asBool) { Array($0) }
       case 8: withUnsafeBytes(of: asI8) { Array($0) }
       case 16: withUnsafeBytes(of: asI16) { Array($0) }
@@ -131,8 +149,9 @@ extension BuiltinValue {
       case 128: withUnsafeBytes(of: asI128) { Array($0) }
       default: preconditionFailure("Unknown integer bit width.")
       }
-    default: unimplemented("float, ptr, and word are not supported yet.")
-    }
+
+    if o != .host { r.reverse() }
+    return r
   }
 
 }

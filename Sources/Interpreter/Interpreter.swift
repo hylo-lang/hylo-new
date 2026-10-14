@@ -371,6 +371,9 @@ public struct Interpreter {
       case .parameter(let i):
         return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
+        if program.types[t].equals(MachineType.i(1)) {
+          return .init(bool: n != 0)
+        }
         let l = memory.layout(t)
         return .init(integer: n, bitWidth: l.size * 8)
       default:

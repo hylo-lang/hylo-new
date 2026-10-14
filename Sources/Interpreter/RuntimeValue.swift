@@ -116,7 +116,7 @@ extension RuntimeValue {
 
     if s == MachineType.self {
       let v = p.type(u, as: MachineType.self)
-      self = RuntimeValue(ofType: v, havingByteRepresentation: bs)
+      self = RuntimeValue(ofType: v, havingByteRepresentation: bs, providedBy: &l)
     } else if s == Struct.self || s == Tuple.self {
       self = RuntimeValue(
         record: t, definedIn: &p,
@@ -125,40 +125,32 @@ extension RuntimeValue {
       self = RuntimeValue(
         enum: t, definedIn: &p,
         havingByteRepresentation: bs, providedBy: &l)
+    } else {
+      unreachable()
     }
-
-    unreachable()
   }
 
   /// Creates a value of type `t` from its byte representation `bs`.
   private init(
     ofType t: MachineType,
     havingByteRepresentation bs: ArraySlice<UInt8>,
+    providedBy c: inout TypeLayoutCache
   ) {
     switch t {
     case .i(let n):
-      self =
-        RuntimeValue(integerHavingBitWidth: n, byteRepresentation: bs)
-    default: unimplemented("float, word, ptr are not supported yet.")
-    }
-  }
-
-  /// Creates an instance for `w`-bit integer having byte representation `bs`.
-  private init(
-    integerHavingBitWidth w: UInt8,
-    byteRepresentation bs: ArraySlice<UInt8>,
-  ) {
-    // TODO: using `interpret` is wrong and should use endianness instead.
-    self =
-      switch w {
-      case 1: .scalar(.i1(interpret(bs, as: Bool.self)))
-      case 8: .scalar(.i8(interpret(bs, as: UInt8.self)))
-      case 16: .scalar(.i16(interpret(bs, as: UInt16.self)))
-      case 32: .scalar(.i32(interpret(bs, as: UInt32.self)))
-      case 64: .scalar(.i64(interpret(bs, as: UInt64.self)))
-      case 128: .scalar(.i128(interpret(bs, as: UInt128.self)))
-      default: preconditionFailure()
+      if n == 1 {
+        self = .scalar(BuiltinValue(bool: bs.first! == 0))
+      } else {
+        let o = c.abi.byteOrder
+        let v = BigInt(byteRepresentation: bs, inByteOrder: o)
+        self = .scalar(BuiltinValue(integer: v, bitWidth: bs.count * 8))
       }
+    case .word:
+      let o = c.abi.byteOrder
+      let v = BigInt(byteRepresentation: bs, inByteOrder: o)
+      self = .scalar(BuiltinValue(integer: v, bitWidth: bs.count * 8))
+    default: unimplemented("floats and ptr are not supported yet.")
+    }
   }
 
   /// Creates a value for record type `t` defined in `p` from its byte
@@ -234,7 +226,7 @@ extension RuntimeValue {
     switch self {
     case .scalar(let v):
       let u = p.type(t.underlying, as: MachineType.self)
-      return v.byteRepresentation(as: u)
+      return v.byteRepresentation(as: u, usingLayoutsFrom: &c)
     case .composite(_):
       let u = p.tag(t.underlying)
       if u == Struct.self || u == Tuple.self {
@@ -301,11 +293,4 @@ extension RuntimeValue {
     return r
   }
 
-}
-
-/// Interprets `bs` as a value of `t`.
-private func interpret<T>(_ bs: ArraySlice<UInt8>, as t: T.Type) -> T {
-  bs.withUnsafeBytes {
-    $0.baseAddress!.assumingMemoryBound(to: t).pointee
-  }
 }

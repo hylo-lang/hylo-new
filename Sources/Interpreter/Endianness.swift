@@ -8,3 +8,14 @@ public enum Endianness {
   case msbFirst
 
 }
+
+extension Endianness {
+
+  /// Endianness of the host machine.
+  static var host: Self {
+    withUnsafeBytes(of: UInt16(1)) {
+      $0[0] == 1 ? .lsbFirst : .msbFirst
+    }
+  }
+
+}
