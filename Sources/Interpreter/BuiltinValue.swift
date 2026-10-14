@@ -116,7 +116,7 @@ extension BuiltinValue {
 extension BuiltinValue {
 
   /// Returns the byte representation of `self` as a value of type `t`,
-  /// ordered by `o`.
+  /// following the layouts provided by `c`.
   ///
   /// - Precondition: `self` is an instance of `t`.
   public func byteRepresentation(

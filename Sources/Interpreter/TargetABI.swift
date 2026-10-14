@@ -43,8 +43,13 @@ extension TargetABI {
 /// `.i(1)` and `.i(8)` have one-byte alignment.
 struct UnrealABI: TargetABI {
 
-  /// An instance.
-  public init() {}
+  /// The byte order used by this ABI.
+  let byteOrder: Endianness
+
+  /// Creates an ABI with the specified byte order.
+  public init(byteOrder: Endianness = .lsbFirst) {
+    self.byteOrder = byteOrder
+  }
 
   /// The size of a word in `bits`
   private let bitsInAWord = 64
@@ -57,9 +62,6 @@ struct UnrealABI: TargetABI {
 
   /// The number of bits in a pointer type.
   var bitsInAPointer: Int { bitsInAWord }
-
-  /// The order in which the bytes of values of multi-byte machine types are arranged.
-  var byteOrder: Endianness { .lsbFirst }
 
 }
 
