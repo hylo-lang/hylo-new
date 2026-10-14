@@ -886,7 +886,7 @@ public struct TypeStore: Sendable {
       return n
     } else {
       return self.map(n) { (s, t) in
-        // The unchecked cast is okay because type of an identity is irrelevant to `Hashable`.
+        // The unchecked cast is okay because the type of an identity is irrelevant to `Hashable`.
         if let u = substitutions[.init(uncheckedFrom: t)] { .stepOver(u) } else { .stepInto(t) }
       }
     }
