@@ -7,7 +7,7 @@ public protocol TargetABI {
   func alignment(_ t: MachineType) -> Int
 
   /// The number of bits in a pointer type.
-  var bitsInAPointer: Int { get }
+  var bitsInAPointer: UInt8 { get }
 
   /// The order in which the bytes of values of multi-byte machine types are
   /// arranged.
@@ -21,12 +21,12 @@ extension TargetABI {
   public func size(_ t: MachineType) -> Int {
     switch t {
     case .i(let w): Int(w.roundingUp(afterDividingBy: 8))
-    case .word: bitsInAPointer / 8
+    case .word: Int(bitsInAPointer) / 8
     case .float16: 2
     case .float32: 4
     case .float64: 8
     case .float128: 16
-    case .ptr: bitsInAPointer / 8
+    case .ptr: Int(bitsInAPointer) / 8
     }
   }
 
@@ -52,7 +52,7 @@ struct UnrealABI: TargetABI {
   }
 
   /// The size of a word in `bits`
-  private let bitsInAWord = 64
+  private let bitsInAWord: UInt8 = 64
 
   /// The maximal alignment of a machine type in bytes.
   private let maxAlignment = 128 / 8
@@ -61,7 +61,7 @@ struct UnrealABI: TargetABI {
   func alignment(_ t: MachineType) -> Int { min(size(t), maxAlignment) }
 
   /// The number of bits in a pointer type.
-  var bitsInAPointer: Int { bitsInAWord }
+  var bitsInAPointer: UInt8 { bitsInAWord }
 
 }
 

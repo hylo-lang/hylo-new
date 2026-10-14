@@ -40,8 +40,8 @@ enum RuntimeValue {
 extension RuntimeValue {
 
   /// Creates a `w`-bit integer having value `n`.
-  public init(integer n: BigInt, bitWidth w: Int) {
-    precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
+  public init(integer n: BigInt, bitWidth w: UInt8) {
+    precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
     self = .scalar(BuiltinValue(integer: n, bitWidth: w))
   }
@@ -138,17 +138,11 @@ extension RuntimeValue {
   ) {
     switch t {
     case .i(let n):
-      if n == 1 {
-        self = .scalar(BuiltinValue(bool: bs.first! != 0))
-      } else {
-        let o = c.abi.byteOrder
-        let v = BigInt(byteRepresentation: bs, inByteOrder: o)
-        self = .scalar(BuiltinValue(integer: v, bitWidth: bs.count * 8))
-      }
+      let v = BigInt(byteRepresentation: bs, inByteOrder: c.abi.byteOrder)
+      self = .scalar(BuiltinValue(integer: v, bitWidth: n))
     case .word:
-      let o = c.abi.byteOrder
-      let v = BigInt(byteRepresentation: bs, inByteOrder: o)
-      self = .scalar(BuiltinValue(integer: v, bitWidth: bs.count * 8))
+      let v = BigInt(byteRepresentation: bs, inByteOrder: c.abi.byteOrder)
+      self = .scalar(BuiltinValue(integer: v, bitWidth: c.abi.bitsInAPointer))
     default: unimplemented("floats and ptr are not supported yet.")
     }
   }

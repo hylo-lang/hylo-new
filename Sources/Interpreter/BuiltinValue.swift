@@ -90,12 +90,13 @@ enum BuiltinValue: Regular {
 extension BuiltinValue {
 
   /// Creates a `w`-bit integer having value `n`.
-  public init(integer n: BigInt, bitWidth w: Int) {
-    precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
+  public init(integer n: BigInt, bitWidth w: UInt8) {
+    precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
     let m = n.twosComplement(ofBitWidth: UInt8(w))
     self =
       switch w {
+      case 1: .i1(m != 0)
       case 8: .i8(UInt8(m))
       case 16: .i16(UInt16(m))
       case 32: .i32(UInt32(m))
