@@ -114,6 +114,74 @@ final class RuntimeValueTests: XCTestCase {
     )
   }
 
+  func testTuple() {
+    let i8 = id(MachineType.i(8))
+    let i16 = id(MachineType.i(16))
+    let inner = p.types.tuple(of: [i8.underlying, i16.underlying])
+    let t = MonomorphicTypeIdentity(p.types.tuple(of: [i8.underlying, inner]))
+    let bs: [UInt8] = [3, 0, 2, 1]
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: t, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: t, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+  }
+
+  func testStruct() async throws {
+    let t = await type(
+      named: "I8I16I8",
+      in: """
+        public struct I16I8 {
+          let x: Builtin.i16
+          let y: Builtin.i8
+        }
+        public struct I8I16I8 {
+          let x: Builtin.i8
+          let y: I16I8
+        }
+        """
+    )
+    let bs: [UInt8] = [2, 0, 3, 1]
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: t, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: t, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+  }
+
+  func testEnum() async throws {
+    let t = await type(
+      named: "Either",
+      in: """
+        public enum Either {
+          case first(Builtin.i8)
+          case second(Builtin.i16)
+        }
+        """
+    )
+    var bs: [UInt8] = [2, 0, 1]
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: t, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: t, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+
+    bs = [2, 0, 0]
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: t, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: t, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+  }
+
   /// Returns the type erased identity of `t`.
   private func id<T: TypeTree>(_ t: T) -> MonomorphicTypeIdentity {
     .init(p.types.demand(t).erased)
@@ -123,11 +191,11 @@ final class RuntimeValueTests: XCTestCase {
   ///
   /// - Precondition: `n` should be unique across `p`.
   /// - Precondition: `n` should be present in `s`.
-  private func type(named n: String, in s: SourceFile) async -> AnyTypeIdentity {
+  private func type(named n: String, in s: SourceFile) async -> MonomorphicTypeIdentity {
     await add(s)
     let d = p.castToDeclaration(p.select(.name(.init(identifier: n))).first!)!
     let mt = p.types.cast(p.type(maybeAssignedTo: d)!, to: Metatype.self)!
-    return p.types[mt].inhabitant
+    return .init(p.types[mt].inhabitant)
   }
 
   /// Adds `s` with no dependency to `p`.
