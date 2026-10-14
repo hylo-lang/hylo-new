@@ -95,13 +95,14 @@ extension BuiltinValue {
   public init(integer n: BigInt, bitWidth w: Int) {
     precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
+    let m = n.twosComplement(ofBitWidth: UInt8(w))
     self =
       switch w {
-      case 8: .i8(UInt8(n))
-      case 16: .i16(UInt16(n))
-      case 32: .i32(UInt32(n))
-      case 64: .i64(UInt64(n))
-      case 128: .i128(UInt128(n))
+      case 8: .i8(UInt8(m))
+      case 16: .i16(UInt16(m))
+      case 32: .i32(UInt32(m))
+      case 64: .i64(UInt64(m))
+      case 128: .i128(UInt128(m))
       default: preconditionFailure("Unknown integer bit width.")
       }
   }
