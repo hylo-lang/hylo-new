@@ -5,60 +5,138 @@ import XCTest
 
 final class RuntimeValueTests: XCTestCase {
 
-  // TODO: the semantics of runtime value is changed, rewrite the tests.
-  //
-  // func testTwosComplementRepresentation() {
-  //   XCTAssertEqual(twosComplementRepresentation(0), 0)
-  //   XCTAssertEqual(twosComplementRepresentation(1), 1)
-  //   XCTAssertEqual(twosComplementRepresentation(2), 2)
-  //   XCTAssertEqual(twosComplementRepresentation(-1), UInt128.max)
-  //   XCTAssertEqual(twosComplementRepresentation(-2), UInt128.max - 1)
-  // }
-  //
-  // func testRuntimeValueIntegerInitializer() {
-  //   XCTAssertEqual(RuntimeValue(integer: 0, bitWidth: 8, alignment: 1).bytes, [0])
-  //   XCTAssertEqual(RuntimeValue(integer: 1, bitWidth: 8, alignment: 1).bytes, [1])
-  //   XCTAssertEqual(RuntimeValue(integer: -1, bitWidth: 8, alignment: 1).bytes, [255])
-  //   XCTAssertEqual(RuntimeValue(integer: -2, bitWidth: 8, alignment: 1).bytes, [254])
-  //
-  //   XCTAssertEqual(
-  //     RuntimeValue(integer: 1, bitWidth: 16, alignment: 2).bytes,
-  //     withUnsafeBytes(of: UInt16(1), Array.init)[...])
-  //   XCTAssertEqual(
-  //     RuntimeValue(integer: -1, bitWidth: 16, alignment: 2).bytes,
-  //     withUnsafeBytes(of: UInt16(65535), Array.init)[...])
-  //
-  //   XCTAssertEqual(
-  //     RuntimeValue(integer: 1, bitWidth: 32, alignment: 4).bytes,
-  //     withUnsafeBytes(of: UInt32(1), Array.init)[...])
-  //
-  //   XCTAssertEqual(
-  //     RuntimeValue(integer: 1, bitWidth: 64, alignment: 8).bytes,
-  //     withUnsafeBytes(of: UInt64(1), Array.init)[...])
-  //
-  //   XCTAssertEqual(
-  //     RuntimeValue(integer: 1, bitWidth: 128, alignment: 8).bytes,
-  //     withUnsafeBytes(of: UInt128(1), Array.init)[...])
-  // }
-  //
-  // func testRuntimeValueBoolInitializer() {
-  //   let f = RuntimeValue(bool: false)
-  //   XCTAssertFalse(f.asBool)
-  //   XCTAssertEqual(f.bytes, [0])
-  //
-  //   let t = RuntimeValue(bool: true)
-  //   XCTAssertTrue(t.asBool)
-  //   XCTAssertEqual(t.bytes, [1])
-  // }
-  //
-  // func testRuntimeValueAlignment() {
-  //   for i in 1...10 {
-  //     let b = Array(repeating: UInt8(0), count: i)
-  //     let a = UInt(
-  //       bitPattern: RuntimeValue(bytes: b, havingAlignment: i).bytes.withUnsafeBytes(\.baseAddress)!
-  //     )
-  //     XCTAssert(a % UInt(i) == 0)
-  //   }
-  // }
+  var p = Program(forTesting: true)
+  var l = TypeLayoutCache(for: UnrealABI())
+
+  func testBool() {
+    let i1 = id(MachineType.i(1))
+    XCTAssertEqual(
+      RuntimeValue(bool: true)
+        .byteRepresentation(as: i1, definedIn: &p, usingLayoutsFrom: &l),
+      [1]
+    )
+    XCTAssertEqual(
+      RuntimeValue(bool: false)
+        .byteRepresentation(as: i1, definedIn: &p, usingLayoutsFrom: &l),
+      [0]
+    )
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: i1, definedIn: &p,
+        havingByteRepresentation: [0][...], providedBy: &l
+      ).byteRepresentation(as: i1, definedIn: &p, usingLayoutsFrom: &l),
+      [0]
+    )
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: i1, definedIn: &p,
+        havingByteRepresentation: [1][...], providedBy: &l
+      ).byteRepresentation(as: i1, definedIn: &p, usingLayoutsFrom: &l),
+      [1]
+    )
+  }
+
+  func testInteger() {
+    let i8 = id(MachineType.i(8))
+    let i16 = id(MachineType.i(16))
+    let i32 = id(MachineType.i(32))
+    let i64 = id(MachineType.i(64))
+    let i128 = id(MachineType.i(128))
+
+    var bs: [UInt8] = [2]
+    XCTAssertEqual(
+      RuntimeValue(integer: 2, bitWidth: 8)
+        .byteRepresentation(as: i8, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: i8, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: i8, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+
+    bs = [2, 1]
+    XCTAssertEqual(
+      RuntimeValue(integer: 258, bitWidth: 16)
+        .byteRepresentation(as: i16, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: i16, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: i16, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+
+    bs = [2, 1, 0, 0]
+    XCTAssertEqual(
+      RuntimeValue(integer: 258, bitWidth: 32)
+        .byteRepresentation(as: i32, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: i32, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: i32, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+
+    bs = [2, 1, 0, 0, 0, 0, 0, 0]
+    XCTAssertEqual(
+      RuntimeValue(integer: 258, bitWidth: 64)
+        .byteRepresentation(as: i64, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: i64, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: i64, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+
+    bs = [2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    XCTAssertEqual(
+      RuntimeValue(integer: 258, bitWidth: 128)
+        .byteRepresentation(as: i128, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(
+        ofType: i128, definedIn: &p,
+        havingByteRepresentation: bs[...], providedBy: &l
+      ).byteRepresentation(as: i128, definedIn: &p, usingLayoutsFrom: &l),
+      bs
+    )
+  }
+
+  /// Returns the type erased identity of `t`.
+  private func id<T: TypeTree>(_ t: T) -> MonomorphicTypeIdentity {
+    .init(p.types.demand(t).erased)
+  }
+
+  /// Returns type declared as `n` in `s`.
+  ///
+  /// - Precondition: `n` should be unique across `p`.
+  /// - Precondition: `n` should be present in `s`.
+  private func type(named n: String, in s: SourceFile) async -> AnyTypeIdentity {
+    await add(s)
+    let d = p.castToDeclaration(p.select(.name(.init(identifier: n))).first!)!
+    let mt = p.types.cast(p.type(maybeAssignedTo: d)!, to: Metatype.self)!
+    return p.types[mt].inhabitant
+  }
+
+  /// Adds `s` with no dependency to `p`.
+  private func add(_ s: SourceFile) async {
+    let name = UUID().uuidString
+    let m = p.demandModule(Module.Name(name))
+    _ = p[m].addSource(s)
+    await p.assignScopes(m)
+    p.assignTypes(m) { _, _ in false }
+  }
 
 }

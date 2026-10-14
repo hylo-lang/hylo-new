@@ -25,7 +25,7 @@ enum RuntimeValue {
     }
   }
 
-  /// The component values of a composite value.
+  /// The component values of a composite value in declaration order.
   ///
   /// - Precondition: `self` is an instance of a composite type.
   fileprivate var parts: [RuntimeValue] {
@@ -139,7 +139,7 @@ extension RuntimeValue {
     switch t {
     case .i(let n):
       if n == 1 {
-        self = .scalar(BuiltinValue(bool: bs.first! == 0))
+        self = .scalar(BuiltinValue(bool: bs.first! != 0))
       } else {
         let o = c.abi.byteOrder
         let v = BigInt(byteRepresentation: bs, inByteOrder: o)
