@@ -90,8 +90,6 @@ enum BuiltinValue: Regular {
 extension BuiltinValue {
 
   /// Creates a `w`-bit integer having value `n`.
-  ///
-  /// - Precondition: `n >= 0`.
   public init(integer n: BigInt, bitWidth w: Int) {
     precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
