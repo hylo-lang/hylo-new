@@ -158,8 +158,8 @@ final class RuntimeValueTests: XCTestCase {
       named: "Either",
       in: """
         public enum Either {
-          case first(Builtin.i8)
-          case second(Builtin.i16)
+          case first(value: Builtin.i8)
+          case second(value: Builtin.i16)
         }
         """
     )
