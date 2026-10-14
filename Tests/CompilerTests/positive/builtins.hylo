@@ -81,6 +81,28 @@ fun test_Builtin_advanced_by_bytes() {
   precondition(q.b == (7 as UInt8))
 }
 
+// MARK: Testing Builtin.shl_*()
+
+fun test_Builtin_shl() {
+  expect(Builtin.icmp_eq_word(Builtin.shl_word(12.value, 2.value), 48.value))
+}
+
+// MARK: Testing Builtin.ashr_*()
+
+fun test_Builtin_ashr() {
+  expect(Builtin.icmp_eq_word(Builtin.ashr_word(-8.value, 2.value), -2.value))
+  expect(Builtin.icmp_eq_word(Builtin.ashr_word(8.value, 2.value), 2.value))
+}
+
+// MARK: Testing Builtin.lshr_*()
+
+fun test_Builtin_lshr() {
+  expect(Builtin.icmp_eq_i8(
+    Builtin.lshr_i8((-8 as Int8).value, (2 as Int8).value), (62 as Int8).value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.lshr_i8((8 as Int8).value, (2 as Int8).value), (2 as Int8).value))
+}
+
 // MARK: Testing Builtin.and_*()
 
 fun test_Builtin_and() {
@@ -300,6 +322,22 @@ fun test_Builtin_icmp() {
   expect(Builtin.icmp_ult_i64(zero, minus_one))
   expect(Builtin.icmp_ule_i64(zero, zero))
   expect(Builtin.icmp_ugt_i64(Int64.min().value, Int64.max().value))
+}
+
+fun test_Builtin_icmp_ptr() {
+  sink let x = (1, 2)
+  let one = Builtin.address(of: x.0)
+  let two = Builtin.address(of: x.1)
+
+  expect(Builtin.icmp_eq_ptr(one, one))
+  expect(Builtin.icmp_eq_ptr(two, two))
+  expect(Builtin.icmp_ne_ptr(one, two))
+  expect(Builtin.icmp_ne_ptr(two, one))
+  expect(Builtin.icmp_ult_ptr(one, two))
+  expect(Builtin.icmp_ugt_ptr(two, one))
+
+  // Guarantees the lifetime of `x`.
+  _ = x
 }
 
 // MARK: Testing Builtin.mul_*_*()
@@ -577,6 +615,17 @@ fun test_Builtin_urem() {
     (1 as UInt64).value))
 }
 
+// MARK: Testing Builtin.lshr_*()
+
+fun test_Builtin_lhsr() {
+  expect(Builtin.icmp_eq_i64(
+    Builtin.lshr_i64((8 as UInt64).value, (2 as UInt64).value),
+    (2 as UInt64).value))
+  expect(Builtin.icmp_eq_i8(
+    Builtin.lshr_i8((-1 as Int8).value, (1 as Int8).value),
+    (127 as Int8).value))
+}
+
 // MARK: Testing Builtin.usub_with_overflow_*()
 
 fun test_Builtin_usub_with_overflow() {
@@ -641,6 +690,9 @@ public fun main() {
   test_Builtin_add()
   test_Builtin_address()
   test_Builtin_advanced_by_bytes()
+  test_Builtin_shl()
+  test_Builtin_ashr()
+  test_Builtin_lshr()
   test_Builtin_and()
   test_Builtin_assume_initialized()
   test_Builtin_fadd()
@@ -654,6 +706,7 @@ public fun main() {
   test_Builtin_frem()
   test_Builtin_fsub()
   test_Builtin_icmp()
+  test_Builtin_icmp_ptr()
   test_Builtin_mul()
   test_Builtin_or()
   test_Builtin_sadd_with_overflow()
@@ -670,6 +723,7 @@ public fun main() {
   test_Builtin_uitofp()
   test_Builtin_umul_with_overflow()
   test_Builtin_urem()
+  test_Builtin_lhsr()
   test_Builtin_usub_with_overflow()
   test_Builtin_xor()
   test_Builtin_zeroinitializer()

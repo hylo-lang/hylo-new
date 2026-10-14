@@ -592,6 +592,8 @@ public struct Program: Sendable {
         return true
       } else if let x = cast(q, to: NameExpression.self), let y = self[x].qualification {
         q = y
+      } else if let x = cast(q, to: TupleMember.self) {
+        q = self[x].parent
       } else if let x = cast(q, to: Call.self), self[x].style == .bracketed {
         q = self[x].callee
       } else {

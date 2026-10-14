@@ -1,0 +1,25 @@
+//! exit-status:42
+
+struct X is Deinitializable {
+
+  var v: Int
+  memberwise init
+
+  subscript foo() auto -> Int {
+    let   { yield self.v }
+    inout { yield &self.v }
+  }
+
+  subscript bar() auto -> Int {
+    let   { yield self.foo[] }
+    inout { yield &self.foo[] }
+  }
+
+}
+
+public fun main() -> Int32 {
+  var x = X(v: 20)
+  inout w = &x.bar[]
+  &w = w << 1
+  return Int32(x.v + 2)
+}

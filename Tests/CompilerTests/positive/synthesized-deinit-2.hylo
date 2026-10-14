@@ -1,0 +1,11 @@
+struct S0<T> is Deinitializable {
+  fun deinit() sink {}
+}
+
+struct S1<T> {}
+
+given S1<Int> is Deinitializable {
+  fun deinit() sink {}
+}
+
+public fun main() {}

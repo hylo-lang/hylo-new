@@ -52,6 +52,36 @@ public enum BuiltinFunction: Hashable, Sendable {
   /// state of `x` before the instruction is applied.
   case assumeInitialized(Bool)
 
+  /// `Builtin.trunc_or_zext_T_U(x: T) -> U`
+  ///
+  /// Returns `x` as an instance of `U`.
+  ///
+  /// This function is essentially an alias for either `trunc`, `zext`, or the identity depending
+  /// on the widths of the source and target during code generation. The result is the application
+  /// of one of the following operations, where `T` and `U` identify integer types (e.g., `i64`):
+  ///
+  /// - truncation if `T` is wider than `U`
+  /// - zero-extension if `T` is narrower than `U`
+  /// - identity if `T` is equal to `U`
+  ///
+  /// - Requires: The value of `x` must be representable as an instance of `U`.
+  case truncateOrZeroExtend(MachineType.ID, MachineType.ID)
+
+  /// `Builtin.trunc_or_sext_T_U(x: T) -> U`
+  ///
+  /// Returns `x` as an instance of `U`.
+  ///
+  /// This function is essentially an alias for either `trunc`, `sext`, or the identity depending
+  /// on the widths of the source and target during code generation. The result is the application
+  /// of one of the following operations, where `T` and `U` identify integer types (e.g., `i64`):
+  ///
+  /// - truncation if `T` is wider than `U`
+  /// - sign-extension if `T` is narrower than `U`
+  /// - identity if `T` is equal to `U`
+  ///
+  /// - Requires: The value of `x` must be representable as an instance of `U`.
+  case truncateOrSignExtend(MachineType.ID, MachineType.ID)
+
   // MARK: Functions with a counterpart LLVM instruction.
 
   case add(OverflowBehavior, MachineType.ID)
@@ -60,19 +90,19 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case mul(OverflowBehavior, MachineType.ID)
 
-  //  case shl(OverflowBehavior, MachineType.ID)
-
   case udiv(exact: Bool, MachineType.ID)
 
   case sdiv(exact: Bool, MachineType.ID)
 
-  //  case lshr(exact: Bool, MachineType.ID)
-  //
-  //  case ashr(exact: Bool, MachineType.ID)
-
   case urem(MachineType.ID)
 
   case srem(MachineType.ID)
+
+  case shl(MachineType.ID)
+
+  case ashr(MachineType.ID)
+
+  case lshr(MachineType.ID)
 
   case and(MachineType.ID)
 
@@ -144,11 +174,11 @@ public enum BuiltinFunction: Hashable, Sendable {
   /// In LLVM: `fptosi`.
   case fptosi(MachineType.ID, MachineType.ID)
 
-  //  case ctpop(MachineType.ID)
-  //
-  //  case ctlz(MachineType.ID)
-  //
-  //  case cttz(MachineType.ID)
+  case ctpop(MachineType.ID)
+
+  case ctlz(MachineType.ID)
+
+  case cttz(MachineType.ID)
 
   case zeroinitializer(MachineType.ID)
 
@@ -427,19 +457,19 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, t, to: t)).erased
     case .mul(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
-    //    case .shl(_, let t):
-    //      return .init(^t, ^t, to: ^t)
     case .udiv(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .sdiv(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
-    //    case .lshr(_, let t):
-    //      return .init(^t, ^t, to: ^t)
-    //    case .ashr(_, let t):
-    //      return .init(^t, ^t, to: ^t)
     case .urem(let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .srem(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
+    case .shl(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
+    case .ashr(let t):
+      return s.demand(Arrow(t, t, to: t)).erased
+    case .lshr(let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .and(let t):
       return s.demand(Arrow(t, t, to: t)).erased
@@ -468,6 +498,10 @@ extension BuiltinFunction {
     case .icmp(_, let t):
       return s.demand(Arrow(t, t, to: i1)).erased
     case .trunc(let f, let d):
+      return s.demand(Arrow(f, to: d)).erased
+    case .truncateOrSignExtend(let f, let d):
+      return s.demand(Arrow(f, to: d)).erased
+    case .truncateOrZeroExtend(let f, let d):
       return s.demand(Arrow(f, to: d)).erased
     case .zext(let f, let d):
       return s.demand(Arrow(f, to: d)).erased
@@ -501,12 +535,12 @@ extension BuiltinFunction {
       return s.demand(Arrow(f, to: d)).erased
     case .fptosi(let f, let d):
       return s.demand(Arrow(f, to: d)).erased
-    //    case .ctpop(let t):
-    //      return .init(^t, to: ^t)
-    //    case .ctlz(let t):
-    //      return .init(^t, to: ^t)
-    //    case .cttz(let t):
-    //      return .init(^t, to: ^t)
+    case .ctpop(let t):
+      return s.demand(Arrow(t, to: t)).erased
+    case .ctlz(let t):
+      return s.demand(Arrow(t, to: t)).erased
+    case .cttz(let t):
+      return s.demand(Arrow(t, to: t)).erased
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
     case .advancedByBytes(let byteOffset):
@@ -778,20 +812,20 @@ extension BuiltinFunction: Showable {
       return (p != .ignore)
         ? printer.format("mul_%S_%T", [p, t.erased])
         : printer.format("mul_%T", [t.erased])
-    //    case .shl(let p, let t):
-    //      return (p != .ignore) ? "shl_\(p)_\(t)" : "shl_\(t)"
     case .udiv(let e, let t):
       return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
     case .sdiv(let e, let t):
       return printer.format(e ? "sdiv_exact_%T" : "sdiv_%T", [t.erased])
-    //    case .lshr(let e, let t):
-    //      return e ? "lshr_exact_\(t)" : "lshr_\(t)"
-    //    case .ashr(let e, let t):
-    //      return e ? "ashr_exact_\(t)" : "ashr_\(t)"
     case .urem(let t):
       return printer.format("urem_%T", [t.erased])
     case .srem(let t):
       return printer.format("srem_%T", [t.erased])
+    case .shl(let t):
+      return printer.format("shl_%T", [t.erased])
+    case .ashr(let t):
+      return printer.format("ashr_%T", [t.erased])
+    case .lshr(let t):
+      return printer.format("lshr_%T", [t.erased])
     case .and(let t):
       return printer.format("and_%T", [t.erased])
     case .or(let t):
@@ -814,6 +848,10 @@ extension BuiltinFunction: Showable {
       return printer.format("icmp_%S_%T", [p, t.erased])
     case .trunc(let l, let r):
       return printer.format("trunc_%T_%T", [l.erased, r.erased])
+    case .truncateOrZeroExtend(let l, let r):
+      return printer.format("trunc_or_zext_%T_%T", [l.erased, r.erased])
+    case .truncateOrSignExtend(let l, let r):
+      return printer.format("trunc_or_sext_%T_%T", [l.erased, r.erased])
     case .zext(let l, let r):
       return printer.format("zext_%T_%T", [l.erased, r.erased])
     case .sext(let l, let r):
@@ -846,12 +884,12 @@ extension BuiltinFunction: Showable {
       return "fptoui_\(l)_\(r)"
     case .fptosi(let l, let r):
       return "fptosi_\(l)_\(r)"
-    //    case .ctpop(let t):
-    //      return "ctpop_\(t)"
-    //    case .ctlz(let t):
-    //      return "ctlz_\(t)"
-    //    case .cttz(let t):
-    //      return "cttz_\(t)"
+    case .ctpop(let t):
+      return printer.format("ctpop_%T", [t.erased])
+    case .ctlz(let t):
+      return printer.format("ctlz_%T", [t.erased])
+    case .cttz(let t):
+      return printer.format("cttz_%T", [t.erased])
     case .zeroinitializer(let t):
       return printer.format("zeroinitializer_%T", [t.erased])
     case .advancedByBytes(let t):
@@ -1132,26 +1170,12 @@ extension BuiltinFunction {
     case "mul":
       guard let (p, t) = integerArithmeticTail(&tokens) else { return nil }
       self = .mul(p, s.demand(t))
-
-    //    case "shl":
-    //      guard let (p, t) = integerArithmeticTail(&tokens) else { return nil }
-    //      self = .shl(p, t)
-
     case "udiv":
       guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
       self = .udiv(exact: p != nil, s.demand(t))
     case "sdiv":
       guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
       self = .sdiv(exact: p != nil, s.demand(t))
-
-    //    case "lshr":
-    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
-    //      self = .lshr(exact: p != nil, t)
-    //
-    //    case "ashr":
-    //      guard let (p, t) = (maybe("exact") + machineType)(&tokens) else { return nil }
-    //      self = .ashr(exact: p != nil, t)
-
     case "urem":
       guard let t = machineType(&tokens) else { return nil }
       self = .urem(s.demand(t))
@@ -1159,6 +1183,15 @@ extension BuiltinFunction {
       guard let t = machineType(&tokens) else { return nil }
       self = .srem(s.demand(t))
 
+    case "shl":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .shl(s.demand(t))
+    case "ashr":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .ashr(s.demand(t))
+    case "lshr":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .lshr(s.demand(t))
     case "and":
       guard let t = machineType(&tokens) else { return nil }
       self = .and(s.demand(t))
@@ -1168,6 +1201,7 @@ extension BuiltinFunction {
     case "xor":
       guard let t = machineType(&tokens) else { return nil }
       self = .xor(s.demand(t))
+
     case "sadd":
       guard let t = integerArithmeticWithOverflowTail(&tokens) else { return nil }
       self = .signedAdditionWithOverflow(s.demand(t))
@@ -1191,8 +1225,15 @@ extension BuiltinFunction {
       self = .icmp(p, s.demand(t))
 
     case "trunc":
-      guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
-      self = .trunc(s.demand(f), s.demand(d))
+      guard let (o, f, d) = integerTruncationTail(&tokens) else { return nil }
+      switch o {
+      case .truncate:
+        self = .trunc(s.demand(f), s.demand(d))
+      case .truncateOrZeroExtend:
+        self = .truncateOrZeroExtend(s.demand(f), s.demand(d))
+      case .truncateOrSignExtend:
+        self = .truncateOrSignExtend(s.demand(f), s.demand(d))
+      }
 
     case "zext":
       guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
@@ -1217,7 +1258,7 @@ extension BuiltinFunction {
     //    case "ptrtoint":
     //      guard let t = machineType(&tokens) else { return nil }
     //      self = .ptrtoint(t)
-    //
+
     case "fadd":
       guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
       self = .fadd(p, s.demand(t))
@@ -1258,23 +1299,22 @@ extension BuiltinFunction {
       guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
       self = .fptosi(s.demand(f), s.demand(d))
 
-    //
-    //    case "ctpop":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .ctpop(t)
-    //
-    //    case "ctlz":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .ctlz(t)
-    //
-    //    case "cttz":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .cttz(t)
+    case "ctpop":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .ctpop(s.demand(t))
+
+    case "ctlz":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .ctlz(s.demand(t))
+
+    case "cttz":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .cttz(s.demand(t))
 
     case "zeroinitializer":
       guard let t = machineType(&tokens) else { return nil }
       self = .zeroinitializer(s.demand(t))
-    //
+
     //    case "atomic":
     //      if let t = tokens.first, t.contains("fence") {
     //        self.init(fence: n)
@@ -1550,6 +1590,20 @@ extension BuiltinFunction {
 
 }
 
+/// The semantics of an integer conversion.
+private enum IntegerConversion {
+
+  /// Truncation.
+  case truncate
+
+  /// Truncation or zero-extension.
+  case truncateOrZeroExtend
+
+  /// Truncation of sign-extension.
+  case truncateOrSignExtend
+
+}
+
 /// A function that parses an instance of `T` by consuming a prefix of tokens from `stream`, or
 /// returns `nil` if such instance cannot be parsed.
 ///
@@ -1629,6 +1683,27 @@ private func integerArithmeticWithOverflowTail(
 ) -> MachineType? {
   let p = exactly("with") + exactly("overflow") + machineType
   return p(&stream).map(\.1)
+}
+
+/// Parses the parameters and type of an integer truncation instruction.
+private func integerTruncationTail(
+  _ stream: inout ArraySlice<Substring>
+) -> (IntegerConversion, MachineType, MachineType)? {
+  var conversion = IntegerConversion.truncate
+  if stream.first == "or" {
+    stream.removeFirst()
+    switch stream.popFirst() {
+    case "zext":
+      conversion = .truncateOrZeroExtend
+    case "sext":
+      conversion = .truncateOrSignExtend
+    default:
+      return nil
+    }
+  }
+
+  let tail = machineType + machineType
+  return tail(&stream).map({ (t, u) in (conversion, t, u) })
 }
 
 /// Parses the parameters and type of `advanced_by_bytes`.

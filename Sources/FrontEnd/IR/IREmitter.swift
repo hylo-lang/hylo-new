@@ -562,17 +562,18 @@ internal struct IREmitter {
 
   /// Generates the IR of `s`.
   private mutating func lower(_ s: Assignment.ID) -> ControlFlow {
-    // The LHS should be an inout expression.
-    guard let target = program.read(program[s].lhs.erased, \InoutExpression.lvalue) else {
+    // The LHS should be marked for mutation.
+    if !program.isMarkedForMutation(program[s].lhs) {
       report(program.assignmentNotMarkedMutating(s))
       return .next
     }
 
     // If the LHS does not occur in the RHS, we can build the RHS in place.
-    if let n = program.cast(target, to: NameExpression.self) {
+    let lhs = program.read(program[s].lhs.erased, \InoutExpression.lvalue) ?? program[s].lhs
+    if let n = program.cast(lhs, to: NameExpression.self) {
       if case .direct(let d) = program.declaration(referredToBy: n) {
         if !program.occurs(referenceTo: d, in: program[s].rhs) {
-          let target = lowered(lvalue: target)
+          let target = lowered(lvalue: lhs)
           lower(store: program[s].rhs, to: target)
           return .next
         }
@@ -1561,19 +1562,25 @@ internal struct IREmitter {
       ? .synthesized(requirement, arguments)
       : .implementation(requirement, conformance, arguments)
 
-    if let i = program[module].ir.functions.index(forKey: name) {
-      return i
-    } else {
-      let signature = prototype(functionOrConformance: requirement)
-      let signatureWithContext = IRFunction.Signature(
-        typeParameters: accumulatedGenericParameters(visibleFrom: .init(node: conformance)),
-        termParameters: signature.termParameters,
-        output: signature.output)
+    // Did we already declare the function?
+    if let i = program[module].ir.functions.index(forKey: name) { return i }
 
-      let a = program.anchorForDiagnostics(about: conformance)
-      return program[module].ir.addFunction(
-        IRFunction(name: name, anchor: a, signature: signatureWithContext))
+    // The signature of the function is defined as the signature of the requirement as though it
+    // had been declared in the scope of the conformance declaration.s
+    let us = accumulatedGenericParameters(visibleFrom: .init(node: conformance))
+    let ts = program.withTyper(typing: requirement.module) { (tp) in
+      tp.genericParameters(requirement) + us
     }
+
+    let signature = prototype(functionOrConformance: requirement)
+    let signatureWithContext = IRFunction.Signature(
+      typeParameters: ts,
+      termParameters: signature.termParameters,
+      output: signature.output)
+
+    let a = program.anchorForDiagnostics(about: conformance)
+    return program[module].ir.addFunction(
+      IRFunction(name: name, anchor: a, signature: signatureWithContext))
   }
 
   /// Returns the identity of the constructor lowering `d`, declaring it if necessary.
@@ -2905,10 +2912,15 @@ internal struct IREmitter {
     implementSynthesizedDeinitializer(deinitializer, for: witnessArguments)
 
     let (table, xs) = _recordingInsertions({ $0._emit(witness: w) })
+    let implementation = functionReference(to: deinitializer)
+
+    // The deinitializer may be generic, in which case its type arguments are carried by the
+    // conforming type.
+    let ts = program[module].ir[deinitializer].signature.typeParameters
+    let cs = conformerArguments.filter({ (p, _) in ts.contains(p) })
     let x0 = _alloca(.void)
-    let x1 = functionReference(to: deinitializer)
-    let x2 = _type_apply(x1, to: conformerArguments)
-    _apply(x2, [table, s], into: x0, argumentAccesses: .formAndClose)
+    let x1 = _type_apply(implementation, to: cs)
+    _apply(x1, [table, s], into: x0, argumentAccesses: .formAndClose)
     insertionContext.function!.closeOpenEndedRegions(in: xs)
   }
 

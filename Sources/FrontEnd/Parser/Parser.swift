@@ -1424,36 +1424,40 @@ public struct Parser {
   /// Parses an expression made of one or more components.
   ///
   ///     compound-expression ::=
-  ///       compound-expression-head
-  ///       compound-expression '.' (unqualified-name-expression | decimal-number)
+  ///       '&'? primary-expression
+  ///       compound-expression '.' unqualified-name-expression
+  ///       compound-expression '.' decimal
+  ///       compound-expression '(' parameter-list? ')'
+  ///       compound-expression '[' parameter-list? ']'
+  ///       compound-expression '<' generic-parameter (',' generic-parameter)* ','? '>'
   ///
   private mutating func parseCompoundExpression(
     in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity {
-    // Is there a mutation marker?
     let marker = take(.ampersand)
-    if let m = marker, whitespaceBeforeNextToken() {
-      report(separatedUnaryOperator(m.site))
+    var head = try parsePrimaryExpression(in: &file)
+
+    if let m = marker {
+      if tokens.source[m.site.end.index].isWhitespace {
+        report(separatedUnaryOperator(m.site))
+      }
+      head = .init(file.insert(InoutExpression(marker: m, lvalue: head, site: span(from: m))))
     }
 
-    let head = try parsePrimaryExpression(in: &file)
-    return try appendCompounds(to: head, markedForMutationWith: marker, in: &file)
+    return try appendCompounds(to: head, in: &file)
   }
 
   /// Parses the arguments and nominal components that can be affixed to `head`.
   private mutating func appendCompounds(
-    to head: ExpressionIdentity, markedForMutationWith marker: consuming Token?,
+    to head: ExpressionIdentity,
     in file: inout Module.SourceContainer
   ) throws -> ExpressionIdentity {
     var h = head
     while true {
-      // Qualifications and bracketed calls bind more tightly than mutation markers.
       if let n = try appendMemberSelection(to: h, in: &file) {
         h = n
       } else if let n = try appendBracketedArguments(to: h, in: &file) {
         h = n
-      } else if let m = marker.take() {
-        h = .init(file.insert(InoutExpression(marker: m, lvalue: h, site: span(from: m))))
       } else if let n = try appendParenthesizedArguments(to: h, in: &file) {
         h = n
       } else if let n = try appendAngledArguments(to: h, in: &file) {
@@ -2215,7 +2219,7 @@ public struct Parser {
         return .init(n)
       } else {
         // Give up on parsing a pattern and assume we just parsed some qualification.
-        return try .init(appendCompounds(to: head, markedForMutationWith: nil, in: &file))
+        return try .init(appendCompounds(to: head, in: &file))
       }
     }
   }
