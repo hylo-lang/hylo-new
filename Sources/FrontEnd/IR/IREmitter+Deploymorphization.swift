@@ -65,7 +65,7 @@ extension IREmitter {
   /// arguments to type parameters.
   ///
   /// This method replaces `i` with an instruction forming a monomorphic witness table having the
-  /// same entries and captures as the one formed by `i`, extended with an additional captures for
+  /// same entries and captures as the one formed by `i`, extended with an additional capture for
   /// each type argument. These captures are appended at the end of existing ones.
   private mutating func depolymorphize(
     _ i: IRWitnessTable.ID, in f: inout IRFunction,
