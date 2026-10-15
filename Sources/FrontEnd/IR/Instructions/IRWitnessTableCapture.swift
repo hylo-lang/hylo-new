@@ -10,7 +10,7 @@ public struct IRWitnessTableCapture: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The logical index of the capture being indexed.
+  /// The logical index of the capture being accessed.
   public let index: Int
 
   /// The type of the capture being accessed.
