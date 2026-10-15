@@ -900,7 +900,8 @@ extension Program {
       indices: [s.index], indexType: ctx.module.llvm.i32,
       at: ctx.insertionPoint!)
 
-    ctx.value[.register(i.erased)] = x2.v
+    let x3 = ctx.module.llvm.insertLoad(ctx.module.llvm.ptr, from: x2, at: ctx.insertionPoint!)
+    ctx.value[.register(i.erased)] = x3.v
     return ctx.ir.instruction(after: i.erased)
   }
 
