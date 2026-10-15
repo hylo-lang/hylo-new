@@ -130,7 +130,8 @@ extension RuntimeValue {
     }
   }
 
-  /// Creates a value of type `t` from its byte representation `bs`.
+  /// Creates a value of type `t` from its byte representation `bs`, interpreted
+  /// according to the layout provided by `c`.
   private init(
     ofType t: MachineType,
     havingByteRepresentation bs: ArraySlice<UInt8>,
