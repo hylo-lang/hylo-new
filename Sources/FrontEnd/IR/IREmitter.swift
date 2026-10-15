@@ -264,12 +264,12 @@ internal struct IREmitter {
   /// insertion context is configured to generate IR into its lowered form.
   private mutating func lowerDefinition(_ d: ConformanceDeclaration.ID) {
     insertionContext.anchor = program.anchor(introducerOf: d)
-    let (_, declaredWitness) = currentFunction.signature.output.remote!
+    let (_, witness) = currentFunction.signature.output.remote!
 
     // If the conformance is a nested given, we can simply extract the witness from the parameter
     // accepting a witness of a conformance to the enclosing trait.
     if program.isRequirement(d) {
-      let x0 = _property(.init(d), of: .parameter(0), withType: declaredWitness)
+      let x0 = _property(.init(d), of: .parameter(0), withType: witness)
       let x1 = _access([.let], from: x0)
       _yield(x1)
       _return()
@@ -317,50 +317,135 @@ internal struct IREmitter {
 
       case .inherited(_, let m, true) where program.traitRequiring(m) == concept:
         // The implementation is defined in the trait itself.
-        defining(interface, at: program.anchor(introducerOf: d)) { (me) in
-          let defaultImplementation = me.demandLoweredDeclaration(functionOrConformance: m)
-          let callee = me.functionReference(to: defaultImplementation)
-          me._emitCallRequirementImplementation(
-            callee, with: [.parameter(0)], instantiatedWith: table.arguments)
-        }
+        defineRequirementInterface(
+          interface, adaptingDefaultImplementation: m, instantiatedWith: table.arguments, for: d)
 
       case .direct(let m):
         // The implementations is defined either in the conformance declaration directly or in the
         // declaration of the conforming type.
-        let ts = argumentsInstantiating(implementation: m, in: d, declaring: declaredWitness)
-        defining(interface, at: program.anchor(introducerOf: d)) { (me) in
-          me.associate(.init(d), with: .parameter(0))
-          let result = me.currentFunction.returnRegister ?? .poison(.place(.error))
-          let callee = me.loweredCallee(
-            referringTo: m, boundTo: nil, appliedBy: nil,
-            writingResultTo: result)
-          me._emitCallRequirementImplementation(
-            callee.value, with: callee.arguments, instantiatedWith: ts)
-        }
+        defineRequirementInterface(
+          interface, adaptingCustomImplementation: m, for: d, declaring: witness)
 
       default:
         // The implementations is inherited by a trait or extension.
-        defining(interface, at: program.anchor(introducerOf: d)) { (me) in
-          me.associate(.init(d), with: .parameter(0))
-          let result = me.currentFunction.returnRegister ?? .poison(.place(.error))
-          let callee = me.loweredCallee(
-            referringTo: implementation, qualifiedBy: nil, appliedBy: nil,
-            writingResultTo: result, at: me.currentAnchor)
-          me._emitCallRequirementImplementation(
-            callee.value, with: callee.arguments, instantiatedWith: callee.typeArguments)
-        }
+        defineRequirementInterface(
+          interface, adaptingInheritedImplementation: implementation, for: d)
       }
+    }
+
+    // Capture the conformance's term parameters in the witness table.
+    var captures: [IRValue] = []
+    for (i, p) in currentFunction.signature.termParameters.enumerated() {
+      assert(p.access == .let, "unexpected `\(p.access)`-bound conformance parameter")
+      captures.append(_access([.let], from: .parameter(i)))
     }
 
     // The witness table may be generic.
     let ts = TypeArguments.init(
       mapping: currentFunction.signature.typeParameters, to: \.erased)
     let x0 = _witness_table(
-      instantiatedWith: ts, aggregating: entries, capturing: [], as: declaredWitness)
+      instantiatedWith: ts, aggregating: entries, capturing: captures, as: witness)
     let x1 = _access([.let], from: x0)
     _yield(x1)
     _end(IRAccess.self, openedBy: x1)
     _return()
+  }
+
+  /// Defines the body of `interface`, which is an interface forwarding arguments to the default
+  /// implementation of `m` instantiated with `ts` for the witness projected by `d`.
+  ///
+  /// `m` identifies a trait requirement with a default implementation. `interface` is the entry of
+  /// the witness table corresponding to `m`.
+  ///
+  /// This method is called by `lowerDefinition(_:)` while lowering a conformance declaration, so
+  /// that `self.currentFunction` refers to the lowered form of `d`. It emits IR in the body of
+  /// `interface` that forwards the arguments of the conformance to `m`.
+  private mutating func defineRequirementInterface(
+    _ interface: IRFunction.ID,
+    adaptingDefaultImplementation m: DeclarationIdentity,
+    instantiatedWith ts: TypeArguments,
+    for d: ConformanceDeclaration.ID
+  ) {
+    defining(interface, at: program.anchor(introducerOf: d)) { (me) in
+      let defaultImplementation = me.demandLoweredDeclaration(functionOrConformance: m)
+      let callee = me.functionReference(to: defaultImplementation)
+      me._emitCallRequirementImplementation(callee, with: [.parameter(0)], instantiatedWith: ts)
+    }
+  }
+
+  /// Defines the body of `interface`, which is an interface forwarding arguments to the entity `m`
+  /// that implements a requirement for the witness of type `w` projected by `d`.
+  ///
+  /// `m` identifies an entity that is declared either in `d` or in the declaration of the type for
+  /// which `d` declares a conformance. `interface` is the entry of the witness table corresponding
+  /// to the requirement that `m` implements.
+  ///
+  /// This method is called by `lowerDefinition(_:)` while lowering a conformance declaration, so
+  /// that `self.currentFunction` refers to the lowered form of `d`. It emits IR in the body of
+  /// `interface` that forwards the arguments of the conformance to `m`. If `m` is declared in `d`,
+  /// then those arguments include the captures of the witness table. The following to illustrate:
+  ///
+  ///     trait P { fun f(x: Int) }
+  ///     trait Q { fun g(x: Int) }
+  ///     given w: <T is P> => T is Q { fun g(x: Int) { self.f(x) } }
+  ///
+  /// Here, the witness of `T`s conformance to `P` becomes a term parameter of `w` whose value is
+  /// captured by the witness table projected by `w`. This witness also becomes a term parameter of
+  /// `g` because it is defined in the conformance. Hence, the requirement interface stored in the
+  /// witness table table must extract the argument of this parameter from the table's captures.
+  ///
+  /// No capture is forwarded if `m` is declared outside of `d` since in that case the parameters
+  /// of `d`'s lowered form do not also become parameters of `m`'s lowered form.
+  private mutating func defineRequirementInterface(
+    _ interface: IRFunction.ID,
+    adaptingCustomImplementation m: DeclarationIdentity,
+    for d: ConformanceDeclaration.ID, declaring w: AnyTypeIdentity
+  ) {
+    let ts = argumentsInstantiating(implementation: m, for: d, declaring: w)
+    let cs = currentFunction.signature.termParameters
+    defining(interface, at: program.anchor(introducerOf: d)) { (me) in
+      me.associate(.init(d), with: .parameter(0))
+      let result = me.currentFunction.returnRegister ?? .poison(.place(.error))
+      let callee = me.loweredCallee(
+        referringTo: m, boundTo: nil, appliedBy: nil,
+        writingResultTo: result)
+      var xs = callee.arguments
+
+      // Forward the witness table's captures if necessary.
+      if me.program.parent(containing: m, as: ConformanceDeclaration.self) != nil {
+        for (i, c) in cs.enumerated() {
+          xs.append(me._witness_table_capture(i, of: .parameter(0), as: c.type))
+        }
+      }
+
+      me._emitCallRequirementImplementation(callee.value, with: xs, instantiatedWith: ts)
+    }
+  }
+
+  /// Defines the body of `interface`, which is an interface forwarding arguments to the entity `m`
+  /// that implements a requirement for the witness projected by `d`.
+  ///
+  /// `m` identifies a member inherited by a trait or extension and implements a requirement of the
+  /// conformance declared by `d`. `interface` is the entry of the witness table corresponding to
+  /// the requirement that `m` implements.
+  ///
+  /// This method is called by `lowerDefinition(_:)` while lowering a conformance declaration, so
+  /// that `self.currentFunction` refers to the lowered form of `d`. It emits IR in the body of
+  /// `interface` that forwards the arguments of the conformance to `m`.
+  private mutating func defineRequirementInterface(
+    _ interface: IRFunction.ID,
+    adaptingInheritedImplementation m: DeclarationReference,
+    for d: ConformanceDeclaration.ID
+  ) {
+    defining(interface, at: program.anchor(introducerOf: d)) { (me) in
+      me.associate(.init(d), with: .parameter(0))
+      let result = me.currentFunction.returnRegister ?? .poison(.place(.error))
+      let callee = me.loweredCallee(
+        referringTo: m, qualifiedBy: nil, appliedBy: nil,
+        writingResultTo: result, at: me.currentAnchor)
+      me._emitCallRequirementImplementation(
+        callee.value, with: callee.arguments, instantiatedWith: callee.typeArguments)
+    }
   }
 
   /// Generates the IR of `d`.
@@ -446,9 +531,8 @@ internal struct IREmitter {
       }
     }
 
-    // If we're defining a default implementation in a trait, update the local bindings of the
-    // function to map each abstract given to a property access. Unused givens will be removed by
-    // dead code elimination.
+    // If we're defining a default implementation in a trait, update the local bindings to map each
+    // abstract given to a property access. Unused givens will be removed by dead code elimination.
     if let t = program.traitRequiring(d) {
       let ms = program.declarations(of: ConformanceDeclaration.self, lexicallyIn: .init(node: t))
       for m in ms {
@@ -1662,12 +1746,12 @@ internal struct IREmitter {
 
   /// Returns the term parameters and return type of `d`'s lowered representation.
   private mutating func prototype(
-    functionOrConformance d: DeclarationIdentity, applying substitutions: TypeArguments = .init()
+    functionOrConformance d: DeclarationIdentity
   ) -> IRFunction.Signature {
     if let n = program.cast(d, to: ConformanceDeclaration.self) {
-      return prototype(conformance: n, applying: substitutions)
+      return prototype(conformance: n)
     } else {
-      return prototype(function: d, usedMutably: false, applying: substitutions)
+      return prototype(function: d, usedMutably: false)
     }
   }
 
@@ -1677,101 +1761,106 @@ internal struct IREmitter {
   /// given (i.e., a given declared as a trait requirement) these usings are preceded by an
   /// additional parameter accepting an instance of the containing trait.
   private mutating func prototype(
-    conformance d: ConformanceDeclaration.ID, applying substitutions: TypeArguments = .init()
+    conformance d: ConformanceDeclaration.ID
   ) -> IRFunction.Signature {
     let witness = program.types.contextAndHead(program.type(assignedTo: d))
     let types = accumulatedGenericParameters(visibleFrom: program.castToScope(d)!)
     var terms: [IRParameter] = []
 
-    // If the conformance declares an abstract given, accept a witness of conformance of the
-    // enclosing trait.
+    // If the conformance declares an abstract given, it is lowered to a function that accepts a
+    // witness of conformance to the enclosing trait first.
     if let enclosure = program.traitRequiring(d) {
       let s = program.withTyper(typing: module) { (tp) in tp.typeOfTraitSelf(in: enclosure) }
       let t = program.types.dealiased(s)
-      let u = program.types.substitute(substitutions, in: t)
-      terms.append(IRParameter(type: u, access: .let, declaration: nil))
+      terms.append(IRParameter(type: t, access: .let, declaration: nil))
     }
 
-    for p in witness.context.usings {
-      let t = program.types.dealiased(p)
-      let u = program.types.substitute(substitutions, in: t)
-      terms.append(IRParameter(type: u, access: .let, declaration: nil))
+    // The using parameters of the conformance come next.
+    assert(witness.context.usings.count == program[d].contextParameters.usings.count)
+    for p in program[d].contextParameters.usings {
+      terms.append(loweredUsingParameter(p))
     }
 
     return .init(typeParameters: types, termParameters: terms, output: .remote(.let, witness.head))
   }
 
-  /// Returns the term parameters and return type of `d`'s lowered representation.
+  /// Returns the signature of `d`'s lowered representation.
   ///
-  /// `d` declares a function or subscript. The result includes the explicit parameters, usings,
-  /// and captures of `d`, in that order. Type parameters are not included. Those are only lowered
-  /// to term parameters in existentialized functions.
+  /// `d` declares a function or subscript. The result includes the usings, captures, and explicit
+  /// parameters of `d`, in that order.
   private mutating func prototype(
-    function d: DeclarationIdentity, usedMutably: Bool,
-    applying substitutions: TypeArguments = .init(),
+    function d: DeclarationIdentity, usedMutably: Bool
   ) -> IRFunction.Signature {
     let typeOfDeclaration = program.types.contextAndHead(program.type(assignedTo: d))
     let shape = program.types.seenAsTermAbstraction(typeOfDeclaration.head)!
     let types = accumulatedGenericParameters(visibleFrom: program.castToScope(d)!)
     var terms: [IRParameter] = []
 
-    // Parameters of memberwise initializers have no explicit declarations.
+    // Parameters of memberwise initializers have no explicit declaration.
     if program.isMemberwiseInitializer(d) {
       for p in program.types[shape].inputs {
         let t = program.types.dealiased(p.type)
-        let u = program.types.substitute(substitutions, in: t)
-        terms.append(IRParameter(type: u, access: p.access, declaration: nil))
+        terms.append(IRParameter(type: t, access: p.access, declaration: nil))
       }
     }
 
     // Other declarations have capture and parameter lists.
     else {
       let parameters = program.parametersAndCaptures(of: d)
-      precondition(parameters.captures.isEmpty, "TODO")
+      unimplemented(if: !parameters.captures.isEmpty, "functions with captures")
 
-      // Using parameters come first.
-      for p in parameters.usings {
-        var t = program.type(assignedTo: p)
-        t = program.types.dealiased(t)
-        t = program.types.substitute(substitutions, in: t)
-
-        if let b = program.cast(p, to: BindingDeclaration.self) {
-          let (k, v) = program.implicit(introducedBy: b)
-          terms.append(IRParameter(type: t, access: .init(k), declaration: .init(v)))
-        } else {
-          terms.append(IRParameter(type: t, access: .let, declaration: .init(p)))
+      // If `d` implements a requirement in a conformance declaration, the parameters of that
+      // declaration come first.
+      if let enclosure = program.parent(containing: d, as: ConformanceDeclaration.self) {
+        for p in program[enclosure].contextParameters.usings {
+          terms.append(loweredUsingParameter(p))
         }
+      }
+
+      // Using parameters come next.
+      for p in parameters.usings {
+        terms.append(loweredUsingParameter(p))
       }
 
       // If `d` is a trait requirement, the trait receiver comes next.
       if let c = program.traitRequiring(d) {
         let t = program.withTyper(typing: c.module, { (tp) in tp.typeOfTraitSelf(in: c) })
-        let u = program.types.substitute(substitutions, in: t)
-        let v = program.types.dealiased(u)
-        terms.append(IRParameter(type: v, access: .let, declaration: nil))
+        let u = program.types.dealiased(t)
+        terms.append(IRParameter(type: u, access: .let, declaration: nil))
       }
 
       // Explicit parameters come next.
       for p in parameters.explicit {
         let t = program.type(assignedTo: p, assuming: RemoteType.self)
-        let u = program.types.substitute(substitutions, in: program.types[t].projectee)
-        let v = program.types.dealiased(u)
+        let u = program.types.dealiased(program.types[t].projectee)
         let k = program.types[t].access.unlessAuto(program.types[shape].effect)
         assert((k != .auto) || program.tag(of: d) == FunctionBundleDeclaration.self)
-        terms.append(IRParameter(type: v, access: k, declaration: .init(p)))
+        terms.append(IRParameter(type: u, access: k, declaration: .init(p)))
       }
     }
 
     // Return register comes last.
     let r = program.types.resultOfApplying(typeOfDeclaration.head, mutably: usedMutably)!
-    let s = program.types.substitute(substitutions, in: r)
-    let t = program.types.dealiased(s)
+    let s = program.types.dealiased(r)
     if program.types[shape].style == .parenthesized {
-      terms.append(IRParameter(type: t, access: .set, declaration: nil))
+      terms.append(IRParameter(type: s, access: .set, declaration: nil))
       return .init(typeParameters: types, termParameters: terms, output: .indirect)
     } else {
-      let output = IRFunction.Output.remote(program.types[shape].effect, t)
+      let output = IRFunction.Output.remote(program.types[shape].effect, s)
       return .init(typeParameters: types, termParameters: terms, output: output)
+    }
+  }
+
+  /// Returns the lowered declaration of `p`, which introduces a using parameter.
+  private mutating func loweredUsingParameter(_ p: DeclarationIdentity) -> IRParameter {
+    let t = program.type(assignedTo: p)
+    let u = program.types.dealiased(t)
+
+    if let b = program.cast(p, to: BindingDeclaration.self) {
+      let (k, v) = program.implicit(introducedBy: b)
+      return IRParameter(type: u, access: .init(k), declaration: .init(v))
+    } else {
+      return IRParameter(type: u, access: .let, declaration: .init(p))
     }
   }
 
@@ -2346,12 +2435,13 @@ internal struct IREmitter {
     return insert(s)!
   }
 
-  /// Inserts a `witness_table_stash` instruction.
-  internal mutating func _witness_table_stash(
-    of witness: IRValue, as stashType: AnyTypeIdentity
+  /// Inserts a `witness_table_capture` instruction.
+  internal mutating func _witness_table_capture(
+    _ index: Int, of witness: IRValue, as captureType: AnyTypeIdentity
   ) -> IRValue {
-    let t = program.types.dealiased(stashType)
-    let s = IRWitnessTableStash(source: witness, stashType: t, anchor: currentAnchor)
+    let t = program.types.dealiased(captureType)
+    let s = IRWitnessTableCapture(
+      source: witness, index: index, captureType: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -3276,7 +3366,7 @@ internal struct IREmitter {
   /// in the context of `d`, which declares a witness of type `w`.
   private mutating func argumentsInstantiating(
     implementation m: DeclarationIdentity,
-    in d: ConformanceDeclaration.ID, declaring w: AnyTypeIdentity
+    for d: ConformanceDeclaration.ID, declaring w: AnyTypeIdentity
   ) -> TypeArguments {
     if program.isContained(m, in: .init(node: d)) {
       let ps = accumulatedGenericParameters(visibleFrom: .init(node: d))

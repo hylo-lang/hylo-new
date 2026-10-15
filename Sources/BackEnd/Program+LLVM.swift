@@ -208,8 +208,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRUnreachable.self), in: &ctx)
     case IRWitnessTable.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRWitnessTable.self), in: &ctx)
-    case IRWitnessTableStash.self:
-      return incorporate(ctx.ir.castUnchecked(i, to: IRWitnessTableStash.self), in: &ctx)
+    case IRWitnessTableCapture.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRWitnessTableCapture.self), in: &ctx)
     case IRYield.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRYield.self), in: &ctx)
     case let s:
@@ -878,22 +878,30 @@ extension Program {
 
   /// Generates the LLVM IR code corresponding to `i`.
   internal mutating func incorporate(
-    _ i: IRWitnessTableStash.ID, in ctx: inout FunctionGenerationContext
+    _ i: IRWitnessTableCapture.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
 
     let abstractTableTypeInHylo = ctx.ir.result(of: s.source)!.type
     let abstractTableType = metadata(of: abstractTableTypeInHylo, in: &ctx.module)
-    let entriesType = StructType.UnsafeReference(abstractTableType.llvm)!
-    let entriesSize = ctx.module.llvm.layout.storageSize(of: entriesType)
 
+    // Compute a pointer to the start of the witness table.
     let x0 = codegen(s.source, in: &ctx)
+
+    // Move the pointer to the end of the table's entries.
     let x1 = ctx.module.llvm.insertGetElementPointerInBounds(
-      of: x0, typed: ctx.module.llvm.i8,
-      indices: [entriesSize], indexType: ctx.module.llvm.i32,
+      of: x0, typed: abstractTableType.llvm,
+      indices: [1], indexType: ctx.module.llvm.i32,
       at: ctx.insertionPoint!)
 
-    ctx.value[.register(i.erased)] = x1.v
+    // Move the pointer to the selected capture.
+    let x2 = ctx.module.llvm.insertGetElementPointerInBounds(
+      of: x1, typed: ctx.module.llvm.ptr,
+      indices: [s.index], indexType: ctx.module.llvm.i32,
+      at: ctx.insertionPoint!)
+
+    let x3 = ctx.module.llvm.insertLoad(ctx.module.llvm.ptr, from: x2, at: ctx.insertionPoint!)
+    ctx.value[.register(i.erased)] = x3.v
     return ctx.ir.instruction(after: i.erased)
   }
 

@@ -1982,12 +1982,10 @@ public struct Typer {
     visibleFrom s: ScopeIdentity
   ) -> [GenericParameter.ID] {
     var accumulator: [GenericParameter.ID] = []
-    var p = s
-    while let n = p.node {
-      if let d = program.castToDeclaration(n) {
+    for p in program.scopes(from: s) {
+      if let n = p.node, let d = program.castToDeclaration(n) {
         accumulator.append(contentsOf: genericParameters(d).reversed())
       }
-      p = program.parent(containing: n)
     }
     return accumulator.reversed()
   }

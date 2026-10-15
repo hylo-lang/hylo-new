@@ -32,7 +32,13 @@ extension IREmitter {
     f.closeOpenEndedRegions(in: ws)
   }
   
-  /// Replaces uses of `i` with their existentialized forms.
+  /// Replaces uses of `i`, which are in `f`, with their existentialized forms, using `witnesses`
+  /// to compute arguments to type parameters.
+  ///
+  /// This method replaces each use of `i` with an instruction that uses the existentialized form
+  /// of the abstraction resulting from `i`. `witnesses` is a table mapping a type to the value of
+  /// its witness. This table may be extended if new witnesses must be constructed to form the
+  /// instructions replacing the uses of `i`.
   private mutating func depolymorphize(
     _ i: IRTypeApply.ID, in f: inout IRFunction,
     reusing witnesses: inout [AnyTypeIdentity: IRValue]
@@ -55,7 +61,12 @@ extension IREmitter {
     }
   }
 
-  /// Replaces uses of `i` its existentialized form.
+  /// Replaces `i`, which is in `f`, with its existentialized form, , using `witnesses` to compute
+  /// arguments to type parameters.
+  ///
+  /// This method replaces `i` with an instruction forming a monomorphic witness table having the
+  /// same entries and captures as the one formed by `i`, extended with an additional capture for
+  /// each type argument. These captures are appended at the end of existing ones.
   private mutating func depolymorphize(
     _ i: IRWitnessTable.ID, in f: inout IRFunction,
     reusing witnesses: inout [AnyTypeIdentity: IRValue]
@@ -63,10 +74,12 @@ extension IREmitter {
     // Nothing to do if the witness table isn't generic.
     let s = f.at(i)
     if s.arguments.isEmpty { return }
-    unimplemented(if: !s.captures.isEmpty, "captures in generic witness table")
 
-    let ws = lowering(before: i.erased, in: &f) { (me) in
-      me._emitAccessTypeWitnesses(for: s.arguments, reusing: &witnesses)
+    // Existentialized type parameters are laid out after other captures so that the indices of the
+    // latter are not invalidated.
+    var ws = Array(s.captures)
+    lowering(before: i.erased, in: &f) { (me) in
+      ws.append(contentsOf: me._emitAccessTypeWitnesses(for: s.arguments, reusing: &witnesses))
     }
 
     let entries = s.entries.map { (e) in
@@ -76,7 +89,7 @@ extension IREmitter {
       // Is the entry polymorphic?
       let maybePoly = program[module].ir[program[module].ir.identity(function: n)!]
       if !maybePoly.isMonomorphic {
-        let p = definePartialApplicationExistentializing(maybePoly)
+        let p = definePartialApplicationExistentializing(entry: maybePoly, in: s)
         return functionReference(to: p)
       } else {
         return e
@@ -216,8 +229,8 @@ extension IREmitter {
       return i
     }
 
-    // The existentialized form of the function takes the generic parameter as type witnesses
-    // before the term parameters of the polymorphic form.
+    // The existentialized form of the function takes generic parameters as type witnesses before
+    // the term parameters of the polymorphic form.
     var ps: [IRParameter] = .init(
       minimumCapacity: poly.signature.typeParameters.count + poly.signature.termParameters.count)
     let t = program.types.demand(TypeWitness()).erased
@@ -234,7 +247,7 @@ extension IREmitter {
   }
 
   /// Returns a partial application of `poly`, which is the generic interface of an implementation
-  /// stored in a witness table, to the type arguments captured by that witness table.
+  /// in `table`, to the type arguments captured by `table`.
   ///
   /// When a generic conformance declaration is existentialized, the entries stored in the witness
   /// table that is projected must be partially applied to the existentialized arguments to present
@@ -246,10 +259,10 @@ extension IREmitter {
   /// The implementation of `f` defined in `w` is generic over `T`, meaning that it has to be
   /// existentialized along with `w`. However, the resulting existentialized form takes one more
   /// term parameter than the signature of `f` advertises. Hence, we have to construct another
-  /// function reading the argument to this parameter from the captures of the existentialized
-  /// witness table, which is passed as the first argument.
+  /// function reading the argument that will be passed to this parameter from the captures of the
+  /// existentialized witness table.
   private mutating func definePartialApplicationExistentializing(
-    _ poly: IRFunction
+    entry poly: IRFunction, in table: IRWitnessTable
   ) -> IRFunction.ID {
     // Existentialize the polymorphic function.
     let mono = demandExistentialized(poly)
@@ -265,15 +278,18 @@ extension IREmitter {
     // Define the body of that function.
     let entry = applied.addBlock()
     lowering(.end(of: entry), anchoredTo: poly.anchor, in: &applied) { (me) in
-      let t = me.program.types.demand(TypeWitness()).erased
-      let u = me.program.types.tuple(of: Array(repeating: t, count: types.count))
-      let stash = me._witness_table_stash(of: .parameter(0), as: u)
+      var arguments: [IRValue] = []
+
+      let w = me.program.types.demand(TypeWitness()).erased
+      let n = table.captures.count
+      for i in 0 ..< types.count {
+        arguments.append(me._witness_table_capture(n + i, of: .parameter(0), as: w))
+      }
+      for i in 0 ..< terms.count {
+        arguments.append(.parameter(i))
+      }
 
       let callee = me.functionReference(to: mono)
-      var arguments: [IRValue] = []
-      for i in 0 ..< types.count { arguments.append(me._subfield(stash, at: [i])) }
-      for i in 0 ..< terms.count { arguments.append(.parameter(i)) }
-
       if poly.isSubscript {
         unimplemented()
       } else {
