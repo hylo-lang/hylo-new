@@ -361,7 +361,7 @@ fun $implementation[P.foo for Self: ?0].existentialized.applied_0(
   let %p0: P<?0>, let %p1: ?0, set %p2: Int
 ) {
 %b0:
-  %r0 = witness_table_stash %p0 as {Type}
+  %r0 = witness_table_captrue %p0 at 0 as Type
   ...
   %r6 = apply $implementation[P.foo for Self: ?0].existentialized(%r2, %r3, %r4) => %r5
   ...
@@ -374,13 +374,13 @@ fun $implementation[P.foo for Self: ?0].existentialized(
 
 The existentialization of `foo`'s implementation interface results in the last function, which accepts a type witness of the trait's `Self` parameter as its first argument.
 The second function represents this interface partially applied to its first argument.
-The value of the witness is read from the witness table using the `witness_table_stash` instruction, which projects the place containing the captures of a witness table.
+The value of the witness is read from the witness table using the `witness_table_property` instruction, which projects the captures of a witness table.
 Finally, the witness table is filled with the partially applied interfaces, along with a capture of the type witness passed to the conformance declaration.
 
 Note that nothing in the type system guarantees the safety of these functions.
 Instead, the sole argument justifying their correctness is that they are all the product of a mechanical transformation.
 In particular, unlike the type of a lambda, the type of a witness table does not describe the shape of its captures.
-Consequently, `witness_table_stash` unsafely assumes the shape of the table's captures.
+Consequently, `witness_table_capture` unsafely assumes the shape of the table's captures.
 
 The lifetimes of a table's captures are guaranteed to exceed the lifetime of the table itself because witness tables do not yet support copying or relocation.
 This limitation should be lifted in the future, requiring a mechanism to ensure the liveness of a table's captures.

@@ -2,7 +2,7 @@ import Archivist
 
 /// Accesses the captures of a witness table.
 @Archivable
-public struct IRWitnessTableStash: Instruction {
+public struct IRWitnessTableCapture: Instruction {
 
   /// The operands of the instruction.
   public let operands: [IRValue]
@@ -10,21 +10,26 @@ public struct IRWitnessTableStash: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The type of the stash being accessed.
-  public let stashType: AnyTypeIdentity
+  /// The logical index of the capture being indexed.
+  public let index: Int
+
+  /// The type of the capture being accessed.
+  public let captureType: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
-  public init(source: IRValue, stashType: AnyTypeIdentity, anchor: Anchor) {
+  public init(source: IRValue, index: Int, captureType: AnyTypeIdentity, anchor: Anchor) {
     self.operands = [source]
     self.anchor = anchor
-    self.stashType = stashType
+    self.index = index
+    self.captureType = captureType
   }
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
   public init(_ other: Self, substituting properties: IRSubstitutionTable) {
     self.operands = [properties[other.source]]
     self.anchor = properties.anchor(other)
-    self.stashType = other.stashType
+    self.index = other.index
+    self.captureType = other.captureType
   }
 
   /// The witness table whose stash is being accessed.
@@ -34,16 +39,16 @@ public struct IRWitnessTableStash: Instruction {
 
   /// The type of the value loaded by this instruction.
   public var type: IRType {
-    .place(stashType)
+    .place(captureType)
   }
 
 }
 
-extension IRWitnessTableStash: Showable {
+extension IRWitnessTableCapture: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "witness_table_stash \(printer.show(source)) as \(printer.show(stashType))"
+    "witness_table_capture \(printer.show(source)) at \(index) as \(printer.show(captureType))"
   }
 
 }

@@ -2342,12 +2342,13 @@ internal struct IREmitter {
     return insert(s)!
   }
 
-  /// Inserts a `witness_table_stash` instruction.
-  internal mutating func _witness_table_stash(
-    of witness: IRValue, as stashType: AnyTypeIdentity
+  /// Inserts a `witness_table_capture` instruction.
+  internal mutating func _witness_table_capture(
+    _ index: Int, of witness: IRValue, as captureType: AnyTypeIdentity
   ) -> IRValue {
-    let t = program.types.dealiased(stashType)
-    let s = IRWitnessTableStash(source: witness, stashType: t, anchor: currentAnchor)
+    let t = program.types.dealiased(captureType)
+    let s = IRWitnessTableCapture(
+      source: witness, index: index, captureType: t, anchor: currentAnchor)
     return insert(s)!
   }
 

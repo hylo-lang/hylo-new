@@ -265,15 +265,17 @@ extension IREmitter {
     // Define the body of that function.
     let entry = applied.addBlock()
     lowering(.end(of: entry), anchoredTo: poly.anchor, in: &applied) { (me) in
-      let t = me.program.types.demand(TypeWitness()).erased
-      let u = me.program.types.tuple(of: Array(repeating: t, count: types.count))
-      let stash = me._witness_table_stash(of: .parameter(0), as: u)
+      var arguments: [IRValue] = []
+
+      let w = me.program.types.demand(TypeWitness()).erased
+      for i in 0 ..< types.count {
+        arguments.append(me._witness_table_capture(i, of: .parameter(0), as: w))
+      }
+      for i in 0 ..< terms.count {
+        arguments.append(.parameter(i))
+      }
 
       let callee = me.functionReference(to: mono)
-      var arguments: [IRValue] = []
-      for i in 0 ..< types.count { arguments.append(me._subfield(stash, at: [i])) }
-      for i in 0 ..< terms.count { arguments.append(.parameter(i)) }
-
       if poly.isSubscript {
         unimplemented()
       } else {
