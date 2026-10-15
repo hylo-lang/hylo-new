@@ -32,7 +32,13 @@ extension IREmitter {
     f.closeOpenEndedRegions(in: ws)
   }
   
-  /// Replaces uses of `i` with their existentialized forms.
+  /// Replaces uses of `i`, which are in `f`, with their existentialized forms, using `witnesses`
+  /// to compute arguments to type parameters.
+  ///
+  /// This method replaces each use of `i` with an instruction that uses the existentialized form
+  /// of the abstraction resulting from `i`. `witnesses` is a table mapping a type to the value of
+  /// its witness. This table may be extended if new witnesses must be constructed to form the
+  /// instructions replacing the uses of `i`.
   private mutating func depolymorphize(
     _ i: IRTypeApply.ID, in f: inout IRFunction,
     reusing witnesses: inout [AnyTypeIdentity: IRValue]
@@ -55,7 +61,12 @@ extension IREmitter {
     }
   }
 
-  /// Replaces uses of `i` its existentialized form.
+  /// Replaces `i`, which is in `f`, with its existentialized form, , using `witnesses` to compute
+  /// arguments to type parameters.
+  ///
+  /// This method replaces `i` with an instruction forming a monomorphic witness table having the
+  /// same entries and captures as the one formed by `i`, extended with an additional captures for
+  /// each type argument. These captures are appended at the end of existing ones.
   private mutating func depolymorphize(
     _ i: IRWitnessTable.ID, in f: inout IRFunction,
     reusing witnesses: inout [AnyTypeIdentity: IRValue]
@@ -64,6 +75,8 @@ extension IREmitter {
     let s = f.at(i)
     if s.arguments.isEmpty { return }
 
+    // Existentialized type parameters are laid out after other captures so that the indices of the
+    // latter are not invalidated.
     var ws = Array(s.captures)
     lowering(before: i.erased, in: &f) { (me) in
       ws.append(contentsOf: me._emitAccessTypeWitnesses(for: s.arguments, reusing: &witnesses))
@@ -234,7 +247,7 @@ extension IREmitter {
   }
 
   /// Returns a partial application of `poly`, which is the generic interface of an implementation
-  /// stored in a witness table, to the type arguments captured by that witness table.
+  /// in `table`, to the type arguments captured by `table`.
   ///
   /// When a generic conformance declaration is existentialized, the entries stored in the witness
   /// table that is projected must be partially applied to the existentialized arguments to present
