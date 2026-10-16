@@ -46,6 +46,14 @@ extension UInt16 {
     &self.value = Builtin.trunc_word_i16(x.value)
   }
 
+  /// Returns the remainder of dividing `self` by `other`.
+  ///
+  /// - Requires: `other` is not `0`.
+  @inline(always)
+  public fun infix% (other: Self) -> Self {
+    .new(value: Builtin.urem_i16(self.value, other.value))
+  }
+
 }
 
 extension Pointer<UInt8> {
@@ -242,6 +250,12 @@ extension Pointer<RecordMemberType> {
   public fun infix+ (offset: Int) -> Self {
     let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
     return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
+  }
+
+  /// Returns `self` advanced in memory by `offset` `Pointee`s.
+  @inline(always)
+  public fun infix+ (offset: UInt32) -> Self {
+    self + Int(offset)
   }
 
   /// Advances `self` in memory by `offset` `Pointee`s.
@@ -547,4 +561,93 @@ public fun __hylo_offset_of_member(
     in_the_range_from: start, until: end)
   sink let r = preceding_size.rounded_up(to_nearest_multiple_of: nth_alignment)
   return r
+}
+
+/// Stably sorts `start..<end` by decreasing alignment.
+@inline(always)
+public fun sort_by_decreasing_alignment(
+  from start: Pointer<RecordMemberType>,
+  until end: Pointer<RecordMemberType>
+) {
+  if start == end { return }
+  // The first element is a trivially sorted range; insert the others into it, in order.
+  var sorted_end = start + 1
+  insert_in_order_before_max_less_aligned_suffix(
+    range_from: start + 1, until: end,
+    where_alignment_exceeds: 0 as Alignment,
+    into_range_from: start, until: &sorted_end)
+}
+
+/// Returns the size of a record type having members given by the array of length `member_count` at
+/// `member_array`, in declaration order.
+///
+/// - Note: mutates the array pointed to by `member_array`.
+@inline(always)
+public fun __hylo_size_of_record(
+  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
+) -> Size {
+  let start = member_array
+  let end = member_array + member_count
+  sort_by_decreasing_alignment(from: start, until: end)
+  return size_of_record_having_ordered_members(in_the_range_from: start, until: end)
+}
+
+/// Returns the greatest common divisor of `x` and `y`.
+///
+/// - Requires: `x` and `y` are not both `0`.
+@inline(always)
+public fun gcd(x: Alignment, y: Alignment) -> Alignment {
+  var a = x.copy()
+  var b = y.copy()
+  while b != (0 as Alignment) {
+    sink let r = a % b
+    &a = b.copy()
+    &b = r
+  }
+  return a
+}
+
+/// Returns the alignment of a record type having members given by the
+/// array of length `member_count` at `member_array`.
+///
+/// The result is the least common multiple of the alignments of the members, or `1` if there are
+/// no members.
+///
+/// - Note: traps if the result is not representable as an `Alignment`.
+@inline(always)
+public fun __hylo_alignment_of_record(
+  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
+) -> Alignment {
+  var r = 1 as Alignment
+  var p = member_array.copy()
+  let end = member_array + member_count
+  while p < end {
+    sink let a = p.pointee().alignment()
+    // With `a` first, Euclid's first step is `a % r`, which is `0` in the common case.
+    &r = (r / gcd(a, r)) * a
+    &p += 1
+  }
+  return r
+}
+
+/// Returns the alignment of a record type having members given by the
+/// array of length `member_count` at `member_array`, whose alignments are all powers of two.
+///
+/// The result is the greatest alignment of any member, or `1` if there are no members, which is
+/// the least common multiple of the alignments under the precondition.
+///
+/// - Requires: the alignment of every member is a power of two.
+@inline(always)
+public fun __hylo_alignment_of_record_power_of_two(
+  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
+) -> Alignment {
+  var largest = 1 as Alignment
+  var p = member_array.copy()
+  let end = member_array + member_count
+  while p < end {
+    sink let alignment = p.pointee().alignment()
+    if alignment > largest { &largest = alignment }
+    &p += 1
+  }
+  return largest
 }
