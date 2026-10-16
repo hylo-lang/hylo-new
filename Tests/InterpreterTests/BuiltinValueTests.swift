@@ -31,6 +31,16 @@ final class BuiltinValueTests: XCTestCase {
     )
   }
 
+  func testIntegerValue() {
+    XCTAssertEqual(BuiltinValue(integer: 0, bitWidth: 8).asI8, 0)
+    XCTAssertEqual(BuiltinValue(integer: 1, bitWidth: 8).asI8, 1)
+    XCTAssertEqual(BuiltinValue(integer: 127, bitWidth: 8).asI8, 127)
+    XCTAssertEqual(BuiltinValue(integer: 255, bitWidth: 8).asI8, 255)
+    XCTAssertEqual(BuiltinValue(integer: -1, bitWidth: 8).asI8, 255)
+    XCTAssertEqual(BuiltinValue(integer: -2, bitWidth: 8).asI8, 254)
+    XCTAssertEqual(BuiltinValue(integer: -128, bitWidth: 8).asI8, 128)
+  }
+
   func testIntegersForLsbFirst() {
     var l = TypeLayoutCache(for: UnrealABI(byteOrder: .lsbFirst))
     XCTAssertEqual(
