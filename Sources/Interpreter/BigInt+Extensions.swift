@@ -2,14 +2,15 @@ import BigInt
 
 extension BigInt {
 
-  /// Creates an integer from the byte representation `bs` of an unsigned
-  /// integer, ordered by `o`.
-  init(byteRepresentation bs: some Collection<UInt8>, inByteOrder o: Endianness) {
-    if o == .lsbFirst {
-      self = .init(byteRepresentation: bs.reversed(), inByteOrder: .msbFirst)
+  /// Creates an instance by interpreting `storedFrom` as an unsigned value
+  /// stored in `byteOrder`.
+  init(unsignedFrom storedFrom: some Collection<UInt8>, storedIn byteOrder: Endianness) {
+    if byteOrder == .lsbFirst {
+      self = .init(unsignedFrom: storedFrom.reversed(), storedIn: .msbFirst)
     } else {
-      self = bs.reduce(BigInt(0)) { r, c in
-        (r << 8 | BigInt(c))
+      self = storedFrom.reduce(into: 0 as BigInt) { r, c in
+        r <<= 8
+        r |= BigInt(c)
       }
     }
   }

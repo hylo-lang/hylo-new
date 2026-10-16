@@ -139,10 +139,10 @@ extension RuntimeValue {
   ) {
     switch t {
     case .i(let n):
-      let v = BigInt(byteRepresentation: bs, inByteOrder: c.abi.byteOrder)
+      let v = BigInt(unsignedFrom: bs, storedIn: c.abi.byteOrder)
       self = .scalar(BuiltinValue(integer: v, bitWidth: n))
     case .word:
-      let v = BigInt(byteRepresentation: bs, inByteOrder: c.abi.byteOrder)
+      let v = BigInt(unsignedFrom: bs, storedIn: c.abi.byteOrder)
       self = .scalar(BuiltinValue(integer: v, bitWidth: c.abi.bitsInAPointer))
     default: unimplemented("floats and ptr are not supported yet.")
     }
