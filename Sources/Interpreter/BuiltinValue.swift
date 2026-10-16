@@ -90,18 +90,19 @@ enum BuiltinValue: Regular {
 extension BuiltinValue {
 
   /// Creates a `w`-bit integer having value `n`.
+  ///
+  /// - Precondition: `n` is representable as a signed integer of `w` bits.
   public init(integer n: BigInt, bitWidth w: UInt8) {
     precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
-    let m = n.twosComplement(ofBitWidth: UInt8(w))
     self =
       switch w {
-      case 1: .i1(m != 0)
-      case 8: .i8(UInt8(m))
-      case 16: .i16(UInt16(m))
-      case 32: .i32(UInt32(m))
-      case 64: .i64(UInt64(m))
-      case 128: .i128(UInt128(m))
+      case 1: .i1(n != 0)
+      case 8: .i8(UInt8(bitPattern: Int8(n)))
+      case 16: .i16(UInt16(bitPattern: Int16(n)))
+      case 32: .i32(UInt32(bitPattern: Int32(n)))
+      case 64: .i64(UInt64(bitPattern: Int64(n)))
+      case 128: .i128(UInt128(bitPattern: Int128(n)))
       default: preconditionFailure("Unknown integer bit width.")
       }
   }

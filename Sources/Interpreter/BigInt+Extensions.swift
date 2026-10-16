@@ -14,16 +14,4 @@ extension BigInt {
     }
   }
 
-  /// Returns the two's-complement representation of `self` using `w` bits.
-  ///
-  /// - Precondition: `w` is positive.
-  /// - Precondition: `self` is representable as a signed integer of `w` bits.
-  func twosComplement(ofBitWidth w: UInt8) -> BigInt {
-    precondition(w > 0)
-
-    let modulus = BigInt(1) << Int(w)
-    let remainder = self % modulus
-    return remainder < 0 ? remainder + modulus : remainder
-  }
-
 }
