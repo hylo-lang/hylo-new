@@ -116,12 +116,12 @@ extension BuiltinValue {
 extension BuiltinValue {
 
   /// Returns the byte representation of `self` as a value of type `t`,
-  /// following the layouts provided by `c`.
+  /// laid out according to the layouts provided by `c`.
   ///
   /// - Precondition: `self` is an instance of `t`.
   public func byteRepresentation(
-    as t: MachineType,
-    usingLayoutsFrom c: inout TypeLayoutCache
+    asValueOf t: MachineType,
+    laidOutUsing c: inout TypeLayoutCache
   ) -> [UInt8] {
     let o = c.abi.byteOrder
     let w = c.abi.bitsInAPointer

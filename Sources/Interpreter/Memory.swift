@@ -367,8 +367,8 @@ extension Memory {
   private mutating func store(_ v: RuntimeValue, at p: Memory.TypedAddress) {
     let bs =
       v.byteRepresentation(
-        as: p.type, definedIn: &program,
-        usingLayoutsFrom: &typeLayouts)
+        asValueOf: p.type, definedIn: &program,
+        laidOutUsing: &typeLayouts)
     let o = p.offset
     self[p.allocation].storage[o..<o + bs.count] = bs[...]
   }
