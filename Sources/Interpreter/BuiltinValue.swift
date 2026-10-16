@@ -92,6 +92,7 @@ extension BuiltinValue {
   /// Creates a `w`-bit integer having value `n`.
   public init(integer n: BigInt, bitWidth w: UInt8) {
     precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
+    precondition(n.isRepresentable(asIntegerHavingBitWidth: w))
 
     self =
       switch w {
