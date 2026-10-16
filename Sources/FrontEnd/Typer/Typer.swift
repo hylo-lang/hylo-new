@@ -1012,6 +1012,18 @@ public struct Typer {
       return .success(true)
     }
 
+    // Closed tuples are derivable memberwise.
+    if let t = program.types.cast(conformer, to: Tuple.self) {
+      let (members, isOpenEnded) = program.types.members(of: t)
+      if !isOpenEnded {
+        var result = StructuralConformanceLookupResult.success(true)
+        for m in members {
+          result = result && isDerivable(conformanceTo: concept, for: m, in: scopeOfUse)
+        }
+        return result
+      }
+    }
+
     let a = typeOfModel(of: conformer, conformingTo: concept, with: []).erased
     if let pick = summon(a, in: scopeOfUse).uniqueElement {
       return .success(program.isTransitivelySyntheticConformance(pick.witness))

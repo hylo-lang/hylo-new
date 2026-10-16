@@ -1,0 +1,9 @@
+//! stage:llvm
+
+// Metatypes are zero-sized in LLVM.
+
+fun f(x: Metatype<Int>) {}
+
+public fun main() {
+  f(Int)
+}

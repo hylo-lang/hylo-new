@@ -1,0 +1,10 @@
+//! stage:lowering
+
+// The payloads of `E` are tuples, whose conformances to `Deinitializable` are derived memberwise.
+
+enum E is Deinitializable {
+  case a(x: Int, y: Bool)
+  case b
+}
+
+public fun main() {}

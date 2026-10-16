@@ -36,18 +36,34 @@ internal struct IREmitter {
 
   /// Generates the definitions of synthesized functions.
   internal mutating func implementSynthesizedFunctions() {
-    // TODO: Remove once the standard library compiles.
-    if program[module].isStandardLibrary { return }
-
     for f in program[module].ir.functions.values.indices {
       guard case .synthesized(let d, let a) =  program[module].ir[f].name else { continue }
 
       switch d {
       case program.standardLibraryDeclaration(.deinitializableDeinit):
         implementSynthesizedDeinitializer(f, for: a)
+      case program.standardLibraryDeclaration(.copyableCopy):
+        implementTrap(f)
+      case _ where program.parent(containing: d).node
+          == program.standardLibraryDeclaration(.movableTakeValue).erased:
+        implementTrap(f)
       default:
         continue // TODO
       }
+    }
+  }
+
+  /// Generates a body for `f` that just traps.
+  ///
+  /// Serves as a stub for synthesized implementations that are not supported yet.
+  private mutating func implementTrap(_ f: IRFunction.ID) {
+    // Nothing to do if the function has already been defined.
+    if program[module].ir[f].isDefined { return }
+
+    // TODO: Synthesize a real implementation.
+    defining(f, at: program[module].ir[f].anchor) { (me) in
+      me._emitTrap()
+      me._unreachable()
     }
   }
 
@@ -249,6 +265,15 @@ internal struct IREmitter {
 
   /// Generates the IR of `d`.
   private mutating func lower(_ d: ConformanceDeclaration.ID) {
+    // Built-in conformances to literal traits have no witness because conversions from literals
+    // are lowered inline and literal types have no runtime representation.
+    if !program.isRequirement(d) {
+      let concept = program.types[program.implementations(definedBy: d).concept].declaration
+      if (concept == program.standardLibraryDeclaration(.expressibleByIntegerLiteral))
+        || (concept == program.standardLibraryDeclaration(.expressibleByFloatingPointLiteral))
+      { return }
+    }
+
     // Lower explicit requirement implementations first.
     if let ms = program[d].members {
       for m in ms { lower(m) }
