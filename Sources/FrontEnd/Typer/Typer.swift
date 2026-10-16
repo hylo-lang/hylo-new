@@ -4343,6 +4343,7 @@ public struct Typer {
 
     for m in ds {
       if !resolvableWithQualification(m) { continue }
+      if program.isStatic(m) && !selectionIsStatic { continue }
       var member = typeOfName(referringTo: m, statically: selectionIsStatic)
       if let a = program.types[receiver] as? TypeApplication {
         member = program.types.substitute(a.arguments, in: member)
@@ -4383,6 +4384,7 @@ public struct Typer {
 
         for m in declarations(lexicallyIn: .init(node: e))[n.identifier] ?? [] {
           if !resolvableWithQualification(m) { continue }
+          if program.isStatic(m) && !selectionIsStatic { continue }
           var member = typeOfName(referringTo: m, statically: selectionIsStatic)
 
           // Strip the context defined by the extension, apply type arguments from the matching
