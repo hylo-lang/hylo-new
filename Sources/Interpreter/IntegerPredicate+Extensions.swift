@@ -22,19 +22,19 @@ extension IntegerPredicate {
   }
 
   /// Returns whether `lhs` satisfies `self` with respect to `rhs` where `lhs`
-  /// and `rhs` are `w`-bit integers.
+  /// and `rhs` are `w`-bit integers whose bytes are arranged in byte order `o`.
   internal func callAsFunction(
     _ lhs: RuntimeValue, _ rhs: RuntimeValue,
-    bitWidth w: Int
+    bitWidth w: Int, inByteOrder o: Endianness
   ) -> Bool {
     switch w {
     case 8: self(lhs.asI8, rhs.asI8)
-    case 16: self(lhs.asI16, rhs.asI16)
-    case 32: self(lhs.asI32, rhs.asI32)
-    case 64: self(lhs.asI64, rhs.asI64)
+    case 16: self(lhs.asI16(inByteOrder: o), rhs.asI16(inByteOrder: o))
+    case 32: self(lhs.asI32(inByteOrder: o), rhs.asI32(inByteOrder: o))
+    case 64: self(lhs.asI64(inByteOrder: o), rhs.asI64(inByteOrder: o))
     // TODO: uncomment when 128-bit integer is supported.
     //
-    // case 128: self(lhs.i128, rhs.i128)
+    // case 128: self(lhs.i128(inByteOrder: o), rhs.i128(inByteOrder: o))
     default: fatalError("Unknown builtin integer size \(w)")
     }
   }

@@ -2,7 +2,7 @@ import FrontEnd
 import Utilities
 
 /// The layout of a type in memory, including the positions of its parts.
-struct TypeLayout: Regular {
+public struct TypeLayout: Regular {
 
   /// Memory layout of a type, without any detail about parts.
   public struct StorageRequirements: Regular {
