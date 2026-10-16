@@ -8,29 +8,23 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of all kinds of types.
   func testTypes() async {
-    var p = await Program.withMinimalStandardLibrary()
+    var (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      public struct A {}
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        public struct A {}
+      public trait Provider {
+        type Output
+      }
 
-        public trait Provider {
-          type Output
-        }
+      public struct C {
+        type Output = Int
+      }
 
-        public struct C {
-          type Output = Int
-        }
-
-        enum MyEnum<T> {
-          case one
-          case two(x: T)
-        }
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      enum MyEnum<T> {
+        case one
+        case two(x: T)
+      }
+      """)
 
     testReservedTypesMangling(program: &p)
     testCoreTypesMangling(program: &p)
@@ -57,56 +51,50 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of specific declarations.
   func testSpecificDeclarations() async {
-    var p = await Program.withMinimalStandardLibrary()
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      trait W { type X }
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        trait W { type X }
+      given Void is W { type X = Void }
 
-        given Void is W { type X = Void }
+      enum MyEnum<T> {
+        case one
+        case two(x: T)
+      }
 
-        enum MyEnum<T> {
-          case one
-          case two(x: T)
+      struct B<X> {
+        let x: X
+        public memberwise init
+      }
+
+      struct P<X, Y> {
+        let x: X
+        let y: Y
+        public memberwise init
+      }
+
+      fun 複雑(サ a: B<Int>, シ b: P<Int, P<Bool, B<Int>>>) -> Int { Int() }
+      static fun 複雑2(ス c: Int, セ: Bool) -> Bool { Bool() }
+
+      extension <T> {Void, T} {
+        fun f() {}
+      }
+
+      public fun f(x: inout Int64) auto -> Int64 {
+        let   { (Int64(), ) }
+        inout { Int64() }
+      }
+
+      fun g() {
+        let x = Int()
+        _ = x
+        let f0 = fun[](a: Void) -> Void {
+          let b = Int()
+          _ = b
         }
+      }
 
-        struct B<X> {
-          let x: X
-          public memberwise init
-        }
-
-        struct P<X, Y> {
-          let x: X
-          let y: Y
-          public memberwise init
-        }
-
-        fun 複雑(サ a: B<Int>, シ b: P<Int, P<Bool, B<Int>>>) -> Int { Int() }
-        static fun 複雑2(ス c: Int, セ: Bool) -> Bool { Bool() }
-
-        extension <T> {Void, T} {
-          fun f() {}
-        }
-
-        public fun f(x: inout Int64) auto -> Int64 {
-          let   { (Int64(), ) }
-          inout { Int64() }
-        }
-
-        fun g() {
-          let x = Int()
-          _ = x
-          let f0 = fun[](a: Void) -> Void {
-            let b = Int()
-            _ = b
-          }
-        }
-
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      """)
 
     // Exact match test cases.
     let expected: [String: (any Syntax.Type, String)] = [
@@ -179,19 +167,14 @@ final class ManglingTests: XCTestCase {
     ]
 
     for (n, (t, r)) in expected {
-      guard let d = findDeclaration(t, named: n, in: m0, of: p) else {
+      guard let d = p.findDeclaration(t, named: n, in: m0) else {
         XCTFail("unable to find declaration \(n)")
         continue
       }
       assertManglingOf(declaration: d, in: p, is: r)
     }
     for (n, (t, r)) in expected2 {
-      guard
-        let d = findDeclaration(
-          t, in: m0, of: p,
-          nameMatching: { (name) in name.contains(n) }
-        )
-      else {
+      guard let d = p.findDeclaration(t, in: m0, nameMatching: { $0.contains(n) }) else {
         XCTFail("unable to find declaration with name containing \(n)")
         continue
       }
@@ -202,80 +185,74 @@ final class ManglingTests: XCTestCase {
 
   /// Tests that the demangling for a selection of declarations don't contain errors.
   func testDeclarationsSelection() async {
-    var p = await Program.withMinimalStandardLibrary()
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      public struct A {}
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        public struct A {}
+      trait X {}
 
-        trait X {}
+      trait Indexable {
+        type Index
+        fun index(of: Self) -> Index
+        fun size() -> Index
 
-        trait Indexable {
-          type Index
-          fun index(of: Self) -> Index
-          fun size() -> Index
+        given Indexable is X {}
+      }
 
-          given Indexable is X {}
+      struct MyInt {
+        public memberwise init
+        public fun infix+ (other: Self) -> Self { Self() }
+      }
+      struct MyInt64 {
+        public memberwise init
+        public fun infix+ (other: Self) -> Self { Self() }
+      }
+      type Number = MyInt
+
+      struct Angle {
+        public var radians: MyInt64
+        public memberwise init
+        public init(degrees: MyInt64) {
+          &self.radians = MyInt64()
+        }
+      }
+
+      struct B<X> {
+        public memberwise init
+      }
+
+      struct P<X, Y> {
+        public memberwise init
+      }
+
+      fun français(_ x: MyInt, label y: A) -> MyInt {
+        let (bar, ham) = (MyInt(), MyInt())
+        return bar + ham
+      }
+
+      fun 複雑(サ: B<MyInt>, シ: P<MyInt, P<Bool, B<MyInt>>>) -> MyInt { MyInt() }
+      fun 複雑2(ス: MyInt, セ: Bool) -> Bool { Bool() }
+
+      fun foo(y: MyInt) {
+        let local = MyInt()
+        let lambda = fun[let capture = local](x x: MyInt) { capture + x }
+        if Bool() {
+          let z = lambda(x: y)
+          _ = z
         }
 
-        struct MyInt {
-          public memberwise init
-          public fun infix+ (other: Self) -> Self { Self() }
-        }
-        struct MyInt64 {
-          public memberwise init
-          public fun infix+ (other: Self) -> Self { Self() }
-        }
-        type Number = MyInt
-
-        struct Angle {
-          public var radians: MyInt64
-          public memberwise init
-          public init(degrees: MyInt64) {
-            &self.radians = MyInt64()
-          }
+        struct U {
+          fun hammer() {}
         }
 
-        struct B<X> {
-          public memberwise init
-        }
+        given Number is X {}
+      }
 
-        struct P<X, Y> {
-          public memberwise init
-        }
-
-        fun français(_ x: MyInt, label y: A) -> MyInt {
-          let (bar, ham) = (MyInt(), MyInt())
-          return bar + ham
-        }
-
-        fun 複雑(サ: B<MyInt>, シ: P<MyInt, P<Bool, B<MyInt>>>) -> MyInt { MyInt() }
-        fun 複雑2(ス: MyInt, セ: Bool) -> Bool { Bool() }
-
-        fun foo(y: MyInt) {
-          let local = MyInt()
-          let lambda = fun[let capture = local](x x: MyInt) { capture + x }
-          if Bool() {
-            let z = lambda(x: y)
-            _ = z
-          }
-
-          struct U {
-            fun hammer() {}
-          }
-
-          given Number is X {}
-        }
-
-        fun bar() {
-          let f = fun (a: Int) -> Void {}
-          let g = fun (a: Int) -> Void {}
-        }
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      fun bar() {
+        let f = fun (a: Int) -> Void {}
+        let g = fun (a: Int) -> Void {}
+      }
+      """)
 
     for d in p[m0].topLevelDeclarations {
       assertDemanglingIsOk(mangled: p.mangled(d))
@@ -284,34 +261,28 @@ final class ManglingTests: XCTestCase {
 
   /// Tests demangling for declarations with more generics.
   func testDeclarationsWithMoreGenerics() async {
-    var p = await Program.withMinimalStandardLibrary()
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      trait P { type X }
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        trait P { type X }
+      given Void is P { type X = Void }
 
-        given Void is P { type X = Void }
+      fun check<T>(x: T) {}
 
-        fun check<T>(x: T) {}
+      fun f0<T where T == Void>(x: T.X) {
+        check<Void>(x)
+      }
 
-        fun f0<T where T == Void>(x: T.X) {
-          check<Void>(x)
-        }
+      fun f1<T, U where T == U, T is P>(x: U.X) {
+        check<T.X>(x)
+        let y: T.X = x
+      }
 
-        fun f1<T, U where T == U, T is P>(x: U.X) {
-          check<T.X>(x)
-          let y: T.X = x
-        }
-
-        fun f2<T, U where T == U, T is P, U is P, T.X == U.X>(x: U.X) {
-          check<T.X>(x)
-          let y: T.X = x
-        }
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      fun f2<T, U where T == U, T is P, U is P, T.X == U.X>(x: U.X) {
+        check<T.X>(x)
+        let y: T.X = x
+      }
+      """)
 
     for d in p[m0].topLevelDeclarations {
       assertDemanglingIsOk(mangled: p.mangled(d))
@@ -320,31 +291,25 @@ final class ManglingTests: XCTestCase {
 
   /// Tests mangling and demangling in cases where entity lookup is used internally.
   func testReuseScopes() async {
-    var p = await Program.withMinimalStandardLibrary()
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(
+      """
+      struct A {
+        public memberwise init
 
-    let m0 = p.addUserModule(
-      named: "M0",
-      source:
-        """
-        struct A {
-          public memberwise init
+        struct X {}
+        struct Y {}
+      }
+      struct B {
+        public memberwise init
 
-          struct X {}
-          struct Y {}
-        }
-        struct B {
-          public memberwise init
+        struct X {}
+        struct Y {}
 
-          struct X {}
-          struct Y {}
+        fun f1(x: X, y: Y) {}
+        fun f2(x: A.X, y: A.Y) {}
+      }
 
-          fun f1(x: X, y: Y) {}
-          fun f2(x: A.X, y: A.Y) {}
-        }
-
-        """)
-    p = await p.typeChecked()
-    failIfContainsError(p)
+      """)
 
     let expected: [String: (any Syntax.Type, String)] = [
       "A.X": (StructDeclaration.self, "M0.#.A.X"),
@@ -362,12 +327,95 @@ final class ManglingTests: XCTestCase {
     ]
 
     for (n, (t, r)) in expected {
-      guard let d = findDeclaration(t, named: n, in: m0, of: p) else {
+      guard let d = p.findDeclaration(t, named: n, in: m0) else {
         XCTFail("unable to find declaration \(n)")
         continue
       }
       assertManglingOf(declaration: d, in: p, is: r)
     }
+  }
+
+  /// Tests the mangling and demangling of the names of IR functions.
+  func testIRFunctionNames() async {
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(conformingProgram)
+
+    let greet = p.findDeclaration(FunctionDeclaration.self, named: "Greeter.greet", in: m0)!
+    let conformance = p.firstDeclaration(ConformanceDeclaration.self, in: m0)!
+    let origin = p.firstDeclaration(BindingDeclaration.self, in: m0)!
+
+    let names: [IRFunction.Name] = [
+      .lowered(greet),
+      .initializer(origin),
+      .synthesized(greet, TypeArguments()),
+      .implementation(greet, conformance, TypeArguments()),
+      .existentialized(.lowered(greet)),
+      .slide(.lowered(greet), 0),
+      .plateau(.lowered(greet), 0),
+      .applied(.lowered(greet), 0),
+    ]
+
+    XCTAssertEqual(
+      Set(IRFunction.Name.Kind.allCases).subtracting(names.map(\.kind)), [],
+      "these cases of IRFunction.Name are not covered by this test")
+
+    for n in names {
+      assertDemanglingIsOk(mangled: p.mangled(n), of: "IRFunction.Name.\(n.kind)")
+    }
+  }
+
+  /// Tests that the initializers of bindings declaring the same names in different modules are
+  /// mangled differently.
+  func testInitializerNamesAreQualified() async {
+    var p = await Program.withMinimalStandardLibrary()
+    let m0 = p.addUserModule(named: "M0", source: "let origin = Int()")
+    let m1 = p.addUserModule(named: "M1", source: "let origin = Int()")
+
+    p = await p.typeChecked()
+    failIfContainsError(p)
+
+    let mangled = [m0, m1].map { (m) in
+      let origin = p.firstDeclaration(BindingDeclaration.self, in: m)!
+      return p.mangled(.initializer(origin))
+    }
+    XCTAssertNotEqual(mangled[0], mangled[1])
+
+    for (m, s) in zip(["M0", "M1"], mangled) {
+      assertDemanglingIsOk(mangled: s, of: "initializer in \(m)")
+      let demangled = DemangledSymbol(s).description
+      XCTAssert(demangled.hasPrefix("init \(m)."), "(demangled: \(demangled))")
+    }
+  }
+
+  /// Tests the mangling and demangling of the names of IR globals.
+  func testIRGlobalNames() async {
+    let (p, m0) = await typeCheckedWithMinimalStandardLibrary(conformingProgram)
+
+    let robot = p.firstDeclaration(StructDeclaration.self, named: "Robot", in: m0)!
+    let origin = p.firstDeclaration(BindingDeclaration.self, in: m0)!
+
+    let names: [IRGlobal.Name] = [
+      .lowered(origin),
+      .witness(p.type(assignedTo: robot)),
+    ]
+
+    XCTAssertEqual(
+      Set(IRGlobal.Name.Kind.allCases).subtracting(names.map(\.kind)), [],
+      "these cases of IRGlobal.Name are not covered by this test")
+
+    for n in names {
+      assertDemanglingIsOk(mangled: p.mangled(n), of: "IRGlobal.Name.\(n.kind)")
+    }
+  }
+
+  /// A program declaring a struct, a trait, a conformance of the former to the latter, and a
+  /// global binding.
+  private var conformingProgram: SourceFile {
+    """
+    struct Robot { public memberwise init }
+    trait Greeter { fun greet() }
+    given Robot is Greeter { fun greet() {} }
+    let origin = Robot()
+    """
   }
 
   /// Tests the mangling and demangling of reserved types in `program`.
@@ -405,7 +453,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of associated types in `program`.
   private func testAssociatedTypeMangling(module m: Module.ID, program: inout Program) {
-    let provider = findTopLevelDeclaration(named: "Provider", in: m, of: program)!
+    let provider = program.firstTopLevelDeclaration(named: "Provider", in: m)!
     let traitDeclaration = TraitDeclaration.ID(uncheckedFrom: provider.erased)
     let providerRequirement = program.types.demand(Trait(declaration: traitDeclaration))
     let providerType = providerRequirement.erased
@@ -432,7 +480,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of enum types in `program`.
   private func testEnumTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "MyEnum", in: m)!
     assertManglingOf(
       type: program.types.demand(
         Enum(declaration: .init(uncheckedFrom: d.erased))
@@ -541,14 +589,14 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of opaque environment types in `program`.
   private func testOpaqueEnvironmentTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "MyEnum", in: m)!
     let t = OpaqueType.environment(d)
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "some M0.#.MyEnum")
   }
 
   /// Tests the mangling and demangling of opaque environment types in `program`.
   private func testOpaquePayloadTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "MyEnum", in: m)!
     let t = OpaqueType.payload(program.castUnchecked(d, to: EnumDeclaration.self))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "some M0.#.MyEnum")
   }
@@ -562,14 +610,14 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of struct types in `program`.
   private func testStructTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "A", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "A", in: m)!
     let t = Struct(declaration: .init(uncheckedFrom: d.erased))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "M0.#.A")
   }
 
   /// Tests the mangling and demangling of trait types in `program`.
   private func testTraitTypeMangling(module m: Module.ID, program: inout Program) {
-    let d = findTopLevelDeclaration(named: "Provider", in: m, of: program)!
+    let d = program.firstTopLevelDeclaration(named: "Provider", in: m)!
     let t = Trait(declaration: .init(uncheckedFrom: d.erased))
     assertManglingOf(type: program.types.demand(t).erased, in: program, is: "M0.#.Provider")
   }
@@ -614,7 +662,7 @@ final class ManglingTests: XCTestCase {
 
   /// Tests the mangling and demangling of type alias types in `program`.
   private func testTypeAliasMangling(module m: Module.ID, program: inout Program) {
-    let c = findTopLevelDeclaration(named: "C", in: m, of: program)!
+    let c = program.firstTopLevelDeclaration(named: "C", in: m)!
     let output = (program[c] as! StructDeclaration).members[0]
     assertManglingOf(
       type: program.type(assignedTo: output),
@@ -644,55 +692,51 @@ final class ManglingTests: XCTestCase {
     )
   }
 
-  /// Asserts that the mangling of `t` in `p` equals `expected`.
-  private func assertDemanglingIsOk(mangled m: String) {
-    let demangled = DemangledSymbol(m).description
-    XCTAssertFalse(demangled.contains("#!"), "demangling of \(m) contains errors: \(demangled)")
+}
+
+extension IRFunction.Name {
+
+  /// A case of `IRFunction.Name`.
+  internal enum Kind: CaseIterable {
+
+    case lowered, initializer, synthesized, implementation, existentialized, slide, plateau, applied
+
   }
 
-  /// Finds the first top-level declaration of `m` named `n`, returning its identity, or `nil` if
-  /// no such declaration exists.
-  private func findTopLevelDeclaration(
-    named n: String, in m: Module.ID, of program: Program
-  ) -> DeclarationIdentity? {
-    program[m].topLevelDeclarations.first { d in
-      return program.debugName(of: d) == n
+  /// The case of `self`.
+  ///
+  /// Ensures exhaustive testing.
+  internal var kind: Kind {
+    switch self {
+    case .lowered: .lowered
+    case .initializer: .initializer
+    case .synthesized: .synthesized
+    case .implementation: .implementation
+    case .existentialized: .existentialized
+    case .slide: .slide
+    case .plateau: .plateau
+    case .applied: .applied
     }
   }
 
-  /// Finds the first declaration of `m` of type `t`, named `n`, returning its identity, or
-  /// `nil` if no such declaration exists.
-  private func findDeclaration<T: Syntax>(
-    _ t: T.Type, named n: String, in m: Module.ID, of program: Program
-  ) -> DeclarationIdentity? {
-    findDeclaration(t, in: m, of: program) { $0 == n }
+}
+
+extension IRGlobal.Name {
+
+  /// A case of `IRGlobal.Name`.
+  internal enum Kind: CaseIterable {
+
+    case lowered, witness
+
   }
 
-  /// Finds the first declaration of `m` of type `t`, that has a name for which `predicate` returns
-  /// `true`, returning its identity, or `nil` if no such declaration exists.
-  private func findDeclaration<T: Syntax>(
-    _ t: T.Type, in m: Module.ID, of program: Program, nameMatching predicate: (String) -> Bool
-  ) -> DeclarationIdentity? {
-    let u = SyntaxTag(t)
-    for s in program[m].syntax {
-      if program.tag(of: s) == u && program.isDeclaration(s) {
-        let d = DeclarationIdentity(uncheckedFrom: s)
-        if predicate(program.debugName(of: d)) {
-          return d
-        }
-      }
-    }
-    return nil
-  }
-
-
-  /// Fail the tests if `p` contains errors.
-  private func failIfContainsError(_ p: Program) {
-    if p.containsError {
-      for d in p.diagnostics {
-        print(d)
-      }
-      XCTFail("Unexpected error(s) in test program: \(p.diagnostics)")
+  /// The case of `self`.
+  ///
+  /// Ensures exhaustive testing.
+  internal var kind: Kind {
+    switch self {
+    case .lowered: .lowered
+    case .witness: .witness
     }
   }
 
