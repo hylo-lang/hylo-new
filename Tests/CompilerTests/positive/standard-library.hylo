@@ -1,0 +1,17 @@
+fun test_memory_layout() {
+  precondition(Metatype<UInt8>.size() == 1 as UInt32)
+  precondition(Metatype<UInt8>.alignment() == 1 as UInt16)
+  precondition(Metatype<UInt8>.stride() == 1 as UInt32)
+
+  precondition(Metatype<UInt16>.size() == 2 as UInt32)
+  precondition(Metatype<UInt16>.alignment() == 2 as UInt16)
+  precondition(Metatype<UInt16>.stride() == 2 as UInt32)
+
+  precondition(Metatype<{UInt8, UInt16}>.size() == 3 as UInt32)
+  precondition(Metatype<{UInt8, UInt16}>.alignment() == 2 as UInt16)
+  precondition(Metatype<{UInt8, UInt16}>.stride() == 4 as UInt32)
+}
+
+public fun main() {
+  test_memory_layout()
+}
