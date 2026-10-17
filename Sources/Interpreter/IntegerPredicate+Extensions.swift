@@ -25,9 +25,10 @@ extension IntegerPredicate {
   /// and `rhs` are `w`-bit integers.
   internal func callAsFunction(
     _ lhs: RuntimeValue, _ rhs: RuntimeValue,
-    bitWidth w: Int
+    bitWidth w: UInt8
   ) -> Bool {
     switch w {
+    case 1: self(lhs.asBool ? UInt8(1) : 0, rhs.asBool ? UInt8(1) : 0)
     case 8: self(lhs.asI8, rhs.asI8)
     case 16: self(lhs.asI16, rhs.asI16)
     case 32: self(lhs.asI32, rhs.asI32)

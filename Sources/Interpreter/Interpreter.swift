@@ -371,8 +371,7 @@ public struct Interpreter {
       case .parameter(let i):
         return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
-        let l = memory.layout(t)
-        return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
+        return .init(integer: n, bitWidth: bitWidth(t))
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
@@ -426,20 +425,29 @@ public struct Interpreter {
     switch f {
     case .trap: throw Trap()
     case .icmp(let p, let t):
-      let w = memory.layout(t).size * 8
+      let w = bitWidth(t)
       let lhs = try self[arguments[0]]
       let rhs = try self[arguments[1]]
       let r = p(lhs, rhs, bitWidth: w)
       return .init(bool: r)
     case .zeroinitializer(let t):
-      let l = memory.layout(t)
+      let w = bitWidth(t)
       let u = program.types[t]
       return switch u {
-      case .i(_): .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
-      case .word: .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
+      case .i(_): .init(integer: 0, bitWidth: w)
+      case .word: .init(integer: 0, bitWidth: w)
       default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
+    }
+  }
+
+  /// Returns the bit width of `t`.
+  private mutating func bitWidth(_ t: MachineType.ID) -> UInt8 {
+    if program.types[t].equals(MachineType.i(1)) {
+      1
+    } else {
+      UInt8(memory.layout(t).size * 8)
     }
   }
 

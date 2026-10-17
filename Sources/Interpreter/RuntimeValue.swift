@@ -3,141 +3,289 @@ import FrontEnd
 import Utilities
 
 /// A value occurring during program execution.
-struct RuntimeValue {
+enum RuntimeValue {
 
-  /// The bytes of the value preceded by zero or more bytes of padding to satisfy
-  /// its alignment.
-  private let storage: [UInt8]
+  /// When self is an instance of a `MachineType`.
+  case scalar(BuiltinValue)
 
-  /// The number of bytes before the value logically begins.
-  private let baseOffset: Int
+  /// The sequence of component values of a composite type.
+  ///
+  /// For product types, the value of each stored property in declaration order.
+  /// For enum types, the value of the active case followed by the value of
+  /// discriminator.
+  case composite([RuntimeValue])
 
-  /// Creates an instance having bytes `bs` and alignment `a`.
-  public init(bytes bs: [UInt8], havingAlignment a: Int) {
-    var (s, o) = Array.aligned(
-      repeating: 0 as UInt8,
-      count: bs.count,
-      alignment: a
-    )
-    s[o...] = bs[...]
-    baseOffset = o
-    storage = s
+  /// The underlying builtin value.
+  ///
+  /// - Precondition: `self` is an instance of a `MachineType`.
+  fileprivate var asBuiltin: BuiltinValue {
+    switch self {
+    case .scalar(let v): v
+    case .composite(_): preconditionFailure("`self` is not an instance of scalar type.")
+    }
   }
 
-  /// Raw bytes of the value.
-  public var bytes: ArraySlice<UInt8> { storage[baseOffset...] }
+  /// The component values of a composite value in declaration order.
+  ///
+  /// - Precondition: `self` is an instance of a composite type.
+  fileprivate var parts: [RuntimeValue] {
+    switch self {
+    case .scalar(_): preconditionFailure("`self` is not an instance of composite type.")
+    case .composite(let vs): vs
+    }
+  }
+
 }
 
 extension RuntimeValue {
 
-  /// Creates a `w`-bit integer having value `n` and alignment `a`.
-  public init(integer n: BigInt, bitWidth w: Int, alignment a: Int) {
-    precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
-    precondition(a > 0)
+  /// Creates a `w`-bit integer having value `n`.
+  public init(integer n: BigInt, bitWidth w: UInt8) {
+    precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
-    let r = twosComplementRepresentation(n)
-    self.init(bytes: byteRepresentation(r, bitWidth: w), havingAlignment: a)
+    self = .scalar(BuiltinValue(integer: n, bitWidth: w))
   }
 
-  /// Creates an instance of `MachineType.i(1)` having value `b` and layout `l`.
+  /// Creates an instance of `MachineType.i(1)`.
   public init(bool b: Bool) {
-    self.init(integer: b ? 1 : 0, bitWidth: 8, alignment: 1)
-  }
-
-  /// Returns the result of calling `body` on a pointer to the value's bytes
-  /// interpreted as a `T` instance.
-  ///
-  /// - Precondition: `self` is aligned for `T`.
-  internal func withUnsafePointer<T, R>(
-    to _: T.Type, _ body: (UnsafePointer<T>) -> R
-  ) -> R {
-    precondition(MemoryLayout<T>.size <= bytes.count)
-    return bytes.withUnsafeBytes { p in
-      body(p.baseAddress!.assumingMemoryBound(to: T.self))
-    }
+    self = .scalar(BuiltinValue(bool: b))
   }
 
   /// The boolean value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(1)`.
-  public var asBool: Bool {
-    withUnsafePointer(to: UInt8.self) { $0.pointee != 0 }
-  }
+  public var asBool: Bool { asBuiltin.asBool }
 
   /// The 8-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(8)`.
-  public var asI8: UInt8 {
-    withUnsafePointer(to: UInt8.self) { $0.pointee }
-  }
+  public var asI8: UInt8 { asBuiltin.asI8 }
 
   /// The 16-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(16)`.
-  public var asI16: UInt16 {
-    withUnsafePointer(to: UInt16.self) { $0.pointee }
-  }
+  public var asI16: UInt16 { asBuiltin.asI16 }
 
   /// The 32-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(32)`.
-  public var asI32: UInt32 {
-    withUnsafePointer(to: UInt32.self) { $0.pointee }
-  }
+  public var asI32: UInt32 { asBuiltin.asI32 }
 
   /// The 64-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(64)`.
-  public var asI64: UInt64 {
-    withUnsafePointer(to: UInt64.self) { $0.pointee }
-  }
+  public var asI64: UInt64 { asBuiltin.asI64 }
 
-  // TODO: uncomment when 128-bit integer is supported.
-  //
-  // /// The 128-bit unsigned value.
-  // ///
-  // /// - Precondition: `self` is an instance of `MachineType.i(128)`.
-  // public var asI128: UInt128 {
-  //   withUnsafePointer(to: UInt128.self) { $0.pointee }
-  // }
+  /// The 128-bit unsigned value.
+  ///
+  /// - Precondition: `self` is an instance of `MachineType.i(128)`.
+  public var asI128: UInt128 { asBuiltin.asI128 }
+
+  /// Returns the unsigned interpretation of `self` as an integer of type `t`.
+  ///
+  /// - Precondition: `self` is a value of type `t`.
+  public func unsignedIntValue(as t: MachineType) -> UInt128 {
+    switch t {
+    case .i(let w):
+      switch w {
+      case 8: UInt128(asI8)
+      case 16: UInt128(asI16)
+      case 32: UInt128(asI32)
+      case 64: UInt128(asI64)
+      case 128: asI128
+      default: preconditionFailure()
+      }
+    default: preconditionFailure()
+    }
+  }
 
 }
 
-/// Returns an in-memory byte representation of the low-order `w` bits of `n`.
-internal func byteRepresentation(_ n: UInt128, bitWidth w: Int) -> [UInt8] {
-  precondition(w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
-  switch w {
-  case 8:
-    let value = UInt8(truncatingIfNeeded: n)
-    return withUnsafeBytes(of: value, Array.init)
+extension RuntimeValue {
 
-  case 16:
-    let value = UInt16(truncatingIfNeeded: n)
-    return withUnsafeBytes(of: value, Array.init)
+  /// Creates a value of type `t`, defined in `p`, by interpreting its byte
+  /// representation `bs` according to the layout provided by `l`.
+  public init(
+    ofType t: MonomorphicTypeIdentity,
+    definedIn p: inout Program,
+    havingByteRepresentation bs: ArraySlice<UInt8>,
+    providedBy l: inout TypeLayoutCache
+  ) {
+    let u = p.underlyingType(t.underlying)
+    let s = p.tag(u)
 
-  case 32:
-    let value = UInt32(truncatingIfNeeded: n)
-    return withUnsafeBytes(of: value, Array.init)
-
-  case 64:
-    let value = UInt64(truncatingIfNeeded: n)
-    return withUnsafeBytes(of: value, Array.init)
-
-  case 128:
-    return withUnsafeBytes(of: n, Array.init)
-
-  default:
-    unreachable()
+    if s == MachineType.self {
+      let v = p.type(u, as: MachineType.self)
+      self = RuntimeValue(ofType: v, havingByteRepresentation: bs, providedBy: &l)
+    } else if s == Struct.self || s == Tuple.self {
+      self = RuntimeValue(
+        record: t, definedIn: &p,
+        havingByteRepresentation: bs, providedBy: &l)
+    } else if s == Enum.self {
+      self = RuntimeValue(
+        enum: t, definedIn: &p,
+        havingByteRepresentation: bs, providedBy: &l)
+    } else {
+      unreachable()
+    }
   }
+
+  /// Creates a value of type `t` by interpreting its byte representation `bs`
+  /// according to the layout provided by `c`.
+  private init(
+    ofType t: MachineType,
+    havingByteRepresentation bs: ArraySlice<UInt8>,
+    providedBy c: inout TypeLayoutCache
+  ) {
+    switch t {
+    case .i(let n):
+      let v = BigInt(unsignedFrom: bs, storedIn: c.abi.byteOrder)
+      self = .scalar(BuiltinValue(integer: v, bitWidth: n))
+    case .word:
+      let v = BigInt(unsignedFrom: bs, storedIn: c.abi.byteOrder)
+      self = .scalar(BuiltinValue(integer: v, bitWidth: c.abi.bitsInAPointer))
+    default: unimplemented("floats and ptr are not supported yet.")
+    }
+  }
+
+  /// Creates a value for record type `t`, defined in `p`, by interpreting its
+  /// byte representation `bs` according to the layout provided by `c`.
+  private init(
+    record t: MonomorphicTypeIdentity,
+    definedIn p: inout Program,
+    havingByteRepresentation bs: ArraySlice<UInt8>,
+    providedBy c: inout TypeLayoutCache
+  ) {
+    let l = c.layout(t, in: &p)
+    let parts =
+      l.parts.map {
+        RuntimeValue(
+          part: $0, definedIn: &p,
+          havingByteRepresentationOfParent: bs, providedBy: &c)
+      }
+    self = .composite(parts)
+  }
+
+  /// Creates a value of enum type `t`, defined in `p`, by interpreting its
+  /// byte representation `bs` according to the layout provided by `c`.
+  private init(
+    enum t: MonomorphicTypeIdentity,
+    definedIn p: inout Program,
+    havingByteRepresentation bs: ArraySlice<UInt8>,
+    providedBy c: inout TypeLayoutCache
+  ) {
+    let l = c.layout(t, in: &p)
+
+    let discriminator = RuntimeValue(
+      part: l.discriminator, definedIn: &p,
+      havingByteRepresentationOfParent: bs, providedBy: &c)
+
+    let discriminatorType = p.type(l.discriminator.type.underlying, as: MachineType.self)
+    let activeCaseIndex = Int(discriminator.unsignedIntValue(as: discriminatorType))
+    let activeCase = RuntimeValue(
+      part: l.parts[activeCaseIndex], definedIn: &p,
+      havingByteRepresentationOfParent: bs, providedBy: &c)
+
+    self = .composite([activeCase, discriminator])
+  }
+
+  /// Creates a value for `part`, defined in `p`, by interpreting the byte
+  /// representation `bs` of `part`'s immediate parent according to the layout
+  /// provided by `c`.
+  private init(
+    part: TypeLayout.Part,
+    definedIn p: inout Program,
+    havingByteRepresentationOfParent bs: ArraySlice<UInt8>,
+    providedBy c: inout TypeLayoutCache
+  ) {
+    let n = c.layout(part.type, in: &p).size
+    let bytes = bs[bs.startIndex + part.offset..<bs.startIndex + part.offset + n]
+    self = RuntimeValue(
+      ofType: part.type, definedIn: &p,
+      havingByteRepresentation: bytes, providedBy: &c)
+  }
+
 }
 
-/// Returns 128-bit two's-complement representation of `n`.
-///
-/// - Precondition: `n` must be representable as a signed 128-bit integer.
-internal func twosComplementRepresentation(_ n: BigInt) -> UInt128 {
-  if n.sign == .plus {
-    return UInt128(n.magnitude)
+extension RuntimeValue {
+
+  /// Returns the byte representation of `self` as a value of type `t`, defined
+  /// in `p`, laid out according to the type layout provided by `c`.
+  ///
+  /// - Precondition: `self` is an instance of `t`.
+  public func byteRepresentation(
+    asValueOf t: MonomorphicTypeIdentity,
+    definedIn p: inout Program,
+    laidOutUsing c: inout TypeLayoutCache
+  ) -> [UInt8] {
+    switch self {
+    case .scalar(let v):
+      let u = p.type(t.underlying, as: MachineType.self)
+      return v.byteRepresentation(asValueOf: u, laidOutUsing: &c)
+    case .composite(_):
+      let u = p.tag(t.underlying)
+      if u == Struct.self || u == Tuple.self {
+        return byteRepresentation(asValueOfRecord: t, definedIn: &p, laidOutUsing: &c)
+      } else if u == Enum.self {
+        return byteRepresentation(asValueOfEnum: t, definedIn: &p, laidOutUsing: &c)
+      } else {
+        unreachable("A composite type must be a struct, tuple, or enum.")
+      }
+    }
   }
 
-  return UInt128.max - UInt128(n.magnitude) + 1
+  /// Returns the byte representation of `self` as a value of record type `t`,
+  /// defined in `p`, laid out according to the layout provided by `c`.
+  ///
+  /// - Precondition: `self` is an instance of `t`.
+  private func byteRepresentation(
+    asValueOfRecord t: MonomorphicTypeIdentity,
+    definedIn p: inout Program,
+    laidOutUsing c: inout TypeLayoutCache
+  ) -> [UInt8] {
+    let l = c.layout(t, in: &p)
+    var r = [UInt8](repeating: 0, count: l.size)
+
+    for (partValue, partInfo) in zip(parts, l.parts) {
+      let partBytes = partValue.byteRepresentation(
+        asValueOf: partInfo.type,
+        definedIn: &p, laidOutUsing: &c)
+      r[partInfo.offset..<partInfo.offset + partBytes.count] = partBytes[...]
+    }
+
+    return r
+  }
+
+  /// Returns the byte representation of `self` as a value of an enum of type `t`,
+  /// defined in `p`, laid out according to the layout provided by `c`.
+  ///
+  /// - Precondition: `self` is an instance of `t`.
+  private func byteRepresentation(
+    asValueOfEnum t: MonomorphicTypeIdentity,
+    definedIn p: inout Program,
+    laidOutUsing c: inout TypeLayoutCache
+  ) -> [UInt8] {
+    let l = c.layout(t, in: &p)
+    var r = [UInt8](repeating: 0, count: l.size)
+
+    let discriminator =
+      parts[1].byteRepresentation(
+        asValueOf: l.discriminator.type,
+        definedIn: &p, laidOutUsing: &c)
+    let discriminatorOffset = l.discriminator.offset
+    let discriminatorType =
+      p.type(l.discriminator.type.underlying, as: MachineType.self)
+    r[discriminatorOffset..<discriminatorOffset + discriminator.count] = discriminator[...]
+
+    let activeCaseIndex =
+      Int(parts[1].unsignedIntValue(as: discriminatorType))
+    let activeCase = parts[0].byteRepresentation(
+      asValueOf: l.parts[activeCaseIndex].type,
+      definedIn: &p, laidOutUsing: &c)
+    let activeCaseOffset = l.parts[activeCaseIndex].offset
+    r[activeCaseOffset..<activeCaseOffset + activeCase.count] = activeCase[...]
+
+    return r
+  }
+
 }
