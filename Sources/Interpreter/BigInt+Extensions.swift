@@ -17,12 +17,13 @@ extension BigInt {
 
   /// Returns whether `self` is representable as a `w`-bit integer.
   func isRepresentable(asIntegerHavingBitWidth w: UInt8) -> Bool {
-    if self >= 0 {
-      let unsignedUpperBound = BigInt(1) << w
-      return self < unsignedUpperBound
+    precondition(w > 0)
+    if self < 0 {
+      let wMinusOneLowBits = ~((-1 as BigInt) << (w - 1))
+      return (self | ~wMinusOneLowBits) == self
     } else {
-      let signedUpperBound = BigInt(1) << (w - 1)
-      return self >= -signedUpperBound && self < signedUpperBound
+      let wLowBits = ~((-1 as BigInt) << w)
+      return (self & wLowBits) == self
     }
   }
 
