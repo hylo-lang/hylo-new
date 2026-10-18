@@ -209,83 +209,77 @@ extension RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Returns the byte representation of `self` as a value of type `t`, defined
-  /// in `p`, laid out according to the type layout provided by `c`.
-  ///
-  /// - Precondition: `self` is an instance of `t`.
-  public func byteRepresentation(
-    asValueOf t: MonomorphicTypeIdentity,
+  /// Returns the memory representation of stored `t`, defined in `p`
+  /// as laid out by `typeLayouts`.
+  public func bytes(
+    ofStored t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    laidOutUsing c: inout LayoutComputer
+    laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
     switch self {
-    case .scalar(let v):
-      let u = p.type(t.underlying, as: MachineType.self)
-      return v.byteRepresentation(asValueOf: u, laidOutUsing: &c)
+    case .scalar(let value):
+      let valueType = p.type(t.underlying, as: MachineType.self)
+      return value.bytes(ofStored: valueType, laidOutUsing: &typeLayouts)
     case .composite(_):
-      let u = p.tag(t.underlying)
-      if u == Struct.self || u == Tuple.self {
-        return byteRepresentation(asValueOfRecord: t, definedIn: &p, laidOutUsing: &c)
-      } else if u == Enum.self {
-        return byteRepresentation(asValueOfEnum: t, definedIn: &p, laidOutUsing: &c)
+      let typeTag = p.tag(t.underlying)
+      if typeTag == Struct.self || typeTag == Tuple.self {
+        return bytes(ofStoredRecord: t, definedIn: &p, laidOutUsing: &typeLayouts)
+      } else if typeTag == Enum.self {
+        return bytes(ofStoredEnum: t, definedIn: &p, laidOutUsing: &typeLayouts)
       } else {
         unreachable("A composite type must be a struct, tuple, or enum.")
       }
     }
   }
 
-  /// Returns the byte representation of `self` as a value of record type `t`,
-  /// defined in `p`, laid out according to the layout provided by `c`.
-  ///
-  /// - Precondition: `self` is an instance of `t`.
-  private func byteRepresentation(
-    asValueOfRecord t: MonomorphicTypeIdentity,
+  /// Returns the memory representation of stored record type `t`, defined in `p`
+  /// as laid out by `typeLayouts`.
+  private func bytes(
+    ofStoredRecord t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    laidOutUsing c: inout LayoutComputer
+    laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
-    let l = c.layout(t, in: &p)
-    var r = [UInt8](repeating: 0, count: l.size)
+    let l = typeLayouts.layout(t, in: &p)
+    var bytes = [UInt8](repeating: 0, count: l.size)
 
     for (partValue, partInfo) in zip(parts, l.parts) {
-      let partBytes = partValue.byteRepresentation(
-        asValueOf: partInfo.type,
-        definedIn: &p, laidOutUsing: &c)
-      r[partInfo.offset..<partInfo.offset + partBytes.count] = partBytes[...]
+      let partBytes = partValue.bytes(
+        ofStored: partInfo.type,
+        definedIn: &p, laidOutUsing: &typeLayouts)
+      bytes[partInfo.offset..<partInfo.offset + partBytes.count] = partBytes[...]
     }
 
-    return r
+    return bytes
   }
 
-  /// Returns the byte representation of `self` as a value of an enum of type `t`,
-  /// defined in `p`, laid out according to the layout provided by `c`.
-  ///
-  /// - Precondition: `self` is an instance of `t`.
-  private func byteRepresentation(
-    asValueOfEnum t: MonomorphicTypeIdentity,
+  /// Returns the memory representation of stored enum `t`, defined in `p`
+  /// as laid out by `typeLayouts`.
+  private func bytes(
+    ofStoredEnum t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    laidOutUsing c: inout LayoutComputer
+    laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
-    let l = c.layout(t, in: &p)
-    var r = [UInt8](repeating: 0, count: l.size)
+    let l = typeLayouts.layout(t, in: &p)
+    var bytes = [UInt8](repeating: 0, count: l.size)
 
     let discriminator =
-      parts[1].byteRepresentation(
-        asValueOf: l.discriminator.type,
-        definedIn: &p, laidOutUsing: &c)
+      parts[1].bytes(
+        ofStored: l.discriminator.type,
+        definedIn: &p, laidOutUsing: &typeLayouts)
     let discriminatorOffset = l.discriminator.offset
     let discriminatorType =
       p.type(l.discriminator.type.underlying, as: MachineType.self)
-    r[discriminatorOffset..<discriminatorOffset + discriminator.count] = discriminator[...]
+    bytes[discriminatorOffset..<discriminatorOffset + discriminator.count] = discriminator[...]
 
     let activeCaseIndex =
       Int(parts[1].unsignedIntValue(as: discriminatorType))
-    let activeCase = parts[0].byteRepresentation(
-      asValueOf: l.parts[activeCaseIndex].type,
-      definedIn: &p, laidOutUsing: &c)
+    let activeCase = parts[0].bytes(
+      ofStored: l.parts[activeCaseIndex].type,
+      definedIn: &p, laidOutUsing: &typeLayouts)
     let activeCaseOffset = l.parts[activeCaseIndex].offset
-    r[activeCaseOffset..<activeCaseOffset + activeCase.count] = activeCase[...]
+    bytes[activeCaseOffset..<activeCaseOffset + activeCase.count] = activeCase[...]
 
-    return r
+    return bytes
   }
 
 }

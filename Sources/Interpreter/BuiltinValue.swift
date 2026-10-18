@@ -115,31 +115,28 @@ extension BuiltinValue {
 
 extension BuiltinValue {
 
-  /// Returns the byte representation of `self` as a value of type `t`,
-  /// laid out according to the layouts provided by `c`.
-  ///
-  /// - Precondition: `self` is an instance of `t`.
-  public func byteRepresentation(
-    asValueOf t: MachineType,
-    laidOutUsing c: inout LayoutComputer
+  /// Returns the memory representation of the stored `t` as laid out by `typeLayouts`.
+  public func bytes(
+    ofStored t: MachineType,
+    laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
-    let o = c.abi.byteOrder
-    let w = c.abi.bitsInAPointer
+    let byteOrder = typeLayouts.abi.byteOrder
+    let wordSize = typeLayouts.abi.bitsInAPointer
 
     return switch t {
-    case .i(let n): byteRepresentation(asIntegerHavingBitWidth: n, orderedBy: o)
-    case .word: byteRepresentation(asIntegerHavingBitWidth: UInt8(w), orderedBy: o)
+    case .i(let w): bytes(ofIntgerHavingBitWidth: w, in: byteOrder)
+    case .word: bytes(ofIntgerHavingBitWidth: UInt8(wordSize), in: byteOrder)
     default: unimplemented("floats, and ptr are not supported yet.")
     }
 
   }
 
-  /// Returns the byte representation of `self` as a `w`-bit integer, ordered by `o`.
-  private func byteRepresentation(
-    asIntegerHavingBitWidth w: UInt8,
-    orderedBy o: Endianness
+  /// Returns the memory representation o stored `w`-bit integer.
+  private func bytes(
+    ofIntgerHavingBitWidth w: UInt8,
+    in byteOrder: Endianness
   ) -> [UInt8] {
-    var r =
+    var bytes =
       switch w {
       case 1: withUnsafeBytes(of: asBool) { Array($0) }
       case 8: withUnsafeBytes(of: asUInt8) { Array($0) }
@@ -150,8 +147,8 @@ extension BuiltinValue {
       default: preconditionFailure("Unknown integer bit width.")
       }
 
-    if o != .host { r.reverse() }
-    return r
+    if byteOrder != .host { bytes.reverse() }
+    return bytes
   }
 
 }
