@@ -6,7 +6,7 @@ import XCTest
 final class BuiltinValueTests: XCTestCase {
 
   func testBooleanValueWithLsbFirstOrderingABI() {
-    var l = LayoutComputer(for: UnrealABI(byteOrder: .lsbFirst))
+    var l = LayoutComputer(for: UnrealABI(byteOrder: .little))
     XCTAssertEqual(
       BuiltinValue(bool: true).bytes(ofStored: .i(1), laidOutUsing: &l),
       [1]
@@ -19,7 +19,7 @@ final class BuiltinValueTests: XCTestCase {
   }
 
   func testBooleanValueWithMsbFirstOrderingABI() {
-    var l = LayoutComputer(for: UnrealABI(byteOrder: .msbFirst))
+    var l = LayoutComputer(for: UnrealABI(byteOrder: .big))
     XCTAssertEqual(
       BuiltinValue(bool: true).bytes(ofStored: .i(1), laidOutUsing: &l),
       [1]
@@ -42,7 +42,7 @@ final class BuiltinValueTests: XCTestCase {
   }
 
   func testIntegersForLsbFirst() {
-    var l = LayoutComputer(for: UnrealABI(byteOrder: .lsbFirst))
+    var l = LayoutComputer(for: UnrealABI(byteOrder: .little))
     XCTAssertEqual(
       BuiltinValue(integer: 2, bitWidth: 8)
         .bytes(ofStored: .i(8), laidOutUsing: &l),
@@ -75,7 +75,7 @@ final class BuiltinValueTests: XCTestCase {
   }
 
   func testIntegersForMsbFirst() {
-    var l = LayoutComputer(for: UnrealABI(byteOrder: .msbFirst))
+    var l = LayoutComputer(for: UnrealABI(byteOrder: .big))
     XCTAssertEqual(
       BuiltinValue(integer: 2, bitWidth: 8)
         .bytes(ofStored: .i(8), laidOutUsing: &l),

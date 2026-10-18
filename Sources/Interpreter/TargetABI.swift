@@ -1,3 +1,4 @@
+import Archivist
 import FrontEnd
 
 /// Types that describe the ABI for which we might interpret code.
@@ -47,7 +48,7 @@ struct UnrealABI: TargetABI {
   let byteOrder: Endianness
 
   /// Creates an ABI with the specified byte order.
-  public init(byteOrder: Endianness = .lsbFirst) {
+  public init(byteOrder: Endianness = .little) {
     self.byteOrder = byteOrder
   }
 
