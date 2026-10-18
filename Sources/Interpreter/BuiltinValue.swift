@@ -121,7 +121,7 @@ extension BuiltinValue {
   /// - Precondition: `self` is an instance of `t`.
   public func byteRepresentation(
     asValueOf t: MachineType,
-    laidOutUsing c: inout TypeLayoutCache
+    laidOutUsing c: inout LayoutComputer
   ) -> [UInt8] {
     let o = c.abi.byteOrder
     let w = c.abi.bitsInAPointer

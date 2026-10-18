@@ -109,7 +109,7 @@ extension RuntimeValue {
     ofType t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
     havingByteRepresentation bs: ArraySlice<UInt8>,
-    providedBy l: inout TypeLayoutCache
+    providedBy l: inout LayoutComputer
   ) {
     let u = p.underlyingType(t.underlying)
     let s = p.tag(u)
@@ -135,7 +135,7 @@ extension RuntimeValue {
   private init(
     ofType t: MachineType,
     havingByteRepresentation bs: ArraySlice<UInt8>,
-    providedBy c: inout TypeLayoutCache
+    providedBy c: inout LayoutComputer
   ) {
     switch t {
     case .i(let n):
@@ -154,7 +154,7 @@ extension RuntimeValue {
     record t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
     havingByteRepresentation bs: ArraySlice<UInt8>,
-    providedBy c: inout TypeLayoutCache
+    providedBy c: inout LayoutComputer
   ) {
     let l = c.layout(t, in: &p)
     let parts =
@@ -172,7 +172,7 @@ extension RuntimeValue {
     enum t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
     havingByteRepresentation bs: ArraySlice<UInt8>,
-    providedBy c: inout TypeLayoutCache
+    providedBy c: inout LayoutComputer
   ) {
     let l = c.layout(t, in: &p)
 
@@ -196,7 +196,7 @@ extension RuntimeValue {
     part: TypeLayout.Part,
     definedIn p: inout Program,
     havingByteRepresentationOfParent bs: ArraySlice<UInt8>,
-    providedBy c: inout TypeLayoutCache
+    providedBy c: inout LayoutComputer
   ) {
     let n = c.layout(part.type, in: &p).size
     let bytes = bs[bs.startIndex + part.offset..<bs.startIndex + part.offset + n]
@@ -216,7 +216,7 @@ extension RuntimeValue {
   public func byteRepresentation(
     asValueOf t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    laidOutUsing c: inout TypeLayoutCache
+    laidOutUsing c: inout LayoutComputer
   ) -> [UInt8] {
     switch self {
     case .scalar(let v):
@@ -241,7 +241,7 @@ extension RuntimeValue {
   private func byteRepresentation(
     asValueOfRecord t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    laidOutUsing c: inout TypeLayoutCache
+    laidOutUsing c: inout LayoutComputer
   ) -> [UInt8] {
     let l = c.layout(t, in: &p)
     var r = [UInt8](repeating: 0, count: l.size)
@@ -263,7 +263,7 @@ extension RuntimeValue {
   private func byteRepresentation(
     asValueOfEnum t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    laidOutUsing c: inout TypeLayoutCache
+    laidOutUsing c: inout LayoutComputer
   ) -> [UInt8] {
     let l = c.layout(t, in: &p)
     var r = [UInt8](repeating: 0, count: l.size)

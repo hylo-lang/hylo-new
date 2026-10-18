@@ -8,7 +8,7 @@ struct Memory {
   public var program: Program
 
   /// The type layouts computed so far.
-  internal var typeLayouts: TypeLayoutCache
+  internal var typeLayouts: LayoutComputer
 
   /// The ID of the next block to be allocated.
   private var nextAllocation = 0

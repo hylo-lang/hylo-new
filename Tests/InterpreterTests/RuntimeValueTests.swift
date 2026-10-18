@@ -6,7 +6,7 @@ import XCTest
 final class RuntimeValueTests: XCTestCase {
 
   var p = Program(forTesting: true)
-  var l = TypeLayoutCache(for: UnrealABI())
+  var l = LayoutComputer(for: UnrealABI())
 
   func testBool() {
     let i1 = id(MachineType.i(1))
