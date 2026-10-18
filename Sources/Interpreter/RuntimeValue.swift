@@ -59,27 +59,27 @@ extension RuntimeValue {
   /// The 8-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(8)`.
-  public var asI8: UInt8 { asBuiltin.asI8 }
+  public var asUInt8: UInt8 { asBuiltin.asUInt8 }
 
   /// The 16-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(16)`.
-  public var asI16: UInt16 { asBuiltin.asI16 }
+  public var asUInt16: UInt16 { asBuiltin.asUInt16 }
 
   /// The 32-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(32)`.
-  public var asI32: UInt32 { asBuiltin.asI32 }
+  public var asUInt32: UInt32 { asBuiltin.asUInt32 }
 
   /// The 64-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(64)`.
-  public var asI64: UInt64 { asBuiltin.asI64 }
+  public var asUInt64: UInt64 { asBuiltin.asUInt64 }
 
   /// The 128-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(128)`.
-  public var asI128: UInt128 { asBuiltin.asI128 }
+  public var asUInt128: UInt128 { asBuiltin.asUInt128 }
 
   /// Returns the unsigned interpretation of `self` as an integer of type `t`.
   ///
@@ -88,11 +88,11 @@ extension RuntimeValue {
     switch t {
     case .i(let w):
       switch w {
-      case 8: UInt128(asI8)
-      case 16: UInt128(asI16)
-      case 32: UInt128(asI32)
-      case 64: UInt128(asI64)
-      case 128: asI128
+      case 8: UInt128(asUInt8)
+      case 16: UInt128(asUInt16)
+      case 32: UInt128(asUInt32)
+      case 64: UInt128(asUInt64)
+      case 128: asUInt128
       default: preconditionFailure()
       }
     default: preconditionFailure()

@@ -29,10 +29,10 @@ extension IntegerPredicate {
   ) -> Bool {
     switch w {
     case 1: self(lhs.asBool ? UInt8(1) : 0, rhs.asBool ? UInt8(1) : 0)
-    case 8: self(lhs.asI8, rhs.asI8)
-    case 16: self(lhs.asI16, rhs.asI16)
-    case 32: self(lhs.asI32, rhs.asI32)
-    case 64: self(lhs.asI64, rhs.asI64)
+    case 8: self(lhs.asUInt8, rhs.asUInt8)
+    case 16: self(lhs.asUInt16, rhs.asUInt16)
+    case 32: self(lhs.asUInt32, rhs.asUInt32)
+    case 64: self(lhs.asUInt64, rhs.asUInt64)
     // TODO: uncomment when 128-bit integer is supported.
     //
     // case 128: self(lhs.i128, rhs.i128)

@@ -38,7 +38,7 @@ enum BuiltinValue: Regular {
   /// The 8-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(8)`.
-  var asI8: UInt8 {
+  var asUInt8: UInt8 {
     switch self {
     case .i8(let x): x
     default: preconditionFailure("Not an instance of `MachineType.i(8)`.")
@@ -48,7 +48,7 @@ enum BuiltinValue: Regular {
   /// The 16-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(16)`.
-  var asI16: UInt16 {
+  var asUInt16: UInt16 {
     switch self {
     case .i16(let x): x
     default: preconditionFailure("Not an instance of `MachineType.i(16)`.")
@@ -58,7 +58,7 @@ enum BuiltinValue: Regular {
   /// The 32-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(32)`.
-  var asI32: UInt32 {
+  var asUInt32: UInt32 {
     switch self {
     case .i32(let x): x
     default: preconditionFailure("Not an instance of `MachineType.i(32)`.")
@@ -68,7 +68,7 @@ enum BuiltinValue: Regular {
   /// The 64-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(64)`.
-  var asI64: UInt64 {
+  var asUInt64: UInt64 {
     switch self {
     case .i64(let x): x
     default: preconditionFailure("Not an instance of `MachineType.i(64)`.")
@@ -78,7 +78,7 @@ enum BuiltinValue: Regular {
   /// The 128-bit unsigned value.
   ///
   /// - Precondition: `self` is an instance of `MachineType.i(128)`.
-  var asI128: UInt128 {
+  var asUInt128: UInt128 {
     switch self {
     case .i128(let x): x
     default: preconditionFailure("Not an instance of `MachineType.i(128)`.")
@@ -142,11 +142,11 @@ extension BuiltinValue {
     var r =
       switch w {
       case 1: withUnsafeBytes(of: asBool) { Array($0) }
-      case 8: withUnsafeBytes(of: asI8) { Array($0) }
-      case 16: withUnsafeBytes(of: asI16) { Array($0) }
-      case 32: withUnsafeBytes(of: asI32) { Array($0) }
-      case 64: withUnsafeBytes(of: asI64) { Array($0) }
-      case 128: withUnsafeBytes(of: asI128) { Array($0) }
+      case 8: withUnsafeBytes(of: asUInt8) { Array($0) }
+      case 16: withUnsafeBytes(of: asUInt16) { Array($0) }
+      case 32: withUnsafeBytes(of: asUInt32) { Array($0) }
+      case 64: withUnsafeBytes(of: asUInt64) { Array($0) }
+      case 128: withUnsafeBytes(of: asUInt128) { Array($0) }
       default: preconditionFailure("Unknown integer bit width.")
       }
 
