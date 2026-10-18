@@ -125,8 +125,8 @@ extension BuiltinValue {
     let wordSize = typeLayouts.abi.bitsInAPointer
 
     return switch t {
-    case .i(let w): bytes(ofIntgerHavingBitWidth: w, in: byteOrder)
-    case .word: bytes(ofIntgerHavingBitWidth: UInt8(wordSize), in: byteOrder)
+    case .i(let w): bytes(ofIntegerHavingBitWidth: w, in: byteOrder)
+    case .word: bytes(ofIntegerHavingBitWidth: UInt8(wordSize), in: byteOrder)
     default: unimplemented("floats, and ptr are not supported yet.")
     }
 
@@ -134,7 +134,7 @@ extension BuiltinValue {
 
   /// Returns the memory representation o stored `w`-bit integer.
   private func bytes(
-    ofIntgerHavingBitWidth w: UInt8,
+    ofIntegerHavingBitWidth w: UInt8,
     in byteOrder: Endianness
   ) -> [UInt8] {
     var bytes =
