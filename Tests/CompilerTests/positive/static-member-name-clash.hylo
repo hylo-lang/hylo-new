@@ -1,0 +1,12 @@
+//! stage:lowering
+
+// Checks that selecting a member on an instance ignores static members of the same name.
+
+struct A is Deinitializable {
+  memberwise init
+  fun f() {}
+}
+
+extension <T> T {
+  static fun f() { A().f() }
+}

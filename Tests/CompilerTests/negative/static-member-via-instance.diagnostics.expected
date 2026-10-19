@@ -1,0 +1,4 @@
+negative/static-member-via-instance.hylo:5.17-18: error: type 'A' has no member 'f'
+fun g(a: A) { a.f() }
+                ^
+
