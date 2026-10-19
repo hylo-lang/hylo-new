@@ -23,25 +23,25 @@ public struct Pointer<Pointee> is Deinitializable {
     //       https://github.com/orgs/hylo-lang/discussions/1825#discussioncomment-17956070
     // set where Pointee is Deinitializable {
     //   inout s = &self.unsafe[]
-    //   &s.deinit()
+    //   &s.deinit() // TODO: remove after https://github.com/hylo-lang/hylo/issues/1932
     //   yield &s
     // }
   }
 
-  // /// Creates an instance with the same memory representation as `address`.
-  // ///  TODO design int to pointer semantics. https://github.com/hylo-lang/hylo-new/issues/438
-  // public init(bit_pattern address: UInt) { 
-  //   &self.base = Builtin.inttoptr_word(address.value)
-  // }
-
   /// Creates an instance referring to the same address as `p`.
   ///
-  /// Note that dereferencing type-punned pointers will cause problems unless the rules for
-  /// `unsafe[]` (which see) are followed.
+  /// Note that dereferencing type-punned pointers will cause problems unless the rules of
+  /// `unsafe[]` are upheld.
   @inline(always)
   public init<Other>(type_punning p: Pointer<Other>) {
     &self.base = p.base
   }
+
+  // /// Creates an instance with the same memory representation as `address`.
+  // ///  TODO design int to pointer semantics. https://github.com/hylo-lang/hylo-new/issues/438
+  // public init(bit_pattern address: UInt) {
+  //   &self.base = Builtin.inttoptr_word(address.value)
+  // }
 
   // /// Creates an instance with the same memory representation as `address`.
   // ///  TODO design int to pointer semantics. https://github.com/hylo-lang/hylo-new/issues/438
@@ -53,9 +53,9 @@ public struct Pointer<Pointee> is Deinitializable {
   // /// Returns `self` offset forward by `n` array elements of `Pointee` type.
   // @inline(always)
   // public fun advance(by n: Int) -> Self {
-  //   // TODO implement MemoryLayout<T> or equivalent.
-  //   // let offset_in_bytes = Pointee.layout.stride() * n
-  //   // return PointerToMutable<Pointee>.new(
+  //   // TODO implement layout queries https://github.com/hylo-lang/hylo-new/pull/493
+  //   // let offset_in_bytes = Metatype<Pointee>.stride() * n
+  //   // return Pointer<Pointee>.new(
   //   //   self.base: Builtin.advanced_by_bytes_word(self.base, offset_in_bytes.value))
   // }
 
@@ -67,7 +67,7 @@ public struct Pointer<Pointee> is Deinitializable {
 
   // /// Returns the result of applying `initialize` to the uninitialized `Pointee` storage.
   // ///
-  // /// - Requires: the `MemoryLayout<Pointee>.size()` bytes starting at the address are uninitialized
+  // /// - Requires: the `Metatype<Pointee>.size()` bytes starting at the address are uninitialized
   // ///   and suitably aligned for `Pointee`.
   // /// TODO enable after fixing https://github.com/hylo-lang/hylo-new/issues/384
   // @inline(always)
@@ -76,13 +76,14 @@ public struct Pointer<Pointee> is Deinitializable {
   // }
 
   // /// Initializes the memory referenced by `count` consecutive bytewise copies of `value`.
+  // TODO implement layout queries https://github.com/hylo-lang/hylo-new/pull/493
   // @inline(always)
   // public fun unsafe_initialize(copying_bytes_from source: Pointer<Pointee>, count: Int) {
   //   var i = 0
   //   var s = Pointer<Int8>(type_punning: source)
-  //   var d = PointerToMutable<Int8>(type_punning: self)
+  //   var d = Pointer<Int8>(type_punning: self)
 
-  //   let byte_count = MemoryLayout<Pointee>.stride() * count
+  //   let byte_count = Metatype<Pointee>.stride() * count
   //   while i < byte_count {
   //     d.unsafe_initialize_pointee(s.unsafe[].copy())
   //     &s = s.advance(by: 1)
@@ -96,7 +97,7 @@ public struct Pointer<Pointee> is Deinitializable {
   /// Returns an equivalent instance.
   ///
   /// Because we don't have a `nonmutating` keyword yet, writing to the pointee of a `let`-bound
-  /// `PointerToMutable` is only possible by copying, e.g.  `&p.copy().unsafe[] = x`.
+  /// `Pointer` is only possible by copying, e.g.  `&p.copy().unsafe[] = x`.
   @inline(always)
   public fun copy() -> Self {
     Pointer(base: self.base)
@@ -135,13 +136,9 @@ extension <Pointee is Movable> Pointer<Pointee> {
     self.base as* (sink Pointee)
   }
 
-}
-
-extension <Pointee is Movable> Pointer<Pointee> {
-
   /// Initializes the value pointed to by `self` to `value`.
   ///
-  /// - Requires: the `MemoryLayout<Pointee>.size()` bytes starting at the address are uninitialized
+  /// - Requires: the `Metatype<Pointee>.size()` bytes starting at the address are uninitialized
   ///   and suitably aligned for `Pointee`.
   @inline(always)
   public fun unsafe_initialize_pointee(value: sink Pointee) {
