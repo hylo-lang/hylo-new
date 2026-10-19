@@ -366,13 +366,9 @@ extension IREmitter {
         default:
           let s = poly.at(i)
           lowering(p, anchoredTo: s.anchor, in: &target) { (me) in
-            // If `s` stores a type witness that depends on generic parameters, the constant must
-            // be replaced by a witness computed at run-time.
-            if let store = s as? IRStore, case .type(let t, _) = store.value,
-              !me.program.types.parameters(freeIn: t).isEmpty
-            {
-              let w = me._emitAccessTypeWitness(of: t, reusing: &witnesses)
-              me._memory_copy(w, to: properties[store.target])
+            if me.existentializeGenericTypeWitnessStore(s, substituting: properties,
+                 reusing: &witnesses) {
+              return
             } else if let clone = me.insert(s.substituting(properties)) {
               properties[.register(i)] = clone
             }
@@ -383,6 +379,23 @@ extension IREmitter {
 
     depolymorphize(&target, passing: witnesses)
     program[module].ir[mono].take(definition: target)
+  }
+
+  /// If `s` stores a type witness that depends on generic parameters, replaces the constant by a
+  /// witness computed at run-time and returns `true`; otherwise, returns `false`.
+  private mutating func existentializeGenericTypeWitnessStore(
+    _ s: any Instruction, substituting properties: IRSubstitutionTable,
+    reusing witnesses: inout [AnyTypeIdentity: IRValue]
+  ) -> Bool {
+    if let store = s as? IRStore, case .type(let t, _) = store.value,
+      !program.types.parameters(freeIn: t).isEmpty
+    {
+      let w = _emitAccessTypeWitness(of: t, reusing: &witnesses)
+      _memory_copy(w, to: properties[store.target])
+      return true
+    } else {
+      return false
+    }
   }
 
 }
