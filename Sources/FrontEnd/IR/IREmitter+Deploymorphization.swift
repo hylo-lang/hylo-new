@@ -367,9 +367,8 @@ extension IREmitter {
           let s = poly.at(i)
           lowering(p, anchoredTo: s.anchor, in: &target) { (me) in
             if me.existentializeGenericTypeWitnessStore(s, substituting: properties,
-                 reusing: &witnesses) {
-              return
-            } else if let clone = me.insert(s.substituting(properties)) {
+              reusing: &witnesses)
+            {} else if let clone = me.insert(s.substituting(properties)) {
               properties[.register(i)] = clone
             }
           }
@@ -387,14 +386,24 @@ extension IREmitter {
     _ s: any Instruction, substituting properties: IRSubstitutionTable,
     reusing witnesses: inout [AnyTypeIdentity: IRValue]
   ) -> Bool {
-    if let store = s as? IRStore, case .type(let t, _) = store.value,
-      !program.types.parameters(freeIn: t).isEmpty
-    {
+    if let store = s as? IRStore, let t = genericTypeWitness(store.value) {
       let w = _emitAccessTypeWitness(of: t, reusing: &witnesses)
       _memory_copy(w, to: properties[store.target])
       return true
     } else {
+      // Type witness constants depending on generic parameters only occur in stores.
+      assert(!s.operands.contains(where: { (o) in genericTypeWitness(o) != nil }))
       return false
+    }
+  }
+
+  /// Returns the type witnessed by `v` iff `v` is a type witness constant depending on generic
+  /// parameters; otherwise, returns `nil`.
+  private mutating func genericTypeWitness(_ v: IRValue) -> AnyTypeIdentity? {
+    if case .type(let t, _) = v, !program.types.parameters(freeIn: t).isEmpty {
+      return t
+    } else {
+      return nil
     }
   }
 
