@@ -15,8 +15,7 @@ public struct Pointer<Pointee> is Deinitializable {
     /// - Requires: nothing mutates the value's storage during this projection's lifetime.
     let { yield (self.base as* (let Pointee)) }
 
-    /// - Requires: the value is mutable, and nothing accesses its
-    ///   storage except through this projection during its lifetime.
+    /// - Requires: the pointed-to object shall not have other bindings throughout the projection.
     inout { yield &(self.base as* (inout Pointee)) }
 
     // TODO: https://github.com/hylo-lang/hylo-new/issues/447
