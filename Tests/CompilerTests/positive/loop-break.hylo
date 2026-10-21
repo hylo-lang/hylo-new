@@ -1,0 +1,30 @@
+fun break_simple() -> Bool {
+  var x = 0
+  while x < 5 {
+    &x += 1 ; break
+  }
+  return x == 1
+}
+
+fun break_nested() -> Bool {
+  var x = 0
+  while x < 5 {
+    while x < 5 { &x += 1 ; break }
+  }
+  return x == 5
+}
+
+fun break_from_condition() -> Bool {
+  var x = 0
+  while x < 5 {
+    if x == 3 { break }
+    &x += 1
+  }
+  return x == 3
+}
+
+public fun main() {
+  precondition(break_simple())
+  precondition(break_nested())
+  precondition(break_from_condition())
+}

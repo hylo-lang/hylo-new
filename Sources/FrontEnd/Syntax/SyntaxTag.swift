@@ -80,6 +80,7 @@ public struct SyntaxTag: Sendable {
     Assignment.self,
     Block.self,
     Discard.self,
+    LoopControl.self,
     Return.self,
     While.self,
     Yield.self,

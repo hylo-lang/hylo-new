@@ -162,6 +162,13 @@ extension Program {
     .init(.error, "illegal '\(k)' access", at: span(anchor))
   }
 
+  /// Returns an error diagnosing an illegal occurrence of a loop control statement.
+  internal func illegalLoopControl(_ s: LoopControl.ID) -> Diagnostic {
+    let a = spanForDiagnostic(about: s)
+    let s = String(describing: self[s].action)
+    return .init(.error, "'\(s)' statement can only occur in a loop", at: a)
+  }
+
   /// Returns an error diagnosing an invalid relocation.
   internal func illegalMove(at anchor: Anchor) -> Diagnostic {
     .init(.error, "illegal move", at: span(anchor))
