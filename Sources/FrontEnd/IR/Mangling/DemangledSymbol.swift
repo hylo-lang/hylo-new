@@ -140,10 +140,10 @@ internal indirect enum DemangledEntity: Hashable, Sendable {
   case initializer(DemangledEntity)
 
   /// An IRFunction with `name == .synthesized`.
-  case synthesizedFunction(DemangledEntity, [DemangledType.TypeApplicationArgument])
+  case synthesizedFunction(DemangledEntity, [DemangledType])
 
   /// An IRFunction with `name == .implementation`.
-  case implementation(DemangledEntity, DemangledEntity, [DemangledType.TypeApplicationArgument])
+  case implementation(DemangledEntity, DemangledEntity, [DemangledType])
 
   /// An IRFunction with `name == .existentialized`.
   case existentialized(DemangledEntity)
@@ -208,12 +208,10 @@ extension DemangledEntity: CustomStringConvertible {
       return "\(e)"
     case .initializer(let e):
       return "init \(e)"
-    case .synthesizedFunction(let e, let arguments):
-      let args = arguments.map { "[\($0.formal): \($0.argument)]" }.joined(separator: ", ")
-      return "\(e)<\(args)>"
+    case .synthesizedFunction(let e, let a):
+      return "\(e)<\(list: a)>"
     case .implementation(let e, let c, let a):
-      let args = a.map { "[\($0.formal): \($0.argument)]" }.joined(separator: ", ")
-      return "\(e) implements \(c)<\(args)>"
+      return "\(e) implements \(c)<\(list: a)>"
     case .existentialized(let e):
       return "some \(e)"
     case .applied(let e, let n):
@@ -315,24 +313,13 @@ internal indirect enum DemangledType: Hashable, Sendable {
   case typeAlias(declaration: DemangledEntity, aliasee: DemangledType)
 
   /// A type application.
-  case typeApplication(abstraction: DemangledType, arguments: [TypeApplicationArgument])
+  case typeApplication(abstraction: DemangledType, arguments: [DemangledType])
 
   /// A type witness.
   case typeWitness
 
   /// An universal type.
   case universalType(parameters: [DemangledType], head: DemangledType)
-
-  /// A type application argument.
-  internal struct TypeApplicationArgument: Hashable, Sendable {
-
-    /// The formal parameter.
-    internal let formal: DemangledType
-
-    /// The value of the type.
-    internal let argument: DemangledType
-
-  }
 
   /// A parameter of a callable symbol.
   internal struct Parameter: Hashable, Sendable {
@@ -425,8 +412,7 @@ extension DemangledType: CustomStringConvertible {
       return "typealias \(declaration) = \(aliasee)"
 
     case .typeApplication(let abstraction, let arguments):
-      let args = arguments.map({ (a) in "[\(a.formal): \(a.argument)]" }).joined(separator: ", ")
-      return "\(abstraction)<\(args)>"
+      return "\(abstraction)<\(list: arguments)>"
 
     case .typeWitness:
       return "Type"

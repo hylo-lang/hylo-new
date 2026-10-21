@@ -1205,7 +1205,6 @@ internal struct ManglingEncoding: Sendable {
   /// Writes the mangled representation of `a` to `output`.
   private mutating func append(typeArguments a: TypeArguments, to output: inout ManglingContext) {
     output.add(items: a.elements) { (o, e) in
-      append(type: e.key.erased, to: &o)
       append(type: e.value, to: &o)
     }
   }
@@ -1213,13 +1212,8 @@ internal struct ManglingEncoding: Sendable {
   /// Demangles type arguments from `source`.
   private static func takeTypeArguments(
     from source: inout DemanglingContext
-  ) -> [DemangledType.TypeApplicationArgument]? {
-    let takeArgument = { (s: inout DemanglingContext) -> DemangledType.TypeApplicationArgument? in
-      let k = takeType(from: &s)
-      let v = takeType(from: &s)
-      return .init(formal: k, argument: v)
-    }
-    return source.takeItems(takingEachWith: takeArgument)
+  ) -> [DemangledType]? {
+    source.takeItems(takingEachWith: takeType(from:))
   }
 
   /// Writes the mangled representation of `t` to `output`.
