@@ -1467,9 +1467,9 @@ extension Program {
   }
 
   /// Defines a thunk representing a Hylo function that calls the C function `foreign` having
-  /// *indirect C calling* convention.
+  /// indirect C calling convention.
   ///
-  /// - See: `Docs/ABI.md`
+  /// - Seealso: Docs/ABI.md
   private mutating func defineIndirectToHyloThunk(
     calling foreign: String, in f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) {
@@ -1819,8 +1819,9 @@ extension Program {
   private mutating func record(
     fields: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
   ) -> ConcreteLayout {
+    // Construct an array with the the members ordered according to decreasing alignment, then in
+    // increasing declaration order.
     let rs = fields.map({ (u) in metadata(of: u, in: &ctx) })
-    /// The members ordered according to decreasing alignment, then in increasing declaration order.
     let ps = fields.indices.sorted { (a, b) in
       let lhs = rs[a].layout.alignment
       let rhs = rs[b].layout.alignment

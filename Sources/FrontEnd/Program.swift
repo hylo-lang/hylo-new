@@ -1938,6 +1938,7 @@ extension Program {
 
     /// All standard library floating point types.
     static let allFloatingPointTypes: [StandardLibraryEntity] = [.float32, .float64]
+
   }
 
   /// Returns the type of a term witnessing that `t` conforms to the core trait `p`.
