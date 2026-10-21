@@ -5,7 +5,7 @@ internal struct ManglingEncoding: Sendable {
 
   // Mangling conventions:
   //
-  // We mangle three kinds of symbols:
+  // We mangle three sorts of symbols:
   // - entities (declarations, translation units, modules, scopes)
   // - types
   // - witness tables (`IRWitnessTable`)
@@ -906,18 +906,15 @@ internal struct ManglingEncoding: Sendable {
     genericParameter t: GenericParameter, to output: inout ManglingContext
   ) {
     switch t {
-    case .conformer(let d, let k):
+    case .conformer(let d, _):
       output.add(operator: .genericParameterConformerType)
       append(decl: DeclarationIdentity(d), to: &output)
-      append(kind: k, to: &output)
-    case .user(let d, let k):
+    case .user(let d, _):
       output.add(operator: .genericParameterUserType)
       append(decl: DeclarationIdentity(d), to: &output)
-      append(kind: k, to: &output)
-    case .nth(let n, let k):
+    case .nth(let n, _):
       output.add(operator: .genericParameterNthType)
       output.add(integer: Int(n))
-      append(kind: k, to: &output)
     }
   }
 
@@ -926,8 +923,7 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    return takeKind(from: &source)
-      .map({ (k) in .genericParameterConformer(declaration: d, kind: k) }) ?? .error
+    return .genericParameterConformer(declaration: d)
   }
 
   /// Demangles a generic parameter user type from `source`.
@@ -935,16 +931,15 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    return takeKind(from: &source)
-      .map({ (k) in .genericParameterUser(declaration: d, kind: k) }) ?? .error
+    return .genericParameterUser(declaration: d)
   }
 
   /// Demangles a generic parameter nth type from `source`.
   private static func takeGenericParameterNthType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    if let n = source.takeInt(), let k = takeKind(from: &source) {
-      return .genericParameterNth(index: n, kind: k)
+    if let n = source.takeInt() {
+      return .genericParameterNth(index: n)
     } else {
       return .error
     }
@@ -1205,7 +1200,6 @@ internal struct ManglingEncoding: Sendable {
   /// Writes the mangled representation of `a` to `output`.
   private mutating func append(typeArguments a: TypeArguments, to output: inout ManglingContext) {
     output.add(items: a.elements) { (o, e) in
-      append(type: e.key.erased, to: &o)
       append(type: e.value, to: &o)
     }
   }
@@ -1213,13 +1207,8 @@ internal struct ManglingEncoding: Sendable {
   /// Demangles type arguments from `source`.
   private static func takeTypeArguments(
     from source: inout DemanglingContext
-  ) -> [DemangledType.TypeApplicationArgument]? {
-    let takeArgument = { (s: inout DemanglingContext) -> DemangledType.TypeApplicationArgument? in
-      let k = takeType(from: &s)
-      let v = takeType(from: &s)
-      return .init(formal: k, argument: v)
-    }
-    return source.takeItems(takingEachWith: takeArgument)
+  ) -> [DemangledType]? {
+    source.takeItems(takingEachWith: takeType(from:))
   }
 
   /// Writes the mangled representation of `t` to `output`.
@@ -1302,4 +1291,5 @@ extension ScopeIdentity {
   fileprivate var asSymbol: MangledSymbol {
     isFile ? .fileScope(self) : .node(node!)
   }
+
 }
