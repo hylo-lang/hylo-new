@@ -61,23 +61,15 @@ internal struct ModuleGenerationContext: ~Copyable {
 
   /// The header of the structure representing information stored in all type witnesses.
   ///
-  /// A type witness is a 4-tuple followed by a tail buffer of zero or more pointers. The tuple is
-  /// composed of the following elements:
+  /// The type witness of a type `T` describes how instances of `T` are laid out in memory. The
+  /// contents of a witness consists of a 64-bit integer header encoding the size and alignment of
+  /// `T`, potentially followed by a tail buffer describing the byte offsets of each stored member.
   ///
-  /// - A string describing the type being witnessed, as an instance of `Hylo.String`;
-  /// - The size of the type, as a 32-bit unsigned integer;
-  /// - The alignment of the type, as a 16-bit unsigned ingeter;
-  /// - The number of type parameters or type arguments, encoded using a 16-bit signed integer.
+  /// The size of an instance is encoded in the 48 most significant bits of the header whereas the
+  /// alignment is encoded in the 16 least significant bits.
   ///
-  /// Let `n` be the value of the 4-th component. If `n` is non-negative, then the witness is for a
-  /// proper type, `n` is the arity of the constructor that formed this type, and the tail buffer
-  /// contains a pointer to the witnesses the type arguments. Otherwise, the witness is for a type
-  /// constructor of arity `-n` and the tail buffer contains a pointer to a function implementing
-  /// that constructor.
-  ///
-  /// - Note: If this structure is changed, `TypeWitnessHeader` in
-  ///   StandardLibrary/Sources/Core/Runtime/OffsetOfMember.hylo must be
-  ///   updated accordingly.
+  /// - Note: Changes to this structure requires the following sources to be modified accordingly:
+  ///   - StandardLibrary/Sources/Core/Runtime/OffsetOfMember.hylo
   internal let typeWitnessHeader: SwiftyLLVM.StructType.UnsafeReference
 
   /// Creates the initial state of a compilation of `m`.
@@ -91,16 +83,15 @@ internal struct ModuleGenerationContext: ~Copyable {
 
     let fun = self.llvm.functionPointer.t
     let ptr = self.llvm.ptr.t
-    let iptr = self.llvm.iptr.t
     let i32 = self.llvm.i32.t
-    let i16 = self.llvm.i16.t
+    let i64 = self.llvm.i64.t
 
     self.empty = self.llvm.structType([])
     self.slide = self.llvm.functionType(from: [ptr])
     self.plateau = self.llvm.functionType(from: [ptr, ptr, fun, ptr], to: i32)
     self.nestedProject = self.llvm.structType([ptr, fun, ptr])
     self.plateauCallback = self.llvm.structType([fun, ptr])
-    self.typeWitnessHeader = self.llvm.structType(named: "$htwh", [iptr, i32, i16, i16])
+    self.typeWitnessHeader = self.llvm.structType(named: "$htwh", [i64])
   }
 
   /// Returns the resources held by this instance.

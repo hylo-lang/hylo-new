@@ -68,10 +68,7 @@ extension Pointer<Int> {
 extension TypeWitnessHeader {
 
   init(size: Int, alignment: Int) {
-    Pointer<UInt8>.null_(&self.description)
-    &self.size = .new(truncating: size)
-    &self.alignment = .new(truncating: alignment)
-    &self.type_argument_or_parameter_count = .zero()
+    &self.size_and_alignment = .new((size << 16) | alignment)
   }
 
   /// Fatal error unless TypeWitnessHeader lays out in declaration

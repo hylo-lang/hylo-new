@@ -1,5 +1,8 @@
 //! exit-status:42
 
+// This test exercises the allocation of a local variable whose size and alignment are determined
+// at compile-time, by consulting a type witness.
+
 trait DefaultConstructible { init() }
 
 trait P {

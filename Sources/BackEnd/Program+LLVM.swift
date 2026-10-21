@@ -1155,30 +1155,28 @@ extension Program {
   ///
   /// - Requires: `t` is dealiased.
   private mutating func demandGlobalTypeWitness(
-    of t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
+    _ t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
   ) -> SwiftyLLVM.GlobalVariable.UnsafeReference {
-    // TODO: type arguments/parameters
-    // TODO: witnesses of opaque types
-
     let name = llvmName(global: .witness(t))
+
+    // Did we already computed the type result?
     if let existing = ctx.llvm.global(named: name) {
       return existing
     }
+
+    // TODO: witnesses of opaque types
 
     // Declare the symbol.
     let symbol = ctx.llvm.declareGlobalVariable(name, ctx.typeWitnessHeader)
     ctx.llvm.setLinkage(.private, for: symbol)
 
-    // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in
-    // the module. Otherwise, the witness is for a type whose layout is defined externally.
+    // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in the
+    // module. Otherwise, the witness is for a type whose layout is defined externally.
     let m = metadata(of: t, in: &ctx)
     guard let s = m.layout.size.fixed else { return symbol }
 
     let fields: [LLVMValue] = [
-      demandGlobalString(show(t), in: &ctx).v,
-      ctx.llvm.i32.unsafe[].constant(s).v,
-      ctx.llvm.i16.unsafe[].constant(m.layout.alignment).v,
-      ctx.llvm.i16.unsafe[].zero.v,
+      ctx.llvm.i64.unsafe[].constant(UInt64(s << 16) | UInt64(m.layout.alignment)).v,
     ]
 
     let alignment = ctx.llvm.layout.preferredAlignment(of: ctx.typeWitnessHeader)
@@ -1289,14 +1287,14 @@ extension Program {
   /// witness stored in memory.
   private mutating func insertLoadTypeSize(
     from witness: LLVMValue, in ctx: inout FunctionGenerationContext
-  ) -> SwiftyLLVM.Load.UnsafeReference {
+  ) -> LLVMValue {
     let x0 = ctx.module.llvm.insertLoad(
       ctx.module.llvm.ptr, from: witness, at: ctx.insertionPoint!)
-    let x1 = ctx.module.llvm.insertGetStructElementPointer(
-      of: x0, typed: ctx.module.typeWitnessHeader, index: 1, at: ctx.insertionPoint!)
-    let x2 = ctx.module.llvm.insertLoad(
-      ctx.module.llvm.i32, from: x1, at: ctx.insertionPoint!)
-    return x2
+    let x1 = ctx.module.llvm.insertLoad(
+      ctx.module.llvm.i64, from: x0, at: ctx.insertionPoint!)
+    let x2 = ctx.module.llvm.insertAShr(
+      x1, ctx.module.llvm.i64.unsafe[].constant(16), at: ctx.insertionPoint!)
+    return x2.v
   }
 
   /// Returns the representations of `arguments`, which are passed to `callee`, in LLVM IR.

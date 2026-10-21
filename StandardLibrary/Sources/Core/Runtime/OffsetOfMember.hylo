@@ -67,18 +67,11 @@ public struct TypeWitnessHeader {
   @inline(always)
   public memberwise init
 
-  // TODO: Use `Hylo.String` after #492 lands.
-  /// The type name in nul-terminated utf-8.
-  let description: Int
-
-  /// The size of the type in bytes.
-  let size: Size
-
-  /// The alignment of the type in bytes.
-  let alignment: Alignment
-
-  /// The number of type parameters or type arguments
-  let type_argument_or_parameter_count: Int16
+  /// The size and alignment requirement of the type, in bytes.
+  ///
+  /// The 48 most significant bits encode the size whereas the 16 least significant bits encode the
+  /// alignment requirement.
+  let size_and_alignment: UInt64
 
 }
 
@@ -94,13 +87,19 @@ extension Pointer<TypeWitnessHeader> {
   /// Returns the size of an instance.
   @inline(always)
   public fun size() -> Size {
-    (self.value as* let Self.Pointee).size.copy()
+    let x = UInt64(value: Builtin.ashr_i64(
+      (self.value as* let Self.Pointee).size_and_alignment.value,
+      (16 as UInt64).value))
+    return .new(value: Builtin.trunc_or_zext_i64_i32(x.value))
   }
 
   /// Returns the alignment of an instance.
   @inline(always)
   public fun alignment() -> Alignment {
-    (self.value as* let Self.Pointee).alignment.copy()
+    let x = UInt64(value: Builtin.and_i64(
+      (self.value as* let Self.Pointee).size_and_alignment.value,
+      (0xffff as UInt64).value))
+    return .new(value: Builtin.trunc_or_zext_i64_i16(x.value))
   }
 
   @inline(always)
