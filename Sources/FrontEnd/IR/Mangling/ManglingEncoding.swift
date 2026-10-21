@@ -918,18 +918,15 @@ internal struct ManglingEncoding: Sendable {
     genericParameter t: GenericParameter, to output: inout ManglingContext
   ) {
     switch t {
-    case .conformer(let d, let k):
+    case .conformer(let d, _):
       output.add(operator: .genericParameterConformerType)
       append(decl: DeclarationIdentity(d), to: &output)
-      append(kind: k, to: &output)
-    case .user(let d, let k):
+    case .user(let d, _):
       output.add(operator: .genericParameterUserType)
       append(decl: DeclarationIdentity(d), to: &output)
-      append(kind: k, to: &output)
-    case .nth(let n, let k):
+    case .nth(let n, _):
       output.add(operator: .genericParameterNthType)
       output.add(integer: Int(n))
-      append(kind: k, to: &output)
     }
   }
 
@@ -938,8 +935,7 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    return takeKind(from: &source)
-      .map({ (k) in .genericParameterConformer(declaration: d, kind: k) }) ?? .error
+    return .genericParameterConformer(declaration: d)
   }
 
   /// Demangles a generic parameter user type from `source`.
@@ -947,16 +943,15 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledType {
     let d = takeEntity(from: &source)
-    return takeKind(from: &source)
-      .map({ (k) in .genericParameterUser(declaration: d, kind: k) }) ?? .error
+    return .genericParameterUser(declaration: d)
   }
 
   /// Demangles a generic parameter nth type from `source`.
   private static func takeGenericParameterNthType(
     from source: inout DemanglingContext
   ) -> DemangledType {
-    if let n = source.takeInt(), let k = takeKind(from: &source) {
-      return .genericParameterNth(index: n, kind: k)
+    if let n = source.takeInt() {
+      return .genericParameterNth(index: n)
     } else {
       return .error
     }
