@@ -5,7 +5,7 @@ internal struct ManglingEncoding: Sendable {
 
   // Mangling conventions:
   //
-  // We mangle three kinds of symbols:
+  // We mangle three sorts of symbols:
   // - entities (declarations, translation units, modules, scopes)
   // - types
   // - witness tables (`IRWitnessTable`)
@@ -1303,4 +1303,5 @@ extension ScopeIdentity {
   fileprivate var asSymbol: MangledSymbol {
     isFile ? .fileScope(self) : .node(node!)
   }
+
 }
