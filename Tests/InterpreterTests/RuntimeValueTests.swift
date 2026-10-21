@@ -11,12 +11,12 @@ final class RuntimeValueTests: XCTestCase {
   func testBool() {
     let i1 = id(MachineType.i(1))
     XCTAssertEqual(
-      RuntimeValue(bool: true)
+      RuntimeValue(true)
         .bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
       [1]
     )
     XCTAssertEqual(
-      RuntimeValue(bool: false)
+      RuntimeValue(false)
         .bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
       [0]
     )
@@ -45,7 +45,7 @@ final class RuntimeValueTests: XCTestCase {
 
     var bs: [UInt8] = [2]
     XCTAssertEqual(
-      RuntimeValue(integer: 2, bitWidth: 8)
+      RuntimeValue(2, bitWidth: 8)
         .bytes(ofStored: i8, definedIn: &p, laidOutUsing: &l),
       bs
     )
@@ -59,7 +59,7 @@ final class RuntimeValueTests: XCTestCase {
 
     bs = [2, 1]
     XCTAssertEqual(
-      RuntimeValue(integer: 258, bitWidth: 16)
+      RuntimeValue(258, bitWidth: 16)
         .bytes(ofStored: i16, definedIn: &p, laidOutUsing: &l),
       bs
     )
@@ -73,7 +73,7 @@ final class RuntimeValueTests: XCTestCase {
 
     bs = [2, 1, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(integer: 258, bitWidth: 32)
+      RuntimeValue(258, bitWidth: 32)
         .bytes(ofStored: i32, definedIn: &p, laidOutUsing: &l),
       bs
     )
@@ -87,7 +87,7 @@ final class RuntimeValueTests: XCTestCase {
 
     bs = [2, 1, 0, 0, 0, 0, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(integer: 258, bitWidth: 64)
+      RuntimeValue(258, bitWidth: 64)
         .bytes(ofStored: i64, definedIn: &p, laidOutUsing: &l),
       bs
     )
@@ -101,7 +101,7 @@ final class RuntimeValueTests: XCTestCase {
 
     bs = [2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(integer: 258, bitWidth: 128)
+      RuntimeValue(258, bitWidth: 128)
         .bytes(ofStored: i128, definedIn: &p, laidOutUsing: &l),
       bs
     )

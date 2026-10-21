@@ -90,10 +90,10 @@ enum BuiltinValue: Regular {
 
 extension BuiltinValue {
 
-  /// Creates a `w`-bit integer with the two's-complement representation of `n`.
-  public init(integer n: BigInt, bitWidth w: UInt8) {
+  /// Creates a `w`-bit integer storing the two's-complement representation of `n`.
+  public init(_ n: BigInt, bitWidth w: UInt8) {
     precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
-    precondition(n.isRepresentable(asIntegerHavingBitWidth: w))
+    precondition(n.isRepresentable(asIntegerOfBitWidth: w))
 
     self =
       switch w {
@@ -108,7 +108,7 @@ extension BuiltinValue {
   }
 
   /// Creates an instance of `MachineType.i(1)` having value `b`.
-  public init(bool b: Bool) {
+  public init(_ b: Bool) {
     self = .i1(b)
   }
 
@@ -127,12 +127,12 @@ extension BuiltinValue {
     return switch t {
     case .i(let w): bytes(ofIntegerHavingBitWidth: w, in: byteOrder)
     case .word: bytes(ofIntegerHavingBitWidth: UInt8(wordSize), in: byteOrder)
-    default: unimplemented("floats, and ptr are not supported yet.")
+    default: unimplemented("floats and ptr are not supported yet.")
     }
 
   }
 
-  /// Returns the memory representation o stored `w`-bit integer.
+  /// Returns the memory representation of the stored `w`-bit integer.
   private func bytes(
     ofIntegerHavingBitWidth w: UInt8,
     in byteOrder: Endianness

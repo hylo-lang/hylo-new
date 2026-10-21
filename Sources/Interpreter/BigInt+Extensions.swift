@@ -17,7 +17,7 @@ extension BigInt {
   }
 
   /// Returns whether `self` is representable as a `w`-bit integer.
-  func isRepresentable(asIntegerHavingBitWidth w: UInt8) -> Bool {
+  func isRepresentable(asIntegerOfBitWidth w: UInt8) -> Bool {
     precondition(w > 0)
     if self < 0 {
       let wMinusOneLowBits = ~((-1 as BigInt) << (w - 1))

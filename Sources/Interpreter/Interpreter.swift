@@ -371,7 +371,7 @@ public struct Interpreter {
       case .parameter(let i):
         return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
-        return .init(integer: n, bitWidth: bitWidth(t))
+        return .init(n, bitWidth: bitWidth(t))
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
@@ -429,13 +429,13 @@ public struct Interpreter {
       let lhs = try self[arguments[0]]
       let rhs = try self[arguments[1]]
       let r = p(lhs, rhs, bitWidth: w)
-      return .init(bool: r)
+      return .init(r)
     case .zeroinitializer(let t):
       let w = bitWidth(t)
       let u = program.types[t]
       return switch u {
-      case .i(_): .init(integer: 0, bitWidth: w)
-      case .word: .init(integer: 0, bitWidth: w)
+      case .i(_): .init(0, bitWidth: w)
+      case .word: .init(0, bitWidth: w)
       default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")

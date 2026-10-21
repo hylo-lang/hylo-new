@@ -5,7 +5,7 @@ import Utilities
 /// A value occurring during program execution.
 enum RuntimeValue {
 
-  /// When self is an instance of a `MachineType`.
+  /// An instance of a `MachineType`.
   case scalar(BuiltinValue)
 
   /// The sequence of component values of a composite type.
@@ -40,15 +40,15 @@ enum RuntimeValue {
 extension RuntimeValue {
 
   /// Creates a `w`-bit integer having value `n`.
-  public init(integer n: BigInt, bitWidth w: UInt8) {
+  public init(_ n: BigInt, bitWidth w: UInt8) {
     precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
 
-    self = .scalar(BuiltinValue(integer: n, bitWidth: w))
+    self = .scalar(BuiltinValue(n, bitWidth: w))
   }
 
   /// Creates an instance of `MachineType.i(1)`.
-  public init(bool b: Bool) {
-    self = .scalar(BuiltinValue(bool: b))
+  public init(_ b: Bool) {
+    self = .scalar(BuiltinValue(b))
   }
 
   /// The boolean value.
@@ -140,10 +140,10 @@ extension RuntimeValue {
     switch t {
     case .i(let n):
       let v = BigInt(unsignedFrom: bs, storedIn: c.abi.byteOrder)
-      self = .scalar(BuiltinValue(integer: v, bitWidth: n))
+      self = .scalar(BuiltinValue(v, bitWidth: n))
     case .word:
       let v = BigInt(unsignedFrom: bs, storedIn: c.abi.byteOrder)
-      self = .scalar(BuiltinValue(integer: v, bitWidth: c.abi.bitsInAPointer))
+      self = .scalar(BuiltinValue(v, bitWidth: c.abi.bitsInAPointer))
     default: unimplemented("floats and ptr are not supported yet.")
     }
   }
