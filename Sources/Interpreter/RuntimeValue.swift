@@ -104,105 +104,96 @@ extension RuntimeValue {
 extension RuntimeValue {
 
   /// Creates a value of type `t`, defined in `p`, by interpreting its byte
-  /// representation `bs` according to the layout provided by `l`.
+  /// representation `storage` according to the layout provided by `layouts`.
   public init(
-    ofType t: MonomorphicTypeIdentity,
+    _ storage: ArraySlice<UInt8>,
+    type t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    havingByteRepresentation bs: ArraySlice<UInt8>,
-    providedBy l: inout LayoutComputer
+    layouts: inout LayoutComputer
   ) {
     let u = p.underlyingType(t.underlying)
     let s = p.tag(u)
 
     if s == MachineType.self {
       let v = p.type(u, as: MachineType.self)
-      self = RuntimeValue(ofType: v, havingByteRepresentation: bs, providedBy: &l)
+      self = RuntimeValue(storage, type: v, layouts: &layouts)
     } else if s == Struct.self || s == Tuple.self {
-      self = RuntimeValue(
-        record: t, definedIn: &p,
-        havingByteRepresentation: bs, providedBy: &l)
+      self = .init(record: storage, type: t, definedIn: &p, layouts: &layouts)
     } else if s == Enum.self {
-      self = RuntimeValue(
-        enum: t, definedIn: &p,
-        havingByteRepresentation: bs, providedBy: &l)
+      self = .init(enum: storage, type: t, definedIn: &p, layouts: &layouts)
     } else {
       unreachable()
     }
   }
 
-  /// Creates a value of type `t` by interpreting its byte representation `bs`
-  /// according to the layout provided by `c`.
+  /// Creates a value of type `t` by interpreting its byte representation `storage`
+  /// according to the layout provided by `layouts`.
   private init(
-    ofType t: MachineType,
-    havingByteRepresentation bs: ArraySlice<UInt8>,
-    providedBy c: inout LayoutComputer
+    _ storage: ArraySlice<UInt8>,
+    type t: MachineType,
+    layouts: inout LayoutComputer
   ) {
     switch t {
     case .i(let n):
-      let v = BigInt(unsignedFrom: bs, storedIn: c.abi.byteOrder)
+      let v = BigInt(unsignedFrom: storage, storedIn: layouts.abi.byteOrder)
       self = .scalar(BuiltinValue(v, bitWidth: n))
     case .word:
-      let v = BigInt(unsignedFrom: bs, storedIn: c.abi.byteOrder)
-      self = .scalar(BuiltinValue(v, bitWidth: c.abi.bitsInAPointer))
+      let v = BigInt(unsignedFrom: storage, storedIn: layouts.abi.byteOrder)
+      self = .scalar(BuiltinValue(v, bitWidth: layouts.abi.bitsInAPointer))
     default: unimplemented("floats and ptr are not supported yet.")
     }
   }
 
   /// Creates a value for record type `t`, defined in `p`, by interpreting its
-  /// byte representation `bs` according to the layout provided by `c`.
+  /// byte representation `storage` according to the layout provided by `layouts`.
   private init(
-    record t: MonomorphicTypeIdentity,
+    record storage: ArraySlice<UInt8>,
+    type t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    havingByteRepresentation bs: ArraySlice<UInt8>,
-    providedBy c: inout LayoutComputer
+    layouts: inout LayoutComputer
   ) {
-    let l = c.layout(t, in: &p)
+    let l = layouts.layout(t, in: &p)
     let parts =
       l.parts.map {
-        RuntimeValue(
-          part: $0, definedIn: &p,
-          havingByteRepresentationOfParent: bs, providedBy: &c)
+        RuntimeValue($0, parentRepresentation: storage, program: &p, layouts: &layouts)
       }
     self = .composite(parts)
   }
 
   /// Creates a value of enum type `t`, defined in `p`, by interpreting its
-  /// byte representation `bs` according to the layout provided by `c`.
+  /// byte representation `storage` according to the layout provided by `layouts`.
   private init(
-    enum t: MonomorphicTypeIdentity,
+    enum storage: ArraySlice<UInt8>,
+    type t: MonomorphicTypeIdentity,
     definedIn p: inout Program,
-    havingByteRepresentation bs: ArraySlice<UInt8>,
-    providedBy c: inout LayoutComputer
+    layouts: inout LayoutComputer
   ) {
-    let l = c.layout(t, in: &p)
+    let l = layouts.layout(t, in: &p)
 
     let discriminator = RuntimeValue(
-      part: l.discriminator, definedIn: &p,
-      havingByteRepresentationOfParent: bs, providedBy: &c)
+      l.discriminator, parentRepresentation: storage, program: &p, layouts: &layouts)
 
     let discriminatorType = p.type(l.discriminator.type.underlying, as: MachineType.self)
     let activeCaseIndex = Int(discriminator.unsignedIntValue(as: discriminatorType))
     let activeCase = RuntimeValue(
-      part: l.parts[activeCaseIndex], definedIn: &p,
-      havingByteRepresentationOfParent: bs, providedBy: &c)
+      l.parts[activeCaseIndex], parentRepresentation: storage,
+      program: &p, layouts: &layouts)
 
     self = .composite([activeCase, discriminator])
   }
 
-  /// Creates a value for `part`, defined in `p`, by interpreting the byte
-  /// representation `bs` of `part`'s immediate parent according to the layout
-  /// provided by `c`.
+  /// Creates a value for `part` by interpreting the byte representation of its
+  /// parent according to the layout provided by `layouts` in `program`.
   private init(
-    part: TypeLayout.Part,
-    definedIn p: inout Program,
-    havingByteRepresentationOfParent bs: ArraySlice<UInt8>,
-    providedBy c: inout LayoutComputer
+    _ part: TypeLayout.Part,
+    parentRepresentation storage: ArraySlice<UInt8>,
+    program: inout Program,
+    layouts: inout LayoutComputer
   ) {
-    let n = c.layout(part.type, in: &p).size
-    let bytes = bs[bs.startIndex + part.offset..<bs.startIndex + part.offset + n]
-    self = RuntimeValue(
-      ofType: part.type, definedIn: &p,
-      havingByteRepresentation: bytes, providedBy: &c)
+    let partStart = storage.startIndex + part.offset
+    let partSize = layouts.layout(part.type, in: &program).size
+    let bytes = storage[partStart..<partStart + partSize]
+    self = .init(bytes, type: part.type, definedIn: &program, layouts: &layouts)
   }
 
 }

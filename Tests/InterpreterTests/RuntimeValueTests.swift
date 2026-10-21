@@ -21,17 +21,13 @@ final class RuntimeValueTests: XCTestCase {
       [0]
     )
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: i1, definedIn: &p,
-        havingByteRepresentation: [0][...], providedBy: &l
-      ).bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue([0][...], type: i1, definedIn: &p, layouts: &l)
+        .bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
       [0]
     )
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: i1, definedIn: &p,
-        havingByteRepresentation: [1][...], providedBy: &l
-      ).bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue([1][...], type: i1, definedIn: &p, layouts: &l)
+        .bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
       [1]
     )
   }
@@ -50,10 +46,8 @@ final class RuntimeValueTests: XCTestCase {
       bs
     )
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: i8, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: i8, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: i8, definedIn: &p, layouts: &l)
+        .bytes(ofStored: i8, definedIn: &p, laidOutUsing: &l),
       bs
     )
 
@@ -64,10 +58,8 @@ final class RuntimeValueTests: XCTestCase {
       bs
     )
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: i16, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: i16, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: i16, definedIn: &p, layouts: &l)
+        .bytes(ofStored: i16, definedIn: &p, laidOutUsing: &l),
       bs
     )
 
@@ -78,10 +70,8 @@ final class RuntimeValueTests: XCTestCase {
       bs
     )
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: i32, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: i32, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: i32, definedIn: &p, layouts: &l)
+        .bytes(ofStored: i32, definedIn: &p, laidOutUsing: &l),
       bs
     )
 
@@ -92,10 +82,8 @@ final class RuntimeValueTests: XCTestCase {
       bs
     )
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: i64, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: i64, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: i64, definedIn: &p, layouts: &l)
+        .bytes(ofStored: i64, definedIn: &p, laidOutUsing: &l),
       bs
     )
 
@@ -106,10 +94,8 @@ final class RuntimeValueTests: XCTestCase {
       bs
     )
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: i128, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: i128, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: i128, definedIn: &p, layouts: &l)
+        .bytes(ofStored: i128, definedIn: &p, laidOutUsing: &l),
       bs
     )
   }
@@ -121,10 +107,8 @@ final class RuntimeValueTests: XCTestCase {
     let t = MonomorphicTypeIdentity(p.types.tuple(of: [i8.underlying, inner]))
     let bs: [UInt8] = [3, 0, 2, 1]
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: t, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
+        .bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
       bs
     )
   }
@@ -145,10 +129,8 @@ final class RuntimeValueTests: XCTestCase {
     )
     let bs: [UInt8] = [2, 0, 3, 1]
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: t, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
+        .bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
       bs
     )
   }
@@ -165,19 +147,15 @@ final class RuntimeValueTests: XCTestCase {
     )
     var bs: [UInt8] = [2, 0, 1]
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: t, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
+        .bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
       bs
     )
 
     bs = [2, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(
-        ofType: t, definedIn: &p,
-        havingByteRepresentation: bs[...], providedBy: &l
-      ).bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
+        .bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
       bs
     )
   }
