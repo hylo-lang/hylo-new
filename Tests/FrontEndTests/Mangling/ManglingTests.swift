@@ -116,13 +116,9 @@ final class ManglingTests: XCTestCase {
       "MyEnum": (EnumDeclaration.self, "M0.#.MyEnum"),
       "複雑(サ:シ:)": (
         FunctionDeclaration.self,
-        "M0.#.fun 複雑: [Void](サ: M0.#.B<[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>, "
-          + "シ: M0.#.P<[GenericParameterUser<M0.#.P.X, *>: Hylo.Int], "
-          + "[GenericParameterUser<M0.#.P.Y, *>: M0.#.P<"
-          + "[GenericParameterUser<M0.#.P.X, *>: Hylo.Bool], "
-          + "[GenericParameterUser<M0.#.P.Y, *>: M0.#.B<"
-          + "[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>]>]>) "
-          + "let -> Hylo.Int"
+        "M0.#.fun 複雑: [Void]("
+          + "サ: M0.#.B<Hylo.Int>, シ: M0.#.P<Hylo.Int, M0.#.P<Hylo.Bool, M0.#.B<Hylo.Int>>>"
+          + ") let -> Hylo.Int"
       ),
       "複雑2(ス:_:)": (
         FunctionDeclaration.self,
@@ -132,13 +128,10 @@ final class ManglingTests: XCTestCase {
       "B.X": (GenericParameterDeclaration.self, "M0.#.B.X"),
       "複雑(サ:シ:).a": (
         ParameterDeclaration.self,
-        "M0.#.fun 複雑: [Void](サ: M0.#.B<[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>, "
-          + "シ: M0.#.P<[GenericParameterUser<M0.#.P.X, *>: Hylo.Int], "
-          + "[GenericParameterUser<M0.#.P.Y, *>: M0.#.P<"
-          + "[GenericParameterUser<M0.#.P.X, *>: Hylo.Bool], "
-          + "[GenericParameterUser<M0.#.P.Y, *>: M0.#.B<"
-          + "[GenericParameterUser<M0.#.B.X, *>: Hylo.Int]>]>]>) "
-          + "let -> Hylo.Int.a"
+        "M0.#.fun 複雑: [Void]("
+          + "サ: M0.#.B<Hylo.Int>, "
+          + "シ: M0.#.P<Hylo.Int, M0.#.P<Hylo.Bool, M0.#.B<Hylo.Int>>>"
+          + ") let -> Hylo.Int.a"
       ),
       "B": (StructDeclaration.self, "M0.#.B"),
       "P": (StructDeclaration.self, "M0.#.P"),
@@ -161,17 +154,17 @@ final class ManglingTests: XCTestCase {
     let expected2: [String: (any Syntax.Type, String)] = [
       ">.X": (
         TypeAliasDeclaration.self,
-        "M0.#.given M0.#.W<[GenericParameterConformer<M0.#.W, *>: Void]> where .X"
+        "M0.#.given M0.#.W<Void> where .X"
       ),
       "B.x": (BindingDeclaration.self, "M0.#.B.[x]"),
       "$<ConformanceDeclaration at": (
         ConformanceDeclaration.self,
-        "M0.#.given M0.#.W<[GenericParameterConformer<M0.#.W, *>: Void]> where "
+        "M0.#.given M0.#.W<Void> where "
       ),
       "$<ExtensionDeclaration at": (
         ExtensionDeclaration.self,
-        "M0.#.extension <GenericParameterUser<...T, *>> "
-          + "(Void, GenericParameterUser<...T, *>, Void) where "
+        "M0.#.extension <GenericParameterUser<...T>> "
+          + "(Void, GenericParameterUser<...T>, Void) where "
       ),
       ">.b": (
         VariableDeclaration.self, "M0.#.fun g: [Void]() let -> Void.$anonymous.b"
@@ -421,13 +414,8 @@ final class ManglingTests: XCTestCase {
       type: program.types.demand(
         AssociatedType(
           declaration: output,
-          qualification: providerWitness
-        )
-      ).erased, in: program,
-      is:
-        "M0.#.Provider.Output.M0.#.Provider<[GenericParameterConformer<M0.#.Provider, *>: "
-          + "GenericParameterConformer<M0.#.Provider, *>]>"
-    )
+          qualification: providerWitness)).erased, in: program,
+      is: "M0.#.Provider.Output.M0.#.Provider<GenericParameterConformer<M0.#.Provider>>")
   }
 
   /// Tests the mangling and demangling of enum types in `program`.
@@ -435,8 +423,7 @@ final class ManglingTests: XCTestCase {
     let d = findTopLevelDeclaration(named: "MyEnum", in: m, of: program)!
     assertManglingOf(
       type: program.types.demand(
-        Enum(declaration: .init(uncheckedFrom: d.erased))
-      ).erased, in: program,
+        Enum(declaration: .init(uncheckedFrom: d.erased))).erased, in: program,
       is: "M0.#.MyEnum")
   }
 
@@ -474,19 +461,19 @@ final class ManglingTests: XCTestCase {
     assertManglingOf(
       type: program.types.demand(GenericParameter.conformer(provider, .proper)).erased,
       in: program,
-      is: "GenericParameterConformer<M0.#.Provider, *>")
+      is: "GenericParameterConformer<M0.#.Provider>")
 
     let myEnum = Array(program.collectTopLevel(EnumDeclaration.self, of: m)).first!
     let userParameter = program[myEnum].parameters.first!
     assertManglingOf(
       type: program.types.demand(GenericParameter.user(userParameter, .proper)).erased,
       in: program,
-      is: "GenericParameterUser<M0.#.MyEnum.T, *>")
+      is: "GenericParameterUser<M0.#.MyEnum.T>")
 
     assertManglingOf(
       type: program.types.demand(GenericParameter.nth(3, .proper)).erased,
       in: program,
-      is: "GenericParameterNth<3, *>")
+      is: "GenericParameterNth<3>")
   }
 
   /// Tests the mangling and demangling of implication types in `program`.
@@ -599,7 +586,7 @@ final class ManglingTests: XCTestCase {
     assertManglingOf(
       type: program.types.demand(t).erased,
       in: program,
-      is: "M0.#.MyEnum<[GenericParameterUser<M0.#.MyEnum.T, *>: Hylo.Int]>")
+      is: "M0.#.MyEnum<Hylo.Int>")
   }
 
   /// Tests the mangling and demangling of universal types in `program`.
@@ -609,7 +596,7 @@ final class ManglingTests: XCTestCase {
     assertManglingOf(
       type: program.types.demand(t).erased,
       in: program,
-      is: "<GenericParameterNth<1, *>> GenericParameterNth<1, *>")
+      is: "<GenericParameterNth<1>> GenericParameterNth<1>")
   }
 
   /// Tests the mangling and demangling of type alias types in `program`.
