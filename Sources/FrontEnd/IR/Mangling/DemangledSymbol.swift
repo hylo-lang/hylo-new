@@ -265,13 +265,13 @@ internal indirect enum DemangledType: Hashable, Sendable {
   case functionPointer(inputs: [DemangledType], output: DemangledType)
 
   /// A generic parameter type representing the conformer of a trait.
-  case genericParameterConformer(declaration: DemangledEntity, kind: Kind)
+  case genericParameterConformer(declaration: DemangledEntity)
 
   /// A generic parameter declared in sources.
-  case genericParameterUser(declaration: DemangledEntity, kind: Kind)
+  case genericParameterUser(declaration: DemangledEntity)
 
   /// The `n`-th parameter of a built-in type.
-  case genericParameterNth(index: Int, kind: Kind)
+  case genericParameterNth(index: Int)
 
   /// An implication type.
   case implication(usings: [DemangledType], head: DemangledType)
@@ -365,14 +365,14 @@ extension DemangledType: CustomStringConvertible {
     case .functionPointer(let inputs, let output):
       return "ptr (\(list: inputs)) -> \(output)"
 
-    case .genericParameterConformer(let declaration, let kind):
-      return "GenericParameterConformer<\(declaration), \(kind)>"
+    case .genericParameterConformer(let declaration):
+      return "GenericParameterConformer<\(declaration)>"
 
-    case .genericParameterUser(let declaration, let kind):
-      return "GenericParameterUser<\(declaration), \(kind)>"
+    case .genericParameterUser(let declaration):
+      return "GenericParameterUser<\(declaration)>"
 
-    case .genericParameterNth(let index, let kind):
-      return "GenericParameterNth<\(index), \(kind)>"
+    case .genericParameterNth(let index):
+      return "GenericParameterNth<\(index)>"
 
     case .implication(let usings, let head):
       return "(\(list: usings)) => \(head)"
