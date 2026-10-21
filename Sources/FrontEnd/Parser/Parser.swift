@@ -2291,6 +2291,10 @@ public struct Parser {
     switch head.tag {
     case .underscore:
       return try .init(parseDiscardStatement(in: &file))
+    case .break:
+      return try .init(parseBreakStatement(in: &file))
+    case .continue:
+      return try .init(parseContinueStatement(in: &file))
     case .return:
       return try .init(parseReturnStatement(in: &file))
     case .while:
@@ -2318,6 +2322,22 @@ public struct Parser {
     }
     let v = try parseExpression(in: &file)
     return file.insert(Discard(value: v, site: span(from: i)))
+  }
+
+  /// Parses a break statement.
+  private mutating func parseBreakStatement(
+    in file: inout Module.SourceContainer
+  ) throws -> LoopControl.ID {
+    let t = try take(.break) ?? expected("'break'")
+    return file.insert(LoopControl(action: .break, site: span(from: t)))
+  }
+
+  /// Parses a continue statement.
+  private mutating func parseContinueStatement(
+    in file: inout Module.SourceContainer
+  ) throws -> LoopControl.ID {
+    let t = try take(.continue) ?? expected("'continue'")
+    return file.insert(LoopControl(action: .continue, site: span(from: t)))
   }
 
   /// Parses a return statement.

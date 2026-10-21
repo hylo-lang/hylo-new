@@ -1133,6 +1133,8 @@ public struct Typer {
       check(program.castUnchecked(s, to: Discard.self))
     case If.self:
       checkAsStatement(program.castUnchecked(s, to: If.self))
+    case LoopControl.self:
+      check(program.castUnchecked(s, to: LoopControl.self))
     case Return.self:
       check(program.castUnchecked(s, to: Return.self))
     case While.self:
@@ -1180,6 +1182,11 @@ public struct Typer {
     } else {
       program.unexpected(s)
     }
+  }
+
+  /// Type checks `s`.
+  private mutating func check(_ s: LoopControl.ID) {
+    program[s.module].setType(.void, for: s)
   }
 
   /// Type checks `s`.

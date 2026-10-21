@@ -508,8 +508,8 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates the definition of `d`, whose body is `definition`, assuming the insertion context
-  /// is configured to generate IR into the lowered form of `d`.
+  /// Generates the definition of `d`, which is a function or subscript whose body is `definition`,
+  /// assuming the insertion context is configured to generate IR into the lowered form of `d`.
   private mutating func lowerDefinition<T: Declaration & Scope>(
     _ definition: [StatementIdentity], of d: T.ID
   ) {
@@ -558,6 +558,9 @@ internal struct IREmitter {
         // Add a return statement to terminate the block.
         me._return()
       })
+
+    case .loopControl:
+      break
     }
   }
 
@@ -617,6 +620,8 @@ internal struct IREmitter {
       return lower(program.castUnchecked(s, to: Discard.self))
     case If.self:
       return lowerAsStatement(program.castUnchecked(s, to: If.self))
+    case LoopControl.self:
+      return lower(program.castUnchecked(s, to: LoopControl.self))
     case Return.self:
       return lower(program.castUnchecked(s, to: Return.self))
     case While.self:
@@ -692,31 +697,51 @@ internal struct IREmitter {
     let onFailure = insertionContext.function!.addBlock()
     let after = insertionContext.function!.addBlock()
 
-    // Lower the conditions and the success branch.
+    // Lower the conditions.
     for c in program[s].conditions {
       insertionContext.point = .end(of: lowerCondition(c, onFailure: onFailure))
     }
 
-    switch lower(program[s].success) {
-    case .next:
-      lowering(after: program[s].success, { $0._br(after) })
-    case .return(let r):
-      lowering(r, { $0._return() })
-    }
+    // Lower the success branch.
+    lowerAsBranch(StatementIdentity(program[s].success), joiningInto: after)
 
     // Lower the failure branch.
     insertionContext.point = .end(of: onFailure)
-    switch lower(StatementIdentity(uncheckedFrom: program[s].failure.erased)) {
-    case .next:
-      lowering(after: program[s].failure, { $0._br(after) })
-    case .return(let r):
-      lowering(r, { $0._return() })
-    }
+    lowerAsBranch(StatementIdentity(uncheckedFrom: program[s].failure.erased), joiningInto: after)
 
     // If neither branch returns control-flow (e.g., both branches return), then the "after" block
     // won't have any predecessor and will be removed during dead code elimination.
     insertionContext.point = .end(of: after)
     return .next
+  }
+
+  /// Generates the IR of `s`, which is a branch of a conditional statement whose control flow
+  /// joins into `after`.
+  private mutating func lowerAsBranch(_ s: StatementIdentity, joiningInto after: IRBlock.ID) {
+    switch lower(s) {
+    case .next:
+      lowering(after: s, { $0._br(after) })
+    case .return(let r):
+      lowering(r, { $0._return() })
+    case .loopControl:
+      break
+    }
+  }
+
+  /// Generates the IR of `s`.
+  private mutating func lower(_ s: LoopControl.ID) -> ControlFlow {
+    if let loop = insertionContext.innermostLoop {
+      switch program[s].action {
+      case .break:
+        lowering(s) { $0._br(loop.exit) }
+      case .continue:
+        lowering(s) { $0._br(loop.head) }
+      }
+    } else {
+      report(program.illegalLoopControl(s))
+    }
+
+    return .loopControl
   }
 
   /// Generates the IR of `s`.
@@ -737,7 +762,7 @@ internal struct IREmitter {
   /// Generates the IR of `s`.
   private mutating func lower(_ s: While.ID) -> ControlFlow {
     let head = _addBlock()
-    let after = _addBlock()
+    let exit = _addBlock()
 
     lowering(at: program[s].introducer.site, in: program.parent(containing: s)) { (me) in
       me._br(head)
@@ -745,17 +770,23 @@ internal struct IREmitter {
 
     insertionContext.point = .end(of: head)
     for c in program[s].conditions {
-      insertionContext.point = .end(of: lowerCondition(c, onFailure: after))
+      insertionContext.point = .end(of: lowerCondition(c, onFailure: exit))
     }
+
+    var outer: LoopLabels? = LoopLabels(head: head, exit: exit)
+    swap(&outer, &insertionContext.innermostLoop)
+    defer { swap(&outer, &insertionContext.innermostLoop) }
 
     switch lower(program[s].body) {
     case .next:
       lowering(after: program[s].body, { $0._br(head) })
     case .return(let r):
       lowering(r, { $0._return() })
+    case .loopControl:
+      break
     }
 
-    insertionContext.point = .end(of: after)
+    insertionContext.point = .end(of: exit)
     return .next
   }
 
@@ -1866,6 +1897,17 @@ internal struct IREmitter {
 
   // MARK: Context
 
+  /// The basic blocks to which loop control statements may jump.
+  private struct LoopLabels {
+
+    /// The basic block representing the start of a loop iteration.
+    let head: IRBlock.ID
+
+    /// The basic block to which the loop exits.
+    let exit: IRBlock.ID
+
+  }
+
   /// The context in which instructions are inserted.
   private struct InsertionContext {
 
@@ -1878,6 +1920,9 @@ internal struct IREmitter {
     /// The region in the source code to which inserted instructions are associated.
     var anchor: Anchor? = nil
 
+    /// The head and exit of the innermost loop.
+    var innermostLoop: LoopLabels? = nil
+
   }
 
   /// The description of the next action a program should execute.
@@ -1888,6 +1933,9 @@ internal struct IREmitter {
 
     /// Return from the current function.
     case `return`(Return.ID)
+
+    /// Break or continue from the innermost loop.
+    case loopControl
 
   }
 

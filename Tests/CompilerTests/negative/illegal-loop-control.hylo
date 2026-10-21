@@ -1,0 +1,5 @@
+//! no-std
+
+fun foo() { break }
+
+fun bar() { continue }
