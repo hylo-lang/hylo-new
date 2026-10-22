@@ -27,7 +27,7 @@ public struct Alignment: Regular, Comparable {
     1 << Int(log2)
   }
 
-  /// Returns `true` iff `l` is weaker than `r`.
+  /// Returns `true` iff `l` is less than `r`.
   public static func < (l: Self, r: Self) -> Bool {
     l.log2 < r.log2
   }
