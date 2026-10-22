@@ -424,19 +424,19 @@ public struct Interpreter {
   ) throws -> RuntimeValue {
     switch f {
     case .trap: throw Trap()
-    case .icmp(let p, let t):
-      let w = bitWidth(t)
+    case .icmp(let compare, let type):
       let lhs = try self[arguments[0]]
       let rhs = try self[arguments[1]]
-      let r = p(lhs, rhs, bitWidth: w)
-      return .init(r)
-    case .zeroinitializer(let t):
-      let w = bitWidth(t)
-      let u = program.types[t]
-      return switch u {
+      return .init(compare(lhs, rhs, bitWidth: bitWidth(type)))
+    case .zeroinitializer(let type):
+      let w = bitWidth(type)
+      return switch program.types[type] {
       case .i(_): .init(0, bitWidth: w)
       case .word: .init(0, bitWidth: w)
-      default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
+      default:
+        unimplemented(
+          "zero-initializer is not yet implemented for \(program.show(program.types[type]))."
+        )
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
     }
