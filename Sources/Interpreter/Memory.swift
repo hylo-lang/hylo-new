@@ -137,7 +137,7 @@ struct Memory {
       }
     }
 
-    /// Returns `true` iff `o` is aligned to `n`.
+    /// Returns `true` iff  element `o` is `n`-byte aligned.
     public func offset(_ o: Offset, hasAlignment n: Alignment) -> Bool {
       storage.withUnsafeBytes {
         UInt(bitPattern: $0.baseAddress! + baseOffset + o).isMultiple(of: n)
@@ -207,7 +207,7 @@ struct Memory {
     }
   }
 
-  /// Returns true if `a` is aligned to `n`.
+  /// Returns true if `a` is `n`-byte aligned.
   public func address(_ a: Address, hasAlignment n: Alignment) -> Bool {
     allocation[a.allocation]!.offset(a.offset, hasAlignment: n)
   }
@@ -279,7 +279,7 @@ extension UnsafeRawPointer {
 
   /// Returns the number of bytes from `self` to the nearest address
   /// aligned to `a`.
-  fileprivate func roundedUp(toNearestMultipleOf a: Alignment) -> Int {
+  fileprivate func forwardOffset(toNearest a: Alignment) -> Int {
     let b = UInt(bitPattern: self)
     return Int(b.roundedUp(toNearestMultipleOf: a) - b)
   }
@@ -293,7 +293,7 @@ extension UnsafeRawBufferPointer {
   ///
   /// If `self.baseAddress == nil`, returns `0`.
   internal func firstOffsetAligned(to a: Alignment) -> Int {
-    baseAddress?.roundedUp(toNearestMultipleOf: a) ?? 0
+    baseAddress?.forwardOffset(toNearest: a) ?? 0
   }
 
 }
