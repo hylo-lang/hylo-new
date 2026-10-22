@@ -38,7 +38,7 @@ final class ManglingAmbiguityTests: XCTestCase {
     // the qualification of `greet` and once for `c` itself.
     XCTAssertEqual(p[c].contextParameters.usings.count, 2)
 
-    // Each base name, paired with a predicate on the entity it should demangle to.
+    // Each base name, paired with a predicate that checks if the given demangled entity corresponds to it.
     let bases: [(IRFunction.Name, (DemangledEntity) -> Bool)] = [
       (.lowered(g), { (e) in self.qualifiedName(e, describes: g, relativeTo: nil, in: p) }),
       (

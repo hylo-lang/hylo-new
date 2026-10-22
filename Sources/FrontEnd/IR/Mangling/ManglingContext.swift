@@ -62,7 +62,7 @@ internal struct ManglingContext {
   }
 
   /// Writes a `declarationEnd` operator for each declaration chain that ended with the last symbol
-  /// added to `output`.
+  /// added to `output` and resets `declarationChainsToDisambiguate` to `0`.
   @inline(__always)
   private mutating func ensureDeclarationEndDisambiguation() {
     let e = exchange(&declarationChainsToDisambiguate, with: 0)
@@ -210,7 +210,7 @@ internal struct ManglingContext {
     }
   }
 
-  /// If `q` known and we can trivially reference it without emitting more qualifications
+  /// If `q` is known, meaning we can trivially reference it without emitting more qualifications
   /// manually, writes a lookup reference to it.
   internal mutating func addIf(referenceable q: ScopeIdentity) -> Bool {
     addIf(reservedOrRecorded: q.asSymbol) || addIf(qualification: q)
