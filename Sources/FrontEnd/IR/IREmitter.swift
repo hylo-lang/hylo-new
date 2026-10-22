@@ -865,7 +865,7 @@ internal struct IREmitter {
           me._assume_state(target, initialized: true)
         }
       } else {
-        let t = program.type(assignedTo: program[e].callee, assuming: Arrow.self)
+        let t = program.dealiasedType(assignedTo: program[e].callee, assuming: Arrow.self)
         lowering(e) { (me) in
           let x0 = me._emitApply(builtin: f, ofType: t, to: me.program[e].arguments)
           me._emitInitialize(target, with: x0)
@@ -1376,7 +1376,7 @@ internal struct IREmitter {
     // Construct a mapping from type parameter to its argument.
     let ps = context.parameters.dropFirst(poly.typeArguments.count)
     let ts = zip(ps, program[e].arguments).map { (p, a) in
-      let t = program.type(assignedTo: a, assuming: Metatype.self)
+      let t = program.dealiasedType(assignedTo: a, assuming: Metatype.self)
       return (p, program.types[t].inhabitant)
     }
 
@@ -1508,7 +1508,7 @@ internal struct IREmitter {
     switch program[e].semantics.value {
     case .pointer:
       // The right-hand side is a remote type.
-      let t = program.type(assignedTo: program[e].target, assuming: Metatype.self)
+      let t = program.dealiasedType(assignedTo: program[e].target, assuming: Metatype.self)
       let u = program.types.cast(program.types[t].inhabitant, to: RemoteType.self)!
       let k = program.types[u].access
 
@@ -1711,15 +1711,15 @@ internal struct IREmitter {
     let ts = accumulatedGenericParameters(visibleFrom: .init(node: d))
     var ps: [IRParameter] = .init(minimumCapacity: program[d].parameters.count + 1)
     for p in program[d].parameters {
-      let t = program.type(assignedTo: p, assuming: RemoteType.self)
-      let u = program.types.dealiased(program.types[t].projectee)
-      ps.append(IRParameter(type: u, access: program.types[t].access, declaration: .init(p)))
+      let t = program.dealiasedType(assignedTo: p, assuming: RemoteType.self)
+      let u = program.types[t]
+      ps.append(IRParameter(type: u.projectee, access: u.access, declaration: .init(p)))
     }
 
     // The constructor returns an instance of the containing enum.
-    let e = program.type(assignedTo: program.parent(containing: d).node!, assuming: Metatype.self)
-    let o = program.types.dealiased(program.types[e].inhabitant)
-    ps.append(.init(type: o, access: .set, declaration: nil))
+    let s = program.parent(containing: d).node!
+    let e = program.dealiasedType(assignedTo: s, assuming: Metatype.self)
+    ps.append(.init(type: program.types[e].inhabitant, access: .set, declaration: nil))
 
     let newFunction = IRFunction(
       name: name,
@@ -1862,7 +1862,7 @@ internal struct IREmitter {
 
       // Explicit parameters come next.
       for p in parameters.explicit {
-        let t = program.type(assignedTo: p, assuming: RemoteType.self)
+        let t = program.dealiasedType(assignedTo: p, assuming: RemoteType.self)
         let u = program.types.dealiased(program.types[t].projectee)
         let k = program.types[t].access.unlessAuto(program.types[shape].effect)
         assert((k != .auto) || program.tag(of: d) == FunctionBundleDeclaration.self)
@@ -2739,7 +2739,7 @@ internal struct IREmitter {
   ///
   /// - Requires: The evaluation of `e` has no side effects.
   private mutating func _emitTypeWitness(expressedBy e: ExpressionIdentity) -> IRValue {
-    let t = program.type(assignedTo: e, assuming: Metatype.self)
+    let t = program.dealiasedType(assignedTo: e, assuming: Metatype.self)
     return _emitTypeWitness(of: program.types[t].inhabitant)
   }
 
@@ -3111,7 +3111,7 @@ internal struct IREmitter {
   ) {
     var properties: [AnyTypeIdentity] = []
     program.forEachStoredProperty(of: d) { (m, _) in
-      let t = program.type(assignedTo: m, assuming: RemoteType.self)
+      let t = program.dealiasedType(assignedTo: m, assuming: RemoteType.self)
       let u = program.types.substitute(a, in: program.types[t].projectee)
       properties.append(program.types.dealiased(u))
     }

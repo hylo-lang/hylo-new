@@ -892,7 +892,7 @@ public struct Program: Sendable {
   /// Returns the type assigned to `n`, assuming it is an instance of `T`.
   ///
   /// - Requires: The module containing `n` is typed.
-  public mutating func type<T: SyntaxIdentity, U: TypeTree>(
+  public mutating func dealiasedType<T: SyntaxIdentity, U: TypeTree>(
     assignedTo n: T, assuming: U.Type
   ) -> U.ID {
     let t = type(assignedTo: n)
@@ -1956,7 +1956,7 @@ extension Program {
   /// The module containing the standard library must have been loaded and type checked.
   public mutating func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
     let d = standardLibraryDeclaration(n)
-    let t = type(assignedTo: d, assuming: Metatype.self)
+    let t = dealiasedType(assignedTo: d, assuming: Metatype.self)
     return types[t].inhabitant
   }
 
