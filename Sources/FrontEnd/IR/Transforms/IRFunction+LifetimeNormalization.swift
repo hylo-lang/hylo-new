@@ -147,6 +147,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRWitnessTable.self), from: &f)
       case IRWitnessTableCapture.self:
         pc = interpret(f.castUnchecked(i, to: IRWitnessTableCapture.self), from: &f)
+      case IRTypeWitness.self:
+        pc = interpret(f.castUnchecked(i, to: IRTypeWitness.self), from: &f)
       case IRYield.self:
         pc = interpret(f.castUnchecked(i, to: IRYield.self), from: &f)
       case let t:
@@ -653,6 +655,14 @@ private struct Transfer: AbstractTransferFunction {
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
     _ i: IRWitnessTableCapture.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .initialized)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRTypeWitness.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     context.declare(i.erased, from: f, initially: .initialized)
     return f.instruction(after: i.erased)

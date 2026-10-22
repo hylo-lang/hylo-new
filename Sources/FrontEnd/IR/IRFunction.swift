@@ -106,6 +106,11 @@ public struct IRFunction: Sendable {
       self.tag = .init(T.self)
     }
 
+    /// Applies the given substitution to the instance wrapped into `self`.
+    fileprivate mutating func substitute(_ properties: IRSubstitutionTable) {
+      self.instruction = self.instruction.substituting(properties)
+    }
+
   }
 
   /// The types of an IR function's parameters and return value.
@@ -461,8 +466,6 @@ public struct IRFunction: Sendable {
       return (t, true)
     case .bundle(_, let t, _):
       return (t, true)
-    case .type(_, let t):
-      return (t.erased, false)
     case .poison(let t):
       return resolved(t)
     }
@@ -501,12 +504,21 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `true` iff `t` and `u` resolve denote the same type.
+  /// Returns `true` iff `t` and `u` resolve to the same type.
   private func areEqual(_ t: IRType, _ u: IRType) -> Bool {
     if let a = resolved(t) {
       return resolved(u).map({ b in a == b }) ?? false
     } else {
       return resolved(u) == nil
+    }
+  }
+
+  /// Returns `true` iff `t` resolves to `u`.
+  private func areEqual(_ t: IRType, _ u: (AnyTypeIdentity, Bool)) -> Bool {
+    if let a = resolved(t) {
+      return a == u
+    } else {
+      return false
     }
   }
 
@@ -730,6 +742,26 @@ public struct IRFunction: Sendable {
       me.slots[old.address].assign(i)
       return old
     }
+  }
+
+  /// Substitutes all uses of `old` with `new`.
+  ///
+  /// - Requires: The result of `new` has the same type as the result of old.
+  internal mutating func replace(
+    _ old: AnyInstructionIdentity, with new: IRValue
+  ) {
+    assert(result(of: new).map({ (b) in areEqual(at(old).type, b) }) ?? false)
+    var patch = IRSubstitutionTable()
+    patch[IRValue.register(old)] = new
+
+    // Modifies the users of `old`.
+    for u in uses[.register(old), default: []] {
+      slots[u.user.address].substitute(patch)
+      uses[new, default: []].append(Use(user: u.user, index: u.index))
+    }
+
+    // Remove the uses of `old` now that they have been replaced.
+    uses[.register(old)] = nil
   }
 
   /// Substitutes occurrences of `old` with `new` in the successors of `source`, returning `true`

@@ -870,9 +870,9 @@ public struct Program: Sendable {
 
   /// Returns the type assigned to `n`.
   ///
-  /// You cannot make strong assumptions about the exact shape of the returned type in general, as
-  /// it may be and/or contain aliases. You may use `type(assignedTo:assuming:)` if you need to
-  /// obtain the type assigned to a node assuming it must have a specific shape.
+  /// You cannot make strong assumptions about the exact shape of the returned type because it may
+  /// contain aliases. Use `dealiasedType(assignedTo:assuming:)` to obtain the type assigned to a
+  /// node assuming it must have a specific shape.
   ///
   /// - Requires: The module containing `n` is typed.
   public func type<T: SyntaxIdentity>(assignedTo n: T) -> AnyTypeIdentity {
@@ -881,15 +881,22 @@ public struct Program: Sendable {
 
   /// Returns the type assigned to `n`, if any.
   ///
-  /// You cannot make strong assumptions about the exact shape of the returned type in general, as
-  /// it may be and/or contain aliases. You may use `type(assignedTo:assuming:)` if you need to
-  /// obtain the type assigned to a node assuming it must have a specific shape.
-  ///
+  /// You cannot make strong assumptions about the exact shape of the returned type because it may
+  /// contain aliases. Use `dealiasedType(assignedTo:assuming:)` to obtain the type assigned to a
+  /// node assuming it must have a specific shape.
   public func type<T: SyntaxIdentity>(maybeAssignedTo n: T) -> AnyTypeIdentity? {
     self[n.module].type(assignedTo: n)
   }
 
-  /// Returns the type assigned to `n`, assuming it is an instance of `T`.
+  /// Returns the type assigned to `n`, dealiased.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public mutating func dealiasedType<T: SyntaxIdentity>(assignedTo n: T) -> AnyTypeIdentity {
+    let t = type(assignedTo: n)
+    return types.dealiased(t)
+  }
+
+  /// Returns the type assigned to `n`, dealiased, assuming it is an instance of `T`.
   ///
   /// - Requires: The module containing `n` is typed.
   public mutating func dealiasedType<T: SyntaxIdentity, U: TypeTree>(

@@ -1539,15 +1539,14 @@ internal struct IREmitter {
 
   /// Implements `lower(lvalue:)` for name expressions.
   private mutating func lowered(lvalue e: NameExpression.ID) -> IRValue {
-    let t = program.type(assignedTo: e)
+    let t = program.dealiasedType(assignedTo: e)
 
     switch program.declaration(referredToBy: e) {
+    case .direct(let d) where program.isTypeDeclaration(d):
+      return lowering(e, { $0._emitAccessTypeWitness(expressedBy: .init(e)) })
+
     case .direct(let d):
-      if program.isTypeDeclaration(d) {
-        return lowering(e, { $0._emitTypeWitness(expressedBy: .init(e)) })
-      } else {
-        return lowering(e, { $0._emit(useOf: d, typed: t) })
-      }
+      return lowering(e, { $0._emit(useOf: d, typed: t) })
 
     case .member(let d):
       // Emit the receiver.
@@ -1555,18 +1554,17 @@ internal struct IREmitter {
       return lowering(e, { $0._property(d, of: q, withType: t) })
 
     case .builtin(.selfAlias):
-      return lowering(e, { $0._emitTypeWitness(of: t) })
+      return lowering(e, { $0._emitAccessTypeWitness(t) })
 
-    default:
-      fatalError(
-        "Lowering not implemented for \(program.show(program.declaration(referredToBy: e)))")
+    case let d:
+      unimplemented("lowering for \(program.show(d))")
     }
   }
 
   /// Implements `lower(lvalue:)` for static calls.
   private mutating func lowered(lvalue e: StaticCall.ID) -> IRValue {
     if program.isReferringToTypeDeclaration(program[e].callee) {
-      return lowering(e, { $0._emitTypeWitness(expressedBy: .init(e)) })
+      return lowering(e, { $0._emitAccessTypeWitness(expressedBy: .init(e)) })
     } else {
       unimplemented("static call")
     }
@@ -2453,14 +2451,24 @@ internal struct IREmitter {
     return insert(s)!
   }
 
-  /// Inserts a `type_witness` application.
-  internal mutating func _type_witness(
-    _ callee: UniversalType.ID, _ arguments: [IRValue]
-  ) -> IRValue {
-    assert(program.types[callee].parameters.count == arguments.count)
-    let t = program.types.demand(TypeWitness())
+  /// Inserts a `type_witness` instruction projecting the witness of `t`.
+  internal mutating func _type_witness(_ t: AnyTypeIdentity) -> IRValue {
+    let w = program.types.demand(TypeWitness())
     let s = IRTypeWitness(
-      constructor: callee, arguments: arguments, typeOfApplication: t,
+      constructor: t, arguments: [], typeOfApplication: w,
+      anchor: currentAnchor)
+    return insert(s)!
+  }
+
+  /// Inserts a `type_witness` instruction projecting the witness of the type resulting from the
+  /// application of `constructor` to `arguments`.
+  internal mutating func _type_witness(
+    _ constructor: UniversalType.ID, _ arguments: [IRValue]
+  ) -> IRValue {
+    assert(program.types[constructor].parameters.count == arguments.count)
+    let w = program.types.demand(TypeWitness())
+    let s = IRTypeWitness(
+      constructor: constructor.erased, arguments: arguments, typeOfApplication: w,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2732,24 +2740,6 @@ internal struct IREmitter {
     }
 
     _return()
-  }
-
-  /// Generates IR for storing the type witness expressed by `e` into a fresh alloca and returns
-  /// that alloca.
-  ///
-  /// - Requires: The evaluation of `e` has no side effects.
-  private mutating func _emitTypeWitness(expressedBy e: ExpressionIdentity) -> IRValue {
-    let t = program.dealiasedType(assignedTo: e, assuming: Metatype.self)
-    return _emitTypeWitness(of: program.types[t].inhabitant)
-  }
-
-  /// Generates IR for storing a type witness of `t` into a fresh alloca and returns that alloca.
-  private mutating func _emitTypeWitness(of t: AnyTypeIdentity) -> IRValue {
-    let u = program.types.dealiased(t)
-    let w = program.types.demand(TypeWitness())
-    let x = _alloca(w.erased)
-    _emitInitialize(x, with: .type(u, w))
-    return x
   }
 
   /// Generates the IR for computing the lvalue referred to by `w`.
@@ -3237,20 +3227,41 @@ internal struct IREmitter {
     _end(IRAccess.self, openedBy: x0)
   }
 
-  /// Generates the IR for accessing a run-time witness of `t`, caching results into `witnesses`.
+  /// Generates IR for accessing a witness of the type expressed by `e`.
+  ///
+  /// - Requires: The evaluation of `e` has no side effects.
+  private mutating func _emitAccessTypeWitness(expressedBy e: ExpressionIdentity) -> IRValue {
+    var empty: [AnyTypeIdentity: IRValue] = [:]
+    let t = program.dealiasedType(assignedTo: e, assuming: Metatype.self)
+    return _emitAccessTypeWitness(program.types[t].inhabitant, reusing: &empty)
+  }
+
+  /// Generates IR for accessing a witness of `t`.
+  ///
+  /// Instructions for allocating and initializing storage for new witnesses are emitted in the
+  /// entry of the current function whereas the return value is always an access emitted at the
+  /// current insertion point.
+  ///
+  /// - Requires: `t` is dealiased.
+  private mutating func _emitAccessTypeWitness(_ t: AnyTypeIdentity) -> IRValue {
+    var empty: [AnyTypeIdentity: IRValue] = [:]
+    return _emitAccessTypeWitness(t, reusing: &empty)
+  }
+
+  /// Generates IR for accessing a witness of `t`, using `witnesses` as a cache.
   ///
   /// `witnesses` is a table mapping a type to a place containing a corresponding witness. It is
   /// updated whenever generating a witness for `t` requires new IR. Instructions for allocating
   /// and initializing storage for new witnesses are emitted in the entry of the current function
   /// whereas the return value is always an access emitted at the current insertion point.
+  ///
+  /// - Requires: `t` is dealiased.
   internal mutating func _emitAccessTypeWitness(
-    of t: AnyTypeIdentity, reusing witnesses: inout [AnyTypeIdentity: IRValue]
+    _ t: AnyTypeIdentity, reusing witnesses: inout [AnyTypeIdentity: IRValue]
   ) -> IRValue {
     // Trivial if the witness is already available.
     if let a = witnesses[t] {
       return _access([.let], from: a)
-    } else {
-      assert(program.types.tag(of: t) != GenericParameter.self)
     }
 
     // Instructions for allocating/initializing the witness are emitted in the entry.
@@ -3258,35 +3269,44 @@ internal struct IREmitter {
     swap(&insertionContext.point, &p)
 
     let ps = program.types.parameters(freeIn: t)
+    var newWitness: IRValue
 
-    // If `t` has no free type parameter, then we can just use a constant value.
+    // If `t` is closed, then we can just use a constant value.
     if ps.isEmpty {
       let g = demandGlobalTypeWitness(t)
-      let a = _global_access(g)
-      witnesses[t.erased] = a
+      newWitness = _global_access(g)
+    }
 
-      swap(&insertionContext.point, &p)
-      return _access([.let], from: a)
+    // If `t` is a generic type parameter, then we'll get its witness after deploymorphization.
+    else if program.types.tag(of: t) == GenericParameter.self {
+      newWitness = _type_witness(t)
     }
 
     // Otherwise, we have to construct a new type witness.
     else {
       let u = program.types.demand(UniversalType(parameters: Array(ps), head: t))
-      let v = ps.map({ (p) in _emitAccessTypeWitness(of: p.erased, reusing: &witnesses) })
-      let a = _type_witness(u, v)
-      witnesses[t.erased] = a
-
-      swap(&insertionContext.point, &p)
-      return _access([.let], from: a)
+      let v = ps.map({ (p) in _emitAccessTypeWitness(p.erased, reusing: &witnesses) })
+      newWitness = _type_witness(u, v)
     }
+
+    witnesses[t.erased] = newWitness
+    swap(&insertionContext.point, &p)
+    return _access([.let], from: newWitness)
   }
 
-  /// Generates IR for accessing run-time witnesses of each type argument in `a`, caching results
-  /// into `witnesses`.
+  /// Generates IR for accessing a witness of each argument in `a`, using `witnesses` as a cache.
+  ///
+  /// `witnesses` is a table mapping a type to a place containing a corresponding witness. It is
+  /// updated whenever generating a witness for `t` requires new IR. Instructions for allocating
+  /// and initializing storage for new witnesses are emitted in the entry of the current function
+  /// whereas the return value is always an access emitted at the current insertion point.
   internal mutating func _emitAccessTypeWitnesses(
-    for a: TypeArguments, reusing witnesses: inout [AnyTypeIdentity: IRValue]
+    _ a: TypeArguments, reusing witnesses: inout [AnyTypeIdentity: IRValue]
   ) -> [IRValue] {
-    a.values.map({ (t) in _emitAccessTypeWitness(of: t.erased, reusing: &witnesses) })
+    a.values.map { (t) in
+      let u = program.types.dealiased(t)
+      return _emitAccessTypeWitness(u, reusing: &witnesses)
+    }
   }
 
   /// Information necessary to emit the deinitialization of an instance.

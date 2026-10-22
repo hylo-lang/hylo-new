@@ -204,6 +204,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRSubfield.self), in: &ctx)
     case IRSwitch.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRSwitch.self), in: &ctx)
+    case IRTypeWitness.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRTypeWitness.self), in: &ctx)
     case IRUnreachable.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRUnreachable.self), in: &ctx)
     case IRWitnessTable.self:
@@ -807,6 +809,21 @@ extension Program {
 
   /// Generates the LLVM IR code corresponding to `i`.
   internal mutating func incorporate(
+    _ i: IRTypeWitness.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+
+    if types.tag(of: s.constructor) != UniversalType.self {
+      let w = demandGlobalTypeWitness(s.constructor, in: &ctx.module).v
+      ctx.value[.register(i.erased)] = w.v
+      return ctx.ir.instruction(after: i.erased)
+    }
+
+    unimplemented()
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
     _ i: IRUnreachable.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     ctx.module.llvm.insertUnreachable(at: ctx.insertionPoint!)
@@ -1146,7 +1163,7 @@ extension Program {
     case .lowered:
       fatalError("TODO: global bindings")
     case .witness(let t):
-      return demandGlobalTypeWitness(of: t, in: &ctx)
+      return demandGlobalTypeWitness(t, in: &ctx)
     }
   }
 
@@ -1544,10 +1561,6 @@ extension Program {
       return codegen(floatingPoint: literal, instanceOf: t, in: &ctx.module)
     case .function(let n, _):
       return demandFunction(named: n, in: &ctx.module).value.v
-    case .type(let t, _):
-      // A type witness is represented by the address of its global metadata (for now).
-      // Runtime type witnesses are not yet supported.
-      return demandGlobalTypeWitness(of: t, in: &ctx.module).v
     default:
       fatalError("no LLVM representation of the Hylo value '\(show(v))'")
     }

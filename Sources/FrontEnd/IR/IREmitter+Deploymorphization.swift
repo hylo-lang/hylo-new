@@ -18,6 +18,8 @@ extension IREmitter {
       switch f.tag(of: i) {
       case IRTypeApply.self:
         depolymorphize(f.castUnchecked(i, to: IRTypeApply.self), in: &f, reusing: &witnesses)
+      case IRTypeWitness.self:
+        depolymorphize(f.castUnchecked(i, to: IRTypeWitness.self), in: &f, reusing: &witnesses)
       case IRWitnessTable.self:
         depolymorphize(f.castUnchecked(i, to: IRWitnessTable.self), in: &f, reusing: &witnesses)
       default:
@@ -61,7 +63,33 @@ extension IREmitter {
     }
   }
 
-  /// Replaces `i`, which is in `f`, with its existentialized form, , using `witnesses` to compute
+  /// Modifies `i` and/or its uses, which are in `f`, so that applications of 0-ary constructors
+  /// are replaced with type witnesses.
+  ///
+  /// This method has no effect unless `i` is projecting the witness of a type resulting from the
+  /// application of a 0-ary constructor. In this case, `i` is replaced with an access to the type
+  /// witness that it computes, using existentialization to substitute type parameters.
+  private mutating func depolymorphize(
+    _ i: IRTypeWitness.ID, in f: inout IRFunction,
+    reusing witnesses: inout [AnyTypeIdentity: IRValue]
+  ) {
+    let s = f.at(i)
+
+    // Nothing to do if the constructor is not a constant.
+    if !s.operands.isEmpty {
+      assert(program.types.parameters(freeIn: s.constructor).isEmpty)
+      return
+    }
+
+    // Otherwise, replaces `i` with an access to the witness that it computes.
+    let w = lowering(before: i.erased, in: &f) { (me) in
+      me._emitAccessTypeWitness(s.constructor, reusing: &witnesses)
+    }
+    f.replace(i.erased, with: w)
+    f.remove(i.erased)
+  }
+
+  /// Replaces `i`, which is in `f`, with its existentialized form, using `witnesses` to compute
   /// arguments to type parameters.
   ///
   /// This method replaces `i` with an instruction forming a monomorphic witness table having the
@@ -79,7 +107,7 @@ extension IREmitter {
     // latter are not invalidated.
     var ws = Array(s.captures)
     lowering(before: i.erased, in: &f) { (me) in
-      ws.append(contentsOf: me._emitAccessTypeWitnesses(for: s.arguments, reusing: &witnesses))
+      ws.append(contentsOf: me._emitAccessTypeWitnesses(s.arguments, reusing: &witnesses))
     }
 
     let entries = s.entries.map { (e) in
@@ -120,7 +148,7 @@ extension IREmitter {
     // witnesses will be concatenated with the term arguments of each use application of `c`
     // instantiated by `i`.
     let ws = lowering(before: i.erased, in: &f) { (me) in
-      me._emitAccessTypeWitnesses(for: application.arguments, reusing: &witnesses)
+      me._emitAccessTypeWitnesses(application.arguments, reusing: &witnesses)
     }
 
     // Update the uses of the type application.
@@ -358,7 +386,7 @@ extension IREmitter {
             if ps.isEmpty {
               properties[.register(i)] = me.insert(s)!
             } else {
-              let w = me._emitAccessTypeWitness(of: s.storage, reusing: &witnesses)
+              let w = me._emitAccessTypeWitness(s.storage, reusing: &witnesses)
               properties[.register(i)] = me._alloca(w, as: s.storage, alignment: s.alignment)
             }
           }
