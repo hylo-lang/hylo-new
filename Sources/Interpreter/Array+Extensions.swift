@@ -25,7 +25,7 @@ extension Array {
       r = Self(repeating: e, count: count + additionalElementsCount)
     }
 
-    let baseOffset = r.withUnsafeBytes { $0.firstOffsetAligned(to: alignment) }
+    let baseOffset = r.withUnsafeBytes { $0.forwardOffset(toNearest: alignment) }
 
     return (r, baseOffset)
   }

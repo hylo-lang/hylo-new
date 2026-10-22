@@ -247,8 +247,10 @@ private func size_of_record_having_ordered_members(
   var r = 0 as Size
   while start < end {
     let w = start.pointee()
-    let position = r.rounded_up(to_nearest_multiple_of_power_of_two: w.log2_alignment())
-    r = position + w.size()
+    if w.size() != 0 {
+      let position = r.rounded_up(to_nearest_multiple_of_power_of_two: w.log2_alignment())
+      r = position + w.size()
+    }
     start += 1
   }
   return r
@@ -385,7 +387,8 @@ final class LayoutTests: XCTestCase {
     if sa.count == 0 { return }
     let offsets = offsets(members: sa)
 
-    let memberOrder = sa.indices.sorted { (i, j) in
+
+    let memberOrder = sa.indices.filter({ sa[$0].size != 0 }).sorted { (i, j) in
       offsets[i] < offsets[j]
         || offsets[i] == offsets[j] && sa[i].alignment > sa[j].alignment
     }
