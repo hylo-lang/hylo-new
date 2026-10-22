@@ -8,7 +8,7 @@ import XCTest
 // ==========================================================
 
 fileprivate typealias Size = UInt32
-/// An alignment in bytes, as written in the test case file.
+/// An alignment in bytes.
 fileprivate typealias Alignment = UInt16
 /// The base-2 logarithm of an alignment in bytes.
 fileprivate typealias Log2Alignment = UInt16
