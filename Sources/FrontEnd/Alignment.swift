@@ -16,9 +16,10 @@ public struct Alignment: Regular, Comparable {
 
   /// Creates an instance whose value is `n` bytes.
   ///
-  /// - Precondition: `n` is a power of two.
+  /// - Precondition: `n < Int.max` is a power of two.
   public init<T: BinaryInteger>(bytes n: T) {
     precondition(n.isPowerOfTwo, "alignment must be a power of two (was \(n))")
+    precondition(n < Int.max)
     self.log2 = UInt8(n.trailingZeroBitCount)
   }
 
@@ -38,7 +39,7 @@ extension Alignment: ExpressibleByIntegerLiteral {
 
   /// Creates an instance whose value is `n` bytes.
   ///
-  /// - Precondition: `n` is a positive power of two.
+  /// - Precondition: `n < Int.max` is a power of two.
   public init(integerLiteral n: Int) {
     self.init(bytes: n)
   }
