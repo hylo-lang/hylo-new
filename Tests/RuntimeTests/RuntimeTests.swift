@@ -387,11 +387,16 @@ final class LayoutTests: XCTestCase {
     if sa.count == 0 { return }
     let offsets = offsets(members: sa)
 
+    // Zero-sized members don't influence the layout. Nothing is guaranteed about their offsets.
+    let nonEmpty = sa.indices.filter { sa[$0].size != 0 }
+    XCTAssertEqual(nonEmpty.map { offsets[$0] }, self.offsets(members: nonEmpty.map { sa[$0] }),
+      "zero-sized members shall not influence the layout of \(sa)")
 
-    let memberOrder = sa.indices.filter({ sa[$0].size != 0 }).sorted { (i, j) in
+    let memberOrder = nonEmpty.sorted { (i, j) in
       offsets[i] < offsets[j]
         || offsets[i] == offsets[j] && sa[i].alignment > sa[j].alignment
     }
+    if memberOrder.isEmpty { return }
 
     // First member always sits at offset 0
     XCTAssertEqual(offsets[memberOrder.first!], 0)
@@ -562,14 +567,16 @@ final class LayoutTests: XCTestCase {
       .write(to: destination, atomically: true, encoding: .utf8)
   }
 
-  /// Returns `n` records of 1 to 10 members whose alignments are drawn from `alignments` and whose
-  /// sizes are at most 16.
+  /// Returns `n` records of 1 to 10 members whose sizes are at most 16 and whose alignments are
+  /// drawn from `alignments`, except that zero-sized members have alignment 1.
   private func randomRecords(
     _ n: Int, alignments: [Alignment], using g: inout SplitMix64
   ) -> [Members] {
     (0..<n).map { _ in
       (0..<Int.random(in: 1...10, using: &g)).map { _ in
-        (size: Size.random(in: 0...16, using: &g), alignment: alignments.randomElement(using: &g)!)
+        let s = Size.random(in: 0...16, using: &g)
+        let a = alignments.randomElement(using: &g)!
+        return (size: s, alignment: s == 0 ? 1 : a)
       }
     }
   }

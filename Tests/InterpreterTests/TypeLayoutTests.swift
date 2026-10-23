@@ -381,12 +381,20 @@ final class TypeLayoutTests: XCTestCase {
 
   private func check_offsets(members sa: [TypeLayout.StorageRequirements]) {
     if sa.count == 0 { return }
-    let offsets = storageLayoutOfRecord(havingMembers: sa).partOffsets
+    let l = storageLayoutOfRecord(havingMembers: sa)
+    let offsets = l.partOffsets
 
-    let member_order = sa.indices.sorted { (i, j) in
+    // Zero-sized members don't influence the layout. Nothing is guaranteed about their offsets.
+    let nonEmpty = sa.indices.filter { sa[$0].size != 0 }
+    let withoutEmpty = storageLayoutOfRecord(havingMembers: nonEmpty.map { sa[$0] })
+    XCTAssertEqual(nonEmpty.map { offsets[$0] }, withoutEmpty.partOffsets)
+    XCTAssertEqual(l.footprint, withoutEmpty.footprint)
+
+    let member_order = nonEmpty.sorted { (i, j) in
       offsets[i] < offsets[j]
         || offsets[i] == offsets[j] && sa[i].alignment > sa[j].alignment
     }
+    if member_order.isEmpty { return }
 
     // First member always sits at offset 0
     XCTAssertEqual(offsets[member_order.first!], 0)
@@ -452,44 +460,37 @@ final class TypeLayoutTests: XCTestCase {
       .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 8, size: 5),
     ])
     check_offsets(members: [
-      .init(alignment: 4, size: 7), .init(alignment: 8, size: 5), .init(alignment: 2, size: 0),
+      .init(alignment: 4, size: 7), .init(alignment: 8, size: 5), .init(alignment: 1, size: 0),
       .init(alignment: 4, size: 9), .init(alignment: 16, size: 1),
     ])
 
     for _ in 0..<3 {
-      let a = (0..<1).map { _ in
-        TypeLayout.StorageRequirements(
-          alignment: Alignment(log2: UInt8.random(in: 0..<5)),
-          size: Int.random(in: 0..<10)
-        )
-      }
+      let a = (0..<1).map { _ in randomStorageRequirements() }
       check_offsets(members: a)
     }
     for _ in 0..<100 {
-      let a = (0..<2).map { _ in
-        TypeLayout.StorageRequirements(
-          alignment: Alignment(log2: UInt8.random(in: 0..<5)),
-          size: Int.random(in: 0..<10)
-        )
-      }
+      let a = (0..<2).map { _ in randomStorageRequirements() }
       check_offsets(members: a)
     }
 
     for _ in 0..<2000 {
-      let a = (0..<10).map { _ in
-        TypeLayout.StorageRequirements(
-          alignment: Alignment(log2: UInt8.random(in: 0..<5)),
-          size: Int.random(in: 0..<10)
-        )
-      }
+      let a = (0..<10).map { _ in randomStorageRequirements() }
       check_offsets(members: a)
     }
+  }
+
+  /// Returns random storage requirements, of alignment 1 if the size is zero.
+  private func randomStorageRequirements() -> TypeLayout.StorageRequirements {
+    let s = Int.random(in: 0..<10)
+    let a = s == 0 ? Alignment(log2: 0) : Alignment(log2: UInt8.random(in: 0..<5))
+    return .init(alignment: a, size: s)
   }
 
   func testBytesOfStorageLayoutOfRecord() {
     XCTAssertEqual(
       storageLayoutOfRecord(havingMembers: [
-        .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 8, size: 5),
+        .init(alignment: 1, size: 5), .init(alignment: 2, size: 3),
+        .init(alignment: 1, size: 0), .init(alignment: 8, size: 5),
       ]).footprint,
 
       .init(alignment: 8, size: 14)
