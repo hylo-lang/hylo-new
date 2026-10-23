@@ -68,8 +68,12 @@ extension TypeLayout.StorageRequirements {
   ///
   /// - Note: the `T` instance is stored `t.size` bytes before the end of the tuple.
   func appending(_ t: Self) -> Self {
-    let r = size.roundedUp(toNearestMultipleOf: t.alignment)
-    return .init(alignment: max(self.alignment, t.alignment), size: r + t.size)
+    if t.size != 0 {
+      let r = size.roundedUp(toNearestMultipleOf: t.alignment)
+      return .init(alignment: max(self.alignment, t.alignment), size: r + t.size)
+    } else {
+      precondition(t.alignment == 1, "Zero-sized types shall be 1-byte aligned.")
+      return self
+    }
   }
-
 }

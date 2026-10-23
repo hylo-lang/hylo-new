@@ -131,7 +131,11 @@ fun verify_offset(
     in: .new(value: Builtin.address(of: w)),
     of_length: .new(l))
 
-  precondition(o == UInt32(x))
+  // Check the offset of non-zero-sized members.
+  let h = Pointer<H>(value: Builtin.address(of: headers)) + i
+  if h.size() != (0 as Size) {
+    precondition(o == UInt32(x))
+  }
 }
 
 fun verify_offsets(
@@ -254,6 +258,11 @@ fun main() -> Int32 {
   verify_size_and_alignment(
     in: (H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
     of_length: 0, to_be: 0, 1)
+
+  // The record with zero-sized fields.
+  verify_size_and_alignment(
+    in: (H(0, 1), H(0, 1), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0), H(0, 0)),
+    of_length: 2, to_be: 0, 1)
 
   // TODO: check for null. Currently
   // https://github.com/hylo-new/issues/450 stands in the way.

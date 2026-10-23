@@ -498,8 +498,10 @@ public fun size_of_record_having_ordered_members(
   var start = start_.copy()
   while start < end {
     let w = start.pointee()
-    let position = r.rounded_up(to_nearest_multiple_of_power_of_two: w.log2_alignment())
-    &r = position + w.size()
+    if w.size() != (0 as Size) {
+      let position = r.rounded_up(to_nearest_multiple_of_power_of_two: w.log2_alignment())
+      &r = position + w.size()
+    }
     &start += 1
   }
   return r
