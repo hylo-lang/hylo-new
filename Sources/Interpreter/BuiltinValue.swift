@@ -24,65 +24,89 @@ enum BuiltinValue: Regular {
   /// 128-bit builtin integer type.
   case i128(UInt128)
 
-  // TODO: support floats, word, ptr, module.
+  /// The `word` type.
+  case word(UInt128)
 
-  /// The boolean value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(1)`.
-  var asBool: Bool {
+  // TODO: support floats and ptr.
+
+  /// The value of the stored `i1`, or `nil` if `self` does not match `.i1(_)`
+  public var i1: Bool? {
     switch self {
-    case .i1(let x): x
-    default: preconditionFailure("Not an instance of `MachineType.i(1)`.")
+    case .i1(let v): v
+    default: nil
     }
   }
 
-  /// The 8-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(8)`.
-  var asUInt8: UInt8 {
+  /// The value of the stored `i8`, or `nil` if `self` does not match `.i8(_)`
+  public var i8: UInt8? {
     switch self {
-    case .i8(let x): x
-    default: preconditionFailure("Not an instance of `MachineType.i(8)`.")
+    case .i8(let v): v
+    default: nil
     }
   }
 
-  /// The 16-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(16)`.
-  var asUInt16: UInt16 {
+  /// The value of the stored `i16`, or `nil` if `self` does not match `.i16(_)`
+  public var i16: UInt16? {
     switch self {
-    case .i16(let x): x
-    default: preconditionFailure("Not an instance of `MachineType.i(16)`.")
+    case .i16(let v): v
+    default: nil
     }
   }
 
-  /// The 32-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(32)`.
-  var asUInt32: UInt32 {
+  /// The value of the stored `i32`, or `nil` if `self` does not match `.i32(_)`
+  public var i32: UInt32? {
     switch self {
-    case .i32(let x): x
-    default: preconditionFailure("Not an instance of `MachineType.i(32)`.")
+    case .i32(let v): v
+    default: nil
     }
   }
 
-  /// The 64-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(64)`.
-  var asUInt64: UInt64 {
+  /// The value of the stored `i64`, or `nil` if `self` does not match `.i64(_)`
+  public var i64: UInt64? {
     switch self {
-    case .i64(let x): x
-    default: preconditionFailure("Not an instance of `MachineType.i(64)`.")
+    case .i64(let v): v
+    default: nil
     }
   }
 
-  /// The 128-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(128)`.
-  var asUInt128: UInt128 {
+  /// The value of the stored `i128`, or `nil` if `self` does not match `.i128(_)`
+  public var i128: UInt128? {
     switch self {
-    case .i128(let x): x
-    default: preconditionFailure("Not an instance of `MachineType.i(128)`.")
+    case .i128(let v): v
+    default: nil
+    }
+  }
+
+  /// The value of the stored `word`, or `nil` if `self` doesn't match `.word(_)`
+  public var word: UInt128? {
+    switch self {
+    case .word(let v): v
+    default: nil
+    }
+  }
+
+  /// The magnitude of stored integer value.
+  public var asUInt128: UInt128 {
+    switch self {
+    case .i8(let v): UInt128(v)
+    case .i16(let v): UInt128(v)
+    case .i32(let v): UInt128(v)
+    case .i64(let v): UInt128(v)
+    case .i128(let v): UInt128(v)
+    default: unreachable()
+    }
+  }
+
+  /// The type of the stored value.
+  public var type: MachineType {
+    switch self {
+    case .i1(_): MachineType.i(1)
+    case .i8(_): MachineType.i(8)
+    case .i16(_): MachineType.i(16)
+    case .i32(_): MachineType.i(32)
+    case .i64(_): MachineType.i(64)
+    case .i128(_): MachineType.i(128)
+    case .word(_): MachineType.word
     }
   }
 
@@ -90,20 +114,22 @@ enum BuiltinValue: Regular {
 
 extension BuiltinValue {
 
-  /// Creates a `w`-bit integer storing the two's-complement representation of `n`.
-  public init(_ n: BigInt, bitWidth w: UInt8) {
-    precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
-    precondition(n.isRepresentable(asIntegerOfBitWidth: w))
-
+  /// Creates an integer of type `t` storing the two's-complement representation of `n`.
+  public init(_ n: BigInt, ofType t: MachineType) {
     self =
-      switch w {
-      case 1: .i1(n != 0)
-      case 8: .i8(UInt8(truncatingIfNeeded: n))
-      case 16: .i16(UInt16(truncatingIfNeeded: n))
-      case 32: .i32(UInt32(truncatingIfNeeded: n))
-      case 64: .i64(UInt64(truncatingIfNeeded: n))
-      case 128: .i128(UInt128(truncatingIfNeeded: n))
-      default: preconditionFailure("Unknown integer bit width.")
+      switch t {
+      case .i(let bitWidth):
+        switch bitWidth {
+        case 1: .i1(n != 0)
+        case 8: .i8(UInt8(truncatingIfNeeded: n))
+        case 16: .i16(UInt16(truncatingIfNeeded: n))
+        case 32: .i32(UInt32(truncatingIfNeeded: n))
+        case 64: .i64(UInt64(truncatingIfNeeded: n))
+        case 128: .i128(UInt128(truncatingIfNeeded: n))
+        default: preconditionFailure("Unknown integer bit width.")
+        }
+      case .word: .word(UInt128(truncatingIfNeeded: n))
+      default: unimplemented("float and ptr are not supported yet.")
       }
   }
 
@@ -116,39 +142,30 @@ extension BuiltinValue {
 
 extension BuiltinValue {
 
-  /// Returns the memory representation of the stored `t` as laid out by `typeLayouts`.
+  /// Returns the memory representation of `self` as laid out by `typeLayouts`.
   public func bytes(
-    ofStored t: MachineType,
     laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
-    let byteOrder = typeLayouts.abi.byteOrder
-    let wordSize = typeLayouts.abi.bitsInAPointer
-
-    return switch t {
-    case .i(let w): bytes(ofIntegerHavingBitWidth: w, in: byteOrder)
-    case .word: bytes(ofIntegerHavingBitWidth: UInt8(wordSize), in: byteOrder)
-    default: unimplemented("floats and ptr are not supported yet.")
-    }
-
-  }
-
-  /// Returns the memory representation of the stored `w`-bit integer.
-  private func bytes(
-    ofIntegerHavingBitWidth w: UInt8,
-    in byteOrder: Endianness
-  ) -> [UInt8] {
     var bytes =
-      switch w {
-      case 1: withUnsafeBytes(of: asBool) { Array($0) }
-      case 8: withUnsafeBytes(of: asUInt8) { Array($0) }
-      case 16: withUnsafeBytes(of: asUInt16) { Array($0) }
-      case 32: withUnsafeBytes(of: asUInt32) { Array($0) }
-      case 64: withUnsafeBytes(of: asUInt64) { Array($0) }
-      case 128: withUnsafeBytes(of: asUInt128) { Array($0) }
-      default: preconditionFailure("Unknown integer bit width.")
+      switch self {
+      case .i1(let v): withUnsafeBytes(of: v) { Array($0) }
+      case .i8(let v): withUnsafeBytes(of: v) { Array($0) }
+      case .i16(let v): withUnsafeBytes(of: v) { Array($0) }
+      case .i32(let v): withUnsafeBytes(of: v) { Array($0) }
+      case .i64(let v): withUnsafeBytes(of: v) { Array($0) }
+      case .i128(let v): withUnsafeBytes(of: v) { Array($0) }
+      case .word(let v):
+        switch typeLayouts.abi.bitsInAPointer {
+        case 8: withUnsafeBytes(of: UInt8(v)) { Array($0) }
+        case 16: withUnsafeBytes(of: UInt16(v)) { Array($0) }
+        case 32: withUnsafeBytes(of: UInt32(v)) { Array($0) }
+        case 64: withUnsafeBytes(of: UInt64(v)) { Array($0) }
+        case 128: withUnsafeBytes(of: UInt128(v)) { Array($0) }
+        default: unreachable("Unknown bit-width of a word.")
+        }
       }
 
-    if byteOrder != .host { bytes.reverse() }
+    if typeLayouts.abi.byteOrder != .host { bytes.reverse() }
     return bytes
   }
 

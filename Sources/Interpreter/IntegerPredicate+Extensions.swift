@@ -21,22 +21,26 @@ extension IntegerPredicate {
     }
   }
 
-  /// Returns whether `lhs` satisfies `self` with respect to `rhs` where `lhs`
-  /// and `rhs` are `w`-bit integers.
+  /// Returns whether `lhs` satisfies `self` with respect to `rhs`.
   internal func callAsFunction(
     _ lhs: RuntimeValue, _ rhs: RuntimeValue,
-    bitWidth w: UInt8
   ) -> Bool {
-    switch w {
-    case 1: self(lhs.asBool ? UInt8(1) : 0, rhs.asBool ? UInt8(1) : 0)
-    case 8: self(lhs.asUInt8, rhs.asUInt8)
-    case 16: self(lhs.asUInt16, rhs.asUInt16)
-    case 32: self(lhs.asUInt32, rhs.asUInt32)
-    case 64: self(lhs.asUInt64, rhs.asUInt64)
-    // TODO: uncomment when 128-bit integer is supported.
-    //
-    // case 128: self(lhs.i128, rhs.i128)
-    default: fatalError("Unknown builtin integer size \(w)")
+    if let x = lhs.i1, let y = rhs.i1 {
+      self(x ? UInt8(1) : 0, y ? UInt8(1) : 0)
+    } else if let x = lhs.i8, let y = rhs.i8 {
+      self(x, y)
+    } else if let x = lhs.i16, let y = rhs.i16 {
+      self(x, y)
+    } else if let x = lhs.i32, let y = rhs.i32 {
+      self(x, y)
+    } else if let x = lhs.i64, let y = rhs.i64 {
+      self(x, y)
+    } else if let x = lhs.i128, let y = rhs.i128 {
+      self(x, y)
+    } else if let x = lhs.word, let y = rhs.word {
+      self(x, y)
+    } else {
+      fatalError("arguments are not same type integers.")
     }
   }
 

@@ -8,12 +8,20 @@ enum RuntimeValue {
   /// An instance of a `MachineType`.
   case scalar(BuiltinValue)
 
-  /// The sequence of component values of a composite type.
+  /// The sequence of component values of given type.
   ///
   /// For product types, the value of each stored property in declaration order.
   /// For enum types, the value of the active case followed by the value of
   /// discriminator.
-  case composite([RuntimeValue])
+  case composite([RuntimeValue], ofType: MonomorphicTypeIdentity)
+
+  /// Returns the type of the stored value in `program`.
+  public func type(in program: inout Program) -> MonomorphicTypeIdentity {
+    switch self {
+    case .scalar(let value): .init(program.types.demand(value.type).erased)
+    case .composite(_, let type): type
+    }
+  }
 
   /// The underlying builtin value.
   ///
@@ -21,7 +29,7 @@ enum RuntimeValue {
   fileprivate var asBuiltin: BuiltinValue {
     switch self {
     case .scalar(let v): v
-    case .composite(_): preconditionFailure("`self` is not an instance of scalar type.")
+    case .composite(_, _): preconditionFailure("`self` is not an instance of scalar type.")
     }
   }
 
@@ -31,7 +39,7 @@ enum RuntimeValue {
   fileprivate var parts: [RuntimeValue] {
     switch self {
     case .scalar(_): preconditionFailure("`self` is not an instance of composite type.")
-    case .composite(let vs): vs
+    case .composite(let vs, _): vs
     }
   }
 
@@ -39,11 +47,9 @@ enum RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Creates a `w`-bit integer having value `n`.
-  public init(_ n: BigInt, bitWidth w: UInt8) {
-    precondition(w == 1 || w == 8 || w == 16 || w == 32 || w == 64 || w == 128)
-
-    self = .scalar(BuiltinValue(n, bitWidth: w))
+  /// Creates an integer of type `t` storing the two's-complement representation of `n`.
+  public init(_ n: BigInt, ofType t: MachineType) {
+    self = .scalar(BuiltinValue(n, ofType: t))
   }
 
   /// Creates an instance of `MachineType.i(1)`.
@@ -51,53 +57,29 @@ extension RuntimeValue {
     self = .scalar(BuiltinValue(b))
   }
 
-  /// The boolean value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(1)`.
-  public var asBool: Bool { asBuiltin.asBool }
+  /// The value of the stored `i1`, or `nil` if `self` does not match `.i1(_)`
+  public var i1: Bool? { asBuiltin.i1 }
 
-  /// The 8-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(8)`.
-  public var asUInt8: UInt8 { asBuiltin.asUInt8 }
+  /// The value of the stored `i8`, or `nil` if `self` does not match `.i8(_)`
+  public var i8: UInt8? { asBuiltin.i8 }
 
-  /// The 16-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(16)`.
-  public var asUInt16: UInt16 { asBuiltin.asUInt16 }
+  /// The value of the stored `i16`, or `nil` if `self` does not match `.i16(_)`
+  public var i16: UInt16? { asBuiltin.i16 }
 
-  /// The 32-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(32)`.
-  public var asUInt32: UInt32 { asBuiltin.asUInt32 }
+  /// The value of the stored `i32`, or `nil` if `self` does not match `.i32(_)`
+  public var i32: UInt32? { asBuiltin.i32 }
 
-  /// The 64-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(64)`.
-  public var asUInt64: UInt64 { asBuiltin.asUInt64 }
+  /// The value of the stored `i64`, or `nil` if `self` does not match `.i64(_)`
+  public var i64: UInt64? { asBuiltin.i64 }
 
-  /// The 128-bit unsigned value.
-  ///
-  /// - Precondition: `self` is an instance of `MachineType.i(128)`.
+  /// The value of the stored `i128`, or `nil` if `self` does not match `.i128(_)`
+  public var i128: UInt128? { asBuiltin.i128 }
+
+  /// The value of the stored `word`, or `nil` if `self` doesn't match `.word(_)`
+  public var word: UInt128? { asBuiltin.word }
+
+  /// The magnitude of stored integer value.
   public var asUInt128: UInt128 { asBuiltin.asUInt128 }
-
-  /// Returns the unsigned interpretation of `self` as an integer of type `t`.
-  ///
-  /// - Precondition: `self` is a value of type `t`.
-  public func unsignedIntValue(as t: MachineType) -> UInt128 {
-    switch t {
-    case .i(let w):
-      switch w {
-      case 8: UInt128(asUInt8)
-      case 16: UInt128(asUInt16)
-      case 32: UInt128(asUInt32)
-      case 64: UInt128(asUInt64)
-      case 128: asUInt128
-      default: preconditionFailure()
-      }
-    default: preconditionFailure()
-    }
-  }
 
 }
 
@@ -116,7 +98,7 @@ extension RuntimeValue {
 
     if s == MachineType.self {
       let v = p.type(u, as: MachineType.self)
-      self = RuntimeValue(storage, type: v, layouts: &layouts)
+      self = .init(storage, type: v, layouts: &layouts)
     } else if s == Struct.self || s == Tuple.self {
       self = .init(record: storage, type: t, definedIn: &p, layouts: &layouts)
     } else if s == Enum.self {
@@ -134,12 +116,12 @@ extension RuntimeValue {
     layouts: inout LayoutComputer
   ) {
     switch t {
-    case .i(let n):
+    case .i(_):
       let v = BigInt(unsignedFrom: storage, storedIn: layouts.abi.byteOrder)
-      self = .scalar(BuiltinValue(v, bitWidth: n))
+      self = .scalar(BuiltinValue(v, ofType: t))
     case .word:
       let v = BigInt(unsignedFrom: storage, storedIn: layouts.abi.byteOrder)
-      self = .scalar(BuiltinValue(v, bitWidth: layouts.abi.bitsInAPointer))
+      self = .scalar(BuiltinValue(v, ofType: t))
     default: unimplemented("floats and ptr are not supported yet.")
     }
   }
@@ -157,7 +139,7 @@ extension RuntimeValue {
       l.parts.map {
         RuntimeValue($0, parentRepresentation: storage, program: &p, layouts: &layouts)
       }
-    self = .composite(parts)
+    self = .composite(parts, ofType: t)
   }
 
   /// Creates a value of enum type `t`, defined in `p`, by interpreting its
@@ -173,13 +155,12 @@ extension RuntimeValue {
     let discriminator = RuntimeValue(
       l.discriminator, parentRepresentation: storage, program: &p, layouts: &layouts)
 
-    let discriminatorType = p.type(l.discriminator.type.underlying, as: MachineType.self)
-    let activeCaseIndex = Int(discriminator.unsignedIntValue(as: discriminatorType))
+    let activeCaseIndex = Int(discriminator.asUInt128)
     let activeCase = RuntimeValue(
       l.parts[activeCaseIndex], parentRepresentation: storage,
       program: &p, layouts: &layouts)
 
-    self = .composite([activeCase, discriminator])
+    self = .composite([activeCase, discriminator], ofType: t)
   }
 
   /// Creates a value for `part` by interpreting the byte representation of its
@@ -200,23 +181,21 @@ extension RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Returns the memory representation of stored `t`, defined in `p`
-  /// as laid out by `typeLayouts`.
+  /// Returns the memory representation of `self` as laid out by `typeLayouts`
+  /// for `program`.
   public func bytes(
-    ofStored t: MonomorphicTypeIdentity,
-    definedIn p: inout Program,
-    laidOutUsing typeLayouts: inout LayoutComputer
+    laidOutUsing typeLayouts: inout LayoutComputer,
+    for program: inout Program
   ) -> [UInt8] {
     switch self {
     case .scalar(let value):
-      let valueType = p.type(t.underlying, as: MachineType.self)
-      return value.bytes(ofStored: valueType, laidOutUsing: &typeLayouts)
-    case .composite(_):
-      let typeTag = p.tag(t.underlying)
+      return value.bytes(laidOutUsing: &typeLayouts)
+    case .composite(_, let type):
+      let typeTag = program.tag(type.underlying)
       if typeTag == Struct.self || typeTag == Tuple.self {
-        return bytes(ofStoredRecord: t, definedIn: &p, laidOutUsing: &typeLayouts)
+        return bytes(ofStoredRecord: type, definedIn: &program, laidOutUsing: &typeLayouts)
       } else if typeTag == Enum.self {
-        return bytes(ofStoredEnum: t, definedIn: &p, laidOutUsing: &typeLayouts)
+        return bytes(ofStoredEnum: type, definedIn: &program, laidOutUsing: &typeLayouts)
       } else {
         unreachable("A composite type must be a struct, tuple, or enum.")
       }
@@ -230,14 +209,13 @@ extension RuntimeValue {
     definedIn p: inout Program,
     laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
+    assert(t == type(in: &p))
     let l = typeLayouts.layout(t, in: &p)
     var bytes = [UInt8](repeating: 0, count: l.size)
 
-    for (partValue, partInfo) in zip(parts, l.parts) {
-      let partBytes = partValue.bytes(
-        ofStored: partInfo.type,
-        definedIn: &p, laidOutUsing: &typeLayouts)
-      bytes[partInfo.offset..<partInfo.offset + partBytes.count] = partBytes[...]
+    for (value, layout) in zip(parts, l.parts) {
+      let partBytes = value.bytes(laidOutUsing: &typeLayouts, for: &p)
+      bytes[layout.offset..<layout.offset + partBytes.count] = partBytes[...]
     }
 
     return bytes
@@ -250,25 +228,18 @@ extension RuntimeValue {
     definedIn p: inout Program,
     laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
+    assert(t == type(in: &p))
     let l = typeLayouts.layout(t, in: &p)
     var bytes = [UInt8](repeating: 0, count: l.size)
 
-    let discriminator =
-      parts[1].bytes(
-        ofStored: l.discriminator.type,
-        definedIn: &p, laidOutUsing: &typeLayouts)
-    let discriminatorOffset = l.discriminator.offset
-    let discriminatorType =
-      p.type(l.discriminator.type.underlying, as: MachineType.self)
-    bytes[discriminatorOffset..<discriminatorOffset + discriminator.count] = discriminator[...]
+    let discriminatorBytes = parts[1].bytes(laidOutUsing: &typeLayouts, for: &p)
+    bytes[l.discriminator.offset..<l.discriminator.offset + discriminatorBytes.count] =
+      discriminatorBytes[...]
 
-    let activeCaseIndex =
-      Int(parts[1].unsignedIntValue(as: discriminatorType))
-    let activeCase = parts[0].bytes(
-      ofStored: l.parts[activeCaseIndex].type,
-      definedIn: &p, laidOutUsing: &typeLayouts)
+    let activeCaseIndex = Int(parts[1].asUInt128)
+    let activeCaseBytes = parts[0].bytes(laidOutUsing: &typeLayouts, for: &p)
     let activeCaseOffset = l.parts[activeCaseIndex].offset
-    bytes[activeCaseOffset..<activeCaseOffset + activeCase.count] = activeCase[...]
+    bytes[activeCaseOffset..<activeCaseOffset + activeCaseBytes.count] = activeCaseBytes[...]
 
     return bytes
   }

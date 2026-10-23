@@ -252,8 +252,7 @@ public struct Interpreter {
     case let x as IRBranch:
       return .jump(to: start(x.target))
     case let x as IRConditionalBranch:
-      let c = try self[x.condition].asBool
-      if c {
+      if try self[x.condition].i1! {
         return .jump(to: start(x.onSuccess))
       } else {
         return .jump(to: start(x.onFailure))
@@ -371,7 +370,7 @@ public struct Interpreter {
       case .parameter(let i):
         return try memory.read(from: topOfStack.parameters[i])
       case .integer(let n, let t):
-        return .init(n, bitWidth: bitWidth(t))
+        return .init(n, ofType: program.types[t])
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
@@ -424,30 +423,20 @@ public struct Interpreter {
   ) throws -> RuntimeValue {
     switch f {
     case .trap: throw Trap()
-    case .icmp(let compare, let type):
+    case .icmp(let compare, _):
       let lhs = try self[arguments[0]]
       let rhs = try self[arguments[1]]
-      return .init(compare(lhs, rhs, bitWidth: bitWidth(type)))
+      return .init(compare(lhs, rhs))
     case .zeroinitializer(let type):
-      let w = bitWidth(type)
       return switch program.types[type] {
-      case .i(_): .init(0, bitWidth: w)
-      case .word: .init(0, bitWidth: w)
+      case .i(_): .init(0, ofType: program.types[type])
+      case .word: .init(0, ofType: program.types[type])
       default:
         unimplemented(
           "zero-initializer is not yet implemented for \(program.show(program.types[type]))."
         )
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
-    }
-  }
-
-  /// Returns the bit width of `t`.
-  private mutating func bitWidth(_ t: MachineType.ID) -> UInt8 {
-    if program.types[t].equals(MachineType.i(1)) {
-      1
-    } else {
-      UInt8(memory.layout(t).size * 8)
     }
   }
 

@@ -11,23 +11,21 @@ final class RuntimeValueTests: XCTestCase {
   func testBool() {
     let i1 = id(MachineType.i(1))
     XCTAssertEqual(
-      RuntimeValue(true)
-        .bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(true).bytes(laidOutUsing: &l, for: &p),
       [1]
     )
     XCTAssertEqual(
-      RuntimeValue(false)
-        .bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(false).bytes(laidOutUsing: &l, for: &p),
       [0]
     )
     XCTAssertEqual(
       RuntimeValue([0][...], type: i1, definedIn: &p, layouts: &l)
-        .bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       [0]
     )
     XCTAssertEqual(
       RuntimeValue([1][...], type: i1, definedIn: &p, layouts: &l)
-        .bytes(ofStored: i1, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       [1]
     )
   }
@@ -41,61 +39,56 @@ final class RuntimeValueTests: XCTestCase {
 
     var bs: [UInt8] = [2]
     XCTAssertEqual(
-      RuntimeValue(2, bitWidth: 8)
-        .bytes(ofStored: i8, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(2, ofType: .i(8)).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
       RuntimeValue(bs[...], type: i8, definedIn: &p, layouts: &l)
-        .bytes(ofStored: i8, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
 
     bs = [2, 1]
     XCTAssertEqual(
-      RuntimeValue(258, bitWidth: 16)
-        .bytes(ofStored: i16, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(258, ofType: .i(16)).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
       RuntimeValue(bs[...], type: i16, definedIn: &p, layouts: &l)
-        .bytes(ofStored: i16, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
 
     bs = [2, 1, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(258, bitWidth: 32)
-        .bytes(ofStored: i32, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(258, ofType: .i(32)).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
       RuntimeValue(bs[...], type: i32, definedIn: &p, layouts: &l)
-        .bytes(ofStored: i32, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
 
     bs = [2, 1, 0, 0, 0, 0, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(258, bitWidth: 64)
-        .bytes(ofStored: i64, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(258, ofType: .i(64)).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
       RuntimeValue(bs[...], type: i64, definedIn: &p, layouts: &l)
-        .bytes(ofStored: i64, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
 
     bs = [2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(258, bitWidth: 128)
-        .bytes(ofStored: i128, definedIn: &p, laidOutUsing: &l),
+      RuntimeValue(258, ofType: .i(128)).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
       RuntimeValue(bs[...], type: i128, definedIn: &p, layouts: &l)
-        .bytes(ofStored: i128, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
   }
@@ -108,7 +101,7 @@ final class RuntimeValueTests: XCTestCase {
     let bs: [UInt8] = [3, 0, 2, 1]
     XCTAssertEqual(
       RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
-        .bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
   }
@@ -130,7 +123,7 @@ final class RuntimeValueTests: XCTestCase {
     let bs: [UInt8] = [2, 0, 3, 1]
     XCTAssertEqual(
       RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
-        .bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
   }
@@ -148,14 +141,14 @@ final class RuntimeValueTests: XCTestCase {
     var bs: [UInt8] = [2, 0, 1]
     XCTAssertEqual(
       RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
-        .bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
 
     bs = [2, 0, 0]
     XCTAssertEqual(
       RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
-        .bytes(ofStored: t, definedIn: &p, laidOutUsing: &l),
+        .bytes(laidOutUsing: &l, for: &p),
       bs
     )
   }
