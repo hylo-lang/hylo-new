@@ -2,10 +2,10 @@ import FrontEnd
 import Utilities
 
 /// A memoizing computer of type layouts.
-struct TypeLayoutCache {
+struct LayoutComputer {
 
   /// The ABI for which the types will be laid out.
-  let abi: any TargetABI
+  public let abi: any TargetABI
 
   /// The memo of layouts computed so far.
   private var storage: [MonomorphicTypeIdentity: TypeLayout] = [:]
@@ -195,7 +195,7 @@ func storageLayoutOfRecord(
   return (b, offsets)
 }
 
-extension TypeLayoutCache {
+extension LayoutComputer {
   /// Returns type and byte offset of `subField` within `t`,
   /// where `t` is defined in `p`.
   mutating func typeAndOffset(

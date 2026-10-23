@@ -2,7 +2,7 @@ import FrontEnd
 import Utilities
 
 /// The layout of a type in memory, including the positions of its parts.
-struct TypeLayout: Regular {
+public struct TypeLayout: Regular {
 
   /// Memory layout of a type, without any detail about parts.
   public struct StorageRequirements: Regular {
@@ -84,6 +84,16 @@ extension TypeLayout.StorageRequirements {
     return .init(
       alignment: Int(lcm(self.alignment, t.alignment)),
       size: Int(r) + t.size)
+  }
+
+}
+
+extension TypeLayout {
+
+  /// The discriminator of an enum layout.
+  var discriminator: TypeLayout.Part {
+    precondition(isEnumLayout)
+    return parts.last!
   }
 
 }

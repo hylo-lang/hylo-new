@@ -5,58 +5,177 @@ import XCTest
 
 final class RuntimeValueTests: XCTestCase {
 
-  func testTwosComplementRepresentation() {
-    XCTAssertEqual(twosComplementRepresentation(0), 0)
-    XCTAssertEqual(twosComplementRepresentation(1), 1)
-    XCTAssertEqual(twosComplementRepresentation(2), 2)
-    XCTAssertEqual(twosComplementRepresentation(-1), UInt128.max)
-    XCTAssertEqual(twosComplementRepresentation(-2), UInt128.max - 1)
+  var p = Program(forTesting: true)
+  var l = LayoutComputer(for: UnrealABI())
+
+  func testBool() {
+    let i1 = id(MachineType.i(1))
+    XCTAssertEqual(
+      RuntimeValue(true).bytes(laidOutUsing: &l, for: &p),
+      [1]
+    )
+    XCTAssertEqual(
+      RuntimeValue(false).bytes(laidOutUsing: &l, for: &p),
+      [0]
+    )
+    XCTAssertEqual(
+      RuntimeValue([0][...], type: i1, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      [0]
+    )
+    XCTAssertEqual(
+      RuntimeValue([1][...], type: i1, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      [1]
+    )
   }
 
-  func testRuntimeValueIntegerInitializer() {
-    XCTAssertEqual(RuntimeValue(integer: 0, bitWidth: 8, alignment: 1).bytes, [0])
-    XCTAssertEqual(RuntimeValue(integer: 1, bitWidth: 8, alignment: 1).bytes, [1])
-    XCTAssertEqual(RuntimeValue(integer: -1, bitWidth: 8, alignment: 1).bytes, [255])
-    XCTAssertEqual(RuntimeValue(integer: -2, bitWidth: 8, alignment: 1).bytes, [254])
+  func testInteger() {
+    let i8 = id(MachineType.i(8))
+    let i16 = id(MachineType.i(16))
+    let i32 = id(MachineType.i(32))
+    let i64 = id(MachineType.i(64))
+    let i128 = id(MachineType.i(128))
 
+    var bs: [UInt8] = [2]
     XCTAssertEqual(
-      RuntimeValue(integer: 1, bitWidth: 16, alignment: 2).bytes,
-      withUnsafeBytes(of: UInt16(1), Array.init)[...])
+      RuntimeValue(2, ofType: .i(8)).bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
     XCTAssertEqual(
-      RuntimeValue(integer: -1, bitWidth: 16, alignment: 2).bytes,
-      withUnsafeBytes(of: UInt16(65535), Array.init)[...])
+      RuntimeValue(bs[...], type: i8, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
 
+    bs = [2, 1]
     XCTAssertEqual(
-      RuntimeValue(integer: 1, bitWidth: 32, alignment: 4).bytes,
-      withUnsafeBytes(of: UInt32(1), Array.init)[...])
+      RuntimeValue(258, ofType: .i(16)).bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(bs[...], type: i16, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
 
+    bs = [2, 1, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(integer: 1, bitWidth: 64, alignment: 8).bytes,
-      withUnsafeBytes(of: UInt64(1), Array.init)[...])
+      RuntimeValue(258, ofType: .i(32)).bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(bs[...], type: i32, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
 
+    bs = [2, 1, 0, 0, 0, 0, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(integer: 1, bitWidth: 128, alignment: 8).bytes,
-      withUnsafeBytes(of: UInt128(1), Array.init)[...])
+      RuntimeValue(258, ofType: .i(64)).bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(bs[...], type: i64, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
+
+    bs = [2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    XCTAssertEqual(
+      RuntimeValue(258, ofType: .i(128)).bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
+    XCTAssertEqual(
+      RuntimeValue(bs[...], type: i128, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
   }
 
-  func testRuntimeValueBoolInitializer() {
-    let f = RuntimeValue(bool: false)
-    XCTAssertFalse(f.asBool)
-    XCTAssertEqual(f.bytes, [0])
-
-    let t = RuntimeValue(bool: true)
-    XCTAssertTrue(t.asBool)
-    XCTAssertEqual(t.bytes, [1])
+  func testTuple() {
+    let i8 = id(MachineType.i(8))
+    let i16 = id(MachineType.i(16))
+    let inner = p.types.tuple(of: [i8.underlying, i16.underlying])
+    let t = MonomorphicTypeIdentity(p.types.tuple(of: [i8.underlying, inner]))
+    let bs: [UInt8] = [3, 0, 2, 1]
+    XCTAssertEqual(
+      RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
   }
 
-  func testRuntimeValueAlignment() {
-    for i in 1...10 {
-      let b = Array(repeating: UInt8(0), count: i)
-      let a = UInt(
-        bitPattern: RuntimeValue(bytes: b, havingAlignment: i).bytes.withUnsafeBytes(\.baseAddress)!
-      )
-      XCTAssert(a % UInt(i) == 0)
-    }
+  func testStruct() async throws {
+    let t = await type(
+      named: "I8I16I8",
+      in: """
+        public struct I16I8 {
+          let x: Builtin.i16
+          let y: Builtin.i8
+        }
+        public struct I8I16I8 {
+          let x: Builtin.i8
+          let y: I16I8
+        }
+        """
+    )
+    let bs: [UInt8] = [2, 0, 3, 1]
+    XCTAssertEqual(
+      RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
+  }
+
+  func testEnum() async throws {
+    let t = await type(
+      named: "Either",
+      in: """
+        public enum Either {
+          case first(value: Builtin.i8)
+          case second(value: Builtin.i16)
+        }
+        """
+    )
+    var bs: [UInt8] = [2, 0, 1]
+    XCTAssertEqual(
+      RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
+
+    bs = [2, 0, 0]
+    XCTAssertEqual(
+      RuntimeValue(bs[...], type: t, definedIn: &p, layouts: &l)
+        .bytes(laidOutUsing: &l, for: &p),
+      bs
+    )
+  }
+
+  /// Returns the type erased identity of `t`.
+  private func id<T: TypeTree>(_ t: T) -> MonomorphicTypeIdentity {
+    .init(p.types.demand(t).erased)
+  }
+
+  /// Returns type declared as `n` in `s`.
+  ///
+  /// - Precondition: `n` should be unique across `p`.
+  /// - Precondition: `n` should be present in `s`.
+  private func type(named n: String, in s: SourceFile) async -> MonomorphicTypeIdentity {
+    await add(s)
+    let d = p.castToDeclaration(p.select(.name(.init(identifier: n))).first!)!
+    let mt = p.types.cast(p.type(maybeAssignedTo: d)!, to: Metatype.self)!
+    return .init(p.types[mt].inhabitant)
+  }
+
+  /// Adds `s` with no dependency to `p`.
+  private func add(_ s: SourceFile) async {
+    let name = UUID().uuidString
+    let m = p.demandModule(Module.Name(name))
+    _ = p[m].addSource(s)
+    await p.assignScopes(m)
+    p.assignTypes(m) { _, _ in false }
   }
 
 }
