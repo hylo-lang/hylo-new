@@ -1785,7 +1785,7 @@ extension Program {
 
     // Otherwise, construct a pair leading with the tag.
     var payloadSize = 0
-    var payloadAlignment: Alignment = 1
+    var payloadAlignment: Alignment = .bytes(1)
     for c in cases {
       let m = metadata(of: c, in: &ctx)
       payloadSize = max(payloadSize, m.layout.size.fixed!)
@@ -1852,7 +1852,7 @@ extension Program {
       size = next + fieldSize
     }
 
-    let a: Alignment = if let max = ps.first { rs[max].layout.alignment } else { 1 }
+    let a: Alignment = if let max = ps.first { rs[max].layout.alignment } else { .bytes(1) }
     return ConcreteLayout(
       fields: elements, propertyToField: fieldToElement, size: .fixed(size), alignment: a)
   }

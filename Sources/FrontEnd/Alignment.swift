@@ -35,13 +35,20 @@ public struct Alignment: Regular, Comparable {
 
 }
 
-extension Alignment: ExpressibleByIntegerLiteral {
+extension Alignment {
 
-  /// Creates an instance whose value is `n` bytes.
+  /// Returns an instance whose value is `n` bytes.
   ///
   /// - Precondition: `n < Int.max` is a power of two.
-  public init(integerLiteral n: Int) {
-    self.init(bytes: n)
+  public static func bytes<T: BinaryInteger>(_ n: T) -> Self {
+    .init(bytes: n)
+  }
+
+  /// Returns an instance whose value is `2^n` bytes.
+  ///
+  /// - Precondition: `2^n` is representable as an `Int`.
+  public static func log2(_ n: UInt8) -> Self {
+    .init(log2: n)
   }
 
 }

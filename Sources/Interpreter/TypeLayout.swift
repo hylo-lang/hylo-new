@@ -72,7 +72,7 @@ extension TypeLayout.StorageRequirements {
       let r = size.roundedUp(toNearestMultipleOf: t.alignment)
       return .init(alignment: max(self.alignment, t.alignment), size: r + t.size)
     } else {
-      precondition(t.alignment == 1, "Zero-sized types shall be 1-byte aligned.")
+      precondition(t.alignment == .bytes(1), "Zero-sized types shall be 1-byte aligned.")
       return self
     }
   }
