@@ -48,6 +48,9 @@ struct TypeLayout: Regular {
   /// The number of bytes occupied by an instance.
   public var size: Int { footprint.size }
 
+  /// The number of bytes between elements in a buffer of this type.
+  public var stride: Int { footprint.stride }
+
   /// The type whose layout is described by `self`.
   public let type: MonomorphicTypeIdentity
 
