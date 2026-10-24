@@ -10,9 +10,9 @@ void hylo_open_test_cases_file_for_reading_indirect(FILE** result) {
   *result = fopen("test-cases.txt", "r");
 }
 
-/// Reads the number of test cases at the beginning of `f`, returning
-/// it, or -1 if reading failed.
-void hylo_read_test_case_count_indirect(FILE **f, intptr_t *result) {
+/// Reads and returns a non-negative integer from `f`, or returns -1 if
+/// reading failed.
+void hylo_read_non_negative_integer_indirect(FILE **f, intptr_t *result) {
   if (fscanf(*f, "%td", result) != 1 || *result < 0) {
     *result = -1;
   }
