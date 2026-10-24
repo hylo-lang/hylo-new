@@ -1,5 +1,6 @@
 import FrontEnd
 import XCTest
+import Utilities
 
 @testable import Interpreter
 
@@ -457,32 +458,40 @@ final class TypeLayoutTests: XCTestCase {
   func testOffsetOfMember() {
 
     check_offsets(members: [
-      .init(alignment: .bytes(1), size: 5), .init(alignment: .bytes(2), size: 3), .init(alignment: .bytes(8), size: 5),
+      .init(alignment: .bytes(1), size: 5),
+      .init(alignment: .bytes(2), size: 3),
+      .init(alignment: .bytes(8), size: 5),
     ])
     check_offsets(members: [
-      .init(alignment: .bytes(4), size: 7), .init(alignment: .bytes(8), size: 5), .init(alignment: .bytes(1), size: 0),
-      .init(alignment: .bytes(4), size: 9), .init(alignment: .bytes(16), size: 1),
+      .init(alignment: .bytes(4), size: 7),
+      .init(alignment: .bytes(8), size: 5),
+      .init(alignment: .bytes(1), size: 0),
+      .init(alignment: .bytes(4), size: 9),
+      .init(alignment: .bytes(16), size: 1),
     ])
 
+    var g = SeedableRandomNumberGenerator(seed: 42)
     for _ in 0..<3 {
-      let a = (0..<1).map { _ in randomStorageRequirements() }
+      let a = (0..<1).map { _ in randomStorageRequirements(using: &g) }
       check_offsets(members: a)
     }
     for _ in 0..<100 {
-      let a = (0..<2).map { _ in randomStorageRequirements() }
+      let a = (0..<2).map { _ in randomStorageRequirements(using: &g) }
       check_offsets(members: a)
     }
 
     for _ in 0..<2000 {
-      let a = (0..<10).map { _ in randomStorageRequirements() }
+      let a = (0..<10).map { _ in randomStorageRequirements(using: &g) }
       check_offsets(members: a)
     }
   }
 
   /// Returns random storage requirements, of alignment 1 if the size is zero.
-  private func randomStorageRequirements() -> TypeLayout.StorageRequirements {
-    let s = Int.random(in: 0..<10)
-    let a = s == 0 ? Alignment(log2: 0) : Alignment(log2: UInt8.random(in: 0..<5))
+  private func randomStorageRequirements<R: RandomNumberGenerator>(
+    using g: inout R
+  ) -> TypeLayout.StorageRequirements {
+    let s = Int.random(in: 0..<10, using: &g)
+    let a = s == 0 ? Alignment(log2: 0) : Alignment(log2: UInt8.random(in: 0..<5, using: &g))
     return .init(alignment: a, size: s)
   }
 
