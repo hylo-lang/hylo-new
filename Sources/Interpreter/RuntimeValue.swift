@@ -40,7 +40,7 @@ extension RuntimeValue {
 
   /// Creates an instance of `MachineType.i(1)` having value `b` and layout `l`.
   public init(bool b: Bool) {
-    self.init(integer: b ? 1 : 0, bitWidth: 8, alignment: 1)
+    self.init(integer: b ? 1 : 0, bitWidth: 8, alignment: .bytes(1))
   }
 
   /// Returns the result of calling `body` on a pointer to the value's bytes

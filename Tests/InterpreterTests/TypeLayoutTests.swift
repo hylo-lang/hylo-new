@@ -16,23 +16,23 @@ final class TypeLayoutTests: XCTestCase {
   }
 
   func testBuiltinIntegers() throws {
-    check(layoutOf: .i(1), hasSize: 1, andAlignment: 1)
-    check(layoutOf: .i(8), hasSize: 1, andAlignment: 1)
-    check(layoutOf: .i(16), hasSize: 2, andAlignment: 2)
-    check(layoutOf: .i(32), hasSize: 4, andAlignment: 4)
-    check(layoutOf: .i(64), hasSize: 8, andAlignment: 8)
+    check(layoutOf: .i(1), hasSize: 1, andAlignment: .bytes(1))
+    check(layoutOf: .i(8), hasSize: 1, andAlignment: .bytes(1))
+    check(layoutOf: .i(16), hasSize: 2, andAlignment: .bytes(2))
+    check(layoutOf: .i(32), hasSize: 4, andAlignment: .bytes(4))
+    check(layoutOf: .i(64), hasSize: 8, andAlignment: .bytes(8))
   }
 
   func testTrivialTuples() throws {
     let void = layout(.void)
     XCTAssertEqual(void.size, 0)
-    XCTAssertEqual(void.alignment, 1)
+    XCTAssertEqual(void.alignment, .bytes(1))
     XCTAssert(void.parts.isEmpty)
 
     let i8 = id(MachineType.i(8))
     let justI8 = layout(p.types.tuple(of: [i8]))
     XCTAssertEqual(justI8.size, 1)
-    XCTAssertEqual(justI8.alignment, 1)
+    XCTAssertEqual(justI8.alignment, .bytes(1))
     XCTAssertEqual(justI8.parts, [.init(name: "0", type: .init(i8), offset: 0)])
   }
 
@@ -40,9 +40,9 @@ final class TypeLayoutTests: XCTestCase {
     let i8 = id(MachineType.i(8))
     let i64 = id(MachineType.i(64))
     let i8i64 = layout(p.types.tuple(of: [i8, i64]))
-    XCTAssertEqual(i8i64.footprint, .init(alignment: 8, size: 9))
+    XCTAssertEqual(i8i64.footprint, .init(alignment: .bytes(8), size: 9))
     let i64i8 = layout(p.types.tuple(of: [i64, i8]))
-    XCTAssertEqual(i64i8.footprint, .init(alignment: 8, size: 9))
+    XCTAssertEqual(i64i8.footprint, .init(alignment: .bytes(8), size: 9))
 
     XCTAssertEqual(
       i8i64.parts,
@@ -65,7 +65,7 @@ final class TypeLayoutTests: XCTestCase {
     let i32 = id(MachineType.i(32))
 
     let i8i16i32 = layout(p.types.tuple(of: [i8, i16, i32]))
-    XCTAssertEqual(i8i16i32.footprint, .init(alignment: 4, size: 7))
+    XCTAssertEqual(i8i16i32.footprint, .init(alignment: .bytes(4), size: 7))
 
     XCTAssertEqual(
       i8i16i32.parts,
@@ -85,7 +85,7 @@ final class TypeLayoutTests: XCTestCase {
           """))
 
     XCTAssertEqual(emptyStruct.size, 0)
-    XCTAssertEqual(emptyStruct.alignment, 1)
+    XCTAssertEqual(emptyStruct.alignment, .bytes(1))
     XCTAssert(emptyStruct.parts.isEmpty)
   }
 
@@ -104,7 +104,7 @@ final class TypeLayoutTests: XCTestCase {
           """))
 
     XCTAssertEqual(i816.size, 3)
-    XCTAssertEqual(i816.alignment, 2)
+    XCTAssertEqual(i816.alignment, .bytes(2))
     XCTAssertEqual(
       i816.parts,
       [
@@ -122,7 +122,7 @@ final class TypeLayoutTests: XCTestCase {
           """))
 
     XCTAssertEqual(emptyEnum.size, 0)
-    XCTAssertEqual(emptyEnum.alignment, 1)
+    XCTAssertEqual(emptyEnum.alignment, .bytes(1))
     XCTAssertEqual(
       emptyEnum.parts,
       [.init(name: "discriminator", type: .init(.void), offset: 0)])
@@ -143,7 +143,7 @@ final class TypeLayoutTests: XCTestCase {
     let i16Tuple = p.types.tuple(of: [id(MachineType.i(16))])
 
     XCTAssertEqual(optional.size, 3)
-    XCTAssertEqual(optional.alignment, 2)
+    XCTAssertEqual(optional.alignment, .bytes(2))
     XCTAssertEqual(
       optional.parts,
       [
@@ -163,7 +163,7 @@ final class TypeLayoutTests: XCTestCase {
           """))
 
     XCTAssertEqual(int8.size, 1)
-    XCTAssertEqual(int8.alignment, 1)
+    XCTAssertEqual(int8.alignment, .bytes(1))
     XCTAssert(int8.parts.isEmpty)
   }
 
@@ -178,7 +178,7 @@ final class TypeLayoutTests: XCTestCase {
 
     let i8 = id(MachineType.i(8))
     XCTAssertEqual(i8Tuple.size, 1)
-    XCTAssertEqual(i8Tuple.alignment, 1)
+    XCTAssertEqual(i8Tuple.alignment, .bytes(1))
     XCTAssertEqual(
       i8Tuple.parts,
       [
@@ -200,7 +200,7 @@ final class TypeLayoutTests: XCTestCase {
 
     let i8 = id(MachineType.i(8))
     XCTAssertEqual(i8Struct.size, 1)
-    XCTAssertEqual(i8Struct.alignment, 1)
+    XCTAssertEqual(i8Struct.alignment, .bytes(1))
     XCTAssertEqual(
       i8Struct.parts,
       [
@@ -224,7 +224,7 @@ final class TypeLayoutTests: XCTestCase {
           """))
 
     XCTAssertEqual(i816.size, 3)
-    XCTAssertEqual(i816.alignment, 2)
+    XCTAssertEqual(i816.alignment, .bytes(2))
     XCTAssertEqual(
       i816.parts,
       [
@@ -246,7 +246,7 @@ final class TypeLayoutTests: XCTestCase {
           """))
 
     XCTAssertEqual(i816.size, 3)
-    XCTAssertEqual(i816.alignment, 2)
+    XCTAssertEqual(i816.alignment, .bytes(2))
     XCTAssertEqual(
       i816.parts,
       [
@@ -273,7 +273,7 @@ final class TypeLayoutTests: XCTestCase {
     let i16Tuple = p.types.tuple(of: [id(MachineType.i(16))])
 
     XCTAssertEqual(optional.size, 3)
-    XCTAssertEqual(optional.alignment, 2)
+    XCTAssertEqual(optional.alignment, .bytes(2))
     XCTAssertEqual(
       optional.parts,
       [
@@ -297,7 +297,7 @@ final class TypeLayoutTests: XCTestCase {
     let tMiddle = p.types.tuple(of: [tInner])
 
     XCTAssertEqual(t.size, 2)
-    XCTAssertEqual(t.alignment, 2)
+    XCTAssertEqual(t.alignment, .bytes(2))
     XCTAssertEqual(t.parts, [.init(name: "0", type: .init(tMiddle), offset: 0)])
   }
 
@@ -331,7 +331,7 @@ final class TypeLayoutTests: XCTestCase {
   //   let i8 = id(MachineType.i(8))
   //
   //   XCTAssertEqual(color.size, 3)
-  //   XCTAssertEqual(color.alignment, 2)
+  //   XCTAssertEqual(color.alignment, .bytes(2))
   //   XCTAssertEqual(
   //     color.parts,
   //     [
@@ -457,11 +457,11 @@ final class TypeLayoutTests: XCTestCase {
   func testOffsetOfMember() {
 
     check_offsets(members: [
-      .init(alignment: 1, size: 5), .init(alignment: 2, size: 3), .init(alignment: 8, size: 5),
+      .init(alignment: .bytes(1), size: 5), .init(alignment: .bytes(2), size: 3), .init(alignment: .bytes(8), size: 5),
     ])
     check_offsets(members: [
-      .init(alignment: 4, size: 7), .init(alignment: 8, size: 5), .init(alignment: 1, size: 0),
-      .init(alignment: 4, size: 9), .init(alignment: 16, size: 1),
+      .init(alignment: .bytes(4), size: 7), .init(alignment: .bytes(8), size: 5), .init(alignment: .bytes(1), size: 0),
+      .init(alignment: .bytes(4), size: 9), .init(alignment: .bytes(16), size: 1),
     ])
 
     for _ in 0..<3 {
@@ -489,11 +489,11 @@ final class TypeLayoutTests: XCTestCase {
   func testBytesOfStorageLayoutOfRecord() {
     XCTAssertEqual(
       storageLayoutOfRecord(havingMembers: [
-        .init(alignment: 1, size: 5), .init(alignment: 2, size: 3),
-        .init(alignment: 1, size: 0), .init(alignment: 8, size: 5),
+        .init(alignment: .bytes(1), size: 5), .init(alignment: .bytes(2), size: 3),
+        .init(alignment: .bytes(1), size: 0), .init(alignment: .bytes(8), size: 5),
       ]).footprint,
 
-      .init(alignment: 8, size: 14)
+      .init(alignment: .bytes(8), size: 14)
     )
   }
 
