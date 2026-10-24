@@ -20,50 +20,40 @@ void hylo_read_non_negative_integer_indirect(FILE **f, intptr_t *result) {
 
 /// Reads a test case from `f` into `s` representing the sizes of
 /// members, `a` representing their alignments, `o` representing
-/// their expected offsets, and `e` representing the expected size and
-/// alignment of the record, returning the number of significant
-/// elements of each of those arrays.
+/// their expected offsets, and `size` and `alignment` representing the
+/// expected size and alignment of the record, returning the number of
+/// significant elements of each of those arrays.
 ///
 /// If errors occur, returns a negative value indicating how far along
 /// the call got.
 void hylo_read_test_case_indirect(
     FILE **f, intptr_t s[10],
-    intptr_t a[10], intptr_t o[10], intptr_t e[2], intptr_t *result) {
-  /// Try to read the first [size] field of the test case.
-  int scan0 = fscanf(*f, "%td", &s[0]);
-  if (scan0 == 0 || scan0 == EOF) {
-    *result = -2;
-    return;
-  }
-  if (s[0] < 0) {
-    *result = -3;
-    return;
-  }
-
-  /// [size] [alignment] of all 10 fields (except the first member's size that's already read)
+    intptr_t a[10], intptr_t o[10], intptr_t *expected_size, intptr_t *expected_alignment,
+    intptr_t *result) {
+  /// Read [size] [alignment] of all 10 members.
   int scan1 = fscanf(*f,
-                     "%td   %td %td   %td %td   %td %td   %td %td   %td %td   "
-                     "%td %td   %td %td   %td %td   %td %td",
-                     &a[0], &s[1], &a[1], &s[2], &a[2], &s[3], &a[3], &s[4],
-                     &a[4], &s[5], &a[5], &s[6], &a[6], &s[7], &a[7], &s[8],
-                     &a[8], &s[9], &a[9]);
-  if (scan1 == 0 || scan1 == EOF) {
+                     "%td %td   %td %td   %td %td   %td %td   %td %td   "
+                     "%td %td   %td %td   %td %td   %td %td   %td %td",
+                     &s[0], &a[0], &s[1], &a[1], &s[2], &a[2], &s[3], &a[3],
+                     &s[4], &a[4], &s[5], &a[5], &s[6], &a[6], &s[7], &a[7],
+                     &s[8], &a[8], &s[9], &a[9]);
+  if (scan1 != 20) {
     *result = -4;
     return;
   }
 
-  /// [expected offset] of each member
+  /// Read [expected offset] of each member.
   int scan2 =
       fscanf(*f, "%td %td %td %td %td %td %td %td %td %td", &o[0], &o[1], &o[2],
              &o[3], &o[4], &o[5], &o[6], &o[7], &o[8], &o[9]);
-  if (scan2 == 0 || scan2 == EOF) {
+  if (scan2 != 10) {
     *result = -5;
     return;
   }
 
-  // [expected size] [expected alignment]
-  int scan3 = fscanf(*f, "%td %td", &e[0], &e[1]);
-  if (scan3 == 0 || scan3 == EOF) {
+  // Read [expected size] [expected alignment].
+  int scan3 = fscanf(*f, "%td %td", expected_size, expected_alignment);
+  if (scan3 != 2) {
     *result = -9;
     return;
   }
