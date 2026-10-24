@@ -554,8 +554,7 @@ final class LayoutTests: XCTestCase {
 
     var g = SeedableRandomNumberGenerator(seed: 0x1234_5678_9abc_def0)
 
-    var records = try readTestCases(from: testDataFile).map(\.members)
-    records += randomRecords(200, alignments: (0...5).map { 1 << $0 }, using: &g)
+    let records = randomRecords(200, alignments: (0...5).map { 1 << $0 }, using: &g)
     try write(records, to: testDataFile)
   }
 
