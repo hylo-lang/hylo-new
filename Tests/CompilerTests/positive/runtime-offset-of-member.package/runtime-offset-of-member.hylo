@@ -176,7 +176,6 @@ fun verify_size_and_alignment(
   let m = Pointer<RecordMemberType>(value: Builtin.address(of: w))
   let n = UInt32(l)
 
-  // Computing the size mutates the array.
   precondition(__hylo_log2_alignment_of_record(in: m, of_length: n) == log2(expected_alignment))
   precondition(__hylo_size_of_record(in: m, of_length: n) == UInt32(expected_size))
   // The size is idempotent w.r.t. the mutation of the array.

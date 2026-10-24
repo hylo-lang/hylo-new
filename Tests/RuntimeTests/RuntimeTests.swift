@@ -552,7 +552,7 @@ final class LayoutTests: XCTestCase {
       return
     }
 
-    var g = SplitMix64(seed: 0x1234_5678_9abc_def0)
+    var g = SeedableRandomNumberGenerator(seed: 0x1234_5678_9abc_def0)
 
     var records = try readTestCases(from: testDataFile).map(\.members)
     records += randomRecords(200, alignments: (0...5).map { 1 << $0 }, using: &g)
@@ -570,7 +570,7 @@ final class LayoutTests: XCTestCase {
   /// Returns `n` records of 1 to 10 members whose sizes are at most 16 and whose alignments are
   /// drawn from `alignments`, except that zero-sized members have alignment 1.
   private func randomRecords(
-    _ n: Int, alignments: [Alignment], using g: inout SplitMix64
+    _ n: Int, alignments: [Alignment], using g: inout SeedableRandomNumberGenerator
   ) -> [Members] {
     (0..<n).map { _ in
       (0..<Int.random(in: 1...10, using: &g)).map { _ in
@@ -583,22 +583,3 @@ final class LayoutTests: XCTestCase {
 
 }
 
-/// A seedable random number generator, so that generated test cases are reproducible.
-fileprivate struct SplitMix64: RandomNumberGenerator {
-
-  /// The state of the generator.
-  private var state: UInt64
-
-  /// Creates an instance generating the sequence identified by `seed`.
-  init(seed: UInt64) { self.state = seed }
-
-  /// Returns the next value in the sequence.
-  mutating func next() -> UInt64 {
-    state &+= 0x9e37_79b9_7f4a_7c15
-    var z = state
-    z = (z ^ (z >> 30)) &* 0xbf58_476d_1ce4_e5b9
-    z = (z ^ (z >> 27)) &* 0x94d0_49bb_1331_11eb
-    return z ^ (z >> 31)
-  }
-
-}
