@@ -18,18 +18,15 @@ void hylo_read_non_negative_integer_indirect(FILE **f, intptr_t *result) {
   }
 }
 
-/// Reads a test case from `f` into `s` representing the sizes of
-/// members, `a` representing their alignments, `o` representing
-/// their expected offsets, and `size` and `alignment` representing the
-/// expected size and alignment of the record, returning the number of
-/// significant elements of each of those arrays.
+/// Reads a test case from `f` into `s` representing the sizes of members, `a` representing their
+/// alignments, `o` representing their expected offsets, returning the number of significant
+/// elements of each of those arrays.
 ///
-/// If errors occur, returns a negative value indicating how far along
-/// the call got.
+/// If errors occur, returns a negative value indicating how far along the call got.
 void hylo_read_test_case_indirect(
-    FILE **f, intptr_t s[10],
-    intptr_t a[10], intptr_t o[10], intptr_t *expected_size, intptr_t *expected_alignment,
-    intptr_t *result) {
+    FILE **f, intptr_t s[10], intptr_t a[10], intptr_t o[10],
+    intptr_t *expected_size, intptr_t *expected_alignment, intptr_t *result
+) {
   /// Read [size] [alignment] of all 10 members.
   int scan1 = fscanf(*f,
                      "%td %td   %td %td   %td %td   %td %td   %td %td   "
