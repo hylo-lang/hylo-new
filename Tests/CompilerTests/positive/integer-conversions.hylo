@@ -1,5 +1,4 @@
-public fun main() {
-  // Int to signed.
+fun int_to_signed() {
   precondition(Int(-2) == -2)
   precondition(Int(12) == 12)
 
@@ -8,9 +7,39 @@ public fun main() {
 
   precondition(Int64(-2) == (-2 as Int64))
   precondition(Int64(12) == (12 as Int64))
+}
 
-  // Int to unsigned.
+fun int_to_unsigned() {
   precondition(UInt(12) == (12 as UInt))
   precondition(UInt16(2) == (2 as UInt16))
   precondition(UInt64(2) == (2 as UInt64))
+}
+
+fun truncating_or_extending() {
+  // Sign extension from signed sources.
+  precondition(Int32(truncating_or_extending: -2 as Int8) == (-2 as Int32))
+  precondition(UInt16(truncating_or_extending: -1 as Int8) == (65535 as UInt16))
+  precondition(Int(truncating_or_extending: -3 as Int16) == -3)
+
+  // Zero extension from unsigned sources.
+  precondition(Int32(truncating_or_extending: 255 as UInt8) == (255 as Int32))
+  precondition(UInt64(truncating_or_extending: 200 as UInt8) == (200 as UInt64))
+  precondition(Int(truncating_or_extending: 65535 as UInt16) == 65535)
+
+  // Truncation.
+  precondition(Int8(truncating_or_extending: 384 as Int32) == (-128 as Int8))
+  precondition(UInt8(truncating_or_extending: 511 as UInt16) == (255 as UInt8))
+  precondition(Int8(truncating_or_extending: -1 as Int64) == (-1 as Int8))
+  precondition(UInt8(truncating_or_extending: 258) == (2 as UInt8))
+
+  // Same size.
+  precondition(Int16(truncating_or_extending: -7 as Int16) == (-7 as Int16))
+  precondition(UInt32(truncating_or_extending: -1 as Int32) == UInt32.max())
+  precondition(Int32(truncating_or_extending: UInt32.max()) == (-1 as Int32))
+}
+
+public fun main() {
+  int_to_signed()
+  int_to_unsigned()
+  truncating_or_extending()
 }
