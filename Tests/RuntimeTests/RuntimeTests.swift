@@ -447,7 +447,7 @@ final class LayoutTests: XCTestCase {
       )
       let padding = o1 &- end0
 
-      XCTAssertLessThanOrEqual(
+      XCTAssertLessThan(
         padding, UInt32(m1.alignment),
         """
         Needless padding \(padding) before member at offset \(o1)
@@ -545,7 +545,7 @@ final class LayoutTests: XCTestCase {
     try checkTestCases(in: testDataFile)
   }
 
-  /// Rewrites the test case files, keeping the cases already in `test-cases.txt` and appending
+  /// Rewrites the test case file, keeping the cases already in `test-cases.txt` and appending
   /// generated ones, if the environment variable `HYLO_REGENERATE_LAYOUT_TEST_CASES` is set.
   func testRegenerateTestCases() throws {
     guard ProcessInfo.processInfo.environment["HYLO_REGENERATE_LAYOUT_TEST_CASES"] != nil else {

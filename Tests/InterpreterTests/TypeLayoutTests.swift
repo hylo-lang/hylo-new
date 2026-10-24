@@ -445,7 +445,7 @@ final class TypeLayoutTests: XCTestCase {
       )
       let padding = o1 &- end0
 
-      XCTAssertLessThanOrEqual(
+      XCTAssertLessThan(
         padding, m1.alignment.bytes,
         """
         Needless padding \(padding) before member at offset \(o1)

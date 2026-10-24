@@ -1,7 +1,6 @@
 import FrontEnd
 import XCTest
 
-
 final class AlignmentTests: XCTestCase {
 
   func testBytes() {
@@ -50,17 +49,16 @@ final class AlignmentTests: XCTestCase {
   func testIsMultipleOf() {
     for n in -33 ... 33 {
       for power in 0 ... 5 {
-        let a = 2 << power
+        let a = 1 << power
         XCTAssert((n * a).isMultiple(of: Alignment(bytes: a)))
       }
     }
   }
 
-
   func testIsMultipleOfFalse() {
     for n in -33 ... 33 {
       for power in 1 ... 5 {
-        let a = 2 << power
+        let a = 1 << power
         XCTAssertFalse((n * a - 1).isMultiple(of: Alignment(bytes: a)))
         XCTAssertFalse((n * a + 1).isMultiple(of: Alignment(bytes: a)))
       }
@@ -72,6 +70,10 @@ final class AlignmentTests: XCTestCase {
     XCTAssert((-24).isMultiple(of: Alignment(bytes: 8)))
     XCTAssertFalse((-12).isMultiple(of: Alignment(bytes: 8)))
     XCTAssert((-13).isMultiple(of: .init(bytes: 1)))
+  }
+
+  func testDescription() {
+    XCTAssertEqual("\(Alignment.bytes(64))", "64")
   }
 
 }
