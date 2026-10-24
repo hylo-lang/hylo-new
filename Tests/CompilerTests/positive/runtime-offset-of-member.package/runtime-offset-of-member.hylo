@@ -48,7 +48,7 @@ extension Metatype<Int> {
 
   /// Returns the number of bytes between elements in a buffer of `Subject`.
   public static fun stride() -> Size {
-    Self.size().rounded_up(to_nearest_multiple_of_power_of_two: Self.log2_alignment())
+    Self.size().rounded_up(to_nearest_multiple_of_2_to_the: Self.log2_alignment())
   }
 
 }

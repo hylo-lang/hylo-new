@@ -42,7 +42,7 @@ let layoutRequirementsChecked: () = checkLayoutRequirements()
 fileprivate extension Size {
 
   /// Returns the least n >= `self` that is a multiple of `2^k`.
-  func rounded_up(to_nearest_multiple_of_power_of_two k: Log2Alignment) -> Size {
+  func rounded_up(to_nearest_multiple_of_2_to_the k: Log2Alignment) -> Size {
     let a = Size(1) << k
     // The distance from the nearest multiple of `a` <= `self` to `self`.
     let excess = self % a
@@ -248,7 +248,7 @@ private func size_of_record_having_ordered_members(
   while start < end {
     let w = start.pointee()
     if w.size() != 0 {
-      let position = r.rounded_up(to_nearest_multiple_of_power_of_two: w.log2_alignment())
+      let position = r.rounded_up(to_nearest_multiple_of_2_to_the: w.log2_alignment())
       r = position + w.size()
     }
     start += 1
@@ -274,7 +274,7 @@ private func __hylo_offset_of_member(
     from: &start, to: &end, that_lay_out_before: p, having_log2_alignment: nth_log2_alignment)
   if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
-  return preceding_size.rounded_up(to_nearest_multiple_of_power_of_two: nth_log2_alignment)
+  return preceding_size.rounded_up(to_nearest_multiple_of_2_to_the: nth_log2_alignment)
 }
 
 //
