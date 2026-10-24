@@ -23,7 +23,7 @@ internal func generateIntegerTypes() -> String {
         "/// An unsigned integer type that can represent any object size on the target platform.",
       builtinType: "word", .unsigned, .fittingLargestObjectSize, includedConformances: .minimal))
 
-  return types.map(\.description).joined(separator: "\n")
+  return types.map({ (t) in t.source(convertingFrom: types) }).joined(separator: "\n")
 }
 
 extension IntegerTypeDefinition {
@@ -90,7 +90,7 @@ private enum Conformances {
 }
 
 /// Information for emitting a standard library integer type.
-private struct IntegerTypeDefinition: CustomStringConvertible {
+private struct IntegerTypeDefinition {
 
   /// The exposed name of the generated declaration, e.g., `Int64`.
   let declarationName: String
@@ -276,6 +276,24 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
+  /// Returns the initializers converting instances of the types in `sources` to instances of
+  /// `Self` by truncating or extending their representation according to the source's signedness.
+  func truncatingOrExtendingInitializers(from sources: [IntegerTypeDefinition]) -> String {
+    sources.map({ (u) in
+      let (operation, extensionName) = u.signedness == .signed ? ("sext", "sign") : ("zext", "zero")
+      return """
+
+
+          /// Creates an instance whose representation is that of `other`, truncated or
+          /// \(extensionName)-extended to the width of `Self`.
+          @inline(always)
+          public init(truncating_or_extending other: \(u.declarationName)) {
+            &self.value = Builtin.trunc_or_\(operation)_\(u.builtinType)_\(builtinType)(other.value)
+          }
+        """
+    }).joined()
+  }
+
   /// Returns an expression denoting the value of `n`, which is an instance of `builtinType`, as an
   /// instance of `Builtin.word`.
   ///
@@ -290,8 +308,9 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
     }
   }
 
-  /// The source code representation of this type.
-  var description: String {
+  /// Returns the source code representation of this type, including initializers converting
+  /// instances of the types in `conversionSources`.
+  func source(convertingFrom conversionSources: [IntegerTypeDefinition]) -> String {
     """
     \(declarationDocumentation)
     @_symbol(\"\(declarationName)\")
@@ -316,7 +335,7 @@ private struct IntegerTypeDefinition: CustomStringConvertible {
       @inline(always)
       public init(other: Int) {
         \(initializeFromInt)
-      }\(absMethod ?? "")
+      }\(truncatingOrExtendingInitializers(from: conversionSources))\(absMethod ?? "")
 
       /// Returns the number of bits that are set in the representation of `self`.
       @inline(always)

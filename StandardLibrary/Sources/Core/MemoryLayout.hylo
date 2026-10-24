@@ -1,0 +1,27 @@
+extension <T> Metatype<T> {
+
+  /// Returns the size of the type `T` in bytes.
+  @inline(always)
+  public static fun size() -> Int {
+    // Assumes: no object has size larger than `Int.max()` bytes.
+    Int(truncating_or_extending: Pointer<RecordMemberType>(value: Builtin.address(of: T)).pointee().size())
+  }
+
+  /// Returns the alignment of the type `T` in bytes.
+  @inline(always)
+  public static fun alignment() -> Int {
+    // Assumes: no object has size larger than `Int.max()` bytes.
+    Int(truncating_or_extending: Pointer<RecordMemberType>(value: Builtin.address(of: T)).pointee().alignment())
+  }
+
+  /// Returns the stride of the type `T` in bytes.
+  @inline(always)
+  public static fun stride() -> Int {
+    // Assumes: no object has size larger than `Int.max()` bytes.
+    Int(truncating_or_extending:
+      Pointer<RecordMemberType>(value: Builtin.address(of: T)).pointee().size()
+        .rounded_up(to_nearest_multiple_of:
+          Pointer<RecordMemberType>(value: Builtin.address(of: T)).pointee().alignment()))
+  }
+
+}

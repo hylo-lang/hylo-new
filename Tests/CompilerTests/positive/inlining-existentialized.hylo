@@ -1,0 +1,24 @@
+trait P {
+  fun f() -> Int
+}
+
+struct S is P & Deinitializable {
+  fun f() -> Int { 4 }
+  init() {}
+}
+
+// Calls to a generic function marked `@inline(always)` are rewritten to call its existentialized
+// form, which must then be inlined.
+@inline(always)
+fun e<T is P>(x: T) -> Int {
+  x.f()
+}
+
+public fun f(s: S) -> Int {
+  e(s)
+}
+
+public fun main() {
+  let s = S()
+  precondition(f(s) == 4)
+}
