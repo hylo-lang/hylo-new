@@ -1,14 +1,13 @@
 /// Tests `__hylo_offset_of_member`, `__hylo_size_of_record` and `__hylo_log2_alignment_of_record`
 /// against the cases of `test-cases.txt`. The file begins with the number of cases it contains,
 /// each of which describes a record on 3 lines.
-/// A record has up to 10 members. Unused member slots are padded with `0 0`.
+/// A record has up to 10 members. Unused member slots are padded with "0 0".
 ///
 ///     5 1  3 2  5 8  0 0  0 0  0 0  0 0  0 0  0 0  0 0 <- [size] [alignment] of each member
 ///     9    6    0    0    0    0    0    0    0    0   <- [expected offset]  of each member
 ///     14   8                                           <- [size] [alignment] of the record
 ///
-/// Alignments are powers of two given in bytes; an `[alignment]` of `0` marks an unused slot.
-/// The record's `[alignment]` is the maximal alignment of its members.
+/// Alignments are powers of two given in bytes; an [alignment] of `0` marks an unused slot.
 
 type Size = UInt32
 type Log2Alignment = UInt16
@@ -189,7 +188,7 @@ fun verify_size_and_alignment(
 fun open_test_cases_file_for_reading() -> Pointer<Never>
 
 /// Returns the number of test cases in `file`, or `-1` if it could not be read.
-@extern_c_indirect("hylo_read_test_case_count_indirect")
+@extern_c_indirect("hylo_read_non_negative_integer_indirect")
 fun read_test_case_count(file: Pointer<Never>) -> Int
 
 @extern_c_indirect("hylo_read_test_case_indirect")
