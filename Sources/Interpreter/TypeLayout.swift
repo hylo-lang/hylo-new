@@ -12,6 +12,9 @@ struct TypeLayout: Regular {
     /// The number of bytes occupied by an instance.
     let size: Int
 
+    /// The number of bytes between elements in a buffer of this type.
+    var stride: Int { size.roundedUp(toNearestMultipleOf: alignment) }
+
   }
 
   /// A (potential, in the case of enum types) named or unnambed member of a type.

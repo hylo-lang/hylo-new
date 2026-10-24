@@ -80,7 +80,8 @@ struct Memory {
 
     /// An allocation for `n` contiguous `t`s with the given `id`.
     public init(_ t: TypeLayout, count n: Int, id: ID) {
-      self.init(t.size * n, bytesWithAlignment: t.alignment, id: id)
+      let paddingAtEnd = if n != 0 { t.footprint.stride - t.size } else { 0 }
+      self.init(t.footprint.stride * n - paddingAtEnd, bytesWithAlignment: t.alignment, id: id)
     }
 
     /// The address of the `o`th byte.

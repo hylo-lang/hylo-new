@@ -29,6 +29,21 @@ final class InterpreterMemoryTests: XCTestCase {
     }
   }
 
+  func testAllocationOfTypeWhoseSizeIsNotAMultipleOfItsAlignment() throws {
+    // `i24` has size 3 but alignment 4.
+    let t = id(MachineType.i(24))
+    let l = layout(t).footprint
+    XCTAssertEqual(l.size, 3)
+    XCTAssertEqual(l.alignment, .bytes(4))
+
+    // Each element of an array is one stride after the previous one.
+    // The last element has no padding.
+    let a = m.allocate(.init(t), count: 3)
+    XCTAssertEqual(m[a.allocation].size, 3 * l.stride - 1)
+    XCTAssertNoThrow(
+      try m[a.allocation].checkAlignmentAndAllocationBounds(at: l.stride, for: layout(t)))
+  }
+
   func testMemoryAddressArithmetic() throws {
     let a = m.allocate(.init(id(MachineType.i(8))), count: 128)
 
