@@ -85,7 +85,7 @@ extension Pointer<TypeWitnessHeader> {
 
 extension UInt {
 
-  /// Creates an instance with the value of `x`.
+  /// Creates an instance equal to `x`.
   @inline(always)
   public init(x: UInt32) {
     &self.value = Builtin.zext_i32_word(x.value)
@@ -95,13 +95,13 @@ extension UInt {
 
 extension Int {
 
-  /// Creates an instance with the value of `x`.
+  /// Creates an instance equal to `x`.
   @inline(always)
   public init(x: UInt32) {
     &self.value = Builtin.zext_i32_word(x.value)
   }
 
-  /// Creates an instance with the value of `x`.
+  /// Creates an instance equal to `x`.
   @inline(always)
   public init(x: UInt16) {
     &self.value = Builtin.zext_i16_word(x.value)
