@@ -1852,6 +1852,8 @@ extension Program {
       size = next + fieldSize
     }
 
+    // 0-sized types have alignment 1.
+    assert(ps.allSatisfy{ rs[$0].layout.size != 0 || rs[$0].layout.alignment == .bytes(1) })
     let a: Alignment = if let max = ps.first { rs[max].layout.alignment } else { .bytes(1) }
     return ConcreteLayout(
       fields: elements, propertyToField: fieldToElement, size: .fixed(size), alignment: a)
