@@ -1153,12 +1153,15 @@ extension Program {
   /// Returns the global LLVM variable containing the type witness of `t`, declaring it if
   /// necessary.
   ///
-  /// - Requires: `t` is dealiased.
+  /// - Requires: `t` is dealiased and monomorphic.
   private mutating func demandGlobalTypeWitness(
     of t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
   ) -> SwiftyLLVM.GlobalVariable.UnsafeReference {
     // TODO: type arguments/parameters
     // TODO: witnesses of opaque types
+
+    assert(types.parameters(freeIn: t).isEmpty,
+      "global type witness requested for non-concrete type '\(show(t))'")
 
     let name = llvmName(global: .witness(t))
     if let existing = ctx.llvm.global(named: name) {

@@ -163,6 +163,8 @@ extension Program {
     switch f {
     case .lowered(let d):
       return inliningPolicy(of: d) ?? .opportunistic
+    case .existentialized(let g):
+      return inliningPolicy(of: g)
     default:
       return .opportunistic
     }
