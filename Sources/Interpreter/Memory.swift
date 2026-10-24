@@ -80,8 +80,13 @@ struct Memory {
 
     /// An allocation for `n` contiguous `t`s with the given `id`.
     public init(_ t: TypeLayout, count n: Int, id: ID) {
-      let paddingAtEnd = if n != 0 { t.footprint.stride - t.size } else { 0 }
-      self.init(t.footprint.stride * n - paddingAtEnd, bytesWithAlignment: t.alignment, id: id)
+      precondition(n >= 0)
+      if n != 0 {
+        let paddingAtEnd = t.stride - t.size
+        self.init(t.stride * n - paddingAtEnd, bytesWithAlignment: t.alignment, id: id)
+      } else {
+        self.init(0, bytesWithAlignment: .bytes(1), id: id)
+      }
     }
 
     /// The address of the `o`th byte.
@@ -138,7 +143,7 @@ struct Memory {
       }
     }
 
-    /// Returns `true` iff  element `o` is `n`-byte aligned.
+    /// Returns `true` iff the address at offset `o` is `n`-byte aligned.
     public func offset(_ o: Offset, hasAlignment n: Alignment) -> Bool {
       storage.withUnsafeBytes {
         UInt(bitPattern: $0.baseAddress! + baseOffset + o).isMultiple(of: n)
@@ -191,6 +196,7 @@ struct Memory {
 
   /// Allocates `n` contiguous instances of `t` and returns the`Address` of the first instance.
   public mutating func allocate(_ t: MonomorphicTypeIdentity, count n: Int = 1) -> Address {
+    precondition(n >= 0)
     let a = nextAllocation
     nextAllocation += 1
     allocation[a] = Allocation(typeLayouts.layout(t, in: &program), count: n, id: a)
