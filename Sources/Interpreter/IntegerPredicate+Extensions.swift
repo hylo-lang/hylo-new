@@ -37,8 +37,6 @@ extension IntegerPredicate {
       self(x, y)
     } else if let x = lhs.i128, let y = rhs.i128 {
       self(x, y)
-    } else if let x = lhs.word, let y = rhs.word {
-      self(x, y)
     } else {
       fatalError("arguments are not same type integers.")
     }

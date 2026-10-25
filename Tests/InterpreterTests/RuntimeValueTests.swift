@@ -40,7 +40,7 @@ final class RuntimeValueTests: XCTestCase {
 
     var bs: [UInt8] = [2]
     XCTAssertEqual(
-      RuntimeValue(2, ofType: .i(8)).bytes(laidOutUsing: &l, for: &p),
+      RuntimeValue(2, bitWidth: 8).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
@@ -51,7 +51,7 @@ final class RuntimeValueTests: XCTestCase {
 
     bs = [2, 1]
     XCTAssertEqual(
-      RuntimeValue(258, ofType: .i(16)).bytes(laidOutUsing: &l, for: &p),
+      RuntimeValue(258, bitWidth: 16).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
@@ -62,7 +62,7 @@ final class RuntimeValueTests: XCTestCase {
 
     bs = [2, 1, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(258, ofType: .i(32)).bytes(laidOutUsing: &l, for: &p),
+      RuntimeValue(258, bitWidth: 32).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
@@ -73,7 +73,7 @@ final class RuntimeValueTests: XCTestCase {
 
     bs = [2, 1, 0, 0, 0, 0, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(258, ofType: .i(64)).bytes(laidOutUsing: &l, for: &p),
+      RuntimeValue(258, bitWidth: 64).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(
@@ -84,7 +84,7 @@ final class RuntimeValueTests: XCTestCase {
 
     bs = [2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     XCTAssertEqual(
-      RuntimeValue(258, ofType: .i(128)).bytes(laidOutUsing: &l, for: &p),
+      RuntimeValue(258, bitWidth: 128).bytes(laidOutUsing: &l, for: &p),
       bs
     )
     XCTAssertEqual(

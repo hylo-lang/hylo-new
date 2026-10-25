@@ -24,9 +24,6 @@ enum BuiltinValue: Regular {
   /// 128-bit builtin integer type.
   case i128(UInt128)
 
-  /// The `word` type.
-  case word(UInt128)
-
   // TODO: support floats and ptr.
 
   /// The value of the stored `i1`, or `nil` if `self` does not match `.i1(_)`
@@ -77,14 +74,6 @@ enum BuiltinValue: Regular {
     }
   }
 
-  /// The value of the stored `word`, or `nil` if `self` doesn't match `.word(_)`
-  public var word: UInt128? {
-    switch self {
-    case .word(let v): v
-    default: nil
-    }
-  }
-
   /// The magnitude of stored integer value.
   public var asUInt128: UInt128 {
     switch self {
@@ -106,7 +95,6 @@ enum BuiltinValue: Regular {
     case .i32(_): MachineType.i(32)
     case .i64(_): MachineType.i(64)
     case .i128(_): MachineType.i(128)
-    case .word(_): MachineType.word
     }
   }
 
@@ -114,28 +102,45 @@ enum BuiltinValue: Regular {
 
 extension BuiltinValue {
 
-  /// Creates an integer of type `t` storing the two's-complement representation of `n`.
-  public init(_ n: BigInt, ofType t: MachineType) {
+  /// Creates a `w`-bit integer storing the two's-complement representation of `n`.
+  public init(_ n: BigInt, bitWidth w: UInt8) {
     self =
-      switch t {
-      case .i(let bitWidth):
-        switch bitWidth {
-        case 1: .i1(n != 0)
-        case 8: .i8(UInt8(truncatingIfNeeded: n))
-        case 16: .i16(UInt16(truncatingIfNeeded: n))
-        case 32: .i32(UInt32(truncatingIfNeeded: n))
-        case 64: .i64(UInt64(truncatingIfNeeded: n))
-        case 128: .i128(UInt128(truncatingIfNeeded: n))
-        default: preconditionFailure("Unknown integer bit width.")
-        }
-      case .word: .word(UInt128(truncatingIfNeeded: n))
-      default: unimplemented("float and ptr are not supported yet.")
+      switch w {
+      case 1: .i1(n != 0)
+      case 8: .i8(UInt8(truncatingIfNeeded: n))
+      case 16: .i16(UInt16(truncatingIfNeeded: n))
+      case 32: .i32(UInt32(truncatingIfNeeded: n))
+      case 64: .i64(UInt64(truncatingIfNeeded: n))
+      case 128: .i128(UInt128(truncatingIfNeeded: n))
+      default: preconditionFailure("Unknown integer bit width.")
       }
   }
 
   /// Creates an instance of `MachineType.i(1)` having value `b`.
   public init(_ b: Bool) {
     self = .i1(b)
+  }
+
+  /// Creates a value of type `t` by interpreting its byte representation `storage`
+  /// according to the layout provided by `layouts`.
+  public init(
+    _ storage: ArraySlice<UInt8>,
+    type t: MachineType,
+    layouts: inout LayoutComputer
+  ) {
+    switch t {
+    case .i(let bitWidth):
+      self = .init(
+        BigInt(unsignedFrom: storage, storedIn: layouts.abi.byteOrder),
+        bitWidth: bitWidth
+      )
+    case .word:
+      self = .init(
+        BigInt(unsignedFrom: storage, storedIn: layouts.abi.byteOrder),
+        bitWidth: layouts.abi.bitsInAPointer
+      )
+    default: unimplemented("floats and ptr are not supported yet.")
+    }
   }
 
 }
@@ -154,15 +159,6 @@ extension BuiltinValue {
       case .i32(let v): withUnsafeBytes(of: v) { Array($0) }
       case .i64(let v): withUnsafeBytes(of: v) { Array($0) }
       case .i128(let v): withUnsafeBytes(of: v) { Array($0) }
-      case .word(let v):
-        switch typeLayouts.abi.bitsInAPointer {
-        case 8: withUnsafeBytes(of: UInt8(v)) { Array($0) }
-        case 16: withUnsafeBytes(of: UInt16(v)) { Array($0) }
-        case 32: withUnsafeBytes(of: UInt32(v)) { Array($0) }
-        case 64: withUnsafeBytes(of: UInt64(v)) { Array($0) }
-        case 128: withUnsafeBytes(of: UInt128(v)) { Array($0) }
-        default: unreachable("Unknown bit-width of a word.")
-        }
       }
 
     if typeLayouts.abi.byteOrder != .host { bytes.reverse() }

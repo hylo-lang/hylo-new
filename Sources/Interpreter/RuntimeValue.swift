@@ -44,9 +44,9 @@ enum RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Creates an integer of type `t` storing the two's-complement representation of `n`.
-  public init(_ n: BigInt, ofType t: MachineType) {
-    self = .scalar(BuiltinValue(n, ofType: t))
+  /// Creates a `w`-bit integer storing the two's-complement representation of `n`.
+  public init(_ n: BigInt, bitWidth w: UInt8) {
+    self = .scalar(BuiltinValue(n, bitWidth: w))
   }
 
   /// Creates an instance of `MachineType.i(1)`.
@@ -72,9 +72,6 @@ extension RuntimeValue {
   /// The value of the stored `i128`, or `nil` if `self` does not match `.i128(_)`
   public var i128: UInt128? { builtin?.i128 }
 
-  /// The value of the stored `word`, or `nil` if `self` doesn't match `.word(_)`
-  public var word: UInt128? { builtin?.word }
-
   /// The magnitude of stored integer value, or `nil` if `self` doesn't match `.i(_)`.
   public var asUInt128: UInt128? { builtin?.asUInt128 }
 
@@ -95,31 +92,13 @@ extension RuntimeValue {
 
     if s == MachineType.self {
       let v = p.type(u, as: MachineType.self)
-      self = .init(storage, type: v, layouts: &layouts)
+      self = .scalar(.init(storage, type: v, layouts: &layouts))
     } else if s == Struct.self || s == Tuple.self {
       self = .init(record: storage, type: t, definedIn: &p, layouts: &layouts)
     } else if s == Enum.self {
       self = .init(enum: storage, type: t, definedIn: &p, layouts: &layouts)
     } else {
       unreachable()
-    }
-  }
-
-  /// Creates a value of type `t` by interpreting its byte representation `storage`
-  /// according to the layout provided by `layouts`.
-  private init(
-    _ storage: ArraySlice<UInt8>,
-    type t: MachineType,
-    layouts: inout LayoutComputer
-  ) {
-    switch t {
-    case .i(_):
-      let v = BigInt(unsignedFrom: storage, storedIn: layouts.abi.byteOrder)
-      self = .scalar(BuiltinValue(v, ofType: t))
-    case .word:
-      let v = BigInt(unsignedFrom: storage, storedIn: layouts.abi.byteOrder)
-      self = .scalar(BuiltinValue(v, ofType: t))
-    default: unimplemented("floats and ptr are not supported yet.")
     }
   }
 
