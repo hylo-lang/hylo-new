@@ -5,6 +5,15 @@ import XCTest
 
 final class BuiltinValueTests: XCTestCase {
 
+  func testBuiltinValueType() {
+    XCTAssertEqual(BuiltinValue(true).type, .i(1))
+    XCTAssertEqual(BuiltinValue(2, bitWidth: 8).type, .i(8))
+    XCTAssertEqual(BuiltinValue(2, bitWidth: 16).type, .i(16))
+    XCTAssertEqual(BuiltinValue(2, bitWidth: 32).type, .i(32))
+    XCTAssertEqual(BuiltinValue(2, bitWidth: 64).type, .i(64))
+    XCTAssertEqual(BuiltinValue(2, bitWidth: 128).type, .i(128))
+  }
+
   func testBooleanValueWithLsbFirstOrderingABI() {
     var l = LayoutComputer(for: UnrealABI(byteOrder: .little))
     XCTAssertEqual(
@@ -39,6 +48,7 @@ final class BuiltinValueTests: XCTestCase {
     XCTAssertEqual(BuiltinValue(-1, bitWidth: 8).i8!, 255)
     XCTAssertEqual(BuiltinValue(-2, bitWidth: 8).i8!, 254)
     XCTAssertEqual(BuiltinValue(-128, bitWidth: 8).i8!, 128)
+    XCTAssertEqual(BuiltinValue(128, bitWidth: 128).i128!, 128)
   }
 
   func testIntegersForLsbFirst() {
