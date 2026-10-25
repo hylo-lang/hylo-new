@@ -9,9 +9,9 @@ extension BigInt {
     if byteOrder == .little {
       self = .init(unsignedFrom: storedForm.reversed(), storedIn: .big)
     } else {
-      self = storedForm.reduce(into: 0 as BigInt) { r, c in
-        r <<= 8
-        r |= BigInt(c)
+      self = storedForm.reduce(into: 0 as BigInt) { reconstructedValue, nextByte in
+        reconstructedValue <<= 8
+        reconstructedValue |= BigInt(nextByte)
       }
     }
   }

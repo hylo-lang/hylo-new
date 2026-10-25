@@ -27,7 +27,7 @@ enum RuntimeValue {
   /// a `MachineType`.
   fileprivate var builtin: BuiltinValue? {
     switch self {
-    case .scalar(let v): v
+    case .scalar(let value): value
     case .composite(_, _): nil
     }
   }
@@ -36,7 +36,7 @@ enum RuntimeValue {
   fileprivate var parts: [RuntimeValue] {
     switch self {
     case .scalar(_): []
-    case .composite(let vs, _): vs
+    case .composite(let components, _): components
     }
   }
 
@@ -87,15 +87,15 @@ extension RuntimeValue {
     definedIn p: inout Program,
     layouts: inout LayoutComputer
   ) {
-    let u = p.underlyingType(t.underlying)
-    let s = p.tag(u)
+    let unwrappedType = p.underlyingType(t.underlying)
+    let typeTag = p.tag(unwrappedType)
 
-    if s == MachineType.self {
-      let v = p.type(u, as: MachineType.self)
+    if typeTag == MachineType.self {
+      let v = p.type(unwrappedType, as: MachineType.self)
       self = .scalar(.init(storage, type: v, layouts: &layouts))
-    } else if s == Struct.self || s == Tuple.self {
+    } else if typeTag == Struct.self || typeTag == Tuple.self {
       self = .init(record: storage, type: t, definedIn: &p, layouts: &layouts)
-    } else if s == Enum.self {
+    } else if typeTag == Enum.self {
       self = .init(enum: storage, type: t, definedIn: &p, layouts: &layouts)
     } else {
       unreachable()

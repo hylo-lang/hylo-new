@@ -352,9 +352,8 @@ extension Memory {
 
   /// Returns the value stored at `p`.
   private mutating func read(from p: Memory.TypedAddress) -> RuntimeValue {
-    let l = layout(p.type)
-    let bs = self[p.allocation].storage[p.offset..<p.offset + l.size]
-    return RuntimeValue(bs, type: l.type, definedIn: &program, layouts: &typeLayouts)
+    let bs = self[p.allocation].storage[p.offset..<p.offset + layout(p.type).size]
+    return RuntimeValue(bs, type: p.type, definedIn: &program, layouts: &typeLayouts)
   }
 
   /// Returns the value stored at `p`, using the permissions and obligations
