@@ -277,7 +277,7 @@ public struct Interpreter {
     case let x as IRRegionEnd<IRProject>:
       _ = x
     case let x as IRProperty:
-      let l = x.record.location(ofField: x.property, in: &self)
+      let l = x.whole.location(ofField: x.property, in: &self)
       return register(l)
     case is IRReturn:
       for a in topOfStack.allocations.reversed() {
@@ -288,7 +288,7 @@ public struct Interpreter {
       try store(x.value, at: x.target)
       return register(())
     case let x as IRSubfield:
-      let l = x.base.location(ofPart: x.path, in: &self)
+      let l = x.whole.location(ofPart: x.path, in: &self)
       return register(l)
     case let x as IRTypeApply:
       _ = x

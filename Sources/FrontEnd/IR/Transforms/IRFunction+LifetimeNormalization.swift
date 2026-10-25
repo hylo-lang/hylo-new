@@ -553,13 +553,13 @@ private struct Transfer: AbstractTransferFunction {
     // If the property is referring to a stored property in a struct whose layout is visible, the
     // instruction behaves like `subfield`.
     if let index = program.storedPropertyIndex(of: s.property, in: s.anchor.scope) {
-      let field = context.locals[s.record]!.place!.appending(contentsOf: [index])
+      let field = context.locals[s.whole]!.place!.appending(contentsOf: [index])
       context.locals[.register(i.erased)] = .place(field)
     }
 
     // Otherwise, it defines a new place.
     else {
-      assert(isInitialized(place: s.record), "abstract property on uninitialized object")
+      assert(isInitialized(place: s.whole), "abstract property on uninitialized object")
       context.declare(i.erased, from: f, initially: .initialized)
     }
 
@@ -616,7 +616,7 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRSubfield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
-    let a = context.locals[s.base]!.place!.appending(contentsOf: s.path)
+    let a = context.locals[s.whole]!.place!.appending(contentsOf: s.path)
     context.locals[.register(i.erased)] = .place(a)
     return f.instruction(after: i.erased)
   }
@@ -757,7 +757,7 @@ private struct Transfer: AbstractTransferFunction {
     while let r = s.register {
       if let s = f.at(r) as? IRProperty, let i = introducer(binding: s.property) {
         let presented = (i == .let) && program.isMember(s.property) ? .sinklet : i
-        return (presented, s.record)
+        return (presented, s.whole)
       } else if let next = f.source(r) {
         s = next
       } else {
@@ -843,7 +843,7 @@ private struct Transfer: AbstractTransferFunction {
     case IRProperty.self:
       return isBoundImmutably(f.castUnchecked(i, to: IRProperty.self), in: f)
     case IRSubfield.self:
-      return isBoundImmutably((f.at(i) as! IRSubfield).base, in: f)
+      return isBoundImmutably((f.at(i) as! IRSubfield).whole, in: f)
     default:
       return true
     }
@@ -856,7 +856,7 @@ private struct Transfer: AbstractTransferFunction {
       let d = program.bindingDeclaration(containing: v),
       program[program[d].pattern].introducer.value != .let
     {
-      return isBoundImmutably(f.at(i).record, in: f)
+      return isBoundImmutably(f.at(i).whole, in: f)
     } else {
       return true
     }

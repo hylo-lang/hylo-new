@@ -249,7 +249,7 @@ public struct IRFunction: Sendable {
     case IRPlaceCast.self:
       return (at(i) as! IRPlaceCast).source
     case IRSubfield.self:
-      return (at(i) as! IRSubfield).base
+      return (at(i) as! IRSubfield).whole
     default:
       return nil
     }

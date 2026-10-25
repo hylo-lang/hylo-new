@@ -17,7 +17,7 @@ extension IRFunction {
     let s = at(i)
     if let u = uses[.register(i.erased)]?.uniqueElement, let t = at(u.user) as? IRSubfield {
       let folded = IRSubfield(
-        base: s.base, path: s.path.appending(contentsOf: t.path),
+        whole: s.whole, path: s.path.appending(contentsOf: t.path),
         subfieldType: t.subfieldType, anchor: t.anchor)
       replace(u.user, with: folded)
       remove(i.erased)

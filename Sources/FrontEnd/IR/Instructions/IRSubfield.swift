@@ -19,10 +19,10 @@ public struct IRSubfield: Instruction {
 
   /// Creates an instance with the given properties.
   public init(
-    base: IRValue, path: IndexPath, subfieldType: AnyTypeIdentity,
+    whole: IRValue, path: IndexPath, subfieldType: AnyTypeIdentity,
     anchor: Anchor
   ) {
-    self.operands = [base]
+    self.operands = [whole]
     self.anchor = anchor
     self.path = path
     self.subfieldType = subfieldType
@@ -30,14 +30,14 @@ public struct IRSubfield: Instruction {
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
   public init(_ other: Self, substituting properties: IRSubstitutionTable) {
-    self.operands = [properties[other.base]]
+    self.operands = [properties[other.whole]]
     self.anchor = properties.anchor(other)
     self.path = other.path
     self.subfieldType = other.subfieldType
   }
 
-  /// The address of the record containing the subfield whose address is computed.
-  public var base: IRValue {
+  /// The place of the whole containing the subfield being accessed.
+  public var whole: IRValue {
     operands[0]
   }
 
@@ -56,7 +56,7 @@ extension IRSubfield: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    "subfield \(printer.show(base)) at \(list: path) as \(printer.show(subfieldType))"
+    "subfield \(printer.show(whole)) at \(list: path) as \(printer.show(subfieldType))"
   }
 
 }

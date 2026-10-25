@@ -778,9 +778,9 @@ extension Program {
     _ i: IRSubfield.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
-    let record = ctx.value[s.base]!
-    let typeInHylo = ctx.ir.result(of: s.base)!.type
-    let address = insertGetFieldAddress(at: s.path, in: record, instanceOf: typeInHylo, in: &ctx)
+    let whole = ctx.value[s.whole]!
+    let wholeType = ctx.ir.result(of: s.whole)!.type
+    let address = insertGetFieldAddress(at: s.path, in: whole, instanceOf: wholeType, in: &ctx)
 
     ctx.value[.register(i.erased)] = address
     return ctx.ir.instruction(after: i.erased)

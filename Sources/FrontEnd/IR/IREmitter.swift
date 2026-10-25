@@ -2384,10 +2384,10 @@ internal struct IREmitter {
 
   /// Inserts a `property` instruction.
   internal mutating func _property(
-    _ property: DeclarationIdentity, of record: IRValue, withType propertyType: AnyTypeIdentity
+    _ property: DeclarationIdentity, of whole: IRValue, withType propertyType: AnyTypeIdentity
   ) -> IRValue {
     let t = program.types.dealiased(propertyType)
-    let s = IRProperty(record: record, property: property, propertyType: t, anchor: currentAnchor)
+    let s = IRProperty(whole: whole, property: property, propertyType: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2402,17 +2402,17 @@ internal struct IREmitter {
   }
 
   /// Inserts a `subfield` instruction.
-  internal mutating func _subfield(_ base: IRValue, at path: IndexPath) -> IRValue {
+  internal mutating func _subfield(_ whole: IRValue, at path: IndexPath) -> IRValue {
     // The instruction is equivalent to the identity if the path is empty.
-    if path.isEmpty { return base }
+    if path.isEmpty { return whole }
 
-    let (root, _) = currentFunction.result(of: base) ?? badOperand()
+    let (root, _) = currentFunction.result(of: whole) ?? badOperand()
     let subfieldType = program.withTyper(typing: module) { (tp) in
       tp.field(of: root, at: path)
     }
 
     let s = IRSubfield(
-      base: base, path: path, subfieldType: subfieldType!,
+      whole: whole, path: path, subfieldType: subfieldType!,
       anchor: currentAnchor)
     return insert(s)!
   }

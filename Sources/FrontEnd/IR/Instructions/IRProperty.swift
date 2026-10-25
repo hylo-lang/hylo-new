@@ -19,10 +19,10 @@ public struct IRProperty: Instruction {
 
   /// Creates an instance with the given properties.
   public init(
-    record: IRValue, property: DeclarationIdentity, propertyType: AnyTypeIdentity,
+    whole: IRValue, property: DeclarationIdentity, propertyType: AnyTypeIdentity,
     anchor: Anchor
   ) {
-    self.operands = [record]
+    self.operands = [whole]
     self.anchor = anchor
     self.property = property
     self.propertyType = propertyType
@@ -30,14 +30,14 @@ public struct IRProperty: Instruction {
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
   public init(_ other: Self, substituting properties: IRSubstitutionTable) {
-    self.operands = [properties[other.record]]
+    self.operands = [properties[other.whole]]
     self.anchor = properties.anchor(other)
     self.property = other.property
     self.propertyType = other.propertyType
   }
 
-  /// The address of the record containing the property whose getter is returned.
-  public var record: IRValue {
+  /// The place of the whole containing the property being accessed.
+  public var whole: IRValue {
     operands[0]
   }
 
@@ -55,7 +55,7 @@ public struct IRProperty: Instruction {
   public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
     // The record is a place storing a witness table.
     guard
-      let t = parent.result(of: record),
+      let t = parent.result(of: whole),
       let (c, _) = program.types.seenAsTraitApplication(t.type)
     else { preconditionFailure("bad operand") }
 
@@ -71,7 +71,7 @@ extension IRProperty: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     let n = printer.program.nameOrTag(of: property)
-    return "property \"\(n)\" of \(printer.show(record)) as \(printer.show(propertyType))"
+    return "property \"\(n)\" of \(printer.show(whole)) as \(printer.show(propertyType))"
   }
 
 }
