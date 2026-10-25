@@ -1,6 +1,6 @@
 extension <T> Metatype<T> {
 
-  /// Returns the size of the type `T` in bytes.
+  /// Returns the size of an instance of `T`, measured in bytes.
   @inline(always)
   public static fun size() -> Int {
     let r = Pointer<RecordMemberType>(value: Builtin.address(of: T)).pointee()
@@ -8,7 +8,10 @@ extension <T> Metatype<T> {
     return Int(truncating_or_extending: r.size())
   }
 
-  /// Returns the alignment of the type `T` in bytes.
+  /// Returns the preferred alignment requirement of `T`, measured in bytes.
+  ///
+  /// The alignment requirement of a type `T` is a constraint on the addresses to/from which an
+  /// instance of `T` can be written/read.
   @inline(always)
   public static fun alignment() -> Int {
     let r = Pointer<RecordMemberType>(value: Builtin.address(of: T)).pointee()
@@ -17,7 +20,8 @@ extension <T> Metatype<T> {
       (1 as UInt) << Int(truncating_or_extending: r.log2_alignment()))
   }
 
-  /// Returns the stride of the type `T` in bytes.
+  /// Returns the distance between the start of two instances of `T` laid out contiguously in memory
+  /// (e.g., in an array), measured in bytes.
   @inline(always)
   public static fun stride() -> Int {
     let r = Pointer<RecordMemberType>(value: Builtin.address(of: T)).pointee()
