@@ -129,12 +129,7 @@ fun verify_offset(
     .new(i),
     in: .new(value: Builtin.address(of: w)),
     of_length: .new(l))
-
-  // Check the offset of non-zero-sized members.
-  let h = Pointer<H>(value: Builtin.address(of: headers)) + i
-  if h.size() != (0 as Size) {
-    precondition(o == UInt32(x))
-  }
+  precondition(o == UInt32(x))
 }
 
 fun verify_offsets(

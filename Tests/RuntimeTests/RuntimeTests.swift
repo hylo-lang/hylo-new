@@ -247,10 +247,8 @@ private func size_of_record_having_ordered_members(
   var r = 0 as Size
   while start < end {
     let w = start.pointee()
-    if w.size() != 0 {
-      let position = r.rounded_up(to_nearest_multiple_of_2_to_the: w.log2_alignment())
-      r = position + w.size()
-    }
+    let position = r.rounded_up(to_nearest_multiple_of_2_to_the: w.log2_alignment())
+    r = position + w.size()
     start += 1
   }
   return r
@@ -272,7 +270,6 @@ private func __hylo_offset_of_member(
 
   filter_and_stable_sort_elements_by_decreasing_alignment(
     from: &start, to: &end, that_lay_out_before: p, having_log2_alignment: nth_log2_alignment)
-  if start == end { return 0 }
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
   return preceding_size.rounded_up(to_nearest_multiple_of_2_to_the: nth_log2_alignment)
 }
