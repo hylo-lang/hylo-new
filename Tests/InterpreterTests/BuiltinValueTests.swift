@@ -98,4 +98,32 @@ final class BuiltinValueTests: XCTestCase {
     )
   }
 
+  func testByteConversionPreserveValue() {
+    var l = LayoutComputer(for: UnrealABI(byteOrder: .big))
+
+    XCTAssertEqual(
+      BuiltinValue(
+        BuiltinValue(2, bitWidth: 8).bytes(laidOutUsing: &l)[...],
+        type: .i(8), layouts: &l
+      ).i8!,
+      2
+    )
+
+    XCTAssertEqual(
+      BuiltinValue(
+        BuiltinValue(255, bitWidth: 8).bytes(laidOutUsing: &l)[...],
+        type: .i(8), layouts: &l
+      ).i8!,
+      255
+    )
+
+    XCTAssertEqual(
+      BuiltinValue(
+        BuiltinValue(-1, bitWidth: 8).bytes(laidOutUsing: &l)[...],
+        type: .i(8), layouts: &l
+      ).i8!,
+      255
+    )
+  }
+
 }
