@@ -11,29 +11,29 @@ public struct IRProperty: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// The property being accessed.
-  public let property: DeclarationIdentity
+  /// The declaration of the property being accessed.
+  public let part: DeclarationIdentity
 
   /// The type of the property being accessed.
-  public let propertyType: AnyTypeIdentity
+  public let partType: AnyTypeIdentity
 
   /// Creates an instance with the given properties.
   public init(
-    whole: IRValue, property: DeclarationIdentity, propertyType: AnyTypeIdentity,
+    whole: IRValue, part: DeclarationIdentity, partType: AnyTypeIdentity,
     anchor: Anchor
   ) {
     self.operands = [whole]
     self.anchor = anchor
-    self.property = property
-    self.propertyType = propertyType
+    self.part = part
+    self.partType = partType
   }
 
   /// Creates a copy of `other`, substituting its properties with `properties`.
   public init(_ other: Self, substituting properties: IRSubstitutionTable) {
     self.operands = [properties[other.whole]]
     self.anchor = properties.anchor(other)
-    self.property = other.property
-    self.propertyType = other.propertyType
+    self.part = other.part
+    self.partType = other.partType
   }
 
   /// The place of the whole containing the property being accessed.
@@ -43,7 +43,7 @@ public struct IRProperty: Instruction {
 
   /// The type of the value loaded by this instruction.
   public var type: IRType {
-    .place(propertyType)
+    .place(partType)
   }
 
   /// `true`.
@@ -60,7 +60,7 @@ public struct IRProperty: Instruction {
     else { preconditionFailure("bad operand") }
 
     // The selected property exists.
-    precondition(program.requirements(of: c).index(of: property) != nil)
+    precondition(program.requirements(of: c).index(of: part) != nil)
     return true
   }
 
@@ -70,8 +70,8 @@ extension IRProperty: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    let n = printer.program.nameOrTag(of: property)
-    return "property \"\(n)\" of \(printer.show(whole)) as \(printer.show(propertyType))"
+    let n = printer.program.nameOrTag(of: part)
+    return "property \"\(n)\" of \(printer.show(whole)) as \(printer.show(partType))"
   }
 
 }

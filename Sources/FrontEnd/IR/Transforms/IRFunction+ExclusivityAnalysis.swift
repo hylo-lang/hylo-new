@@ -288,7 +288,7 @@ private struct Transfer: AbstractTransferFunction {
 
     // If the property is referring to a stored property in a struct whose layout is visible, the
     // instruction behaves like `subfield`.
-    if let index = program.storedPropertyIndex(of: s.property, in: s.anchor.scope) {
+    if let index = program.storedPropertyIndex(of: s.part, in: s.anchor.scope) {
       let field = context.locals[s.whole]!.place!.appending(contentsOf: [index])
       context.locals[.register(i.erased)] = .place(field)
     }
@@ -306,7 +306,7 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRSubfield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
-    let a = context.locals[s.whole]!.place!.appending(contentsOf: s.path)
+    let a = context.locals[s.whole]!.place!.appending(contentsOf: s.part)
     context.locals[.register(i.erased)] = .place(a)
     return f.instruction(after: i.erased)
   }

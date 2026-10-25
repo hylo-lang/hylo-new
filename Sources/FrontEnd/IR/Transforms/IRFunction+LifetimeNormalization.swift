@@ -552,7 +552,7 @@ private struct Transfer: AbstractTransferFunction {
 
     // If the property is referring to a stored property in a struct whose layout is visible, the
     // instruction behaves like `subfield`.
-    if let index = program.storedPropertyIndex(of: s.property, in: s.anchor.scope) {
+    if let index = program.storedPropertyIndex(of: s.part, in: s.anchor.scope) {
       let field = context.locals[s.whole]!.place!.appending(contentsOf: [index])
       context.locals[.register(i.erased)] = .place(field)
     }
@@ -616,7 +616,7 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRSubfield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
-    let a = context.locals[s.whole]!.place!.appending(contentsOf: s.path)
+    let a = context.locals[s.whole]!.place!.appending(contentsOf: s.part)
     context.locals[.register(i.erased)] = .place(a)
     return f.instruction(after: i.erased)
   }
@@ -755,8 +755,8 @@ private struct Transfer: AbstractTransferFunction {
   ) -> (BindingPattern.Introducer?, IRValue) {
     var s = v
     while let r = s.register {
-      if let s = f.at(r) as? IRProperty, let i = introducer(binding: s.property) {
-        let presented = (i == .let) && program.isMember(s.property) ? .sinklet : i
+      if let s = f.at(r) as? IRProperty, let i = introducer(binding: s.part) {
+        let presented = (i == .let) && program.isMember(s.part) ? .sinklet : i
         return (presented, s.whole)
       } else if let next = f.source(r) {
         s = next
@@ -852,7 +852,7 @@ private struct Transfer: AbstractTransferFunction {
   /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
   private func isBoundImmutably(_ i: IRProperty.ID, in f: IRFunction) -> Bool {
     if
-      let v = program.cast(f.at(i).property, to: VariableDeclaration.self),
+      let v = program.cast(f.at(i).part, to: VariableDeclaration.self),
       let d = program.bindingDeclaration(containing: v),
       program[program[d].pattern].introducer.value != .let
     {

@@ -714,12 +714,12 @@ extension Program {
     let s = ctx.ir.at(i)
 
     // Compute the LLVM representation of the whole.
-    let wholeTypeInHylo = ctx.ir.result(of: s.record)!.type
+    let wholeTypeInHylo = ctx.ir.result(of: s.whole)!.type
     let wholeType = metadata(of: wholeTypeInHylo, in: &ctx.module)
-    let whole = codegen(s.record, in: &ctx)
+    let whole = codegen(s.whole, in: &ctx)
 
     // If the property is a field in a struct, lookup its offset.
-    if let index = storedPropertyIndex(of: s.property, in: s.anchor.scope) {
+    if let index = storedPropertyIndex(of: s.part, in: s.anchor.scope) {
       let a = insertGetFieldAddress(
         at: [index], in: whole, instanceOf: wholeTypeInHylo, in: &ctx)
       ctx.value[.register(i.erased)] = a
@@ -729,13 +729,13 @@ extension Program {
     // table is witnessing a conformance.
     else if let (concept, _) = types.seenAsTraitApplication(wholeTypeInHylo) {
       // The contents of a witness table follow the ordering of its requirements.
-      let index = requirements(of: concept).index(of: s.property)!
+      let index = requirements(of: concept).index(of: s.part)!
       let part = ctx.module.llvm.insertGetElementPointerInBounds(
         of: whole, typed: wholeType.llvm,
         indices: [0, index], indexType: ctx.module.llvm.i32,
         at: ctx.insertionPoint!)
 
-      let p = typeOfProperty(s.property, usedAsInstanceOf: s.propertyType, in: &ctx.module)
+      let p = typeOfProperty(s.part, usedAsInstanceOf: s.partType, in: &ctx.module)
       let a = ctx.module.llvm.insertLoad(p, from: part, at: ctx.insertionPoint!).v
       ctx.value[.register(i.erased)] = a
     }
@@ -780,7 +780,7 @@ extension Program {
     let s = ctx.ir.at(i)
     let whole = ctx.value[s.whole]!
     let wholeType = ctx.ir.result(of: s.whole)!.type
-    let address = insertGetFieldAddress(at: s.path, in: whole, instanceOf: wholeType, in: &ctx)
+    let address = insertGetFieldAddress(at: s.part, in: whole, instanceOf: wholeType, in: &ctx)
 
     ctx.value[.register(i.erased)] = address
     return ctx.ir.instruction(after: i.erased)

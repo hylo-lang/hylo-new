@@ -16,10 +16,9 @@ extension IRFunction {
   private mutating func fold(_ i: IRSubfield.ID) {
     let s = at(i)
     if let u = uses[.register(i.erased)]?.uniqueElement, let t = at(u.user) as? IRSubfield {
-      let folded = IRSubfield(
-        whole: s.whole, path: s.path.appending(contentsOf: t.path),
-        subfieldType: t.subfieldType, anchor: t.anchor)
-      replace(u.user, with: folded)
+      let p = s.part.appending(contentsOf: t.part)
+      let x = IRSubfield(whole: s.whole, part: p, partType: t.partType, anchor: t.anchor)
+      replace(u.user, with: x)
       remove(i.erased)
     }
   }
