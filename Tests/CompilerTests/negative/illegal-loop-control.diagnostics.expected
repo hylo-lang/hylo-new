@@ -1,0 +1,6 @@
+negative/illegal-loop-control.hylo:3.13-18: error: 'break' statement can only occur in a loop
+fun foo() { break }
+            ~~~~~
+negative/illegal-loop-control.hylo:5.13-21: error: 'continue' statement can only occur in a loop
+fun bar() { continue }
+            ~~~~~~~~

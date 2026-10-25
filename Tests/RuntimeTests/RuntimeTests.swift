@@ -1,5 +1,6 @@
-import XCTest
 import Foundation
+import Utilities
+import XCTest
 
 // ========================= NOTE ===========================
 // Many of the names in this file use Hylo naming convention
@@ -7,7 +8,10 @@ import Foundation
 // ==========================================================
 
 fileprivate typealias Size = UInt32
+/// An alignment in bytes.
 fileprivate typealias Alignment = UInt16
+/// The base-2 logarithm of an alignment in bytes.
+fileprivate typealias Log2Alignment = UInt16
 fileprivate typealias StringPointer = UnsafePointer<UInt8>?
 
 /// Layout of the first part of type witnesses.
@@ -16,7 +20,7 @@ private struct TypeWitnessHeader {
   // see https://github.com/hylo-lang/hylo-new/issues/306
   let description: UnsafePointer<UInt8>?
   let size: Size
-  let alignment: Alignment
+  let log2_alignment: Log2Alignment
   let type_argument_or_parameter_count: UInt16
 }
 
@@ -28,21 +32,21 @@ func checkLayoutRequirements() {
     "Assumptions about TypeWitnessHeader tuple layout violated"
   )
   precondition(
-    MemoryLayout<Size>.alignment >= MemoryLayout<Alignment>.alignment,
+    MemoryLayout<Size>.alignment >= MemoryLayout<Log2Alignment>.alignment,
     "Assumptions about TypeWitnessHeader tuple layout violated"
   )
 }
 
 let layoutRequirementsChecked: () = checkLayoutRequirements()
 
-fileprivate extension Alignment {
+fileprivate extension Size {
 
-  /// Returns the first n >= i that is a multiple of self
-  func first_aligned_offset(starting_from i: Size) -> Size {
-    let a = Size(self)
-    // The distance from i to the nearest aligned offset <= i.
-    let excess = i % a
-    return excess == 0 ? i : i - excess + a
+  /// Returns the least n >= `self` that is a multiple of `2^k`.
+  func rounded_up(to_nearest_multiple_of_2_to_the k: Log2Alignment) -> Size {
+    let a = Size(1) << k
+    // The distance from the nearest multiple of `a` <= `self` to `self`.
+    let excess = self % a
+    return excess == 0 ? self : self - excess + a
   }
 
 }
@@ -55,8 +59,8 @@ fileprivate extension RecordMemberType {
   /// Returns the size of an instance
   func size() -> Size { self[0].size }
 
-  /// Returns the alignment of an instance
-  func alignment() -> UInt16 { self[0].alignment }
+  /// Returns the base-2 logarithm of the alignment of an instance in bytes
+  func log2_alignment() -> Log2Alignment { self[0].log2_alignment }
 
 }
 
@@ -82,6 +86,9 @@ private extension BinaryInteger {
 
 }
 // ===================================================
+
+/// The members of a record, in declaration order.
+fileprivate typealias Members = [(size: Size, alignment: Alignment)]
 
 /// Returns the first element `x` of `start..<end` such that
 /// `p(x.pointee())` is true.
@@ -134,8 +141,8 @@ private func shift_backward1(
 
 /// Inserts `source.pointee()` at the latest position *q* in
 /// `destinationStart...destinationEnd` such that all its
-/// predecessors' `pointee`s have `alignment` ≥
-/// *q*`.pointee().alignment()`.
+/// predecessors' `pointee`s have `log2_alignment` ≥
+/// *q*`.pointee().log2_alignment()`.
 ///
 /// - Precondition: the pointees of
 ///   `destinationStart..<destinationEnd` are sorted by decreasing
@@ -147,11 +154,11 @@ private func insert_backward_stably_sorted_by_decreasing_alignment(
   from source: UnsafeMutablePointer<RecordMemberType>
 ) {
   let r = source.pointee()
-  let a = r.alignment()
+  let a = r.log2_alignment()
 
   var i = destinationEnd.copy()
   drop_last(
-    from: destinationStart, to: &i, while: { $0.alignment() < a })
+    from: destinationStart, to: &i, while: { $0.log2_alignment() < a })
 
   if source != i {
     shift_backward1(from: i, until: destinationEnd)
@@ -163,8 +170,8 @@ private func insert_backward_stably_sorted_by_decreasing_alignment(
 /// Inserts the pointees in `sourceStart_..<sourceEnd` that satisfy
 /// `p` at the latest position `q` in
 /// `destinationStart...destinationEnd` such that all their
-/// predecessors' `pointee`s have `alignment` ≥
-/// *q*`.pointee().alignment()`.
+/// predecessors' `pointee`s have `log2_alignment` ≥
+/// *q*`.pointee().log2_alignment()`.
 ///
 /// - Precondition: the pointees of
 ///   `destinationStart..<destinationEnd` are sorted by decreasing
@@ -193,10 +200,10 @@ private func filter_and_stable_sort_elements_by_decreasing_alignment(
   from start: inout UnsafeMutablePointer<RecordMemberType>,
   to end: inout UnsafeMutablePointer<RecordMemberType>,
   that_lay_out_before n: UnsafeMutablePointer<RecordMemberType>,
-  having_alignment n_alignment: Alignment
+  having_log2_alignment n_log2_alignment: Log2Alignment
 ) {
   // Drop initial unretained elements before n
-  drop(from: &start, to: n, while: { $0.alignment() < n_alignment })
+  drop(from: &start, to: n, while: { $0.log2_alignment() < n_log2_alignment })
 
   var new_end: UnsafeMutablePointer<RecordMemberType>
   let tail_start: UnsafeMutablePointer<RecordMemberType>
@@ -207,7 +214,7 @@ private func filter_and_stable_sort_elements_by_decreasing_alignment(
 
     insert_backward_stably_sorted_by_decreasing_alignment(
       into: start, until: &new_end, from: start + 1, until: n,
-      where: { $0.alignment() >= n_alignment })
+      where: { $0.log2_alignment() >= n_log2_alignment })
 
     tail_start = n + 1
   }
@@ -216,10 +223,10 @@ private func filter_and_stable_sort_elements_by_decreasing_alignment(
     start = n + 1
     drop(
       from: &start, to: end,
-      while: { $0.alignment() <= n_alignment })
-    
+      while: { $0.log2_alignment() <= n_log2_alignment })
+
     if start == end { return }
-    
+
     new_end = start + 1
     tail_start = new_end
   }
@@ -227,7 +234,7 @@ private func filter_and_stable_sort_elements_by_decreasing_alignment(
   // insert elements after n
   insert_backward_stably_sorted_by_decreasing_alignment(
     into: start, until: &new_end, from: tail_start, until: end,
-    where: { $0.alignment() > n_alignment })
+    where: { $0.log2_alignment() > n_log2_alignment })
   end = new_end
 }
 
@@ -240,7 +247,7 @@ private func size_of_record_having_ordered_members(
   var r = 0 as Size
   while start < end {
     let w = start.pointee()
-    let position = w.alignment().first_aligned_offset(starting_from: r)
+    let position = r.rounded_up(to_nearest_multiple_of_2_to_the: w.log2_alignment())
     r = position + w.size()
     start += 1
   }
@@ -257,15 +264,14 @@ private func __hylo_offset_of_member(
   in memberArray: UnsafeMutablePointer<RecordMemberType>, of_length l: UInt32) -> UInt32
 {
   let p = memberArray + Int(n)
-  let nth_alignment = p.pointee().alignment()
+  let nth_log2_alignment = p.pointee().log2_alignment()
   var start = memberArray
   var end = memberArray + Int(l)
 
   filter_and_stable_sort_elements_by_decreasing_alignment(
-    from: &start, to: &end, that_lay_out_before: p, having_alignment: nth_alignment)
-  if start == end { return 0 }
+    from: &start, to: &end, that_lay_out_before: p, having_log2_alignment: nth_log2_alignment)
   let preceding_size = size_of_record_having_ordered_members(from: start, to: end)
-  return nth_alignment.first_aligned_offset(starting_from: preceding_size)
+  return preceding_size.rounded_up(to_nearest_multiple_of_2_to_the: nth_log2_alignment)
 }
 
 //
@@ -317,14 +323,19 @@ private extension RecordLayout {
 
 final class LayoutTests: XCTestCase {
 
+  /// Returns a witness of a type having the given `size` and `alignment`.
+  ///
+  /// - Requires: `alignment` is a power of two.
   fileprivate func w(size: Size, alignment: Alignment) -> TypeWitnessHeader {
-    .init(
+    precondition(alignment.isPowerOfTwo, "alignment \(alignment) is not a power of two")
+    return .init(
       description: nil,
-      size: size, alignment: alignment,
+      size: size, log2_alignment: Log2Alignment(alignment.trailingZeroBitCount),
       type_argument_or_parameter_count: 0)
   }
 
-  fileprivate func offsets(members: [(size: Size, alignment: Alignment)]) -> [UInt32] {
+  /// Returns the offset of each of `members` in a record having them.
+  fileprivate func offsets(members: Members) -> [UInt32] {
     let witnesses = members.map { (s, a) in w(size: s, alignment: a) }
     return witnesses.withUnsafeBufferPointer { headers in
       let witnessPointers = headers.indices.map { headers.baseAddress! + $0 }
@@ -338,15 +349,19 @@ final class LayoutTests: XCTestCase {
     }
   }
 
-  /// Fragments of the Hylo test input file.
-  var hyloTestCases: [String] = []
+  /// Returns the size of a record having `members` at corresponding `offsets`.
+  private func size(members: Members, offsets: [UInt32]) -> Size {
+    zip(members, offsets).map { (m, o) in m.size + o }.max() ?? 0
+  }
+
+  /// Returns the alignment of a record having `members`, i.e. their maximal alignment.
+  private func alignment(members: Members) -> Alignment {
+    members.map(\.alignment).max() ?? 1
+  }
 
   /// Returns a the test case formatted for the Hylo test
   /// input file.
-  private func hyloTestCase(
-    members sas: [(size: Size, alignment: Alignment)],
-    offsets os: [UInt32]
-  ) -> String {
+  private func hyloTestCase(members sas: Members, offsets os: [UInt32]) -> String {
     func field<T>(_ x: T, width: Int) -> String {
       let s = "\(x)"
       return s + repeatElement(" ", count: max(0, width - s.count))
@@ -354,28 +369,31 @@ final class LayoutTests: XCTestCase {
 
     let sas1 = sas + repeatElement((size: 0, alignment: 0), count: 10 - sas.count)
     let os1 = os + repeatElement(0, count: 10 - os.count)
+    let size = size(members: sas, offsets: os)
+    let alignment = alignment(members: sas)
 
     return """
       \(sas1.map { sa in "\(sa.size) \(sa.alignment)  " }.joined())
       \(os1.map { field($0, width: 4) }.joined(separator: " "))
+      \(field(size, width: 4)) \(field(alignment, width: 4))
       """
   }
 
-  /// Returns the contents of the Hylo test file.
-  private func writeHyloTestFile() throws {
-    try (hyloTestCases.joined(separator: "\n") + "\n-1\n")
-      .write(toFile: "test-cases.txt", atomically: true, encoding: .utf8)
-  }
-
-  private func checkOffsets(members sa: [(size: Size, alignment: Alignment)]) {
+  /// Checks that the offsets of `sa` in a record having them are a valid layout.
+  private func checkOffsets(members sa: Members) {
     if sa.count == 0 { return }
     let offsets = offsets(members: sa)
-    // hyloTestCases.append(hyloTestCase(members: sa, offsets: offsets))
 
-    let memberOrder = sa.indices.sorted { (i, j) in
+    // Zero-sized members don't influence the layout. Nothing is guaranteed about their offsets.
+    let nonEmpty = sa.indices.filter { sa[$0].size != 0 }
+    XCTAssertEqual(nonEmpty.map { offsets[$0] }, self.offsets(members: nonEmpty.map { sa[$0] }),
+      "zero-sized members shall not influence the layout of \(sa)")
+
+    let memberOrder = nonEmpty.sorted { (i, j) in
       offsets[i] < offsets[j]
         || offsets[i] == offsets[j] && sa[i].alignment > sa[j].alignment
     }
+    if memberOrder.isEmpty { return }
 
     // First member always sits at offset 0
     XCTAssertEqual(offsets[memberOrder.first!], 0)
@@ -385,7 +403,7 @@ final class LayoutTests: XCTestCase {
       XCTAssertGreaterThanOrEqual(
         m0.alignment, m1.alignment,
         """
-        Member \(i0) with alignment \(m0.alignment) ordered before member \(i1) 
+        Member \(i0) with alignment \(m0.alignment) ordered before member \(i1)
           with alignment \(m1.alignment) !
         \(zip(sa, offsets).map {"\n\($0), offset: \($1)"}.joined())
         """
@@ -426,7 +444,7 @@ final class LayoutTests: XCTestCase {
       )
       let padding = o1 &- end0
 
-      XCTAssertLessThanOrEqual(
+      XCTAssertLessThan(
         padding, UInt32(m1.alignment),
         """
         Needless padding \(padding) before member at offset \(o1)
@@ -435,17 +453,27 @@ final class LayoutTests: XCTestCase {
     }
   }
 
+  /// Returns the path of this source file.
   func pathToThisFile(p: String = #filePath) -> String { p }
 
-  func testOffsetOfMember() throws {
-
-    let testDataFile = URL(filePath: pathToThisFile())
+  /// Returns the file named `n` in the package of the Hylo test program.
+  private func testDataFile(_ n: String) -> URL {
+    URL(filePath: pathToThisFile())
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appending(
-        path: "CompilerTests/positive/runtime-offset-of-member.package/test-cases.txt")
+      .appending(path: "CompilerTests/positive/runtime-offset-of-member.package/\(n)")
+  }
 
-    var input = try String(contentsOf: testDataFile, encoding: .utf8)[...]
+  /// The file of test cases shared with the Hylo test program.
+  private var testDataFile: URL { testDataFile("test-cases.txt") }
+
+  /// The members of a record, together with the expectations recorded for it.
+  fileprivate typealias TestCase = (
+    members: Members, offsets: [UInt32], size: Size, alignment: Alignment)
+
+  /// Returns the test cases in `file`.
+  private func readTestCases(from file: URL) throws -> [TestCase] {
+    var input = try String(contentsOf: file, encoding: .utf8)[...]
 
     func read1() -> Int? {
       let i = input.drop { $0.isWhitespace }
@@ -466,27 +494,88 @@ final class LayoutTests: XCTestCase {
       return r
     }
 
-    var testCount = 0
-    while !input.isEmpty {
-      guard let first = read1() else {
-        fatalError("invalid test file format; missing next line")
-      }
-      if first == -1 { break }
-      let m = [first] + read(19)
+    guard let n = read1(), n >= 0 else {
+      fatalError("invalid test file format; missing number of test cases")
+    }
+
+    var result: [TestCase] = []
+    for _ in 0..<n {
+      let m = read(20)
       if m.count != 20 { fatalError("incomplete case line of length \(m.count)") }
       let memberCount = (0..<10).first { m[$0 * 2 + 1] == 0 } ?? 10
       let p = (0..<memberCount).map {
         (size: Size(m[$0 * 2]), alignment: Alignment(m[$0 * 2 + 1]))
       }
-      checkOffsets(members: p)
 
       let x = read(10)
       if x.count != 10 {
         fatalError("incomplete expectations of length \(x.count)")
       }
-      testCount += 1
+      let y = read(2)
+      if y.count != 2 {
+        fatalError("incomplete size and alignment expectations of length \(y.count)")
+      }
+      result.append(
+        (members: p, offsets: x.prefix(memberCount).map { UInt32($0) },
+         size: Size(y[0]), alignment: Alignment(y[1])))
     }
-    XCTAssertGreaterThan(testCount, 100, "Not much testing happened")
+    if !input.allSatisfy(\.isWhitespace) {
+      fatalError("invalid test file format; unexpected data after \(n) test cases")
+    }
+    return result
+  }
+
+  /// Checks the cases in `f`.
+  private func checkTestCases(in f: URL) throws {
+    let cases = try readTestCases(from: f)
+    XCTAssertGreaterThan(cases.count, 100, "Not much testing happened")
+
+    for c in cases {
+      checkOffsets(members: c.members)
+      XCTAssertEqual(c.size, size(members: c.members, offsets: c.offsets))
+      XCTAssertEqual(c.alignment, alignment(members: c.members))
+    }
+  }
+
+  /// Checks the cases in `test-cases.txt`.
+  func testOffsetOfMember() throws {
+    try checkTestCases(in: testDataFile)
+  }
+
+  /// Rewrites the test case file, keeping the cases already in `test-cases.txt` and appending
+  /// generated ones, if the environment variable `HYLO_REGENERATE_LAYOUT_TEST_CASES` is set.
+  func testRegenerateTestCases() throws {
+    guard ProcessInfo.processInfo.environment["HYLO_REGENERATE_LAYOUT_TEST_CASES"] != nil else {
+      return
+    }
+
+    var g = SeedableRandomNumberGenerator(seed: 0x1234_5678_9abc_def0)
+
+    let records = randomRecords(200, alignments: (0...5).map { 1 << $0 }, using: &g)
+    try write(records, to: testDataFile)
+  }
+
+  /// Writes `records` and their expectations to `destination` in the format expected by the Hylo
+  /// test program.
+  private func write(_ records: [Members], to destination: URL) throws {
+    let cases = records.map { hyloTestCase(members: $0, offsets: offsets(members: $0)) }
+    try ("\(cases.count)\n" + cases.joined(separator: "\n") + "\n")
+      .write(to: destination, atomically: true, encoding: .utf8)
+  }
+
+  /// Returns `n` records of 1 to 10 members whose sizes are at most 16 and whose alignments are
+  /// drawn from `alignments`, except that zero-sized members have alignment 1.
+  private func randomRecords(
+    _ n: Int, alignments: [Alignment], using g: inout SeedableRandomNumberGenerator
+  ) -> [Members] {
+    (0..<n).map { _ in
+      (0..<Int.random(in: 1...10, using: &g)).map { _ in
+        let s = Size.random(in: 0...16, using: &g)
+        let a = alignments.randomElement(using: &g)!
+        return (size: s, alignment: s == 0 ? 1 : a)
+      }
+    }
   }
 
 }
+

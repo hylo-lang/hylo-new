@@ -56,9 +56,12 @@ Add a `test-case.<artifact-tag>.expected` file besides your `test-case.hylo` to 
 - `*.refined-ir.expected`
 - `*.llvm-ir.expected`
 
-An artifact is composed of a set of contiguous sections, delimited by empty lines. E.g. each function in Hylo IR and LLVM IR are their own sections.
+An artifact is composed of a set of sections, each of which asserting something about a function or
+global.
 
 It is sufficient to specify a subset of sections of the actual artifact. The expected section is matched with the observed section having the closest first line. Then they are compared for equality.
+
+Sections are compared up to a consistent renaming of their function-local names, so an expectation keeps matching when unrelated instructions shift register numbers, and may use descriptive names in place of numbered ones. Before comparison, the names in each section are renumbered in order of first appearance. A name is `%` followed by alphanumeric characters and underscores, which covers LLVM IR values `%N` and `%name` together with their block labels `N:`, and Hylo IR registers `%rN`, parameters `%pN`, and blocks `%bN`. Quoted LLVM names such as `%"$hsInt32"` are left untouched. Two sections match iff they are identical after this renaming, so an expected file may use any names as long as they are used consistently within each section.
 
 ## Inspecting Intermediate Artifacts
 

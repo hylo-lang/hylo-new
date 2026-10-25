@@ -140,6 +140,8 @@ extension Program {
       traverse(castUnchecked(n, to: Block.self), calling: &v)
     case Discard.self:
       traverse(castUnchecked(n, to: Discard.self), calling: &v)
+    case LoopControl.self:
+      break
     case Return.self:
       traverse(castUnchecked(n, to: Return.self), calling: &v)
     case While.self:

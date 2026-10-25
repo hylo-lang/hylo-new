@@ -13,7 +13,9 @@ public struct Token: Hashable, Sendable {
 
     // Reserved keywords
     case auto
+    case `break`
     case `case`
+    case `continue`
     case `else`
     case `enum`
     case `extension`

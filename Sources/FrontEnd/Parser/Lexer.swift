@@ -153,7 +153,9 @@ public struct Lexer: IteratorProtocol, Sequence {
     switch word {
     case "_": tag = .underscore
     case "auto": tag = .auto
+    case "break": tag = .break
     case "case": tag = .case
+    case "continue": tag = .continue
     case "else": tag = .else
     case "enum": tag = .enum
     case "extension": tag = .extension

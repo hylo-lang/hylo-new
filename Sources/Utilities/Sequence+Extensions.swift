@@ -68,31 +68,12 @@ extension Sequence {
   }
 
   /// Returns the element in `self` with the smallest value measured by `p`, if any.
-  /// 
+  ///
   /// If there is more than one smallest element, it is unspecified which one is returned.
   ///
   /// - Complexity: O(n)
   public func min<R: Comparable>(measuredBy p: (Element) -> R) -> Element? {
     self.min(by: { (a, b) in p(a) < p(b) })
-  }
-
-  /// Returns the least positive common multiple of all elements in the sequence;
-  /// Returns `nil` if the sequence is empty.
-  ///
-  /// - Precondition: All elements are non-zero.
-  ///
-  /// - Complexity: `O(n log(m))`, where `n` is the number of elements and
-  ///   `m` is the smallest non-zero element.
-  public func lcm() -> Element.Magnitude? where Element: BinaryInteger {
-    var i = makeIterator()
-    guard let f = i.next() else { return nil }
-
-    var r = f.magnitude
-    while let e = i.next() {
-      r = Utilities.lcm(r, e.magnitude)
-    }
-
-    return r
   }
 
 }

@@ -10,49 +10,48 @@ void hylo_open_test_cases_file_for_reading_indirect(FILE** result) {
   *result = fopen("test-cases.txt", "r");
 }
 
-/// Reads a test case from `f` into `s` representing the sizes of
-/// members, `a` representing their alignments, and `o` representing
-/// their expected offsets, returning the number of significant
+/// Reads and returns a non-negative integer from `f`, or returns -1 if
+/// reading failed.
+void hylo_read_non_negative_integer_indirect(FILE **f, intptr_t *result) {
+  if (fscanf(*f, "%td", result) != 1 || *result < 0) {
+    *result = -1;
+  }
+}
+
+/// Reads a test case from `f` into `s` representing the sizes of members, `a` representing their
+/// alignments, `o` representing their expected offsets, returning the number of significant
 /// elements of each of those arrays.
 ///
-/// If there are no more test cases (the sentinel value -1 is
-/// reached in the input), returns -1.
-///
-/// If errors occur, returns a negative value indicating how far along
-/// the call got.
+/// If errors occur, returns a negative value indicating how far along the call got.
 void hylo_read_test_case_indirect(
-    FILE **f, intptr_t s[10],
-    intptr_t a[10], intptr_t o[10], intptr_t *result) {
-  int scan0 = fscanf(*f, "%td", &s[0]);
-  if (scan0 != 0 && s[0] == -1) {
-    // Normal termination
-    *result = -1;
-    return;
-  }
-  if (scan0 == 0 || scan0 == EOF) {
-    *result = -2;
-    return;
-  }
-  if (s[0] < 0 && s[0] != -1) {
-    *result = -3;
-    return;
-  }
+    FILE **f, intptr_t s[10], intptr_t a[10], intptr_t o[10],
+    intptr_t *expected_size, intptr_t *expected_alignment, intptr_t *result
+) {
+  /// Read [size] [alignment] of all 10 members.
   int scan1 = fscanf(*f,
-                     "%td   %td %td   %td %td   %td %td   %td %td   %td %td   "
-                     "%td %td   %td %td   %td %td   %td %td",
-                     &a[0], &s[1], &a[1], &s[2], &a[2], &s[3], &a[3], &s[4],
-                     &a[4], &s[5], &a[5], &s[6], &a[6], &s[7], &a[7], &s[8],
-                     &a[8], &s[9], &a[9]);
-  if (scan1 == 0 || scan1 == EOF) {
+                     "%td %td   %td %td   %td %td   %td %td   %td %td   "
+                     "%td %td   %td %td   %td %td   %td %td   %td %td",
+                     &s[0], &a[0], &s[1], &a[1], &s[2], &a[2], &s[3], &a[3],
+                     &s[4], &a[4], &s[5], &a[5], &s[6], &a[6], &s[7], &a[7],
+                     &s[8], &a[8], &s[9], &a[9]);
+  if (scan1 != 20) {
     *result = -4;
     return;
   }
 
+  /// Read [expected offset] of each member.
   int scan2 =
       fscanf(*f, "%td %td %td %td %td %td %td %td %td %td", &o[0], &o[1], &o[2],
              &o[3], &o[4], &o[5], &o[6], &o[7], &o[8], &o[9]);
-  if (scan2 == 0 || scan2 == EOF) {
+  if (scan2 != 10) {
     *result = -5;
+    return;
+  }
+
+  // Read [expected size] [expected alignment].
+  int scan3 = fscanf(*f, "%td %td", expected_size, expected_alignment);
+  if (scan3 != 2) {
+    *result = -9;
     return;
   }
 

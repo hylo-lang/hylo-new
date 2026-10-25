@@ -1,4 +1,5 @@
 import FrontEnd
+import Utilities
 import XCTest
 
 @testable import Interpreter

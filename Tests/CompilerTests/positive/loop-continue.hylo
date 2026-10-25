@@ -1,0 +1,25 @@
+fun continue_nested() -> Bool {
+  var x = 0
+  var y = 0
+  while x < 5 {
+    while x < 5 { &x += 1 ; continue }
+    &y += 1
+  }
+  return y == 1
+}
+
+fun continue_from_condition() -> Bool {
+  var x = 0
+  var y = 0
+  while x < 5 {
+    &x += 1
+    if x == 3 { continue }
+    &y += 1
+  }
+  return y == 4
+}
+
+public fun main() {
+  precondition(continue_nested())
+  precondition(continue_from_condition())
+}

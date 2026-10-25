@@ -5,7 +5,7 @@ import FrontEnd
 public protocol TargetABI {
 
   /// Returns the alignment of `t`, which is 1 for `.i(1)` and `.i(8)`.
-  func alignment(_ t: MachineType) -> Int
+  func alignment(_ t: MachineType) -> Alignment
 
   /// The number of bits in a pointer type.
   var bitsInAPointer: UInt8 { get }
@@ -40,8 +40,8 @@ extension TargetABI {
 
 /// An ABI we can use to interpret code when matching some real ABI doesn't matter.
 ///
-/// The alignment is the size of `t`, capped at `maxAlignment`. In particular,
-/// `.i(1)` and `.i(8)` have one-byte alignment.
+/// The alignment is the size of `t` rounded up to a power of two, capped at `maxAlignment`. In
+/// particular, `.i(1)` and `.i(8)` have one-byte alignment.
 struct UnrealABI: TargetABI {
 
   /// The byte order used by this ABI.
@@ -55,11 +55,13 @@ struct UnrealABI: TargetABI {
   /// The size of a word in `bits`
   private let bitsInAWord: UInt8 = 64
 
-  /// The maximal alignment of a machine type in bytes.
-  private let maxAlignment = 128 / 8
+  /// The maximal alignment of a machine type.
+  private let maxAlignment = Alignment(bytes: 128 / 8)
 
   /// Returns the alignment of `t`, which is 1 for `.i(1)` and `.i(8)`.
-  func alignment(_ t: MachineType) -> Int { min(size(t), maxAlignment) }
+  func alignment(_ t: MachineType) -> Alignment {
+    min(Alignment(bytes: UInt(size(t)).roundedUpToPowerOf2), maxAlignment)
+  }
 
   /// The number of bits in a pointer type.
   var bitsInAPointer: UInt8 { bitsInAWord }

@@ -1,12 +1,21 @@
 //! exit-status:42
 
 trait P {
-  fun f() -> Int32
-  fun g() -> Int32 { self.f() + (2 as Int32) }
+  fun foo() -> Int32
 }
 
-given <T> => T is P { fun f() -> Int32 { 40 } }
+trait Q {
+  fun bar() -> Int32
+}
+
+given wa: Void is P {
+  fun foo() -> Int32 { 40 }
+}
+
+given wb: <T is P> => T is Q {
+  fun bar() -> Int32 { self.foo() + (2 as Int32) }
+}
 
 public fun main() -> Int32 {
-  ().g()
+  ().bar()
 }

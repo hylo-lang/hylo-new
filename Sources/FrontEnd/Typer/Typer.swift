@@ -1133,6 +1133,8 @@ public struct Typer {
       check(program.castUnchecked(s, to: Discard.self))
     case If.self:
       checkAsStatement(program.castUnchecked(s, to: If.self))
+    case LoopControl.self:
+      check(program.castUnchecked(s, to: LoopControl.self))
     case Return.self:
       check(program.castUnchecked(s, to: Return.self))
     case While.self:
@@ -1180,6 +1182,11 @@ public struct Typer {
     } else {
       program.unexpected(s)
     }
+  }
+
+  /// Type checks `s`.
+  private mutating func check(_ s: LoopControl.ID) {
+    program[s.module].setType(.void, for: s)
   }
 
   /// Type checks `s`.
@@ -1982,12 +1989,10 @@ public struct Typer {
     visibleFrom s: ScopeIdentity
   ) -> [GenericParameter.ID] {
     var accumulator: [GenericParameter.ID] = []
-    var p = s
-    while let n = p.node {
-      if let d = program.castToDeclaration(n) {
+    for p in program.scopes(from: s) {
+      if let n = p.node, let d = program.castToDeclaration(n) {
         accumulator.append(contentsOf: genericParameters(d).reversed())
       }
-      p = program.parent(containing: n)
     }
     return accumulator.reversed()
   }
@@ -4345,6 +4350,7 @@ public struct Typer {
 
     for m in ds {
       if !resolvableWithQualification(m) { continue }
+      if !isSelectable(m, statically: selectionIsStatic) { continue }
       var member = typeOfName(referringTo: m, statically: selectionIsStatic)
       if let a = program.types[receiver] as? TypeApplication {
         member = program.types.substitute(a.arguments, in: member)
@@ -4385,6 +4391,7 @@ public struct Typer {
 
         for m in declarations(lexicallyIn: .init(node: e))[n.identifier] ?? [] {
           if !resolvableWithQualification(m) { continue }
+          if !isSelectable(m, statically: selectionIsStatic) { continue }
           var member = typeOfName(referringTo: m, statically: selectionIsStatic)
 
           // Strip the context defined by the extension, apply type arguments from the matching
@@ -4416,8 +4423,7 @@ public struct Typer {
       let model = typeOfModel(of: q, conformingTo: concept, with: vs)
       for a in summon(model.erased, in: scopeOfUse) {
         for m in ms {
-          // Ignore the member if it is static but the qualification isn't.
-          if program.isStatic(m) && !selectionIsStatic { continue }
+          if !isSelectable(m, statically: selectionIsStatic) { continue }
 
           // Determine the type of the resolved member, adapting it to the qualification. Since
           // we're resolving a trait requirement we know that we can refer to the unbound version
@@ -4554,6 +4560,15 @@ public struct Typer {
     default:
       return true
     }
+  }
+
+  /// Returns `true` if `m` can be referred to by a selection that is static iff
+  /// `selectionIsStatic` is `true`.
+  ///
+  /// Static members can't be selected on an instance. Non-static members can be selected both
+  /// statically (`self` is unbound) and on an instance (`self` is bound).
+  private func isSelectable(_ m: DeclarationIdentity, statically selectionIsStatic: Bool) -> Bool {
+    selectionIsStatic || !program.isStatic(m)
   }
 
   /// Returns the declarations lexically contained in the declaration of `t`.

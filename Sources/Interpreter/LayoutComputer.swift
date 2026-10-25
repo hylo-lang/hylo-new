@@ -97,7 +97,7 @@ struct LayoutComputer {
     let d = layout(abi.enumDiscriminator(count: cases.count, in: &p), in: &p)
 
     let payload = TypeLayout.StorageRequirements(
-      alignment: Int(cases.map(\.alignment).lcm() ?? 1),
+      alignment: cases.map(\.alignment).max() ?? .bytes(1),
       size: cases.map(\.size).max() ?? 0)
 
     let l = storageLayoutOfRecord(havingMembers: [
@@ -186,7 +186,7 @@ func storageLayoutOfRecord(
     return $0.element.alignment > $1.element.alignment
   }
 
-  var b = TypeLayout.StorageRequirements(alignment: 1, size: 0)
+  var b = TypeLayout.StorageRequirements(alignment: .bytes(1), size: 0)
   var offsets = [Int](repeating: 0, count: ms.count)
   for (i, m) in storageOrder {
     b = b.appending(m)
