@@ -23,22 +23,19 @@ enum RuntimeValue {
     }
   }
 
-  /// The underlying builtin value.
-  ///
-  /// - Precondition: `self` is an instance of a `MachineType`.
-  fileprivate var asBuiltin: BuiltinValue {
+  /// The stored `MachineType` value, or `nil` if `self` is not an instance of
+  /// a `MachineType`.
+  fileprivate var builtin: BuiltinValue? {
     switch self {
     case .scalar(let v): v
-    case .composite(_, _): preconditionFailure("`self` is not an instance of scalar type.")
+    case .composite(_, _): nil
     }
   }
 
-  /// The component values of a composite value in declaration order.
-  ///
-  /// - Precondition: `self` is an instance of a composite type.
+  /// The component values of `self` declaration order.
   fileprivate var parts: [RuntimeValue] {
     switch self {
-    case .scalar(_): preconditionFailure("`self` is not an instance of composite type.")
+    case .scalar(_): []
     case .composite(let vs, _): vs
     }
   }
@@ -58,28 +55,28 @@ extension RuntimeValue {
   }
 
   /// The value of the stored `i1`, or `nil` if `self` does not match `.i1(_)`
-  public var i1: Bool? { asBuiltin.i1 }
+  public var i1: Bool? { builtin?.i1 }
 
   /// The value of the stored `i8`, or `nil` if `self` does not match `.i8(_)`
-  public var i8: UInt8? { asBuiltin.i8 }
+  public var i8: UInt8? { builtin?.i8 }
 
   /// The value of the stored `i16`, or `nil` if `self` does not match `.i16(_)`
-  public var i16: UInt16? { asBuiltin.i16 }
+  public var i16: UInt16? { builtin?.i16 }
 
   /// The value of the stored `i32`, or `nil` if `self` does not match `.i32(_)`
-  public var i32: UInt32? { asBuiltin.i32 }
+  public var i32: UInt32? { builtin?.i32 }
 
   /// The value of the stored `i64`, or `nil` if `self` does not match `.i64(_)`
-  public var i64: UInt64? { asBuiltin.i64 }
+  public var i64: UInt64? { builtin?.i64 }
 
   /// The value of the stored `i128`, or `nil` if `self` does not match `.i128(_)`
-  public var i128: UInt128? { asBuiltin.i128 }
+  public var i128: UInt128? { builtin?.i128 }
 
   /// The value of the stored `word`, or `nil` if `self` doesn't match `.word(_)`
-  public var word: UInt128? { asBuiltin.word }
+  public var word: UInt128? { builtin?.word }
 
-  /// The magnitude of stored integer value.
-  public var asUInt128: UInt128 { asBuiltin.asUInt128 }
+  /// The magnitude of stored integer value, or `nil` if `self` doesn't match `.i(_)`.
+  public var asUInt128: UInt128? { builtin?.asUInt128 }
 
 }
 
@@ -155,7 +152,7 @@ extension RuntimeValue {
     let discriminator = RuntimeValue(
       l.discriminator, parentRepresentation: storage, program: &p, layouts: &layouts)
 
-    let activeCaseIndex = Int(discriminator.asUInt128)
+    let activeCaseIndex = Int(discriminator.asUInt128!)
     let activeCase = RuntimeValue(
       l.parts[activeCaseIndex], parentRepresentation: storage,
       program: &p, layouts: &layouts)
@@ -236,7 +233,7 @@ extension RuntimeValue {
     bytes[l.discriminator.offset..<l.discriminator.offset + discriminatorBytes.count] =
       discriminatorBytes[...]
 
-    let activeCaseIndex = Int(parts[1].asUInt128)
+    let activeCaseIndex = Int(parts[1].asUInt128!)
     let activeCaseBytes = parts[0].bytes(laidOutUsing: &typeLayouts, for: &p)
     let activeCaseOffset = l.parts[activeCaseIndex].offset
     bytes[activeCaseOffset..<activeCaseOffset + activeCaseBytes.count] = activeCaseBytes[...]
