@@ -849,24 +849,14 @@ extension Program {
     let entriesType = StructType.UnsafeReference(abstractTableType.llvm)!
     let entriesSize = ctx.module.llvm.layout.storageSize(of: entriesType)
 
-    let storageAlignment = abstractTableType.layout.alignment
-    var storageSize = entriesSize
-
-    if !s.captures.isEmpty {
-      let p = types.demand(MachineType.ptr).erased
-      let r = record(fields: Array(repeating: p, count: s.captures.count), in: &ctx.module)
-
-      // Captures are represented as a sequence of pointers laid out contiguously in the order in
-      // which they appear in the instruction.
-      assert(r.propertyToField.elementsEqual(0 ..< s.captures.count))
-      assert(storageAlignment & (r.alignment - 1) == 0)
-      storageSize += r.size.fixed!
-    }
+    // Captures are represented as a sequence of pointers laid out contiguously in the order in
+    // which they appear in the instruction.
+    let storageSize = entriesSize + (ctx.module.llvm.layout.pointerSize * s.captures.count)
 
     // Allocate storage for the entire table.
     let tableRawType = ctx.module.llvm.arrayType(storageSize, ctx.module.llvm.i8)
     let storage = ctx.module.llvm.insertAlloca(tableRawType, atEntryOf: ctx.result.value)
-    ctx.module.llvm.setAlignment(storageAlignment, for: storage)
+    ctx.module.llvm.setAlignment(abstractTableType.layout.alignment, for: storage)
 
     // Store the entries.
     for (i, e) in s.entries.enumerated() {
@@ -1627,7 +1617,7 @@ extension Program {
     case Enum.self:
       metadata(of: types.castUnchecked(t, to: Enum.self), in: &ctx)
     case GenericParameter.self:
-      metadata(of: types.castUnchecked(t, to: GenericParameter.self), in: &ctx)
+      ctx.opaqueTypeMetadata
     case MachineType.self:
       metadata(of: types.castUnchecked(t, to: MachineType.self), in: &ctx)
     case Struct.self:
@@ -1637,7 +1627,7 @@ extension Program {
     case TypeApplication.self:
       metadata(of: types.castUnchecked(t, to: TypeApplication.self), in: &ctx)
     case TypeWitness.self:
-      metadata(of: types.castUnchecked(t, to: TypeWitness.self), in: &ctx)
+      ctx.opaqueTypeMetadata
     case UniversalType.self:
       metadata(of: types.castUnchecked(t, to: UniversalType.self), in: &ctx)
     default:
@@ -1671,16 +1661,6 @@ extension Program {
       program.metadata(
         enum: n, cases: program.storage(of: t.erased, visibleFrom: ctx.hylo)!, in: &ctx)
     }
-  }
-
-  /// Returns the LLVM type representation of the Hylo type `t`.
-  private mutating func metadata(
-    of t: GenericParameter.ID, in ctx: inout ModuleGenerationContext
-  ) -> TypeMetadata {
-    let v = ctx.llvm.ptr.t
-    let a = ctx.llvm.layout.preferredAlignment(of: v)
-    let l = ConcreteLayout(fields: [], propertyToField: [], size: .dynamic, alignment: a)
-    return .init(llvm: v, layout: l)
   }
 
   /// Returns the LLVM type representation of the Hylo type `t`.
@@ -1761,14 +1741,6 @@ extension Program {
 
   /// Returns the LLVM type representation of the Hylo type `t`.
   private mutating func metadata(
-    of t: TypeWitness.ID, in ctx: inout ModuleGenerationContext
-  ) -> TypeMetadata {
-    let p = types.demand(MachineType.ptr)
-    return metadata(of: p, in: &ctx)
-  }
-
-  /// Returns the LLVM type representation of the Hylo type `t`.
-  private mutating func metadata(
     of t: UniversalType.ID, in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
@@ -1780,16 +1752,19 @@ extension Program {
     }
   }
 
-  /// Returns the LLVM type representation of a record type having the given name and fields.
+  /// Returns the LLVM type representation of a record type having the given name and fields iff
+  /// none of these fields has a dynamic size.
   private mutating func metadata(
     record name: String, fields: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
-    let layout = record(fields: fields, in: &ctx)
-    let definition = ctx.llvm.structType(named: name, layout.fields, packed: true)
-
-    assert(ctx.llvm.layout.storageSize(of: definition) <= layout.size.fixed!)
-    assert(ctx.llvm.layout.abiAlignment(of: definition) <= layout.alignment)
-    return TypeMetadata(llvm: definition, layout: layout)
+    if let layout = record(fields: fields, in: &ctx) {
+      let definition = ctx.llvm.structType(named: name, layout.fields, packed: true)
+      assert(ctx.llvm.layout.storageSize(of: definition) <= layout.size.fixed!)
+      assert(ctx.llvm.layout.abiAlignment(of: definition) <= layout.alignment)
+      return TypeMetadata(llvm: definition, layout: layout)
+    } else {
+      return ctx.opaqueTypeMetadata
+    }
   }
 
   /// Returns the LLVM type representation of a sum type having the given name and cases.
@@ -1805,8 +1780,12 @@ extension Program {
     var payloadSize = 0
     var payloadAlignment = 1
     for c in cases {
+      // Bail out if there is a case with a dynamic size.
       let m = metadata(of: c, in: &ctx)
-      payloadSize = max(payloadSize, m.layout.size.fixed!)
+      guard let s = m.layout.size.fixed else { return ctx.opaqueTypeMetadata }
+
+      // Otherwise, the size of the payload is the size of the largest case.
+      payloadSize = max(payloadSize, s)
       payloadAlignment = max(payloadAlignment, m.layout.alignment)
     }
 
@@ -1835,10 +1814,10 @@ extension Program {
     return .init(llvm: pair, layout: layout)
   }
 
-  /// Returns the standard layout of a record type having the given fields.
+  /// Returns the layout of a record with given fields iff none of them has a dynamic size.
   private mutating func record(
     fields: [AnyTypeIdentity], in ctx: inout ModuleGenerationContext
-  ) -> ConcreteLayout {
+  ) -> ConcreteLayout? {
     // Construct an array with the the members ordered according to decreasing alignment, then in
     // increasing declaration order.
     let rs = fields.map({ (u) in metadata(of: u, in: &ctx) })
@@ -1853,8 +1832,10 @@ extension Program {
     var size = 0
 
     for p in ps {
-      let fieldSize = rs[p].layout.size.fixed ?? fatalError("unexpected dynamic size")
-      if fieldSize == 0 { continue }
+      // Bail out if there is a field with a dynamic size.
+      guard let fieldSize = rs[p].layout.size.fixed else { return nil }
+      // Skip the field if is zero-sized.
+      guard fieldSize > 0 else { continue }
 
       // Compute the offset of the next property.
       let next = size.rounded(upToNearestMultipleOf: rs[p].layout.alignment)

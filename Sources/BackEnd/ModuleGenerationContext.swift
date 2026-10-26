@@ -72,6 +72,13 @@ internal struct ModuleGenerationContext: ~Copyable {
   ///   - StandardLibrary/Sources/Core/Runtime/OffsetOfMember.hylo
   internal let typeWitnessHeader: SwiftyLLVM.StructType.UnsafeReference
 
+  /// Information about the LLVM representation of opaque types passed by references.
+  ///
+  /// This property is used when computing the layout of a type whose instances have an arbitrary
+  /// size that can only be known at run-time. Instances of such types are always are never erased
+  /// from function signatures and are always passed by reference.
+  internal let opaqueTypeMetadata: TypeMetadata
+
   /// Creates the initial state of a compilation of `m`.
   internal init(compiling hylo: HyloModule.ID, into llvm: consuming LLVMModule) {
     self.hylo = hylo
@@ -92,6 +99,11 @@ internal struct ModuleGenerationContext: ~Copyable {
     self.nestedProject = self.llvm.structType([ptr, fun, ptr])
     self.plateauCallback = self.llvm.structType([fun, ptr])
     self.typeWitnessHeader = self.llvm.structType(named: "$htwh", [i64])
+
+    let l = ConcreteLayout(
+      fields: [], propertyToField: [], size: .dynamic,
+      alignment: self.llvm.layout.preferredAlignment(of: ptr))
+    self.opaqueTypeMetadata = .init(llvm: ptr, layout: l)
   }
 
   /// Returns the resources held by this instance.
