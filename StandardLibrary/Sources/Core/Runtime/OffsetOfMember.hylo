@@ -497,9 +497,13 @@ public fun __hylo_offset_of_member(
   return r
 }
 
+// TODO
+// The two following functions should be removed from the public API once we'll have implemented
+// testable imports. Currently they are used to test the run-time.
+
 /// Returns `base` advanced by `n` times the size of an instance of `T` in bytes.
-@exposed @inline(always)
-fun __advanced<T>(base: Builtin.ptr, by n: Int) -> Builtin.ptr {
+@inline(always)
+public fun __advanced<T>(base: Builtin.ptr, by n: Int) -> Builtin.ptr {
   let layout = Pointer<TypeWitnessHeader>(value: Builtin.address(of: T))
   let offset = layout.size() * n
   return Builtin.advanced_by_bytes_word(base, offset.value)
@@ -516,9 +520,9 @@ fun __advanced<T>(base: Builtin.ptr, by n: Int) -> Builtin.ptr {
 ///
 /// The 48 most significant bits of the return value encode the size of a record composed of the
 /// given members, in bytes. The 16 least significant bits encode its alignment requirement.
-@exposed
+@inline(always)
 @_symbol("initialize_record_offsets(offsets:aggregating:count:)")
-fun __initialize_record_offsets(
+public fun __initialize_record_offsets(
   offsets: Pointer<Int>,
   aggregating members: Pointer<Pointer<TypeWitnessHeader>>,
   count n: Int
@@ -575,7 +579,6 @@ fun __initialize_record_offsets(
     } else {
       &o = 0
     }
-    // &o = a.copy()
 
     &i += 1
   }
@@ -585,7 +588,7 @@ fun __initialize_record_offsets(
 
   // Return size and alignment.
   if n == 0 {
-    return (size << 16) | 1
+    return 1
   } else {
     let a = layout.value as* let Int
     let x = __advanced<W>(members.value, by: a) as* let W
