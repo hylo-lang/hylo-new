@@ -90,7 +90,7 @@ extension Program {
     // Get the declaraiton of LLVM function corresponding to `f`. It is possible that this function
     // has already been declared if it has been referred to by some code that was compiled first.
     let result = demandFunction(f, in: &ctx)
-    incorporate(contentsOf: f, into: result, in: &ctx)
+    incorporate(contentsOf: self[ctx.hylo].ir[f], into: result, in: &ctx)
 
     // If `f` is the module's entry, define a "main" function that just applies it.
     if isEntry(f, of: ctx.hylo) {
@@ -99,13 +99,11 @@ extension Program {
     }
   }
 
-  /// Compiles the contents of `source` into `result`.
+  /// Compiles the contents of `ir` into `result`.
   private mutating func incorporate(
-    contentsOf source: IRFunction.ID, into result: FunctionMetadata,
+    contentsOf ir: IRFunction, into result: FunctionMetadata,
     in ctx: inout ModuleGenerationContext
   ) {
-    let ir = self[ctx.hylo].ir[source]
-
     // Nothing to do for functions having no definition.
     guard let sourceEntry = ir.entry else { return }
 
@@ -845,13 +843,35 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
 
-    if types.tag(of: s.constructor) != UniversalType.self {
+    // Trivial if the instruction projects a constant.
+    if s.operands.isEmpty {
       let w = demandGlobalTypeWitness(s.constructor, in: &ctx.module).v
       ctx.value[.register(i.erased)] = w.v
       return ctx.ir.instruction(after: i.erased)
     }
 
-    unimplemented()
+    // Otherwise, we should compute the type of the witness, which is composed of a type witness
+    // header followed by a tail buffer encoding the stored member offsets.
+    let constructor = types.cast(s.constructor, to: UniversalType.self)!
+    let ms = fields(of: types[constructor].head, visibleFrom: ctx.module.hylo) ?? []
+    let offsetsSize = ctx.module.llvm.layout.storageSize(of: ctx.module.llvm.iptr) * ms.count
+    let witnessType = ctx.module.llvm.arrayType(
+        ctx.module.llvm.layout.storageSize(of: ctx.module.typeWitnessHeader) + offsetsSize,
+        ctx.module.llvm.i8)
+
+    // Allocate memory for the witness.
+    let w = ctx.module.llvm.insertAlloca(witnessType, atEntryOf: ctx.result.value)
+    let a = ctx.module.llvm.layout.preferredAlignment(of: ctx.module.typeWitnessHeader)
+    assert(a % ctx.module.llvm.layout.preferredAlignment(of: ctx.module.llvm.iptr) == 0)
+    ctx.module.llvm.setAlignment(a, for: w)
+
+    // Initialize the witness.
+    let f = demandTypeWitnessConstructor(constructor, in: &ctx.module)
+    let x = Array(w.v, prependedTo: s.operands.map({ (a) in ctx.value[a]! }))
+    _ = ctx.module.llvm.insertCall(f, on: x, at: ctx.insertionPoint!)
+
+    ctx.value[.register(i.erased)] = w.v
+    return ctx.ir.instruction(after: i.erased)
   }
 
   /// Generates the LLVM IR code corresponding to `i`.
@@ -977,19 +997,19 @@ extension Program {
   /// Returns the result of `demandFunction(_:in:)` with the identity of `f`, which is declared in
   /// the module being compiled.
   private mutating func demandFunction(
-    _ f: IRFunction.ID, in ctx: inout ModuleGenerationContext
+    named f: IRFunction.Name, in ctx: inout ModuleGenerationContext
   ) -> FunctionMetadata {
-    let ir = self[ctx.hylo].ir[f]
-    return demandFunction(ir, in: &ctx)
+    let g = self[ctx.hylo].ir.identity(function: f)!
+    return demandFunction(g, in: &ctx)
   }
 
   /// Returns the result of `demandFunction(_:in:)` with the identity of `f`, which is declared in
   /// the module being compiled.
   private mutating func demandFunction(
-    named f: IRFunction.Name, in ctx: inout ModuleGenerationContext
+    _ f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) -> FunctionMetadata {
-    let k = self[ctx.hylo].ir.identity(function: f)!
-    return demandFunction(k, in: &ctx)
+    let g = self[ctx.hylo].ir[f]
+    return demandFunction(g, in: &ctx)
   }
 
   /// Returns the LLVM function corresponding to `ir`, declaring it if necessary.
@@ -1012,6 +1032,27 @@ extension Program {
     let m = FunctionMetadata(prototype: p, value: v, isRamp: ir.isSubscript)
     ctx.functionMetadata[ir.name] = m
     return m
+  }
+
+  /// Returns the LLVM function corresponding to `ir`, which is a function defined in the standard
+  /// library, declaring it if necessary.
+  private mutating func demandStandardLibraryFunction(
+    _ ir: StandardLibraryEntity, in ctx: inout ModuleGenerationContext
+  ) -> FunctionMetadata {
+    let demanded = IRFunction.Name.lowered(standardLibraryDeclaration(ir))
+    if let existing = ctx.functionMetadata[demanded] {
+      return existing
+    }
+
+    let standardLibrary = self.identity(module: Module.standardLibraryName)!
+    let g = self[standardLibrary].ir.identity(function: demanded)!
+    let h = demandFunction(self[standardLibrary].ir[g], in: &ctx)
+
+    // TODO: Remove
+    // This is a temporary fix to ensure the function is compiled into the client module.
+    incorporate(contentsOf: self[standardLibrary].ir[g], into: h, in: &ctx)
+
+    return h
   }
 
   /// Returns the prototype of a LLVM IR function corresponding to a Hylo IR function whose
@@ -1228,6 +1269,69 @@ extension Program {
     return symbol
   }
 
+  /// Returns a function implementing a type witness construtor for applications of `t`.
+  ///
+  /// A type witness constructor is a function returning type witnesses describing instantiations
+  /// of a generic type from other type witnesses representing arguments of that type. For example,
+  /// the type witness constructor of `<T> {T, T}` is a function taking a single type witness and
+  /// returning the witness of a pair composed.
+  ///
+  /// - Requires: `t` is dealiased.
+  private mutating func demandTypeWitnessConstructor(
+    _ t: UniversalType.ID, in ctx: inout ModuleGenerationContext
+  ) -> SwiftyLLVM.Function.UnsafeReference {
+    let name = mangled(IRFunction.Name.typeWitnessConstructor(t))
+
+    // Did we already computed the type result?
+    if let existing = ctx.llvm.function(named: name) {
+      return existing
+    }
+
+    // Declare the witness constructor.
+    let signature = ctx.llvm.functionType(
+      from: Array(repeating: ctx.llvm.ptr.t, count: types[t].parameters.count + 1))
+    let constructor = ctx.llvm.declareFunction(name, signature)
+    if let d = declaration(whereStructOrEnum: types[t].head), isPrivate(d, in: ctx.hylo) {
+      ctx.llvm.setLinkage(.private, for: constructor)
+    }
+
+    // The first parameter denotes the witness being initialized; it is followed by type arguments.
+    let receiver = constructor.unsafe[].parameters[0]
+    var witnesses: [AnyTypeIdentity: LLVMValue] = [:]
+    for (i, p) in types[t].parameters.enumerated() {
+      witnesses[p.erased] = constructor.unsafe[].parameters[1 + i].v
+    }
+
+    let e = ctx.llvm.appendBlock(to: constructor)
+    let p = ctx.llvm.endOf(e)
+
+    if let ms = fields(of: types[t].head, visibleFrom: ctx.hylo) {
+      let length = ctx.llvm.iptr.unsafe[].constant(ms.count)
+
+      // Create a buffer with the witnesses of all stored members.
+      let membersType = ctx.llvm.arrayType(ms.count, ctx.llvm.ptr)
+      let members = ctx.llvm.insertAlloca(membersType, at: p)
+      for (i, m) in ms.enumerated() {
+        let x0 = insertTypeConstructorArgument(
+          m, reusing: &witnesses, at: p, insertingAllocaAtEntryOf: constructor, in: &ctx)
+        let x1 = ctx.llvm.insertGetElementPointerInBounds(
+          of: members, typed: membersType,
+          indices: [0, i], indexType: ctx.llvm.i32, at: p)
+        ctx.llvm.insertStore(x0, to: x1, at: p)
+      }
+
+      let offsets = insertGetRecordOffsets(receiver.v, at: p, in: &ctx)
+      let sizeAndAlignment = insertCallStandardLibraryFunction(
+        .initializeRecordOffsets, with: [offsets.v, members.v, length.v], at: p, in: &ctx)
+      ctx.llvm.insertStore(sizeAndAlignment, to: receiver, at: p)
+    } else {
+      unimplemented("type witness constructor for \(show(t))")
+    }
+
+    ctx.llvm.insertReturn(at: p)
+    return constructor
+  }
+
   private func demandGlobalString(
     _ s: String, in ctx: inout ModuleGenerationContext
   ) -> LLVMValue {
@@ -1441,6 +1545,23 @@ extension Program {
     return adapted
   }
 
+  /// Generates LLVM IR for applying the standard library function `callee` to the `xs`.
+  private mutating func insertCallStandardLibraryFunction(
+    _ callee: Program.StandardLibraryEntity, with xs: consuming [LLVMValue],
+    at p: borrowing InsertionPoint, in ctx: inout ModuleGenerationContext
+  ) -> LLVMValue {
+    let f = demandStandardLibraryFunction(callee, in: &ctx)
+    let s = f.prototype.signature
+
+    // TODO: Read passing conventions from the prototype
+    for i in xs.indices {
+      let v = ctx.llvm.poisonValue(of: s.unsafe[].parameters[i])
+      xs[i] = ctx.llvm.insertInsertValue(xs[i], at: 0, into: v, at: p).v
+    }
+
+    return ctx.llvm.insertCall(f.value, on: xs, at: p).v
+  }
+
   /// Generates the LLVM IR code for returning from the function being compiled.
   private func insertReturn(in ctx: inout FunctionGenerationContext) {
     let p = ctx.module.functionMetadata[ctx.ir.name]!.prototype.mapping.output!
@@ -1455,6 +1576,61 @@ extension Program {
       // TODO: alignment
       ctx.module.llvm.insertReturn(y, at: ctx.insertionPoint!)
     }
+  }
+
+  /// Generates the LLVM IR computing the base address of the buffer containing the offsets of the
+  /// record type witnessed by `typeWItness`.
+  private mutating func insertGetRecordOffsets(
+    _ typeWitness: LLVMValue, at p: borrowing InsertionPoint, in ctx: inout ModuleGenerationContext
+  ) -> LLVMValue {
+    let headerSize = ctx.llvm.layout.storageSize(of: ctx.typeWitnessHeader)
+    let memberOffsets = ctx.llvm.insertGetElementPointerInBounds(
+      of: typeWitness, typed: ctx.llvm.i8, indices: [headerSize], indexType: ctx.llvm.i32, at: p)
+    return memberOffsets.v
+  }
+
+  /// Generates the LLVM IR constructing type witness constructor argument representing `t`, using
+  /// `witnesses` as a cache.
+  private mutating func insertTypeConstructorArgument(
+    _ t: AnyTypeIdentity, reusing witnesses: inout [AnyTypeIdentity: LLVMValue],
+    at p: borrowing InsertionPoint, insertingAllocaAtEntryOf f: Function.UnsafeReference,
+    in ctx: inout ModuleGenerationContext
+  ) -> LLVMValue {
+    // Trivial if the type is in cache.
+    if let w = witnesses[t] { return w }
+
+    // If the type is closed, we can demand a global type witness.
+    let ps = types.parameters(freeIn: t)
+    if ps.isEmpty {
+      let w = demandGlobalTypeWitness(t, in: &ctx)
+      witnesses[t] = w.v
+      return w.v
+    }
+
+    // Otherwise, we have to construct a lazy value.
+    assert(types.tag(of: t) != GenericParameter.self, "unexpected free type parameter")
+    let u = UniversalType.ID(
+      uncheckedFrom: types.introduce(parameters: ps, enumerated: true, into: t))
+    let c = demandTypeWitnessConstructor(u, in: &ctx)
+    let s = ctx.llvm.structType(
+      Array(
+        ctx.llvm.functionPointer.t,
+        prependedTo: Array(repeating: ctx.llvm.ptr.t, count: ps.count)))
+    let w = ctx.llvm.insertAlloca(s, atEntryOf: f)
+    ctx.llvm.setAlignment(max(2, ctx.llvm.layout.preferredAlignment(of: s)), for: w)
+
+    ctx.llvm.insertStore(c, to: w, at: p)
+    for (i, x) in ps.enumerated() {
+      let v = insertTypeConstructorArgument(
+        x.erased, reusing: &witnesses, at: p, insertingAllocaAtEntryOf: f, in: &ctx)
+      let a = ctx.llvm.insertGetStructElementPointer(of: w, typed: s, index: i + 1, at: p)
+      ctx.llvm.insertStore(v, to: a, at: p)
+    }
+
+    let x0 = ctx.llvm.insertPtrToInt(w, to: ctx.llvm.iptr, at: p)
+    let x1 = ctx.llvm.insertBitwiseOr(x0, ctx.llvm.iptr.unsafe[].constant(1), at: p)
+    witnesses[t] = x1.v
+    return x1.v
   }
 
   /// Inserts a call to the `llvm.trap` intrinsic.

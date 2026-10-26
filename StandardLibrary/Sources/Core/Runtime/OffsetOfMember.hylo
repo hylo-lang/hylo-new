@@ -1,39 +1,26 @@
-type Size = UInt32
+type Size = Int
 
-type Alignment = UInt16
+type Alignment = Int
 
 // Because the integer types are incomplete
-extension UInt32 {
-
-  /// Creates an instance with the value of `x`.
-  @inline(always)
-  public init(x: UInt16) {
-    &self.value = Builtin.zext_i16_i32(x.value)
-  }
+extension Int {
 
   @inline(always)
   public fun infix% (other: Self) -> Self {
-    .new(value: Builtin.urem_i32(self.value, other.value))
-  }
-
-  @inline(always)
-  public static fun zero() -> Self {
-    .new(value: Builtin.zeroinitializer_i32())
-  }
-
-  /// Creates an instance having the low 32 bits of `x`.
-  @inline(always)
-  public init(truncating x: Int) {
-    &self.value = Builtin.trunc_word_i32(x.value)
+    .new(value: Builtin.urem_word(self.value, other.value))
   }
 
   /// Returns the least n >= `self` that is a multiple of `a`.
   @inline(always)
   public fun rounded_up(to_nearest_multiple_of a: Alignment) -> Self {
-    let a_ = Size(a)
     // The distance from the nearest multiple of `a` <= `self` to `self`.
-    let excess = self % a_
-    return if excess == (0 as Self) { self.copy() } else { self - excess + a_ }
+    let excess = self % a
+    return if excess == 0 { self.copy() } else { self - excess + a }
+  }
+
+  @inline(always)
+  public fun copy() -> Int {
+    .new(value: self.value)
   }
 
 }
@@ -90,7 +77,7 @@ extension Pointer<TypeWitnessHeader> {
     let x = UInt64(value: Builtin.ashr_i64(
       (self.value as* let Self.Pointee).size_and_alignment.value,
       (16 as UInt64).value))
-    return .new(value: Builtin.trunc_or_zext_i64_i32(x.value))
+    return .new(value: Builtin.trunc_or_zext_i64_word(x.value))
   }
 
   /// Returns the alignment of an instance.
@@ -99,7 +86,7 @@ extension Pointer<TypeWitnessHeader> {
     let x = UInt64(value: Builtin.and_i64(
       (self.value as* let Self.Pointee).size_and_alignment.value,
       (0xffff as UInt64).value))
-    return .new(value: Builtin.trunc_or_zext_i64_i16(x.value))
+    return .new(value: Builtin.trunc_or_zext_i64_word(x.value))
   }
 
   @inline(always)
@@ -180,7 +167,7 @@ extension Metatype<TypeWitnessHeader> {
   /// Returns `self`, granting access to details.
   @inline(always)
   public static fun type_info() -> RecordMemberType {
-    return Pointer<RecordMemberType>(value: Builtin.address(of: Subject)).pointee()
+    Pointer<TypeWitnessHeader>(value: Builtin.address(of: Subject))
   }
 
   /// Returns the size in bytes of the `Subject`.
@@ -210,7 +197,7 @@ extension Metatype<RecordMemberType> {
   /// Returns `self`, granting access to details.
   @inline(always)
   public static fun type_info() -> RecordMemberType {
-    return Pointer<RecordMemberType>(value: Builtin.address(of: Subject)).pointee()
+    Pointer<TypeWitnessHeader>(value: Builtin.address(of: Subject))
   }
 
   /// Returns the size in bytes of the `Subject`.
@@ -287,44 +274,8 @@ extension Metatype<Pointer<UInt8>> {
 
   /// Returns `self`, granting access to details.
   @inline(always)
-  public static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  @inline(always)
-  public static fun alignment() -> Alignment {
-    Self.type_info().alignment()
-  }
-
-}
-
-extension Metatype<UInt32> {
-
-  type Subject = UInt32
-
-  /// Returns `self`, granting access to details.
-  @inline(always)
-  public static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
-  @inline(always)
-  public static fun alignment() -> Alignment {
-    Self.type_info().alignment()
-  }
-
-}
-
-extension Metatype<UInt16> {
-
-  type Subject = UInt16
-
-  /// Returns `self`, granting access to details.
-  @inline(always)
-  public static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
+  public static fun type_info() -> RecordMemberType {
+    Pointer<TypeWitnessHeader>(value: Builtin.address(of: Subject))
   }
 
   /// Returns the multiple of bytes to which all instances of `Subject` are aligned.
@@ -446,12 +397,12 @@ public fun insert_in_order_before_max_less_aligned_suffix(
   }
 }
 
-/// Replaces `start..<end` with its elements having `alignment() > a`,
-/// or having `alignment() == a` but occurring at a position < `p`,
-/// stably-sorted by decreasing alignment.
+/// Replaces elements in the range `start ..< end` with those having either an alignment greater
+/// than `a`, or an alignment equal to `a` but occurring at a position less than `p`, stably-sorted
+/// by decreasing alignment.
 ///
-/// - Note: reduces `start..<end` to a subrange of its initial value
-///   *and* mutates the `pointee`s of `start..<end`.
+/// - Note: reduces `start ..< end` to a subrange of its initial value *and* mutates the `pointee`s
+///   of `start ..< end`.
 @inline(always)
 public fun stable_sort_by_decreasing_alignment(
   from start: inout Pointer<RecordMemberType>,
@@ -503,7 +454,7 @@ public fun stable_sort_by_decreasing_alignment(
 }
 
 /// Returns the size of a record type would have were its members given
-/// in storage order by the `pointee`s of `start_..<end`.
+/// in storage order by the `pointee`s of `start_ ..< end`.
 @inline(always)
 public fun size_of_record_having_ordered_members(
   in_the_range_from start_: Pointer<RecordMemberType>,
@@ -520,20 +471,19 @@ public fun size_of_record_having_ordered_members(
   return r
 }
 
-/// Returns the offset of the `n`th member in declaration order of a
-/// record type having members given by the array of length `l` at
-/// `member_array`.
+/// Returns the offset of the `n`-th member in declaration order of a record type having members
+/// given by the array of length `l` at `member_array`.
 ///
 /// Mutates the elements in the array in arbitrary ways.
 @inline(always)
 public fun __hylo_offset_of_member(
-  n: UInt32,
-  in member_array: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
+  n: Int,
+  in member_array: Pointer<RecordMemberType>, of_length l: Int) -> Int
 {
-  sink let p = member_array + Int(n)
+  sink let p = member_array + n
   sink let nth_alignment = p.pointee().alignment()
   var start = member_array.copy()
-  var end = member_array + Int(l)
+  var end = member_array + l
 
   stable_sort_by_decreasing_alignment(
     from: &start, until: &end,
@@ -545,4 +495,100 @@ public fun __hylo_offset_of_member(
     in_the_range_from: start, until: end)
   sink let r = preceding_size.rounded_up(to_nearest_multiple_of: nth_alignment)
   return r
+}
+
+/// Returns `base` advanced by `n` times the size of an instance of `T` in bytes.
+@exposed @inline(always)
+fun __advanced<T>(base: Builtin.ptr, by n: Int) -> Builtin.ptr {
+  let layout = Pointer<TypeWitnessHeader>(value: Builtin.address(of: T))
+  let offset = layout.size() * n
+  return Builtin.advanced_by_bytes_word(base, offset.value)
+}
+
+/// Initializes `offsets` with the byte offsets of each of the `n` fields described in `members`
+/// and returns the size and alignment of a record having said fields.
+///
+/// `members` points to a buffer initialized in the range `0 ..< n` with witnesses describing the
+/// stored members of some record type (e.g., a tuple), laid out in declaration order. `offsets`
+/// points to an uninitialized buffer capable of storing at least `n` elements. When the function
+/// returns, `offsets` is initialized in the range `0 ..< n` with the offset of each member at the
+/// corresponding position. That is, `offsets[i]` is the byte offset of the `i`-th member.
+///
+/// The 48 most significant bits of the return value encode the size of a record composed of the
+/// given members, in bytes. The 16 least significant bits encode its alignment requirement.
+@exposed
+@_symbol("initialize_record_offsets(offsets:aggregating:count:)")
+fun __initialize_record_offsets(
+  offsets: Pointer<Int>,
+  aggregating members: Pointer<Pointer<TypeWitnessHeader>>,
+  count n: Int
+) -> Int {
+  type W = Pointer<TypeWitnessHeader>
+
+  // Allocate a temporary buffer for storing member indices.
+  sink let layout = Pointer<Int>(value: Builtin.alloca_word(n.value))
+  var size = 0
+
+  // Write in `layout` the index of the member laid out at the corresponding position.
+  var i = 0
+  while i < n {
+    // layout[i] = i
+    set o = __advanced<Int>(layout.value, by: i) as* set Int
+    &o = i.copy()
+
+    var j = i.copy()
+    while j > 0 {
+      // (a, b) = (layout[j - 1], layout[j])
+      inout a = __advanced<Int>(layout.value, by: j - 1) as* inout Int
+      inout b = __advanced<Int>(layout.value, by: j) as* inout Int
+
+      // if members[a].alignment >= members[b].alignment() { break }
+      let x = __advanced<W>(members.value, by: a) as* let W
+      let y = __advanced<W>(members.value, by: b) as* let W
+      if x.alignment() >= y.alignment() { break }
+
+      // layout.swap_at(j - 1, j)
+      sink let c = a
+      &a = b
+      &b = c
+
+      &j -= 1
+    }
+
+    &i += 1
+  }
+
+  // Write in `offsets` the byte offset of each member.
+  &i = 0
+  while i < n {
+    // let s = members[layout[i]].size()
+    let a = __advanced<Int>(layout.value, by: i) as* let Int
+    let x = __advanced<W>(members.value, by: a) as* let W
+    let s = x.size()
+
+    // offsets[a] = ...
+    set o = __advanced<Int>(offsets.value, by: a) as* set Int
+    if s > 0 {
+      sink let n = size.rounded_up(to_nearest_multiple_of: x.alignment())
+      &size = n + s
+      &o = n
+    } else {
+      &o = 0
+    }
+    // &o = a.copy()
+
+    &i += 1
+  }
+
+  // Explicit deinitialization extends the lifetime of `layout`.
+  _ = layout
+
+  // Return size and alignment.
+  if n == 0 {
+    return (size << 16) | 1
+  } else {
+    let a = layout.value as* let Int
+    let x = __advanced<W>(members.value, by: a) as* let W
+    return (size << 16) | x.alignment()
+  }
 }

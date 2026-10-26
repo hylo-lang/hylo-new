@@ -3200,7 +3200,7 @@ public struct Typer {
   /// Since a conformance declaration introduces a `Self` parameter, an associated conformance
   /// requirement of the form `given Self is Movable` would not denote a constrain on types
   /// conforming to `P`. Instead, it would result in a circular definition.
-  internal mutating func typeOfTraitSelf(in d: TraitDeclaration.ID) -> AnyTypeIdentity {
+  public mutating func typeOfTraitSelf(in d: TraitDeclaration.ID) -> AnyTypeIdentity {
     if let memoized = cache.traitToTypeOfTraitSelf[d] { return memoized }
 
     let f = demand(Trait(declaration: d)).erased

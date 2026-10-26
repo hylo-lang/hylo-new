@@ -16,6 +16,8 @@ extension IREmitter {
     var work = Array(f.instructions())
     while let i = work.popLast() {
       switch f.tag(of: i) {
+      case IRProperty.self:
+        depolymorphize(f.castUnchecked(i, to: IRProperty.self), in: &f, reusing: &witnesses)
       case IRTypeApply.self:
         depolymorphize(f.castUnchecked(i, to: IRTypeApply.self), in: &f, reusing: &witnesses)
       case IRTypeWitness.self:
@@ -33,7 +35,34 @@ extension IREmitter {
     }
     f.closeOpenEndedRegions(in: ws)
   }
-  
+
+  /// Modifies `i` so that it uses a type witness of its source's type if necessary.
+  ///
+  /// This method has no effect unless `i` is projecting a part of a whole whose type depends on
+  /// existentialized type parameters. In this case, `i` is modified to include a type witness
+  /// describing its source.
+  private mutating func depolymorphize(
+    _ i: IRProperty.ID, in f: inout IRFunction,
+    reusing witnesses: inout [AnyTypeIdentity: IRValue]
+  ) {
+    let s = f.at(i)
+
+    // Nothing to do if the instruction has already been existentialized.
+    if s.wholeType != nil { return }
+
+    // Nothing to do if the whole isn't generic.
+    let wholeType = f.result(of: s.whole)!.type
+    if program.types.parameters(freeIn: wholeType).isEmpty { return }
+
+    let wholeTypeExistentialized = lowering(before: i.erased, in: &f) { (me) in
+      me._emitAccessTypeWitness(wholeType, reusing: &witnesses)
+    }
+    let new = IRProperty(
+      whole: s.whole, wholeType: wholeTypeExistentialized, part: s.part, partType: s.partType,
+      anchor: s.anchor)
+    f.replace(i.erased, with: new)
+  }
+
   /// Replaces uses of `i`, which are in `f`, with their existentialized forms, using `witnesses`
   /// to compute arguments to type parameters.
   ///

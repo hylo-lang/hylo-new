@@ -514,12 +514,16 @@ public struct Program: Sendable {
       return isPrivate(castUnchecked(d, to: BindingDeclaration.self), in: m)
     case ConformanceDeclaration.self:
       return isPrivate(castUnchecked(d, to: ConformanceDeclaration.self), in: m)
+    case EnumDeclaration.self:
+      return isPrivate(castUnchecked(d, to: EnumDeclaration.self), in: m)
     case FunctionDeclaration.self:
       return isPrivate(castUnchecked(d, to: FunctionDeclaration.self), in: m)
     case FunctionBundleDeclaration.self:
       return isPrivate(castUnchecked(d, to: FunctionBundleDeclaration.self), in: m)
     case VariantDeclaration.self:
       return isPrivate(parent(containing: d, as: FunctionBundleDeclaration.self)!, in: m)
+    case StructDeclaration.self:
+      return isPrivate(castUnchecked(d, to: StructDeclaration.self), in: m)
     default:
       return false
     }
@@ -1936,6 +1940,9 @@ extension Program {
     /// `Hylo.ExpressibleByFloatingPointLiteral.init(floating_point_literal:)`.
     case expressibleByFloatingPointLiteralInit =
       "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
+
+    /// `Hylo.__initialize_record_offsets(offsets:aggregating:count:)`.
+    case initializeRecordOffsets = "initialize_record_offsets(offsets:aggregating:count:)"
 
     /// All standard library integer types.
     static let allIntegerTypes: [StandardLibraryEntity] = [
