@@ -163,6 +163,9 @@ public struct Program: Sendable {
         typer.program[m].ir[work[i].id].take(definition: work[i].function)
       }
 
+      // Don't go any further if an error occured.
+      if typer.program[m].containsError { return }
+
       // New functions may have been introduced during the previous passes. Those that have been
       // declared during depolymorphization must be defined in the current module unless they are
       // behind a resilience boundary. Since this process may result in further new declarations,
