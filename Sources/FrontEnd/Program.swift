@@ -543,7 +543,7 @@ public struct Program: Sendable {
       return isPrivate(d, in: m)
     case .existentialized(let g):
       return isPrivate(g, in: m)
-    case .applied, .slide, .plateau:
+    case .typeWitnessConstructor, .applied, .slide, .plateau:
       return true
     }
   }

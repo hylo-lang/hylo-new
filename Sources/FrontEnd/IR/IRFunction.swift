@@ -24,6 +24,12 @@ public struct IRFunction: Sendable {
     /// The identity of a function implementing a trait requirement.
     case implementation(DeclarationIdentity, ConformanceDeclaration.ID, TypeArguments)
 
+    /// The identity of a type constructor.
+    ///
+    /// A type witness constructor is a function created during code generation that implements the
+    /// construction of a type witness at run-time.
+    case typeWitnessConstructor(UniversalType.ID)
+
     /// The identity of the existentialiezd form of a polymorphic function.
     indirect case existentialized(IRFunction.Name)
 
@@ -47,6 +53,8 @@ public struct IRFunction: Sendable {
         return d == x
       case .implementation(let x, _, _):
         return d == x
+      case .typeWitnessConstructor:
+        return false
       case .existentialized(let n):
         return n.isLoweredForm(of: d)
       case .applied:
@@ -958,6 +966,9 @@ extension IRFunction.Name: Showable {
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
       let n = printer.program.debugName(of: d)
       return "$implementation[\(n) for \(list: xs)]"
+
+    case .typeWitnessConstructor(let t):
+      return "$witness_constructor[\(printer.show(t))]"
 
     case .existentialized(let n):
       return "\(printer.show(n)).existentialized"
