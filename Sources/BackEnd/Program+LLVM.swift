@@ -588,11 +588,7 @@ extension Program {
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
     let x = demandGlobal(s.source, in: &ctx.module)
-    let y = ctx.module.llvm.insertAlloca(ctx.module.llvm.ptr, at: ctx.insertionPoint!)
-    ctx.module.llvm.insertStore(x, to: y, at: ctx.insertionPoint!)
-
-    let v = IRValue.register(i.erased)
-    ctx.value[v] = y.v
+    ctx.value[.register(i.erased)] = x.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -1332,12 +1328,10 @@ extension Program {
     from witness: LLVMValue, in ctx: inout FunctionGenerationContext
   ) -> LLVMValue {
     let x0 = ctx.module.llvm.insertLoad(
-      ctx.module.llvm.ptr, from: witness, at: ctx.insertionPoint!)
-    let x1 = ctx.module.llvm.insertLoad(
-      ctx.module.llvm.i64, from: x0, at: ctx.insertionPoint!)
-    let x2 = ctx.module.llvm.insertAShr(
-      x1, ctx.module.llvm.i64.unsafe[].constant(16), at: ctx.insertionPoint!)
-    return x2.v
+      ctx.module.llvm.i64, from: witness, at: ctx.insertionPoint!)
+    let x1 = ctx.module.llvm.insertAShr(
+      x0, ctx.module.llvm.i64.unsafe[].constant(16), at: ctx.insertionPoint!)
+    return x1.v
   }
 
   /// Returns the representations of `arguments`, which are passed to `callee`, in LLVM IR.
