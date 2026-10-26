@@ -269,7 +269,7 @@ internal struct IREmitter {
     // If the conformance is a nested given, we can simply extract the witness from the parameter
     // accepting a witness of a conformance to the enclosing trait.
     if program.isRequirement(d) {
-      let x0 = _property(.init(d), of: .parameter(0), as: witness)
+      let x0 = _implementation(.init(d), in: .parameter(0), as: witness)
       let x1 = _access([.let], from: x0)
       _yield(x1)
       _return()
@@ -537,7 +537,7 @@ internal struct IREmitter {
       let ms = program.declarations(of: ConformanceDeclaration.self, lexicallyIn: .init(node: t))
       for m in ms {
         let w = program.type(assignedTo: m)
-        let v = _property(.init(m), of: .parameter(0), as: w)
+        let v = _implementation(.init(m), in: .parameter(0), as: w)
         insertionContext.function!.associate(.init(m), with: v)
       }
     }
@@ -1266,7 +1266,7 @@ internal struct IREmitter {
         let interface = program.withTyper(typing: module, { (tp) in tp.typeOfInterface(for: m) })
         return lowering(at: anchor) { (me) in
           let x0 = me._emit(witness: w)
-          let x1 = me._property(m, of: x0, as: interface)
+          let x1 = me._implementation(m, in: x0, as: interface)
           return LoweredCallee(x1, appliedTo: [x0], boundTo: receiver, writingResultTo: r)
         }
       }
@@ -2318,6 +2318,16 @@ internal struct IREmitter {
     insert(IRGlobalAccess(source: source, anchor: currentAnchor))!
   }
 
+  /// Inserts an `implementation` instruction.
+  internal mutating func _implementation(
+    _ requirement: DeclarationIdentity, in table: IRValue, as interface: AnyTypeIdentity
+  ) -> IRValue {
+    let t = program.types.dealiased(interface)
+    let s = IRImplementation(
+      table: table, requirement: requirement, interface: t, anchor: currentAnchor)
+    return insert(s)!
+  }
+
   /// Inserts a `load` instruction.
   internal mutating func _load(_ source: IRValue) -> IRValue {
     assert(currentFunction.isPlace(source))
@@ -2387,7 +2397,8 @@ internal struct IREmitter {
     _ part: DeclarationIdentity, of whole: IRValue, as partType: AnyTypeIdentity
   ) -> IRValue {
     let t = program.types.dealiased(partType)
-    let s = IRProperty(whole: whole, part: part, partType: t, anchor: currentAnchor)
+    let s = IRProperty(
+      whole: whole, wholeType: nil, part: part, partType: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -3012,7 +3023,7 @@ internal struct IREmitter {
     let interface = program.types.demand(
       Arrow((.let, w.type), (.sink, t), to: .void))
 
-    let x0 = _property(requirement, of: table, as: interface.erased)
+    let x0 = _implementation(requirement, in: table, as: interface.erased)
     let x1 = _access([.let], from: x0)
     let x2 = _alloca(.void)
     _apply(x1, [table, s], into: x2, argumentAccesses: .formAndClose)
@@ -3207,7 +3218,7 @@ internal struct IREmitter {
     let interface = program.types.demand(
       Arrow((.let, w.type), (k, typeOfSource), (.sink, typeOfSource), to: .void))
 
-    let x0 = _property(.init(requirement), of: table, as: interface.erased)
+    let x0 = _implementation(.init(requirement), in: table, as: interface.erased)
     let x1 = _access([.let], from: x0)
     let x2 = _alloca(.void)
     _apply(x1, [table, target, source], into: x2, argumentAccesses: .formAndClose)
@@ -3282,7 +3293,8 @@ internal struct IREmitter {
 
     // Otherwise, we have to construct a new type witness.
     else {
-      let u = program.types.demand(UniversalType(parameters: Array(ps), head: t))
+      let u = UniversalType.ID(
+        uncheckedFrom: program.types.introduce(parameters: ps, enumerated: true, into: t))
       let v = ps.map({ (p) in _emitAccessTypeWitness(p.erased, reusing: &witnesses) })
       newWitness = _type_witness(u, v)
     }

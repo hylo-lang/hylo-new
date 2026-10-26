@@ -19,10 +19,10 @@ public struct IRProperty: Instruction {
 
   /// Creates an instance with the given properties.
   public init(
-    whole: IRValue, part: DeclarationIdentity, partType: AnyTypeIdentity,
+    whole: IRValue, wholeType: IRValue?, part: DeclarationIdentity, partType: AnyTypeIdentity,
     anchor: Anchor
   ) {
-    self.operands = [whole]
+    self.operands = Array(whole, prependedTo: Array(unwrapping: wholeType))
     self.anchor = anchor
     self.part = part
     self.partType = partType
@@ -41,7 +41,12 @@ public struct IRProperty: Instruction {
     operands[0]
   }
 
-  /// The type of the value loaded by this instruction.
+  /// A witness of the run-time type of the whole iff that type has been existentialized.
+  public var wholeType: IRValue? {
+    (operands.count > 1) ? operands[1] : nil
+  }
+
+  /// The type of the instruction's result.
   public var type: IRType {
     .place(partType)
   }
@@ -51,19 +56,6 @@ public struct IRProperty: Instruction {
     true
   }
 
-  /// Asserts the well-formedness conditions of the instruction.
-  public func assertWellFormed(in parent: IRFunction, using program: inout Program) -> Bool {
-    // The record is a place storing a witness table.
-    guard
-      let t = parent.result(of: whole),
-      let (c, _) = program.types.seenAsTraitApplication(t.type)
-    else { preconditionFailure("bad operand") }
-
-    // The selected property exists.
-    precondition(program.requirements(of: c).index(of: part) != nil)
-    return true
-  }
-
 }
 
 extension IRProperty: Showable {
@@ -71,7 +63,15 @@ extension IRProperty: Showable {
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
     let n = printer.program.nameOrTag(of: part)
-    return "property \"\(n)\" of \(printer.show(whole)) as \(printer.show(partType))"
+    let w: String
+
+    if let t = wholeType {
+      w = "(\(printer.show(whole)) : \(printer.show(t)))"
+    } else {
+      w = printer.show(whole)
+    }
+
+    return "property \"\(n)\" of \(w) as \(printer.show(partType))"
   }
 
 }

@@ -182,6 +182,8 @@ extension Program {
       return incorporate(ctx.ir.castUnchecked(i, to: IRConditionalBranch.self), in: &ctx)
     case IRGlobalAccess.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRGlobalAccess.self), in: &ctx)
+    case IRImplementation.self:
+      return incorporate(ctx.ir.castUnchecked(i, to: IRImplementation.self), in: &ctx)
     case IRLoad.self:
       return incorporate(ctx.ir.castUnchecked(i, to: IRLoad.self), in: &ctx)
     case IRMemoryCopy.self:
@@ -596,6 +598,32 @@ extension Program {
 
   /// Generates the LLVM IR code corresponding to `i`.
   internal mutating func incorporate(
+    _ i: IRImplementation.ID, in ctx: inout FunctionGenerationContext
+  ) -> AnyInstructionIdentity? {
+    let s = ctx.ir.at(i)
+
+    // Compute the LLVM representation of the table.
+    let tableTypeInHylo = ctx.ir.result(of: s.table)!.type
+    let (concept, _) = types.seenAsTraitApplication(tableTypeInHylo)!
+    let tableType = metadata(conformanceTo: concept, in: &ctx.module)
+    let table = codegen(s.table, in: &ctx)
+
+    // The contents of a witness table follow the ordering of its requirements.
+    let index = requirements(of: concept).index(of: s.requirement)!
+    let part = ctx.module.llvm.insertGetElementPointerInBounds(
+      of: table, typed: tableType.llvm,
+      indices: [0, index], indexType: ctx.module.llvm.i32,
+      at: ctx.insertionPoint!)
+
+    let p = typeOfProperty(s.requirement, usedAsInstanceOf: s.interface, in: &ctx.module)
+    let a = ctx.module.llvm.insertLoad(p, from: part, at: ctx.insertionPoint!).v
+    ctx.value[.register(i.erased)] = a
+
+    return ctx.ir.instruction(after: i.erased)
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`.
+  internal mutating func incorporate(
     _ i: IRLoad.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
     let s = ctx.ir.at(i)
@@ -722,34 +750,35 @@ extension Program {
 
     // Compute the LLVM representation of the whole.
     let wholeTypeInHylo = ctx.ir.result(of: s.whole)!.type
-    let wholeType = metadata(of: wholeTypeInHylo, in: &ctx.module)
     let whole = codegen(s.whole, in: &ctx)
 
-    // If the property is a field in a struct, lookup its offset.
-    if let index = storedPropertyIndex(of: s.part, in: s.anchor.scope) {
+    // Lookup the offset of the property.
+    let index = storedPropertyIndex(of: s.part, in: s.anchor.scope) ?? unimplemented()
+
+    // Do we have to read the offset from a type witness?
+    if let witness = s.wholeType {
+      // Get the base address of the record offsets.
+      let recordOffsets = insertGetRecordOffsets(
+        ctx.value[witness]!, at: ctx.insertionPoint!, in: &ctx.module)
+
+      // Load the offset of the property.
+      let offsetAddress = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: recordOffsets, typed: ctx.module.llvm.iptr,
+        indices: [index], indexType: ctx.module.llvm.i32, at: ctx.insertionPoint!)
+      let offset = ctx.module.llvm.insertLoad(
+        ctx.module.llvm.iptr, from: offsetAddress, at: ctx.insertionPoint!)
+
+      // Advance the base address of the whole by the offset of the part.
+      let a = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: whole, typed: ctx.module.llvm.i8, indices: [offset.v], at: ctx.insertionPoint!)
+      ctx.value[.register(i.erased)] = a.v
+    }
+
+    // Otherwise we can compte the offset at compile-time.
+    else {
       let a = insertGetFieldAddress(
         at: [index], in: whole, instanceOf: wholeTypeInHylo, in: &ctx)
       ctx.value[.register(i.erased)] = a
-    }
-
-    // If the whole is a witness table, the property is a requirement of the trait for which the
-    // table is witnessing a conformance.
-    else if let (concept, _) = types.seenAsTraitApplication(wholeTypeInHylo) {
-      // The contents of a witness table follow the ordering of its requirements.
-      let index = requirements(of: concept).index(of: s.part)!
-      let part = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: whole, typed: wholeType.llvm,
-        indices: [0, index], indexType: ctx.module.llvm.i32,
-        at: ctx.insertionPoint!)
-
-      let p = typeOfProperty(s.part, usedAsInstanceOf: s.partType, in: &ctx.module)
-      let a = ctx.module.llvm.insertLoad(p, from: part, at: ctx.insertionPoint!).v
-      ctx.value[.register(i.erased)] = a
-    }
-
-    // Otherwise, the property is a public property of some resilient type.
-    else {
-      fatalError("TODO: resilient records")
     }
 
     return ctx.ir.instruction(after: i.erased)
@@ -1718,20 +1747,14 @@ extension Program {
   private mutating func metadata(
     of t: TypeApplication.ID, in ctx: inout ModuleGenerationContext
   ) -> TypeMetadata {
-    metadata(of: t, in: &ctx) { (program, ctx, t, n) in
-      if let (concept, _) = program.types.seenAsTraitApplication(t) {
-        // Implementations of associated types and nested conformances are stored as object
-        // pointers. Other implementations are stored as function pointers.
-        let rs = program.requirements(of: concept)
-        var fs: [LLVMType] = .init(minimumCapacity: rs.all.count)
-        fs.append(ctx.llvm.ptr.t, count: rs.all.count - rs.members.count)
-        fs.append(ctx.llvm.functionPointer.t, count: rs.members.count)
+    // If `t` a conformance witness, its LLVM representation does not depend on type arguments.
+    if let (concept, _) = types.seenAsTraitApplication(t) {
+      return metadata(conformanceTo: concept, in: &ctx)
+    }
 
-        let v = ctx.llvm.structType(named: n, fs)
-        let a = ctx.dynamicAllocationAlignment()
-        let l = ConcreteLayout(fields: [], propertyToField: [], size: .dynamic, alignment: a)
-        return TypeMetadata(llvm: v, layout: l)
-      } else if let fields = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
+    // Otherwise, it does.
+    return metadata(of: t, in: &ctx) { (program, ctx, t, n) in
+      if let fields = program.fields(of: t.erased, visibleFrom: ctx.hylo) {
         return program.metadata(record: n, fields: fields, in: &ctx)
       } else {
         unimplemented("no LLVM representation of the type '\(program.show(t))'")
@@ -1749,6 +1772,28 @@ extension Program {
       } else {
         unimplemented("no LLVM representation of the type '\(program.show(t))'")
       }
+    }
+  }
+
+  /// Returns the LLVM type of a table witnessing the conformance of a type to `concept`.
+  private mutating func metadata(
+    conformanceTo concept: Trait.ID, in ctx: inout ModuleGenerationContext
+  ) -> TypeMetadata {
+    let d = types[concept].declaration
+    let t = withTyper(typing: d.module, { (tp) in tp.typeOfTraitSelf(in: d) })
+
+    return metadata(of: t, in: &ctx) { (program, ctx, _, n) in
+      // Implementations of associated types and nested conformances are stored as object pointers.
+      // Other implementations are stored as function pointers.
+      let rs = program.requirements(of: concept)
+      var fs: [LLVMType] = .init(minimumCapacity: rs.all.count)
+      fs.append(ctx.llvm.ptr.t, count: rs.all.count - rs.members.count)
+      fs.append(ctx.llvm.functionPointer.t, count: rs.members.count)
+
+      let v = ctx.llvm.structType(named: n, fs)
+      let a = ctx.dynamicAllocationAlignment()
+      let l = ConcreteLayout(fields: [], propertyToField: [], size: .dynamic, alignment: a)
+      return TypeMetadata(llvm: v, layout: l)
     }
   }
 

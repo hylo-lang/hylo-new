@@ -607,6 +607,7 @@ extension IRFunction {
       IRCase.self,
       IREnumTag.self,  // Safe to redefine assuming MVS.
       IRGlobalAccess.self,
+      IRImplementation.self,
       IRLoad.self,  // Safe to redefine assuming MVS.
       IRPlaceCast.self,
       IRPointerToPlace.self,

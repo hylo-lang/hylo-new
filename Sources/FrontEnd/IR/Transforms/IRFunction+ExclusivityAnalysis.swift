@@ -112,6 +112,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRCase.End.self), from: &f)
       case IRGlobalAccess.self:
         pc = interpret(f.castUnchecked(i, to: IRGlobalAccess.self), from: &f)
+      case IRImplementation.self:
+        pc = interpret(f.castUnchecked(i, to: IRImplementation.self), from: &f)
       case IRPlaceCast.self:
         pc = interpret(f.castUnchecked(i, to: IRPlaceCast.self), from: &f)
       case IRPlaceCast.End.self:
@@ -233,6 +235,14 @@ private struct Transfer: AbstractTransferFunction {
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
     _ i: IRGlobalAccess.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRImplementation.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     context.declare(i.erased, from: f, initially: .unique)
     return f.instruction(after: i.erased)
