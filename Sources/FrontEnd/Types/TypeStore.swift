@@ -260,10 +260,26 @@ public struct TypeStore: Sendable {
   }
 
   /// Returns `n` as the head of a universal type introducing `ps`.
-  public mutating func introduce(
-    parameters ps: [GenericParameter.ID], into n: AnyTypeIdentity
+  ///
+  /// If `enumerated` is `true`, each element in `ps` is first replaced with a parameter uniquely
+  /// identified by its position in `ps`.
+  public mutating func introduce<S: Collection<GenericParameter.ID>>(
+    parameters ps: S, enumerated: Bool = false, into n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    ps.isEmpty ? n : demand(UniversalType(parameters: ps, head: n)).erased
+    if ps.isEmpty {
+      return n
+    } else if enumerated {
+      var qs: [GenericParameter.ID] = []
+      var ts: [AnyTypeIdentity: AnyTypeIdentity] = [:]
+      for (i, p) in ps.enumerated() {
+        qs.append(demand(GenericParameter.nth(i, self[p].kind)))
+        ts[p.erased] = qs[i].erased
+      }
+      let h = substitute(ts, in: n)
+      return demand(UniversalType(parameters: Array(qs), head: h)).erased
+    } else {
+      return demand(UniversalType(parameters: Array(ps), head: n)).erased
+    }
   }
 
   /// Returns `n` without its first requirement.
