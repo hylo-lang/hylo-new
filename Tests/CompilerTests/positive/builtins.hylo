@@ -6,6 +6,23 @@ fun expect_not(c: Builtin.i1) {
   precondition(!Bool(value: c))
 }
 
+// MARK: Testing Builtin.alloca_*()
+
+fun test_Builtin_alloca() {
+  sink let buffer = Pointer<UInt8>(value: Builtin.alloca_i8(2.value))
+
+  set w0 = buffer.value as* set UInt8
+  &w0 = (2 as UInt8)
+  set w1 = Builtin.advanced_by_bytes_word(buffer.value, 1.value) as* set UInt8
+  &w1 = (3 as UInt8)
+
+  let r0 = buffer.value as* let UInt8
+  let r1 = Builtin.advanced_by_bytes_word(buffer.value, 1.value) as* let UInt8
+  expect(Builtin.icmp_eq_i8((r0 + r1).value, (5 as UInt8).value))
+
+  _ = buffer
+}
+
 // MARK: Testing Builtin.add_*_*()
 
 fun test_Builtin_add() {
@@ -687,6 +704,7 @@ fun test_Builtin_zext() {
 }
 
 public fun main() {
+  test_Builtin_alloca()
   test_Builtin_add()
   test_Builtin_address()
   test_Builtin_advanced_by_bytes()

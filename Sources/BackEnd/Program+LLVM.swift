@@ -306,6 +306,13 @@ extension Program {
       ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
         of: b, typed: ctx.module.llvm.i8, indices: offsets , at: ctx.insertionPoint!).v
 
+    case .alloca(let t):
+      let n = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: ctx.module.llvm.iptr.t, in: &ctx)
+      let b = metadata(of: t, in: &ctx.module)
+      let a = ctx.module.llvm.insertAlloca(arrayOf: n, b.llvm, at: ctx.insertionPoint!)
+      ctx.module.llvm.setAlignment(b.layout.alignment, for: a)
+      ctx.value[v] = a.v
+
     case .add(let o, let t):
       let xs = insertLoad(s.arguments, instancesOf: t, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertAdd(
