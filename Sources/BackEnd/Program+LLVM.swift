@@ -1244,25 +1244,39 @@ extension Program {
       return existing
     }
 
-    // TODO: witnesses of opaque types
+    // Compute the offsets of each member, if known.
+    var offsets: [Int] = []
+    let m = metadata(of: t, in: &ctx)
+    if !m.layout.size.isDynamic, let s = StructType.UnsafeReference(m.llvm) {
+      for i in m.layout.propertyToField {
+        offsets.append(i > 0 ? ctx.llvm.layout.offset(of: i, in: s) : 0 )
+      }
+    } else {
+      assert(m.layout.propertyToField.isEmpty)
+    }
+
+    // TODO: Resilience
 
     // Declare the symbol.
-    let symbol = ctx.llvm.declareGlobalVariable(name, ctx.typeWitnessHeader)
+    let int = ctx.llvm.iptr
+    let witnessFields = Array(
+      ctx.typeWitnessHeader.t, prependedTo: repeatElement(int.t, count: offsets.count))
+    let witnessType = ctx.llvm.structType(witnessFields)
+    let symbol = ctx.llvm.declareGlobalVariable(name, witnessType)
+
+    ctx.llvm.setAlignment(ctx.llvm.layout.preferredAlignment(of: witnessType), for: symbol)
     ctx.llvm.setLinkage(.private, for: symbol)
 
-    // The symbol is defined iff the layout of the type is fixed, so that it may be inlined in the
-    // module. Otherwise, the witness is for a type whose layout is defined externally.
-    let m = metadata(of: t, in: &ctx)
-    guard let s = m.layout.size.fixed else { return symbol }
+    // Build the value of the witness.
+    let sizeAndAlignment = ctx.llvm.i64.unsafe[].constant(
+      UInt64((m.layout.size.fixed ?? 0) << 16) | UInt64(m.layout.alignment)).v
+    let head = ctx.llvm.structConstant(
+      of: ctx.typeWitnessHeader, aggregating: [sizeAndAlignment])
+    let tail = offsets.map({ (o) in int.unsafe[].constant(o).v })
 
-    let fields: [LLVMValue] = [
-      ctx.llvm.i64.unsafe[].constant(UInt64(s << 16) | UInt64(m.layout.alignment)).v,
-    ]
-
-    let alignment = ctx.llvm.layout.preferredAlignment(of: ctx.typeWitnessHeader)
-    ctx.llvm.setAlignment(alignment, for: symbol)
-
-    let initializer = ctx.llvm.structConstant(of: ctx.typeWitnessHeader, aggregating: fields)
+    // Define the symbol.
+    let initializer = ctx.llvm.structConstant(
+      of: witnessType, aggregating: Array(head.v, prependedTo: tail))
     ctx.llvm.setInitializer(initializer, for: symbol)
     ctx.llvm.setGlobalConstant(true, for: symbol)
 
