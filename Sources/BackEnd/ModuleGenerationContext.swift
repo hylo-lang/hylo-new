@@ -102,7 +102,7 @@ internal struct ModuleGenerationContext: ~Copyable {
 
     let l = ConcreteLayout(
       fields: [], propertyToField: [], size: .dynamic,
-      alignment: self.llvm.layout.preferredAlignment(of: ptr))
+      alignment: .init(bytes: self.llvm.layout.preferredAlignment(of: ptr)))
     self.opaqueTypeMetadata = .init(llvm: ptr, layout: l)
   }
 
@@ -127,11 +127,11 @@ internal struct ModuleGenerationContext: ~Copyable {
   }
 
   /// Returns the default alignment of a dynamically sized alloca.
-  internal func dynamicAllocationAlignment() -> Int {
+  internal func dynamicAllocationAlignment() -> Alignment {
     if let n = llvm.layout.stackAlignment {
-      return n
+      return Alignment(bytes: n)
     } else {
-      return llvm.layout.preferredAlignment(of: llvm.iptr)
+      return Alignment(bytes: llvm.layout.preferredAlignment(of: llvm.iptr))
     }
   }
 

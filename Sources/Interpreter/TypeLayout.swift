@@ -7,10 +7,13 @@ struct TypeLayout: Regular {
   /// Memory layout of a type, without any detail about parts.
   public struct StorageRequirements: Regular {
     /// The minimum alignment of an instance.
-    let alignment: Int
+    let alignment: Alignment
 
     /// The number of bytes occupied by an instance.
     let size: Int
+
+    /// The number of bytes between elements in a buffer of this type.
+    var stride: Int { size.roundedUp(toNearestMultipleOf: alignment) }
 
   }
 
@@ -40,10 +43,13 @@ struct TypeLayout: Regular {
   public let footprint: StorageRequirements
 
   /// The minimum alignment of an instance.
-  public var alignment: Int { footprint.alignment }
+  public var alignment: Alignment { footprint.alignment }
 
   /// The number of bytes occupied by an instance.
   public var size: Int { footprint.size }
+
+  /// The number of bytes between elements in a buffer of this type.
+  public var stride: Int { footprint.stride }
 
   /// The type whose layout is described by `self`.
   public let type: MonomorphicTypeIdentity
@@ -61,18 +67,6 @@ struct TypeLayout: Regular {
   public let isEnumLayout: Bool
 }
 
-extension UnsignedInteger {
-
-  /// Returns the least multiple of `n` greater than or equal to `self`.
-  ///
-  /// - Precondition: `n > 0`.
-  internal func roundedUp(toNearestMultipleOf n: Self) -> Self {
-    let r = self % n
-    return (r == 0) ? self : self + (n - r)
-  }
-
-}
-
 extension TypeLayout.StorageRequirements {
 
   /// Returns the layout of the tuple `(S, T)`, where `S` and `T` are types whose layout is
@@ -80,10 +74,9 @@ extension TypeLayout.StorageRequirements {
   ///
   /// - Note: the `T` instance is stored `t.size` bytes before the end of the tuple.
   func appending(_ t: Self) -> Self {
-    let r = UInt(size).roundedUp(toNearestMultipleOf: UInt(t.alignment))
-    return .init(
-      alignment: Int(lcm(self.alignment, t.alignment)),
-      size: Int(r) + t.size)
+    precondition(t.size != 0 || t.alignment == .bytes(1), "Zero-sized types are 1-byte aligned.")
+    let r = size.roundedUp(toNearestMultipleOf: t.alignment)
+    return .init(alignment: max(self.alignment, t.alignment), size: r + t.size)
   }
 
 }

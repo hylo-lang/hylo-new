@@ -242,7 +242,7 @@ extension Program {
       let n = insertLoadTypeSize(from: ctx.value[t]!, in: &ctx)
       let x = ctx.module.llvm.insertAlloca(
         arrayOf: n, ctx.module.llvm.i8, at: ctx.insertionPoint!)
-      ctx.module.llvm.setAlignment(ctx.module.dynamicAllocationAlignment(), for: x)
+      ctx.module.llvm.setAlignment(ctx.module.dynamicAllocationAlignment().bytes, for: x)
       ctx.value[v] = x.v
     }
 
@@ -250,7 +250,7 @@ extension Program {
     else {
       let t = metadata(of: s.storage, in: &ctx.module)
       let x = ctx.module.llvm.insertAlloca(t.llvm, atEntryOf: ctx.llvm)
-      ctx.module.llvm.setAlignment(t.layout.alignment, for: x)
+      ctx.module.llvm.setAlignment(t.layout.alignment.bytes, for: x)
       ctx.value[v] = x.v
     }
 
@@ -310,7 +310,7 @@ extension Program {
       let n = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: ctx.module.llvm.iptr.t, in: &ctx)
       let b = metadata(of: t, in: &ctx.module)
       let a = ctx.module.llvm.insertAlloca(arrayOf: n, b.llvm, at: ctx.insertionPoint!)
-      ctx.module.llvm.setAlignment(b.layout.alignment, for: a)
+      ctx.module.llvm.setAlignment(b.layout.alignment.bytes, for: a)
       ctx.value[v] = a.v
 
     case .add(let o, let t):
@@ -640,7 +640,7 @@ extension Program {
     let x1 = codegen(s.source, in: &ctx).v
     let x2 = ctx.module.llvm.i32.unsafe[].constant(n).v
     _ = ctx.module.llvm.insertMemcpy(
-      to: x0, from: x1, count: x2, alignedAt: t.layout.alignment, at: ctx.insertionPoint!)
+      to: x0, from: x1, count: x2, alignedAt: t.layout.alignment.bytes, at: ctx.insertionPoint!)
 
     return ctx.ir.instruction(after: i.erased)
   }
@@ -901,7 +901,7 @@ extension Program {
     // Allocate storage for the entire table.
     let tableRawType = ctx.module.llvm.arrayType(storageSize, ctx.module.llvm.i8)
     let storage = ctx.module.llvm.insertAlloca(tableRawType, atEntryOf: ctx.result.value)
-    ctx.module.llvm.setAlignment(abstractTableType.layout.alignment, for: storage)
+    ctx.module.llvm.setAlignment(abstractTableType.layout.alignment.bytes, for: storage)
 
     // Store the entries.
     for (i, e) in s.entries.enumerated() {
@@ -1178,7 +1178,7 @@ extension Program {
       let m = ctx.result.prototype.mapping
       let t = (j >= 0) ? m.inputs[j].type : m.output!.type
       let x = ctx.module.llvm.insertAlloca(t.llvm, at: ctx.insertionPoint!)
-      ctx.module.llvm.setAlignment(t.layout.alignment, for: x)
+      ctx.module.llvm.setAlignment(t.layout.alignment.bytes, for: x)
       if j >= 0 {
         ctx.module.llvm.insertStore(
           ctx.llvm.unsafe[].parameters[j], to: x, at: ctx.insertionPoint!)
@@ -1269,7 +1269,7 @@ extension Program {
 
     // Build the value of the witness.
     let sizeAndAlignment = ctx.llvm.i64.unsafe[].constant(
-      UInt64((m.layout.size.fixed ?? 0) << 16) | UInt64(m.layout.alignment)).v
+      UInt64((m.layout.size.fixed ?? 0) << 16) | UInt64(m.layout.alignment.bytes)).v
     let head = ctx.llvm.structConstant(
       of: ctx.typeWitnessHeader, aggregating: [sizeAndAlignment])
     let tail = offsets.map({ (o) in int.unsafe[].constant(o).v })
@@ -1720,7 +1720,7 @@ extension Program {
 
       case .byValue(let j):
         let x = ctx.llvm.insertAlloca(input.type.llvm, at: p)
-        ctx.llvm.setAlignment(input.type.layout.alignment, for: x)
+        ctx.llvm.setAlignment(input.type.layout.alignment.bytes, for: x)
         ctx.llvm.insertStore(m.value.unsafe[].parameters[j], to: x, at: p)
         arguments.append(x.v)
 
@@ -1737,7 +1737,7 @@ extension Program {
     case .erased: break
     case .byValue:
       let x = ctx.llvm.insertAlloca(output.type.llvm, at: p)
-      ctx.llvm.setAlignment(output.type.layout.alignment, for: x)
+      ctx.llvm.setAlignment(output.type.layout.alignment.bytes, for: x)
       spilledResultPlace = x.v
       arguments.append(x.v)
 
@@ -1855,7 +1855,7 @@ extension Program {
     metadata(of: t, in: &ctx) { (program, ctx, t, n) in
       let v = ctx.llvm.functionPointer.t
       let s = ctx.llvm.layout.storageSize(of: v)
-      let a = ctx.llvm.layout.preferredAlignment(of: v)
+      let a = Alignment(bytes: ctx.llvm.layout.preferredAlignment(of: v))
       let l = ConcreteLayout(fields: [], propertyToField: [], size: .fixed(s), alignment: a)
       return TypeMetadata(llvm: v, layout: l)
     }
@@ -1899,7 +1899,7 @@ extension Program {
       }
 
       let s = ctx.llvm.layout.storageSize(of: v)
-      let a = ctx.llvm.layout.preferredAlignment(of: v)
+      let a = Alignment(bytes: ctx.llvm.layout.preferredAlignment(of: v))
       let l = ConcreteLayout(fields: [], propertyToField: [], size: .fixed(s), alignment: a)
       return TypeMetadata(llvm: v, layout: l)
     }
@@ -1989,7 +1989,7 @@ extension Program {
     if let layout = record(fields: fields, in: &ctx) {
       let definition = ctx.llvm.structType(named: name, layout.fields, packed: true)
       assert(ctx.llvm.layout.storageSize(of: definition) <= layout.size.fixed!)
-      assert(ctx.llvm.layout.abiAlignment(of: definition) <= layout.alignment)
+      assert(ctx.llvm.layout.abiAlignment(of: definition) <= layout.alignment.bytes)
       return TypeMetadata(llvm: definition, layout: layout)
     } else {
       return ctx.opaqueTypeMetadata
@@ -2007,7 +2007,7 @@ extension Program {
 
     // Otherwise, construct a pair leading with the tag.
     var payloadSize = 0
-    var payloadAlignment = 1
+    var payloadAlignment: Alignment = .bytes(1)
     for c in cases {
       // Bail out if there is a case with a dynamic size.
       let m = metadata(of: c, in: &ctx)
@@ -2028,7 +2028,7 @@ extension Program {
     ]
 
     // Add padding after the tag to satisfy the alignment of the payload if necessary.
-    let payloadOffset = tagSize.rounded(upToNearestMultipleOf: payloadAlignment)
+    let payloadOffset = tagSize.roundedUp(toNearestMultipleOf: payloadAlignment)
     if payloadOffset > tagSize {
       let padding = payloadOffset - tagSize
       fields.append(ctx.llvm.arrayType(padding, ctx.llvm.i8).t)
@@ -2039,7 +2039,8 @@ extension Program {
     let layout = ConcreteLayout(
       fields: fields, propertyToField: [0, fields.count - 1],
       size: .fixed(payloadOffset + payloadSize),
-      alignment: max(payloadAlignment, ctx.llvm.layout.preferredAlignment(of: tag)))
+      alignment:
+        max(payloadAlignment, Alignment(bytes: ctx.llvm.layout.preferredAlignment(of: tag))))
     return .init(llvm: pair, layout: layout)
   }
 
@@ -2067,7 +2068,7 @@ extension Program {
       guard fieldSize > 0 else { continue }
 
       // Compute the offset of the next property.
-      let next = size.rounded(upToNearestMultipleOf: rs[p].layout.alignment)
+      let next = size.roundedUp(toNearestMultipleOf: rs[p].layout.alignment)
 
       // Add padding if necessary.
       if next != size {
@@ -2080,7 +2081,9 @@ extension Program {
       size = next + fieldSize
     }
 
-    let a = if let max = ps.first { rs[max].layout.alignment } else { 1 }
+    // 0-sized types have alignment 1.
+    assert(ps.allSatisfy{ rs[$0].layout.size != 0 || rs[$0].layout.alignment == .bytes(1) })
+    let a = ps.first.map({ (p) in rs[p].layout.alignment }) ?? Alignment.bytes(1)
     return ConcreteLayout(
       fields: elements, propertyToField: fieldToElement, size: .fixed(size), alignment: a)
   }

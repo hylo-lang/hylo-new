@@ -68,9 +68,8 @@ struct Memory {
     }
 
     /// Creates an instance having `n` bytes with alignment `m` and the given `id`.
-    private init(_ n: Int, bytesWithAlignment m: Int, id: ID) {
+    private init(_ n: Int, bytesWithAlignment m: Alignment, id: ID) {
       precondition(n >= 0)
-      precondition(m > 0)
 
       let (s, o) = Storage.aligned(repeating: 0, count: n, alignment: m)
       storage = s
@@ -81,7 +80,13 @@ struct Memory {
 
     /// An allocation for `n` contiguous `t`s with the given `id`.
     public init(_ t: TypeLayout, count n: Int, id: ID) {
-      self.init(t.size * n, bytesWithAlignment: t.alignment, id: id)
+      precondition(n >= 0)
+      if n != 0 {
+        let paddingAtEnd = t.stride - t.size
+        self.init(t.stride * n - paddingAtEnd, bytesWithAlignment: t.alignment, id: id)
+      } else {
+        self.init(0, bytesWithAlignment: .bytes(1), id: id)
+      }
     }
 
     /// The address of the `o`th byte.
@@ -105,7 +110,7 @@ struct Memory {
       to _: T.Type, at a: Offset, _ body: (UnsafeMutablePointer<T>) -> R
     ) -> R {
       precondition(a + MemoryLayout<T>.size <= size)
-      precondition(offset(a, hasAlignment: MemoryLayout<T>.alignment))
+      precondition(offset(a, hasAlignment: Alignment(bytes: MemoryLayout<T>.alignment)))
       return storage.withUnsafeMutableBytes { p in
         body((p.baseAddress! + baseOffset + a).assumingMemoryBound(to: T.self))
       }
@@ -138,10 +143,10 @@ struct Memory {
       }
     }
 
-    /// Returns `true` iff `o` is aligned to an `n` byte boundary.
-    public func offset(_ o: Offset, hasAlignment n: Int) -> Bool {
+    /// Returns `true` iff the address at offset `o` is `n`-byte aligned.
+    public func offset(_ o: Offset, hasAlignment n: Alignment) -> Bool {
       storage.withUnsafeBytes {
-        UInt(bitPattern: $0.baseAddress! + baseOffset + o) % UInt(n) == 0
+        UInt(bitPattern: $0.baseAddress! + baseOffset + o).isMultiple(of: n)
       }
     }
   }
@@ -191,6 +196,7 @@ struct Memory {
 
   /// Allocates `n` contiguous instances of `t` and returns the`Address` of the first instance.
   public mutating func allocate(_ t: MonomorphicTypeIdentity, count n: Int = 1) -> Address {
+    precondition(n >= 0)
     let a = nextAllocation
     nextAllocation += 1
     allocation[a] = Allocation(typeLayouts.layout(t, in: &program), count: n, id: a)
@@ -208,8 +214,8 @@ struct Memory {
     }
   }
 
-  /// Returns true if `a` is aligned to an `n` byte boundary.
-  public func address(_ a: Address, hasAlignment n: Int) -> Bool {
+  /// Returns true if `a` is `n`-byte aligned.
+  public func address(_ a: Address, hasAlignment n: Alignment) -> Bool {
     allocation[a.allocation]!.offset(a.offset, hasAlignment: n)
   }
 
@@ -280,9 +286,9 @@ extension UnsafeRawPointer {
 
   /// Returns the number of bytes from `self` to the nearest address
   /// aligned to `a`.
-  fileprivate func roundedUp(toNearestMultipleOf a: Int) -> Int {
+  fileprivate func forwardOffset(toNearest a: Alignment) -> Int {
     let b = UInt(bitPattern: self)
-    return Int(b.roundedUp(toNearestMultipleOf: UInt(a)) - b)
+    return Int(b.roundedUp(toNearestMultipleOf: a) - b)
   }
 
 }
@@ -293,8 +299,8 @@ extension UnsafeRawBufferPointer {
   /// the nearest address aligned to `a`.
   ///
   /// If `self.baseAddress == nil`, returns `0`.
-  internal func firstOffsetAligned(to a: Int) -> Int {
-    baseAddress?.roundedUp(toNearestMultipleOf: a) ?? 0
+  internal func forwardOffset(toNearest a: Alignment) -> Int {
+    baseAddress?.forwardOffset(toNearest: a) ?? 0
   }
 
 }

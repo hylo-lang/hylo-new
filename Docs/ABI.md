@@ -1,4 +1,27 @@
-# Abstract Binary Interface
+# Application Binary Interface
+
+## Hylo Type Layout
+
+### Definitions
+- **Size:** the number of bytes that the type takes up in memory - the offset past the last member of the type.
+- **Alignment:** the required number that the address of any instance must be a multiple of. 0-sized
+  types have alignment 1. Alignment is always a power of two.
+- **Stride:** the number of bytes between the start of consecutive elements of the type. Can be
+  derived by rounding up the size to the nearest multiple of the alignment.
+
+### Record layout
+Structs, tuples and enums are laid out using the record layout algorithm.
+An enum's record representation is composed of its discriminator and payload, when applicable. Enums
+with 0 or 1 cases have no discriminator.
+
+A record's members are laid out in decreasing order of alignment, or when equal, in declaration
+order. 
+
+- The offset of each member is such that
+  - `(member_byte_offset + member_size) <= record_size`.
+  - the offset is a multiple of the member's alignment.
+- The offset of a 0-sized member is an unspecified number `x` where `0 <= x <= record_size`.
+- 0-sized objects are not guaranteed to have a unique address.
 
 ## Hylo Calling Convention
 
