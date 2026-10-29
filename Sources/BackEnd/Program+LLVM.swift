@@ -740,41 +740,9 @@ extension Program {
   internal mutating func incorporate(
     _ i: IRProperty.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
-    let s = ctx.ir.at(i)
-
-    // Compute the LLVM representation of the whole.
-    let wholeTypeInHylo = ctx.ir.result(of: s.whole)!.type
-    let whole = codegen(s.whole, in: &ctx)
-
-    // Lookup the offset of the property.
-    let index = storedPropertyIndex(of: s.part, in: s.anchor.scope) ?? unimplemented()
-
-    // Do we have to read the offset from a type witness?
-    if let witness = s.wholeType {
-      // Get the base address of the record offsets.
-      let recordOffsets = insertGetRecordOffsets(
-        ctx.value[witness]!, at: ctx.insertionPoint!, in: &ctx.module)
-
-      // Load the offset of the property.
-      let offsetAddress = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: recordOffsets, typed: ctx.module.llvm.iptr,
-        indices: [index], indexType: ctx.module.llvm.i32, at: ctx.insertionPoint!)
-      let offset = ctx.module.llvm.insertLoad(
-        ctx.module.llvm.iptr, from: offsetAddress, at: ctx.insertionPoint!)
-
-      // Advance the base address of the whole by the offset of the part.
-      let a = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: whole, typed: ctx.module.llvm.i8, indices: [offset.v], at: ctx.insertionPoint!)
-      ctx.value[.register(i.erased)] = a.v
+    incorporate(i, in: &ctx) { (me, s) in
+      me.storedPropertyIndex(of: s.part, in: s.anchor.scope) ?? unimplemented()
     }
-
-    // Otherwise we can compte the offset at compile-time.
-    else {
-      let a = insertGetFieldAddress(
-        at: [index], in: whole, instanceOf: wholeTypeInHylo, in: &ctx)
-      ctx.value[.register(i.erased)] = a
-    }
-
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -807,12 +775,7 @@ extension Program {
   internal mutating func incorporate(
     _ i: IRSubfield.ID, in ctx: inout FunctionGenerationContext
   ) -> AnyInstructionIdentity? {
-    let s = ctx.ir.at(i)
-    let whole = ctx.value[s.whole]!
-    let wholeType = ctx.ir.result(of: s.whole)!.type
-    let address = insertGetFieldAddress(at: s.part, in: whole, instanceOf: wholeType, in: &ctx)
-
-    ctx.value[.register(i.erased)] = address
+    incorporate(i, in: &ctx, computingMemberIndexWith: { (_, s) in s.part })
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -992,6 +955,47 @@ extension Program {
     // Return from the ramp with the result of the plateau.
     ctx.module.llvm.insertReturn(control, at: ctx.insertionPoint!)
     return nil
+  }
+
+  /// Generates the LLVM IR code corresponding to `i`, which projects a part of a whole, applying
+  /// `memberIndex` to compute the logical index of the part being accessed.
+  private mutating func incorporate<T: IRPart>(
+    _ i: T.ID, in ctx: inout FunctionGenerationContext,
+    computingMemberIndexWith memberIndex: (inout Self, T) -> Int
+  ) {
+    let s = ctx.ir.at(i)
+
+    // Compute the LLVM representation of the whole.
+    let wholeTypeInHylo = ctx.ir.result(of: s.whole)!.type
+    let whole = codegen(s.whole, in: &ctx)
+
+    // Lookup the offset of the property.
+    let index = memberIndex(&self, s)
+
+    // Do we have to read the offset from a type witness?
+    if let witness = s.wholeWitness {
+      // Get the base address of the record offsets.
+      let recordOffsets = insertGetRecordOffsets(
+        ctx.value[witness]!, at: ctx.insertionPoint!, in: &ctx.module)
+
+      // Load the offset of the property.
+      let offsetAddress = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: recordOffsets, typed: ctx.module.llvm.iptr,
+        indices: [index], indexType: ctx.module.llvm.i32, at: ctx.insertionPoint!)
+      let offset = ctx.module.llvm.insertLoad(
+        ctx.module.llvm.iptr, from: offsetAddress, at: ctx.insertionPoint!)
+
+      // Advance the base address of the whole by the offset of the part.
+      let a = ctx.module.llvm.insertGetElementPointerInBounds(
+        of: whole, typed: ctx.module.llvm.i8, indices: [offset.v], at: ctx.insertionPoint!)
+      ctx.value[.register(i.erased)] = a.v
+    }
+
+    // Otherwise we can compte the offset at compile-time.
+    else {
+      let a = insertGetFieldAddress(at: index, in: whole, instanceOf: wholeTypeInHylo, in: &ctx)
+      ctx.value[.register(i.erased)] = a
+    }
   }
 
   /// Returns the result of `demandFunction(_:in:)` with the identity of `f`, which is declared in
@@ -1390,32 +1394,24 @@ extension Program {
     return w
   }
 
-  /// Returns a pointer to the field at `path` relative to `record`, which is a pointer to storage
+  /// Returns a pointer to the field at `index` relative to `record`, which is a pointer to storage
   /// for an instance of `recordTypeInHylo`.
   private mutating func insertGetFieldAddress(
-    at path: IndexPath, in record: LLVMValue, instanceOf recordTypeInHylo: AnyTypeIdentity,
+    at index: Int, in record: LLVMValue, instanceOf recordTypeInHylo: AnyTypeIdentity,
     in ctx: inout FunctionGenerationContext
   ) -> LLVMValue {
-    let i32 = ctx.module.llvm.i32
-    var current = recordTypeInHylo
-    var indices = [i32.unsafe[].constant(0).v]
-    for p in path {
-      // Get the logical index of the property in its concrete representation.
-      let m = metadata(of: current, in: &ctx.module)
-      let i = m.layout.propertyToField[p]
-
-      // Stop if the property has been erased. The resulting path will be that of its container.
-      if i < 0 { break }
-
-      // Otherwise, move to the next component.
-      indices.append(i32.unsafe[].constant(m.layout.propertyToField[p]).v)
-      current = fields(of: current, visibleFrom: ctx.module.hylo)![p]
-    }
-
     let m = metadata(of: recordTypeInHylo, in: &ctx.module)
-    let r = ctx.module.llvm.insertGetElementPointerInBounds(
+    let i = m.layout.propertyToField[index]
+
+    // If the property's been erased, the result is the address of the whole.
+    if i < 0 { return record }
+
+    // Otherwise, we compute it with getelementptr.
+    let i32 = ctx.module.llvm.i32
+    let indices = [i32.unsafe[].constant(0).v, i32.unsafe[].constant(i).v]
+    let address = ctx.module.llvm.insertGetElementPointerInBounds(
       of: record, typed: m.llvm, indices: indices, at: ctx.insertionPoint!)
-    return r.v
+    return address.v
   }
 
   /// Returns the LLVM values corresponding to `xs`, which are instances of `t`, loaded in memory.

@@ -452,11 +452,11 @@ extension IRValue {
   ///
   /// - Precondition: `self` contains a place.
   fileprivate func location(
-    ofPart p: IndexPath,
+    ofPart p: Int,
     in executor: inout Interpreter
   ) -> Memory.TypedAddress {
     let a = executor.address(of: self)
-    return executor.memory.location(p, in: a)
+    return executor.memory.location([p], in: a)
   }
 
   /// Returns the address of field `f` in `self`, in the current execution

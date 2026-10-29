@@ -19,8 +19,7 @@ public struct IRImplementation: Instruction {
 
   /// Creates an instance with the given properties.
   public init(
-    table: IRValue, requirement: DeclarationIdentity, interface: AnyTypeIdentity,
-    anchor: Anchor
+    table: IRValue, requirement: DeclarationIdentity, interface: AnyTypeIdentity, anchor: Anchor
   ) {
     self.operands = [table]
     self.anchor = anchor
@@ -42,7 +41,7 @@ public struct IRImplementation: Instruction {
   }
 
   /// A witness of the run-time type of the whole iff that type has been existentialized.
-  public var wholeType: IRValue? {
+  public var wholeWitness: IRValue? {
     (operands.count > 1) ? operands[1] : nil
   }
 

@@ -2398,7 +2398,7 @@ internal struct IREmitter {
   ) -> IRValue {
     let t = program.types.dealiased(partType)
     let s = IRProperty(
-      whole: whole, wholeType: nil, part: part, partType: t, anchor: currentAnchor)
+      whole: whole, wholeWitness: nil, part: part, partType: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2418,12 +2418,17 @@ internal struct IREmitter {
     if path.isEmpty { return whole }
 
     let (root, _) = currentFunction.result(of: whole) ?? badOperand()
-    let partType = program.withTyper(typing: module) { (tp) in
-      tp.field(of: root, at: path)
+    let ts = program.withTyper(typing: module) { (tp) in
+      path.reduce(into: [root]) { (t, p) in t.append(tp.fields(of: t.last!)![p]) }
     }
 
-    let s = IRSubfield(whole: whole, part: path, partType: partType!, anchor: currentAnchor)
-    return insert(s)!
+    var w = whole
+    for (t, p) in zip(ts[1...], path) {
+      let s = IRSubfield(whole: w, wholeWitness: nil, part: p, partType: t, anchor: currentAnchor)
+      w = insert(s)!
+    }
+
+    return w
   }
 
   /// Inserts a `switch` instruction.

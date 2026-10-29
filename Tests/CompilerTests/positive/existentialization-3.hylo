@@ -1,5 +1,3 @@
-//! exit-status:42
-
 // This test exercises the construction of type witnesses at compile-time and run-time. Since the
 // layout of pair depends on the size and alignment of its components, a type witness is required
 // in existentialized methods to determine the offset each member. For example, `Pair.init(_:_:)`
@@ -7,9 +5,9 @@
 // of `T` and `U`. In `main(:)`, however, the witness of `Pair<Small, Large>` is constructed at
 // compile-time and stored in the program's binary.
 //
-// Note that `Large`'s alignment requirement is stricter than `Small`'s. Hence, the second member
-// of an instance of `Pair<Small, Large>` is laid out before the first one. This configurations has
-// to be computed consistently at compile-time and run-time.
+// Since the alignment requirement of `Large` is stricter than that of `Small`, the second member
+// of an instance of `Pair<Small, Large>` (or a tuple `{Small, Large}`) is laid out before the
+// first one. This configuration has to be computed consistently at compile-time and run-time.
 
 struct Pair<T, U> {
 
@@ -54,15 +52,23 @@ struct Large is Movable & Deinitializable {
 
 }
 
-public fun main() -> Int32 {
-  // Note: we count bits to make sure we can't accidentally get the correct result by interpreting
-  // the least significant bits of each member with the wrong type.
-  sink let p = Pair(
-    Small(value: 0x3fff as Int16),
-    Large(value: 0x200000 as Int64))
-  let x = p.lhs.value.leading_zero_bit_count()
-  let y = p.rhs.value.trailing_zero_bit_count()
+fun tuple<T is Movable, U is Movable>(x: sink T, y: sink U) -> {T, U} {
+  (x, y)
+}
 
+public fun main() {
+  sink let p = Pair(
+    Small(value: 0x3fff as Int16), // 2 leading zeros
+    Large(value: 0xffff as Int64)) // 48 leading zeros
+
+  precondition(p.lhs.value.leading_zero_bit_count() == 2)
+  precondition(p.rhs.value.leading_zero_bit_count() == 48)
   p.deinit()
-  return Int32(x * y)
+
+  sink let q = tuple(
+    Small(value: 0x3fff as Int16), // 2 leading zeros
+    Large(value: 0xffff as Int64)) // 48 leading zeros
+
+  precondition(q.0.value.leading_zero_bit_count() == 2)
+  precondition(q.1.value.leading_zero_bit_count() == 48)
 }
