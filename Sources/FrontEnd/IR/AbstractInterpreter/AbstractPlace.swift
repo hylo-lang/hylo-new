@@ -26,14 +26,12 @@ internal enum AbstractPlace: Hashable, Sendable {
   /// Returns a new place created by appending `suffix` to `self`.
   ///
   /// - Requires: `self` is not `.null`.
-  internal func appending(contentsOf suffix: IndexPath) -> Self {
-    if suffix.isEmpty { return self }
-
+  internal func appending(_ suffix: Int) -> Self {
     switch self {
     case .root(let root):
-      return .subplace(root: root, path: suffix)
+      return .subplace(root: root, path: [suffix])
     case .subplace(let root, let prefix):
-      return .subplace(root: root, path: prefix.appending(contentsOf: suffix))
+      return .subplace(root: root, path: prefix.appending(suffix))
     }
   }
 

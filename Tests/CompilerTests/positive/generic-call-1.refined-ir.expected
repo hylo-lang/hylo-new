@@ -28,7 +28,7 @@ fun main(set %p0: Int32) {
   %r2 = assume_state %r1 initialized
   %r3 = end %r1
   %r4 = project $<ConformanceDeclaration at generic-call-1:7.1>[]
-  %r5 = property "f" of %r4 as [Void](let P<Self>, self: let Self) let -> Int32
+  %r5 = implementation "f" in %r4 as [Void](let P<Self>, self: let Self) let -> Int32
   %r6 = access [let] %r4
   %r7 = access [let] %r0
   %r8 = access [set] %p0

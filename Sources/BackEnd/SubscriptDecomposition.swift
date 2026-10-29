@@ -234,8 +234,7 @@ extension Program {
   internal mutating func defineSlide(
     dominatedBy y: IRYield.ID, in ctx: inout FunctionGenerationContext
   ) -> (FunctionMetadata, LLVMValue) {
-    let name = IRFunction.Name.slide(ctx.ir.name, ctx.ir.block(defining: y).rawValue)
-    let n = mangled(name)
+    let n = mangled(IRFunction.Name.slide(ctx.ir.name, ctx.ir.block(defining: y).rawValue))
     let f = ctx.module.llvm.declareFunction(n, ctx.module.slide)
     let u = metadata(of: .void, in: &ctx.module)
 
@@ -319,8 +318,7 @@ extension Program {
   internal mutating func definePlateau(
     dominatedBy y: IRProject.ID, in ctx: inout FunctionGenerationContext
   ) -> (FunctionMetadata, LLVMValue, IRBlockSet) {
-    let name = IRFunction.Name.plateau(ctx.ir.name, y.erased.address.rawValue)
-    let n = mangled(name)
+    let n = mangled(IRFunction.Name.plateau(ctx.ir.name, y.erased.address.rawValue))
     let f = ctx.module.llvm.declareFunction(n, ctx.module.plateau)
 
     let m = Prototype.Mapping(inputs: [], output: nil)
@@ -609,6 +607,7 @@ extension IRFunction {
       IRCase.self,
       IREnumTag.self,  // Safe to redefine assuming MVS.
       IRGlobalAccess.self,
+      IRImplementation.self,
       IRLoad.self,  // Safe to redefine assuming MVS.
       IRPlaceCast.self,
       IRPointerToPlace.self,

@@ -151,6 +151,8 @@ internal struct ManglingEncoding: Sendable {
         demangled = takeImplementationDeclaration(from: &source)
       case .existentializedDeclaration:
         demangled = takeExistentializedDeclaration(from: &source)
+      case .typeWitnessConstructorDeclaration:
+        demangled = takeTypeWitnessConstructorDeclaration(from: &source)
       case .appliedDeclaration:
         demangled = takeTaggedEntity(from: &source, { (e, i) in .applied(e, i) })
       case .slideDeclaration:
@@ -556,6 +558,9 @@ internal struct ManglingEncoding: Sendable {
     case .existentialized(let s):
       output.add(operator: .existentializedDeclaration)
       append(function: s, to: &output)
+    case .typeWitnessConstructor(let t):
+      output.add(operator: .typeWitnessConstructorDeclaration)
+      append(type: t.erased, to: &output)
     case .applied(let s, let n):
       append(.appliedDeclaration, tagging: s, with: n, to: &output)
     case .slide(let s, let n):
@@ -612,6 +617,13 @@ internal struct ManglingEncoding: Sendable {
     from source: inout DemanglingContext
   ) -> DemangledEntity {
     .existentialized(takeEntity(from: &source))
+  }
+
+  /// Demangles a type witness constructor declaration from `source`.
+  private static func takeTypeWitnessConstructorDeclaration(
+    from source: inout DemanglingContext
+  ) -> DemangledEntity {
+    .typeWitnessConstructor(takeType(from: &source))
   }
 
   /// Returns the result of `make` applied to a demangled entity followed by a tag.

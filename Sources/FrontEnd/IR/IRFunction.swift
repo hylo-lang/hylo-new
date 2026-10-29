@@ -24,6 +24,12 @@ public struct IRFunction: Sendable {
     /// The identity of a function implementing a trait requirement.
     case implementation(DeclarationIdentity, ConformanceDeclaration.ID, TypeArguments)
 
+    /// The identity of a type constructor.
+    ///
+    /// A type witness constructor is a function created during code generation that implements the
+    /// construction of a type witness at run-time.
+    case typeWitnessConstructor(UniversalType.ID)
+
     /// The identity of the existentialiezd form of a polymorphic function.
     indirect case existentialized(IRFunction.Name)
 
@@ -47,6 +53,8 @@ public struct IRFunction: Sendable {
         return d == x
       case .implementation(let x, _, _):
         return d == x
+      case .typeWitnessConstructor:
+        return false
       case .existentialized(let n):
         return n.isLoweredForm(of: d)
       case .applied:
@@ -104,6 +112,11 @@ public struct IRFunction: Sendable {
     fileprivate mutating func assign<T: Instruction>(_ i: T) {
       self.instruction = i
       self.tag = .init(T.self)
+    }
+
+    /// Applies the given substitution to the instance wrapped into `self`.
+    fileprivate mutating func substitute(_ properties: IRSubstitutionTable) {
+      self.instruction = self.instruction.substituting(properties)
     }
 
   }
@@ -244,7 +257,7 @@ public struct IRFunction: Sendable {
     case IRPlaceCast.self:
       return (at(i) as! IRPlaceCast).source
     case IRSubfield.self:
-      return (at(i) as! IRSubfield).base
+      return (at(i) as! IRSubfield).whole
     default:
       return nil
     }
@@ -461,8 +474,6 @@ public struct IRFunction: Sendable {
       return (t, true)
     case .bundle(_, let t, _):
       return (t, true)
-    case .type(_, let t):
-      return (t.erased, false)
     case .poison(let t):
       return resolved(t)
     }
@@ -501,12 +512,21 @@ public struct IRFunction: Sendable {
     }
   }
 
-  /// Returns `true` iff `t` and `u` resolve denote the same type.
+  /// Returns `true` iff `t` and `u` resolve to the same type.
   private func areEqual(_ t: IRType, _ u: IRType) -> Bool {
     if let a = resolved(t) {
       return resolved(u).map({ b in a == b }) ?? false
     } else {
       return resolved(u) == nil
+    }
+  }
+
+  /// Returns `true` iff `t` resolves to `u`.
+  private func areEqual(_ t: IRType, _ u: (AnyTypeIdentity, Bool)) -> Bool {
+    if let a = resolved(t) {
+      return a == u
+    } else {
+      return false
     }
   }
 
@@ -732,6 +752,26 @@ public struct IRFunction: Sendable {
     }
   }
 
+  /// Substitutes all uses of `old` with `new`.
+  ///
+  /// - Requires: The result of `new` has the same type as the result of old.
+  internal mutating func replace(
+    _ old: AnyInstructionIdentity, with new: IRValue
+  ) {
+    assert(result(of: new).map({ (b) in areEqual(at(old).type, b) }) ?? false)
+    var patch = IRSubstitutionTable()
+    patch[IRValue.register(old)] = new
+
+    // Modifies the users of `old`.
+    for u in uses[.register(old), default: []] {
+      slots[u.user.address].substitute(patch)
+      uses[new, default: []].append(Use(user: u.user, index: u.index))
+    }
+
+    // Remove the uses of `old` now that they have been replaced.
+    uses[.register(old)] = nil
+  }
+
   /// Substitutes occurrences of `old` with `new` in the successors of `source`, returning `true`
   /// iff `old` was a successor of `source`.
   internal mutating func replaceSuccessor(
@@ -926,6 +966,9 @@ extension IRFunction.Name: Showable {
       let xs = a.elements.map({ (p, v) in "\(printer.show(p)): \(printer.show(v))" })
       let n = printer.program.debugName(of: d)
       return "$implementation[\(n) for \(list: xs)]"
+
+    case .typeWitnessConstructor(let t):
+      return "$witness_constructor[\(printer.show(t))]"
 
     case .existentialized(let n):
       return "\(printer.show(n)).existentialized"

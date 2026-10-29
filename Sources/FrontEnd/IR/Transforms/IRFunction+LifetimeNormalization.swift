@@ -113,6 +113,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IREnumTag.self), from: &f)
       case IRGlobalAccess.self:
         pc = interpret(f.castUnchecked(i, to: IRGlobalAccess.self), from: &f)
+      case IRImplementation.self:
+        pc = interpret(f.castUnchecked(i, to: IRImplementation.self), from: &f)
       case IRLoad.self:
         pc = interpret(f.castUnchecked(i, to: IRLoad.self), from: &f)
       case IRMemoryCopy.self:
@@ -147,6 +149,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRWitnessTable.self), from: &f)
       case IRWitnessTableCapture.self:
         pc = interpret(f.castUnchecked(i, to: IRWitnessTableCapture.self), from: &f)
+      case IRTypeWitness.self:
+        pc = interpret(f.castUnchecked(i, to: IRTypeWitness.self), from: &f)
       case IRYield.self:
         pc = interpret(f.castUnchecked(i, to: IRYield.self), from: &f)
       case let t:
@@ -425,6 +429,14 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
+    _ i: IRImplementation.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .initialized)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
     _ i: IRLoad.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
@@ -550,14 +562,14 @@ private struct Transfer: AbstractTransferFunction {
 
     // If the property is referring to a stored property in a struct whose layout is visible, the
     // instruction behaves like `subfield`.
-    if let index = program.storedPropertyIndex(of: s.property, in: s.anchor.scope) {
-      let field = context.locals[s.record]!.place!.appending(contentsOf: [index])
+    if let index = program.storedPropertyIndex(of: s.part, in: s.anchor.scope) {
+      let field = context.locals[s.whole]!.place!.appending(index)
       context.locals[.register(i.erased)] = .place(field)
     }
 
     // Otherwise, it defines a new place.
     else {
-      assert(isInitialized(place: s.record), "abstract property on uninitialized object")
+      assert(isInitialized(place: s.whole), "abstract property on uninitialized object")
       context.declare(i.erased, from: f, initially: .initialized)
     }
 
@@ -614,7 +626,7 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRSubfield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
-    let a = context.locals[s.base]!.place!.appending(contentsOf: s.path)
+    let a = context.locals[s.whole]!.place!.appending(s.part)
     context.locals[.register(i.erased)] = .place(a)
     return f.instruction(after: i.erased)
   }
@@ -653,6 +665,14 @@ private struct Transfer: AbstractTransferFunction {
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
     _ i: IRWitnessTableCapture.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .initialized)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRTypeWitness.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     context.declare(i.erased, from: f, initially: .initialized)
     return f.instruction(after: i.erased)
@@ -745,9 +765,9 @@ private struct Transfer: AbstractTransferFunction {
   ) -> (BindingPattern.Introducer?, IRValue) {
     var s = v
     while let r = s.register {
-      if let s = f.at(r) as? IRProperty, let i = introducer(binding: s.property) {
-        let presented = (i == .let) && program.isMember(s.property) ? .sinklet : i
-        return (presented, s.record)
+      if let s = f.at(r) as? IRProperty, let i = introducer(binding: s.part) {
+        let presented = (i == .let) && program.isMember(s.part) ? .sinklet : i
+        return (presented, s.whole)
       } else if let next = f.source(r) {
         s = next
       } else {
@@ -833,7 +853,7 @@ private struct Transfer: AbstractTransferFunction {
     case IRProperty.self:
       return isBoundImmutably(f.castUnchecked(i, to: IRProperty.self), in: f)
     case IRSubfield.self:
-      return isBoundImmutably((f.at(i) as! IRSubfield).base, in: f)
+      return isBoundImmutably((f.at(i) as! IRSubfield).whole, in: f)
     default:
       return true
     }
@@ -842,11 +862,11 @@ private struct Transfer: AbstractTransferFunction {
   /// Returns `true` iff the result of `i` cannot be used to modify or update a value.
   private func isBoundImmutably(_ i: IRProperty.ID, in f: IRFunction) -> Bool {
     if
-      let v = program.cast(f.at(i).property, to: VariableDeclaration.self),
+      let v = program.cast(f.at(i).part, to: VariableDeclaration.self),
       let d = program.bindingDeclaration(containing: v),
       program[program[d].pattern].introducer.value != .let
     {
-      return isBoundImmutably(f.at(i).record, in: f)
+      return isBoundImmutably(f.at(i).whole, in: f)
     } else {
       return true
     }

@@ -17,9 +17,14 @@ internal struct ConcreteLayout {
     /// other values are undefined.
     private let raw: Int
 
+    /// `true` iff `self` denotes a size determined at runtime.
+    internal var isDynamic: Bool {
+      raw == -1
+    }
+
     /// The size represented by `self` iff it is fixed.
     internal var fixed: Int? {
-      raw >= 0 ? raw : nil
+      raw != -1 ? raw : nil
     }
 
     /// An instance representing a size determined at runtime.

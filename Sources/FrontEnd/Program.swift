@@ -163,6 +163,9 @@ public struct Program: Sendable {
         typer.program[m].ir[work[i].id].take(definition: work[i].function)
       }
 
+      // Don't go any further if an error occured.
+      if typer.program[m].containsError { return }
+
       // New functions may have been introduced during the previous passes. Those that have been
       // declared during depolymorphization must be defined in the current module unless they are
       // behind a resilience boundary. Since this process may result in further new declarations,
@@ -511,12 +514,16 @@ public struct Program: Sendable {
       return isPrivate(castUnchecked(d, to: BindingDeclaration.self), in: m)
     case ConformanceDeclaration.self:
       return isPrivate(castUnchecked(d, to: ConformanceDeclaration.self), in: m)
+    case EnumDeclaration.self:
+      return isPrivate(castUnchecked(d, to: EnumDeclaration.self), in: m)
     case FunctionDeclaration.self:
       return isPrivate(castUnchecked(d, to: FunctionDeclaration.self), in: m)
     case FunctionBundleDeclaration.self:
       return isPrivate(castUnchecked(d, to: FunctionBundleDeclaration.self), in: m)
     case VariantDeclaration.self:
       return isPrivate(parent(containing: d, as: FunctionBundleDeclaration.self)!, in: m)
+    case StructDeclaration.self:
+      return isPrivate(castUnchecked(d, to: StructDeclaration.self), in: m)
     default:
       return false
     }
@@ -540,7 +547,7 @@ public struct Program: Sendable {
       return isPrivate(d, in: m)
     case .existentialized(let g):
       return isPrivate(g, in: m)
-    case .applied, .slide, .plateau:
+    case .typeWitnessConstructor, .applied, .slide, .plateau:
       return true
     }
   }
@@ -870,9 +877,9 @@ public struct Program: Sendable {
 
   /// Returns the type assigned to `n`.
   ///
-  /// You cannot make strong assumptions about the exact shape of the returned type in general, as
-  /// it may be and/or contain aliases. You may use `type(assignedTo:assuming:)` if you need to
-  /// obtain the type assigned to a node assuming it must have a specific shape.
+  /// You cannot make strong assumptions about the exact shape of the returned type because it may
+  /// contain aliases. Use `dealiasedType(assignedTo:assuming:)` to obtain the type assigned to a
+  /// node assuming it must have a specific shape.
   ///
   /// - Requires: The module containing `n` is typed.
   public func type<T: SyntaxIdentity>(assignedTo n: T) -> AnyTypeIdentity {
@@ -881,18 +888,25 @@ public struct Program: Sendable {
 
   /// Returns the type assigned to `n`, if any.
   ///
-  /// You cannot make strong assumptions about the exact shape of the returned type in general, as
-  /// it may be and/or contain aliases. You may use `type(assignedTo:assuming:)` if you need to
-  /// obtain the type assigned to a node assuming it must have a specific shape.
-  ///
+  /// You cannot make strong assumptions about the exact shape of the returned type because it may
+  /// contain aliases. Use `dealiasedType(assignedTo:assuming:)` to obtain the type assigned to a
+  /// node assuming it must have a specific shape.
   public func type<T: SyntaxIdentity>(maybeAssignedTo n: T) -> AnyTypeIdentity? {
     self[n.module].type(assignedTo: n)
   }
 
-  /// Returns the type assigned to `n`, assuming it is an instance of `T`.
+  /// Returns the type assigned to `n`, dealiased.
   ///
   /// - Requires: The module containing `n` is typed.
-  public mutating func type<T: SyntaxIdentity, U: TypeTree>(
+  public mutating func dealiasedType<T: SyntaxIdentity>(assignedTo n: T) -> AnyTypeIdentity {
+    let t = type(assignedTo: n)
+    return types.dealiased(t)
+  }
+
+  /// Returns the type assigned to `n`, dealiased, assuming it is an instance of `T`.
+  ///
+  /// - Requires: The module containing `n` is typed.
+  public mutating func dealiasedType<T: SyntaxIdentity, U: TypeTree>(
     assignedTo n: T, assuming: U.Type
   ) -> U.ID {
     let t = type(assignedTo: n)
@@ -1927,6 +1941,9 @@ extension Program {
     case expressibleByFloatingPointLiteralInit =
       "ExpressibleByFloatingPointLiteral.init(floating_point_literal:)"
 
+    /// `Hylo.__initialize_record_offsets(offsets:aggregating:count:)`.
+    case initializeRecordOffsets = "initialize_record_offsets(offsets:aggregating:count:)"
+
     /// All standard library integer types.
     static let allIntegerTypes: [StandardLibraryEntity] = [
       .int, .uint,
@@ -1938,6 +1955,7 @@ extension Program {
 
     /// All standard library floating point types.
     static let allFloatingPointTypes: [StandardLibraryEntity] = [.float32, .float64]
+
   }
 
   /// Returns the type of a term witnessing that `t` conforms to the core trait `p`.
@@ -1955,7 +1973,7 @@ extension Program {
   /// The module containing the standard library must have been loaded and type checked.
   public mutating func standardLibraryType(_ n: StandardLibraryEntity) -> AnyTypeIdentity {
     let d = standardLibraryDeclaration(n)
-    let t = type(assignedTo: d, assuming: Metatype.self)
+    let t = dealiasedType(assignedTo: d, assuming: Metatype.self)
     return types[t].inhabitant
   }
 

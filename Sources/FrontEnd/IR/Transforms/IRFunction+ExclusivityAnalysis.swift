@@ -112,6 +112,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRCase.End.self), from: &f)
       case IRGlobalAccess.self:
         pc = interpret(f.castUnchecked(i, to: IRGlobalAccess.self), from: &f)
+      case IRImplementation.self:
+        pc = interpret(f.castUnchecked(i, to: IRImplementation.self), from: &f)
       case IRPlaceCast.self:
         pc = interpret(f.castUnchecked(i, to: IRPlaceCast.self), from: &f)
       case IRPlaceCast.End.self:
@@ -130,6 +132,8 @@ private struct Transfer: AbstractTransferFunction {
         pc = interpret(f.castUnchecked(i, to: IRWitnessTable.self), from: &f)
       case IRWitnessTableCapture.self:
         pc = interpret(f.castUnchecked(i, to: IRWitnessTableCapture.self), from: &f)
+      case IRTypeWitness.self:
+        pc = interpret(f.castUnchecked(i, to: IRTypeWitness.self), from: &f)
       default:
         pc = f.instruction(after: i.erased)
       }
@@ -238,6 +242,14 @@ private struct Transfer: AbstractTransferFunction {
 
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
+    _ i: IRImplementation.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
     _ i: IRPlaceCast.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     context.declare(i.erased, from: f, initially: .unique)
@@ -286,8 +298,8 @@ private struct Transfer: AbstractTransferFunction {
 
     // If the property is referring to a stored property in a struct whose layout is visible, the
     // instruction behaves like `subfield`.
-    if let index = program.storedPropertyIndex(of: s.property, in: s.anchor.scope) {
-      let field = context.locals[s.record]!.place!.appending(contentsOf: [index])
+    if let index = program.storedPropertyIndex(of: s.part, in: s.anchor.scope) {
+      let field = context.locals[s.whole]!.place!.appending(index)
       context.locals[.register(i.erased)] = .place(field)
     }
 
@@ -304,7 +316,7 @@ private struct Transfer: AbstractTransferFunction {
     _ i: IRSubfield.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     let s = f.at(i)
-    let a = context.locals[s.base]!.place!.appending(contentsOf: s.path)
+    let a = context.locals[s.whole]!.place!.appending(s.part)
     context.locals[.register(i.erased)] = .place(a)
     return f.instruction(after: i.erased)
   }
@@ -320,6 +332,14 @@ private struct Transfer: AbstractTransferFunction {
   /// Interprets `i`, which is in `f`.
   private mutating func interpret(
     _ i: IRWitnessTableCapture.ID, from f: inout IRFunction
+  ) -> AnyInstructionIdentity? {
+    context.declare(i.erased, from: f, initially: .unique)
+    return f.instruction(after: i.erased)
+  }
+
+  /// Interprets `i`, which is in `f`.
+  private mutating func interpret(
+    _ i: IRTypeWitness.ID, from f: inout IRFunction
   ) -> AnyInstructionIdentity? {
     context.declare(i.erased, from: f, initially: .unique)
     return f.instruction(after: i.erased)

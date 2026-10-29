@@ -1,4 +1,5 @@
 import Archivist
+import Utilities
 
 /// Creates a type witness using a runtime type constructor.
 @Archivable
@@ -10,15 +11,19 @@ public struct IRTypeWitness: Instruction {
   /// The region of the code corresponding to this instruction.
   public let anchor: Anchor
 
-  /// An existential type describing the type witness being constructed.
-  public var constructor: UniversalType.ID
+  /// Either a universal type or a constant describing the witness being constructed.
+  ///
+  /// If `operands` is empty, then the instruction projects a witness of `constructor`, which may
+  /// be any arbitrary type. Otherwise, `constructor` is a universal type denoting an abstraction
+  /// taking as many parameters as the number of `operands`.
+  public var constructor: AnyTypeIdentity
 
   /// The type of the type witness being constructed.
   public let typeOfApplication: TypeWitness.ID
 
   /// Creates an instance with the given properties.
   public init(
-    constructor: UniversalType.ID, arguments: [IRValue], typeOfApplication: TypeWitness.ID,
+    constructor: AnyTypeIdentity, arguments: [IRValue], typeOfApplication: TypeWitness.ID,
     anchor: Anchor
   ) {
     self.operands = arguments
@@ -46,8 +51,13 @@ extension IRTypeWitness: Showable {
 
   /// Returns a textual representation of `self` using `printer`.
   public func show(using printer: inout TreePrinter) -> String {
-    let xs = operands.map({ (o) in printer.show(o) }).joined(separator: ", ")
-    return "type_witness \(printer.show(constructor))(\(xs))"
+    if let u = printer.program.types.cast(constructor, to: UniversalType.self) {
+      let f = printer.show(printer.program.types[u].head)
+      let a = operands.map({ (o) in printer.show(o) })
+      return "type_witness \(f)(\(list: a))"
+    } else {
+      return "type_witness \(printer.show(constructor))"
+    }
   }
 
 }
