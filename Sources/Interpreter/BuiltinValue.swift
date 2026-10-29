@@ -104,6 +104,7 @@ extension BuiltinValue {
 
   /// Creates a `w`-bit integer storing the two's-complement representation of `n`.
   public init(_ n: BigInt, bitWidth w: UInt8) {
+    precondition(n.isRepresentable(asIntegerOfBitWidth: w))
     self =
       switch w {
       case 1: .i1(n != 0)
