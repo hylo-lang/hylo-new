@@ -26,7 +26,7 @@ enum BuiltinValue: Regular {
 
   // TODO: support floats and ptr.
 
-  /// The value of the stored `i1`, or `nil` if `self` does not match `.i1(_)`
+  /// The value of the stored `i1`, if any.
   public var i1: Bool? {
     switch self {
     case .i1(let v): v
@@ -34,7 +34,7 @@ enum BuiltinValue: Regular {
     }
   }
 
-  /// The value of the stored `i8`, or `nil` if `self` does not match `.i8(_)`
+  /// The value of the stored `i8`, if any.
   public var i8: UInt8? {
     switch self {
     case .i8(let v): v
@@ -42,7 +42,7 @@ enum BuiltinValue: Regular {
     }
   }
 
-  /// The value of the stored `i16`, or `nil` if `self` does not match `.i16(_)`
+  /// The value of the stored `i16`, if any.
   public var i16: UInt16? {
     switch self {
     case .i16(let v): v
@@ -50,7 +50,7 @@ enum BuiltinValue: Regular {
     }
   }
 
-  /// The value of the stored `i32`, or `nil` if `self` does not match `.i32(_)`
+  /// The value of the stored `i32`, if any.
   public var i32: UInt32? {
     switch self {
     case .i32(let v): v
@@ -58,7 +58,7 @@ enum BuiltinValue: Regular {
     }
   }
 
-  /// The value of the stored `i64`, or `nil` if `self` does not match `.i64(_)`
+  /// The value of the stored `i64`, if any.
   public var i64: UInt64? {
     switch self {
     case .i64(let v): v
@@ -66,7 +66,7 @@ enum BuiltinValue: Regular {
     }
   }
 
-  /// The value of the stored `i128`, or `nil` if `self` does not match `.i128(_)`
+  /// The value of the stored `i128`, if any.
   public var i128: UInt128? {
     switch self {
     case .i128(let v): v

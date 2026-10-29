@@ -54,25 +54,25 @@ extension RuntimeValue {
     self = .scalar(BuiltinValue(b))
   }
 
-  /// The value of the stored `i1`, or `nil` if `self` does not match `.i1(_)`
+  /// The value of the stored `i1`, if any.
   public var i1: Bool? { builtin?.i1 }
 
-  /// The value of the stored `i8`, or `nil` if `self` does not match `.i8(_)`
+  /// The value of the stored `i8`, if any.
   public var i8: UInt8? { builtin?.i8 }
 
-  /// The value of the stored `i16`, or `nil` if `self` does not match `.i16(_)`
+  /// The value of the stored `i16`, if any.
   public var i16: UInt16? { builtin?.i16 }
 
-  /// The value of the stored `i32`, or `nil` if `self` does not match `.i32(_)`
+  /// The value of the stored `i32`, if any.
   public var i32: UInt32? { builtin?.i32 }
 
-  /// The value of the stored `i64`, or `nil` if `self` does not match `.i64(_)`
+  /// The value of the stored `i64`, if any.
   public var i64: UInt64? { builtin?.i64 }
 
-  /// The value of the stored `i128`, or `nil` if `self` does not match `.i128(_)`
+  /// The value of the stored `i128`, if any.
   public var i128: UInt128? { builtin?.i128 }
 
-  /// The magnitude of stored integer value, or `nil` if `self` doesn't match `.i(_)`.
+  /// The magnitude of stored integer value, if any.
   public var asUInt128: UInt128? { builtin?.asUInt128 }
 
 }
