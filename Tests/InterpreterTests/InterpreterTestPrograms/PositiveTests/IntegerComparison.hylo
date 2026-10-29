@@ -83,6 +83,27 @@ public fun main() {
   if !((3 as UInt64) >= (2 as UInt64)) { Builtin.trap() }
   if !((3 as UInt64) >= (3 as UInt64)) { Builtin.trap() }
   if (2 as UInt64) >= (3 as UInt64) { Builtin.trap() }
+
+  // UInt
+  if !((2 as UInt) == (2 as UInt)) { Builtin.trap() }
+  if (2 as UInt) == (3 as UInt) { Builtin.trap() }
+
+  if (2 as UInt) != (2 as UInt) { Builtin.trap() }
+  if !((2 as UInt) != (3 as UInt)) { Builtin.trap() }
+
+  if !((2 as UInt) < (3 as UInt)) { Builtin.trap() }
+  if (3 as UInt) < (2 as UInt) { Builtin.trap() }
+
+  if !((3 as UInt) > (2 as UInt)) { Builtin.trap() }
+  if (2 as UInt) > (3 as UInt) { Builtin.trap() }
+
+  if !((2 as UInt) <= (3 as UInt)) { Builtin.trap() }
+  if !((3 as UInt) <= (3 as UInt)) { Builtin.trap() }
+  if (3 as UInt) <= (2 as UInt) { Builtin.trap() }
+
+  if !((3 as UInt) >= (2 as UInt)) { Builtin.trap() }
+  if !((3 as UInt) >= (3 as UInt)) { Builtin.trap() }
+  if (2 as UInt) >= (3 as UInt) { Builtin.trap() }
   
   // Int8
   if !((-2 as Int8) == (-2 as Int8)) { Builtin.trap() }
@@ -255,5 +276,48 @@ public fun main() {
   if !((-2 as Int64) >= (-3 as Int64)) { Builtin.trap() }
   if !((2 as Int64) >= (2 as Int64)) { Builtin.trap() }
   if !((-2 as Int64) >= (-2 as Int64)) { Builtin.trap() }
+
+  // Int
+  if !(-2 == -2) { Builtin.trap() }
+  if !(2 == 2) { Builtin.trap() }
+  if -2 == 2 { Builtin.trap() }
+  if 2 == -2 { Builtin.trap() }
+
+  if -2 != -2 { Builtin.trap() }
+  if 2 != 2 { Builtin.trap() }
+  if !(-2 != 2) { Builtin.trap() }
+  if !(2 != -2) { Builtin.trap() }
+
+  if !(2 < 3) { Builtin.trap() }
+  if 3 < 2 { Builtin.trap() }
+  if !(-2 < 3) { Builtin.trap() }
+  if 3 < -2 { Builtin.trap() }
+  if !(-3 < -2) { Builtin.trap() }
+  if -2 < -3 { Builtin.trap() }
+
+  if !(2 <= 3) { Builtin.trap() }
+  if 3 <= 2 { Builtin.trap() }
+  if !(-2 <= 3) { Builtin.trap() }
+  if 3 <= -2 { Builtin.trap() }
+  if !(-3 <= -2) { Builtin.trap() }
+  if -2 <= -3 { Builtin.trap() }
+  if !(2 <= 2) { Builtin.trap() }
+  if !(-2 <= -2) { Builtin.trap() }
+
+  if 2 > 3 { Builtin.trap() }
+  if !(3 > 2) { Builtin.trap() }
+  if -2 > 3 { Builtin.trap() }
+  if !(3 > -2) { Builtin.trap() }
+  if -3 > -2 { Builtin.trap() }
+  if !(-2 > -3) { Builtin.trap() }
+
+  if 2 >= 3 { Builtin.trap() }
+  if !(3 >= 2) { Builtin.trap() }
+  if -2 >= 3 { Builtin.trap() }
+  if !(3 >= -2) { Builtin.trap() }
+  if -3 >= -2 { Builtin.trap() }
+  if !(-2 >= -3) { Builtin.trap() }
+  if !(2 >= 2) { Builtin.trap() }
+  if !(-2 >= -2) { Builtin.trap() }
 
 }

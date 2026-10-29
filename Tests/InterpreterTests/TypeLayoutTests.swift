@@ -7,7 +7,7 @@ import Utilities
 final class TypeLayoutTests: XCTestCase {
 
   var p = Program(forTesting: true)
-  var l = TypeLayoutCache(for: UnrealABI())
+  var l = LayoutComputer(for: UnrealABI())
 
   func check(layoutOf t: MachineType, hasSize s: Int, andAlignment a: Alignment) {
     let r = layout(p.types.demand(t).erased)

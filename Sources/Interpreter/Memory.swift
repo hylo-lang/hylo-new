@@ -8,7 +8,7 @@ struct Memory {
   public var program: Program
 
   /// The type layouts computed so far.
-  internal var typeLayouts: TypeLayoutCache
+  internal var typeLayouts: LayoutComputer
 
   /// The ID of the next block to be allocated.
   private var nextAllocation = 0
@@ -352,9 +352,8 @@ extension Memory {
 
   /// Returns the value stored at `p`.
   private mutating func read(from p: Memory.TypedAddress) -> RuntimeValue {
-    let l = layout(p.type)
-    let bs = self[p.allocation].storage[p.offset..<p.offset + l.size]
-    return RuntimeValue(bytes: Array(bs), havingAlignment: l.alignment)
+    let bs = self[p.allocation].storage[p.offset..<p.offset + layout(p.type).size]
+    return RuntimeValue(bs, type: p.type, definedIn: &program, layouts: &typeLayouts)
   }
 
   /// Returns the value stored at `p`, using the permissions and obligations
@@ -369,9 +368,8 @@ extension Memory {
   ///
   /// - Precondition: `v` is an instance of type `p.type`.
   private mutating func store(_ v: RuntimeValue, at p: Memory.TypedAddress) {
-    let n = v.bytes.count
-    let o = p.offset
-    self[p.allocation].storage[o..<o + n] = v.bytes
+    let bs = v.bytes(laidOutUsing: &typeLayouts, for: &program)
+    self[p.allocation].storage[p.offset..<p.offset + bs.count] = bs[...]
   }
 
   /// Stores `v` at `p`.

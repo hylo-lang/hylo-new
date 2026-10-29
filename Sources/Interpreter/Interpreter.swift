@@ -252,8 +252,7 @@ public struct Interpreter {
     case let x as IRBranch:
       return .jump(to: start(x.target))
     case let x as IRConditionalBranch:
-      let c = try self[x.condition].asBool
-      if c {
+      if try self[x.condition].i1! {
         return .jump(to: start(x.onSuccess))
       } else {
         return .jump(to: start(x.onFailure))
@@ -370,9 +369,8 @@ public struct Interpreter {
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       case .parameter(let i):
         return try memory.read(from: topOfStack.parameters[i])
-      case .integer(let n, let t):
-        let l = memory.layout(t)
-        return .init(integer: n, bitWidth: l.size * 8, alignment: l.alignment)
+      case .integer(let value, let type):
+        return .init(value, bitWidth: bitWidth(type))
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
@@ -425,21 +423,29 @@ public struct Interpreter {
   ) throws -> RuntimeValue {
     switch f {
     case .trap: throw Trap()
-    case .icmp(let p, let t):
-      let w = memory.layout(t).size * 8
+    case .icmp(let compare, _):
       let lhs = try self[arguments[0]]
       let rhs = try self[arguments[1]]
-      let r = p(lhs, rhs, bitWidth: w)
-      return .init(bool: r)
-    case .zeroinitializer(let t):
-      let l = memory.layout(t)
-      let u = program.types[t]
-      return switch u {
-      case .i(_): .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
-      case .word: .init(integer: 0, bitWidth: l.size * 8, alignment: l.alignment)
-      default: unimplemented("zero-initializer is not yet implemented for \(program.show(u)).")
+      return .init(compare(lhs, rhs))
+    case .zeroinitializer(let type):
+      return switch program.types[type] {
+      case .i(_): .init(0, bitWidth: bitWidth(type))
+      case .word: .init(0, bitWidth: bitWidth(type))
+      default:
+        unimplemented(
+          "zero-initializer is not yet implemented for \(program.show(program.types[type]))."
+        )
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
+    }
+  }
+
+  /// Returns the bit width of a value of type `t`.
+  private mutating func bitWidth(_ t: MachineType.ID) -> UInt8 {
+    if program.types[t].equals(MachineType.i(1)) {
+      1
+    } else {
+      UInt8(memory.layout(t).size * 8)
     }
   }
 

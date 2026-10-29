@@ -6,7 +6,7 @@ import XCTest
 final class InterpreterMemoryTests: XCTestCase {
 
   var m = Memory(forRunning: .init(forTesting: true), on: UnrealABI())
-  var l = TypeLayoutCache(for: UnrealABI())
+  var l = LayoutComputer(for: UnrealABI())
 
   func testAllocation() throws {
     var allocations: [Memory.Address] = []
