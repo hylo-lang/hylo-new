@@ -830,8 +830,10 @@ extension Program {
 
     // Initialize the witness.
     let f = demandTypeWitnessConstructor(constructor, in: &ctx.module)
-    let x = Array(w.v, prependedTo: s.operands.map({ (a) in ctx.value[a]! }))
-    _ = ctx.module.llvm.insertCall(f, on: x, at: ctx.insertionPoint!)
+    let x = insertTemporaryArray(
+      of: ctx.module.llvm.ptr, initializedWith: s.operands.map({ (a) in ctx.value[a]! }),
+      in: &ctx)
+    _ = ctx.module.llvm.insertCall(f, on: [w.v, x], at: ctx.insertionPoint!)
 
     ctx.value[.register(i.erased)] = w.v
     return ctx.ir.instruction(after: i.erased)
@@ -1306,28 +1308,32 @@ extension Program {
     }
 
     // Declare the witness constructor.
-    let signature = ctx.llvm.functionType(
-      from: Array(repeating: ctx.llvm.ptr.t, count: types[t].parameters.count + 1))
+    let ptr = ctx.llvm.ptr
+    let signature = ctx.llvm.functionType(from: [ptr.t, ptr.t])
     let constructor = ctx.llvm.declareFunction(name, signature)
     if let d = declaration(whereStructOrEnum: types[t].head), isPrivate(d, in: ctx.hylo) {
       ctx.llvm.setLinkage(.private, for: constructor)
     }
 
-    // The first parameter denotes the witness being initialized; it is followed by type arguments.
-    let receiver = constructor.unsafe[].parameters[0]
-    var witnesses: [AnyTypeIdentity: LLVMValue] = [:]
-    for (i, p) in types[t].parameters.enumerated() {
-      witnesses[p.erased] = constructor.unsafe[].parameters[1 + i].v
-    }
-
     let e = ctx.llvm.appendBlock(to: constructor)
     let p = ctx.llvm.endOf(e)
+
+    // The first parameter denotes the witness being initialized; the second parameter is an array
+    // containing the witnesses of the type arguments.
+    let receiver = constructor.unsafe[].parameters[0]
+    var witnesses: [AnyTypeIdentity: LLVMValue] = [:]
+    for (i, argument) in types[t].parameters.enumerated() {
+      let v = ctx.llvm.insertGetElementPointerInBounds(
+        of: constructor.unsafe[].parameters[1], typed: ptr,
+        indices: [i], indexType: ctx.llvm.i32, at: p)
+      witnesses[argument.erased] = ctx.llvm.insertLoad(ptr, from: v, at: p).v
+    }
 
     if let ms = fields(of: types[t].head, visibleFrom: ctx.hylo) {
       let length = ctx.llvm.iptr.unsafe[].constant(ms.count)
 
       // Create a buffer with the witnesses of all stored members.
-      let membersType = ctx.llvm.arrayType(ms.count, ctx.llvm.ptr)
+      let membersType = ctx.llvm.arrayType(ms.count, ptr)
       let members = ctx.llvm.insertAlloca(membersType, at: p)
       for (i, m) in ms.enumerated() {
         let x0 = insertTypeConstructorArgument(
@@ -1641,6 +1647,36 @@ extension Program {
     let x1 = ctx.llvm.insertBitwiseOr(x0, ctx.llvm.iptr.unsafe[].constant(1), at: p)
     witnesses[t] = x1.v
     return x1.v
+  }
+
+  /// Generates the LLVM IR allocating a temporary array of `t` initializes with `xs`.
+  ///
+  /// The array is allocated in the function's entry.
+  private mutating func insertTemporaryArray<T: SwiftyLLVM.IRType>(
+    of t: T.UnsafeReference, initializedWith xs: [LLVMValue],
+    in ctx: inout FunctionGenerationContext
+  ) -> LLVMValue {
+    // No need to allocate anything if the array is empty.
+    if xs.isEmpty { return ctx.module.llvm.ptr.unsafe[].null }
+
+    // If there is a single element, store it in a simple alloca.
+    else if let x = xs.uniqueElement {
+      let s = ctx.module.llvm.insertAlloca(t, atEntryOf: ctx.result.value)
+      ctx.module.llvm.insertStore(x, to: s, at: ctx.insertionPoint!)
+      return s.v
+    }
+
+    // Otherwise, create a temporary buffer and initializes its contents.
+    else {
+      let a = ctx.module.llvm.arrayType(xs.count, t)
+      let s = ctx.module.llvm.insertAlloca(a, atEntryOf: ctx.result.value)
+      var v = ctx.module.llvm.poisonValue(of: a).v
+      for (i, x) in xs.enumerated() {
+        v = ctx.module.llvm.insertInsertValue(x, at: i, into: v, at: ctx.insertionPoint!).v
+      }
+      ctx.module.llvm.insertStore(v, to: s, at: ctx.insertionPoint!)
+      return s.v
+    }
   }
 
   /// Inserts a call to the `llvm.trap` intrinsic.
