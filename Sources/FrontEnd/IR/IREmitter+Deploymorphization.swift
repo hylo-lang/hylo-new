@@ -31,7 +31,7 @@ extension IREmitter {
     }
     f.closeOpenEndedRegions(in: ws)
   }
-  
+
   /// Replaces uses of `i`, which are in `f`, with their existentialized forms, using `witnesses`
   /// to compute arguments to type parameters.
   ///
@@ -366,7 +366,10 @@ extension IREmitter {
         default:
           let s = poly.at(i)
           lowering(p, anchoredTo: s.anchor, in: &target) { (me) in
-            if let clone = me.insert(s.substituting(properties)) {
+            if !me.existentializeGenericTypeWitnessStore(
+              s, substituting: properties, reusing: &witnesses),
+              let clone = me.insert(s.substituting(properties))
+            {
               properties[.register(i)] = clone
             }
           }
@@ -376,6 +379,33 @@ extension IREmitter {
 
     depolymorphize(&target, passing: witnesses)
     program[module].ir[mono].take(definition: target)
+  }
+
+  /// If `s` stores a type witness that depends on generic parameters, replaces the constant by a
+  /// witness computed at run-time and returns `true`; otherwise, returns `false`.
+  private mutating func existentializeGenericTypeWitnessStore(
+    _ s: any Instruction, substituting properties: IRSubstitutionTable,
+    reusing witnesses: inout [AnyTypeIdentity: IRValue]
+  ) -> Bool {
+    if let store = s as? IRStore, let t = genericTypeWitness(store.value) {
+      let w = _emitAccessTypeWitness(of: t, reusing: &witnesses)
+      _memory_copy(w, to: properties[store.target])
+      return true
+    } else {
+      // Type witness constants depending on generic parameters only occur in stores.
+      assert(!s.operands.contains(where: { (o) in genericTypeWitness(o) != nil }))
+      return false
+    }
+  }
+
+  /// Returns the type witnessed by `v` iff `v` is a type witness constant depending on generic
+  /// parameters; otherwise, returns `nil`.
+  private mutating func genericTypeWitness(_ v: IRValue) -> AnyTypeIdentity? {
+    if case .type(let t, _) = v, !program.types.parameters(freeIn: t).isEmpty {
+      return t
+    } else {
+      return nil
+    }
   }
 
 }

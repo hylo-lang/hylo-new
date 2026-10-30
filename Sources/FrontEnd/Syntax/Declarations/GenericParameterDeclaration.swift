@@ -1,7 +1,7 @@
 import Archivist
 
 /// The declaration of a generic parameter.
-public struct GenericParameterDeclaration: Declaration {
+public struct GenericParameterDeclaration: TypeDeclaration {
 
   /// The identifier of the parameter.
   public let identifier: Parsed<String>
