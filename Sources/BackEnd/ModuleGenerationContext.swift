@@ -72,6 +72,20 @@ internal struct ModuleGenerationContext: ~Copyable {
   ///   - StandardLibrary/Sources/Core/Runtime/OffsetOfMember.hylo
   internal let typeWitnessHeader: SwiftyLLVM.StructType.UnsafeReference
 
+  /// The signature of a type witness constructor.
+  ///
+  /// A type witness constructor is a function returning type witnesses describing instantiations
+  /// of a generic type from other type witnesses representing arguments of that type. For example,
+  /// the type witness constructor of `<T> {T, T}` is a function taking a single type witness and
+  /// returning the witness of a pair composed.
+  ///
+  /// All constructors have the signature `(ptr, ptr) -> void`, where the first parameter takes a
+  /// pointer to a type witness to initialize and the second pointer refers to an array containing
+  /// a witness a each type argument. These witnesses are instances of `iptr` encoding a tagged
+  /// pointer to either a type witness or a closure computing one. The tag is stored in the lowest
+  /// bit, which is set iff the pointer refers to a closure.
+  internal let typeWitnessConstructor: SwiftyLLVM.FunctionType.UnsafeReference
+
   /// Information about the LLVM representation of opaque types passed by references.
   ///
   /// This property is used when computing the layout of a type whose instances have an arbitrary
@@ -99,6 +113,7 @@ internal struct ModuleGenerationContext: ~Copyable {
     self.nestedProject = self.llvm.structType([ptr, fun, ptr])
     self.plateauCallback = self.llvm.structType([fun, ptr])
     self.typeWitnessHeader = self.llvm.structType(named: "$htwh", [i64])
+    self.typeWitnessConstructor = self.llvm.functionType(from: [ptr.t, ptr.t])
 
     let l = ConcreteLayout(
       fields: [], propertyToField: [], size: .dynamic,

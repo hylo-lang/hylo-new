@@ -813,29 +813,24 @@ extension Program {
       return ctx.ir.instruction(after: i.erased)
     }
 
-    // Otherwise, we should compute the type of the witness, which is composed of a type witness
-    // header followed by a tail buffer encoding the stored member offsets.
-    let constructor = types.cast(s.constructor, to: UniversalType.self)!
-    let ms = fields(of: types[constructor].head, visibleFrom: ctx.module.hylo) ?? []
-    let offsetsSize = ctx.module.llvm.layout.storageSize(of: ctx.module.llvm.iptr) * ms.count
-    let witnessType = ctx.module.llvm.arrayType(
-        ctx.module.llvm.layout.storageSize(of: ctx.module.typeWitnessHeader) + offsetsSize,
-        ctx.module.llvm.i8)
+    let int = ctx.module.llvm.iptr
 
-    // Allocate memory for the witness.
-    let w = ctx.module.llvm.insertAlloca(witnessType, atEntryOf: ctx.result.value)
-    let a = ctx.module.llvm.layout.preferredAlignment(of: ctx.module.typeWitnessHeader)
-    assert(a % ctx.module.llvm.layout.preferredAlignment(of: ctx.module.llvm.iptr) == 0)
-    ctx.module.llvm.setAlignment(a, for: w)
+    // Otherwise, we should compute the type of the witness.
+    let u = types.cast(s.constructor, to: UniversalType.self)!
+    let witnessType = rawType(witnessOf: types[u].head, in: &ctx.module)
 
-    // Initialize the witness.
-    let f = demandTypeWitnessConstructor(constructor, in: &ctx.module)
-    let x = insertTemporaryArray(
-      of: ctx.module.llvm.ptr, initializedWith: s.operands.map({ (a) in ctx.value[a]! }),
-      in: &ctx)
-    _ = ctx.module.llvm.insertCall(f, on: [w.v, x], at: ctx.insertionPoint!)
+    // Allocate and initialize the witness by calling its constructor. Arguments are converted to
+    // integers to satisfy the constructor's API.
+    let constructor = demandTypeWitnessConstructor(u, in: &ctx.module)
+    let arguments = s.operands.map { (x) in
+      ctx.module.llvm.insertPtrToInt(ctx.value[x]!, to: int, at: ctx.insertionPoint!).v
+    }
 
-    ctx.value[.register(i.erased)] = w.v
+    let witness = ctx.module.llvm.insertAlloca(witnessType, atEntryOf: ctx.result.value)
+    let xs = insertTemporaryArray(of: int, initializedWith: arguments, in: &ctx)
+    _ = ctx.module.llvm.insertCall(constructor, on: [witness.v, xs], at: ctx.insertionPoint!)
+
+    ctx.value[.register(i.erased)] = witness.v
     return ctx.ir.instruction(after: i.erased)
   }
 
@@ -1236,10 +1231,13 @@ extension Program {
     }
   }
 
-  /// Returns the global LLVM variable containing the type witness of `t`, declaring it if
-  /// necessary.
+  /// Returns a global LLVM variable representing a witness of `t`, declaring it if necessary.
   ///
-  /// - Requires: `t` is dealiased.
+  /// This method can only be used to form witnesses of closed types (i.e., types in which no
+  /// generic parameter occurs free). Use `insertTypeWitness(_:reusing:at:in:in:)` to construct
+  /// witnesses of non-closed types (e.g., `Pointer<T>` where `T` is a parameter).
+  ///
+  /// - Requires: `t` closed and dealiased.
   private mutating func demandGlobalTypeWitness(
     _ t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
   ) -> SwiftyLLVM.GlobalVariable.UnsafeReference {
@@ -1290,13 +1288,6 @@ extension Program {
   }
 
   /// Returns a function implementing a type witness construtor for applications of `t`.
-  ///
-  /// A type witness constructor is a function returning type witnesses describing instantiations
-  /// of a generic type from other type witnesses representing arguments of that type. For example,
-  /// the type witness constructor of `<T> {T, T}` is a function taking a single type witness and
-  /// returning the witness of a pair composed.
-  ///
-  /// - Requires: `t` is dealiased.
   private mutating func demandTypeWitnessConstructor(
     _ t: UniversalType.ID, in ctx: inout ModuleGenerationContext
   ) -> SwiftyLLVM.Function.UnsafeReference {
@@ -1307,43 +1298,42 @@ extension Program {
       return existing
     }
 
-    // Declare the witness constructor.
     let ptr = ctx.llvm.ptr
-    let signature = ctx.llvm.functionType(from: [ptr.t, ptr.t])
-    let constructor = ctx.llvm.declareFunction(name, signature)
+    let int = ctx.llvm.iptr
+    let i32 = ctx.llvm.i32
+
+    // Declare the witness constructor.
+    let constructor = ctx.llvm.declareFunction(name, ctx.typeWitnessConstructor)
     if let d = declaration(whereStructOrEnum: types[t].head), isPrivate(d, in: ctx.hylo) {
       ctx.llvm.setLinkage(.private, for: constructor)
     }
 
     let e = ctx.llvm.appendBlock(to: constructor)
-    let p = ctx.llvm.endOf(e)
+    var p = ctx.llvm.endOf(e)
 
     // The first parameter denotes the witness being initialized; the second parameter is an array
     // containing the witnesses of the type arguments.
     let receiver = constructor.unsafe[].parameters[0]
-    var witnesses: [AnyTypeIdentity: LLVMValue] = [:]
+    var witnesses: [AnyTypeIdentity: (LLVMValue, knownEvaluated: Bool)] = [:]
     for (i, argument) in types[t].parameters.enumerated() {
       let v = ctx.llvm.insertGetElementPointerInBounds(
-        of: constructor.unsafe[].parameters[1], typed: ptr,
-        indices: [i], indexType: ctx.llvm.i32, at: p)
-      witnesses[argument.erased] = ctx.llvm.insertLoad(ptr, from: v, at: p).v
+        of: constructor.unsafe[].parameters[1], typed: ptr, indices: [i], indexType: i32, at: p)
+      witnesses[argument.erased] = (ctx.llvm.insertLoad(int, from: v, at: p).v, false)
     }
 
-    if let ms = fields(of: types[t].head, visibleFrom: ctx.hylo) {
-      let length = ctx.llvm.iptr.unsafe[].constant(ms.count)
-
+    if let rs = fields(of: types[t].head, visibleFrom: ctx.hylo) {
       // Create a buffer with the witnesses of all stored members.
-      let membersType = ctx.llvm.arrayType(ms.count, ptr)
-      let members = ctx.llvm.insertAlloca(membersType, at: p)
-      for (i, m) in ms.enumerated() {
-        let x0 = insertTypeConstructorArgument(
-          m, reusing: &witnesses, at: p, insertingAllocaAtEntryOf: constructor, in: &ctx)
-        let x1 = ctx.llvm.insertGetElementPointerInBounds(
-          of: members, typed: membersType,
-          indices: [0, i], indexType: ctx.llvm.i32, at: p)
-        ctx.llvm.insertStore(x0, to: x1, at: p)
+      let membersType = ctx.llvm.arrayType(rs.count, ptr)
+      let members = ctx.llvm.insertAlloca(membersType, atEntryOf: constructor)
+      for (i, m) in rs.enumerated() {
+        let argument = insertTypeWitness(
+          m, reusing: &witnesses, at: &p, in: constructor, in: &ctx)
+        let parameter = ctx.llvm.insertGetElementPointerInBounds(
+          of: members, typed: membersType, indices: [0, i], indexType: i32, at: p)
+        ctx.llvm.insertStore(argument, to: parameter, at: p)
       }
 
+      let length = int.unsafe[].constant(rs.count)
       let offsets = insertGetRecordOffsets(receiver.v, at: p, in: &ctx)
       let sizeAndAlignment = insertCallStandardLibraryFunction(
         .initializeRecordOffsets, with: [offsets.v, members.v, length.v], at: p, in: &ctx)
@@ -1605,48 +1595,146 @@ extension Program {
     return memberOffsets.v
   }
 
-  /// Generates the LLVM IR constructing type witness constructor argument representing `t`, using
-  /// `witnesses` as a cache.
-  private mutating func insertTypeConstructorArgument(
-    _ t: AnyTypeIdentity, reusing witnesses: inout [AnyTypeIdentity: LLVMValue],
-    at p: borrowing InsertionPoint, insertingAllocaAtEntryOf f: Function.UnsafeReference,
+  /// Returns a witness of `t` or a closure constructing one, using `witnesses` as a cache.
+  ///
+  /// Let `(w0, e0)` be a return value. If `e0` is `true`, then `w0` is a an instance of `ptr`
+  /// referring to a witness of `t`. If `e` is `false`, then `w` is an instance of `iptr` encoding
+  /// a tagged pointer to either a witness of `t` or a closure computing one. The tag is stored in
+  /// the lowest bit of `w`, which is set iff `w` refers to a closure.
+  ///
+  /// A closures is expressed as a tuple `(c, s)`, where `c` is a pointer to another type witness
+  /// constructor and `n` is the size the witnesses that `c` initializes, followed by a tail buffer
+  /// containing the arguments that should be passed to `c`. These arguments are represented as
+  /// tagged pointer using the same encoding as the results of this method.
+  ///
+  /// `witnesses` is a table mapping a type to a pair `(w1, e1)` having the same encoding as the
+  /// results of this method. This table is extended whenever `t` is not already assigned.
+  private mutating func insertMaybeLazyTypeWitness(
+    _ t: AnyTypeIdentity,
+    reusing witnesses: inout [AnyTypeIdentity: (LLVMValue, knownEvaluated: Bool)],
+    at p: borrowing InsertionPoint,
+    in f: Function.UnsafeReference,
     in ctx: inout ModuleGenerationContext
-  ) -> LLVMValue {
+  ) -> (value: LLVMValue, knownEvaluated: Bool) {
     // Trivial if the type is in cache.
     if let w = witnesses[t] { return w }
 
     // If the type is closed, we can demand a global type witness.
     let ps = types.parameters(freeIn: t)
     if ps.isEmpty {
-      let w = demandGlobalTypeWitness(t, in: &ctx)
-      witnesses[t] = w.v
-      return w.v
+      let x0 = demandGlobalTypeWitness(t, in: &ctx).v
+      witnesses[t] = (x0, true)
+      return (x0, true)
     }
 
     // Otherwise, we have to construct a lazy value.
     assert(types.tag(of: t) != GenericParameter.self, "unexpected free type parameter")
+    let int = ctx.llvm.iptr
+    let closure = ctx.llvm.structType(
+      Array(ctx.llvm.functionPointer.t, prependedTo: repeatElement(int.t, count: ps.count + 1)))
+    let w = ctx.llvm.insertAlloca(closure, atEntryOf: f)
+    ctx.llvm.setAlignment(max(2, ctx.llvm.layout.preferredAlignment(of: closure)), for: w)
+
+    // Initialize the constructor.
+    var v = ctx.llvm.poisonValue(of: closure).v
     let u = UniversalType.ID(
       uncheckedFrom: types.introduce(parameters: ps, enumerated: true, into: t))
     let c = demandTypeWitnessConstructor(u, in: &ctx)
-    let s = ctx.llvm.structType(
-      Array(
-        ctx.llvm.functionPointer.t,
-        prependedTo: Array(repeating: ctx.llvm.ptr.t, count: ps.count)))
-    let w = ctx.llvm.insertAlloca(s, atEntryOf: f)
-    ctx.llvm.setAlignment(max(2, ctx.llvm.layout.preferredAlignment(of: s)), for: w)
+    v = ctx.llvm.insertInsertValue(c, at: 0, into: v, at: p).v
 
-    ctx.llvm.insertStore(c, to: w, at: p)
-    for (i, x) in ps.enumerated() {
-      let v = insertTypeConstructorArgument(
-        x.erased, reusing: &witnesses, at: p, insertingAllocaAtEntryOf: f, in: &ctx)
-      let a = ctx.llvm.insertGetStructElementPointer(of: w, typed: s, index: i + 1, at: p)
-      ctx.llvm.insertStore(v, to: a, at: p)
+    // Initialize the arguments.
+    let witnessType = rawType(witnessOf: types[u].head, in: &ctx)
+    let witnessSize = ctx.llvm.layout.storageSize(of: witnessType)
+    v = ctx.llvm.insertInsertValue(int.unsafe[].constant(witnessSize), at: 1, into: v, at: p).v
+    for (i, parameter) in ps.enumerated() {
+      let argument = insertMaybeLazyTypeWitness(
+        parameter.erased, reusing: &witnesses, at: p, in: f, in: &ctx)
+
+      // Wrap the argument in an `Either<ptr, int>` box if necessary.
+      if argument.knownEvaluated {
+        let a = ctx.llvm.insertPtrToInt(argument.value, to: int, at: p)
+        v = ctx.llvm.insertInsertValue(a.v, at: i + 2, into: v, at: p).v
+      } else {
+        v = ctx.llvm.insertInsertValue(argument.value, at: i + 2, into: v, at: p).v
+      }
     }
 
-    let x0 = ctx.llvm.insertPtrToInt(w, to: ctx.llvm.iptr, at: p)
-    let x1 = ctx.llvm.insertBitwiseOr(x0, ctx.llvm.iptr.unsafe[].constant(1), at: p)
-    witnesses[t] = x1.v
-    return x1.v
+    ctx.llvm.insertStore(v, to: w, at: p)
+    let x0 = ctx.llvm.insertPtrToInt(w, to: int, at: p)
+    let x1 = ctx.llvm.insertBitwiseOr(x0, int.unsafe[].constant(1), at: p).v
+    witnesses[t] = (x1, false)
+    return (x1, false)
+  }
+
+  /// Generates LLVM IR building a witness of `t`, using `witnesses` as a cache.
+  ///
+  /// This method calls `insertMaybeLazyTypeWitness(_:reusing:at:at:in:s)` to create the witness
+  /// being returned, generating the necessary code to apply possibly lazy values. The result is
+  /// cached in `witnesses` so that the next call this method with the same `t` is guaranteed to
+  /// reuse the code that may have been generated the first time.
+  private mutating func insertTypeWitness(
+    _ t: AnyTypeIdentity,
+    reusing witnesses: inout [AnyTypeIdentity: (LLVMValue, knownEvaluated: Bool)],
+    at p: inout InsertionPoint,
+    in f: Function.UnsafeReference,
+    in ctx: inout ModuleGenerationContext
+  ) -> LLVMValue {
+    // Get the witness of `t`.
+    let argument = insertMaybeLazyTypeWitness(t, reusing: &witnesses, at: p, in: f, in: &ctx)
+
+    // Trivial if the argument is known to have been evaluated already.
+    if argument.knownEvaluated {
+      return argument.value
+    }
+
+    // Otherwise, we must check at run-time and compute the argument's value if necessary.
+    let done = ctx.llvm.appendBlock(to: f)
+    let lazy = ctx.llvm.appendBlock(to: f)
+    let conclusion = ctx.llvm.appendBlock(to: f)
+
+    let fun = ctx.llvm.functionPointer
+    let int = ctx.llvm.iptr
+    let i32 = ctx.llvm.i32
+
+    // The least significant bit of the argument is a tag.
+    let isLazy = ctx.llvm.insertTrunc(argument.value, to: ctx.llvm.i1, at: p)
+    ctx.llvm.insertCondBr(if: isLazy, then: lazy, else: done, at: p)
+
+    // The argument is a pointer to a type witness.
+    p = ctx.llvm.endOf(done)
+    let w0 = ctx.llvm.insertIntToPtr(argument.value, at: p)
+    ctx.llvm.insertBr(to: conclusion, at: p)
+
+    // The argument is a pointer to a closure that should be applied.
+    p = ctx.llvm.endOf(lazy)
+    let argumentSansTag = ctx.llvm.insertSub(
+      overflow: .nsw, argument.value, int.unsafe[].constant(1), at: p)
+    let pointerToClosure = ctx.llvm.insertIntToPtr(argumentSansTag, at: p)
+    let constructor = ctx.llvm.insertLoad(fun, from: pointerToClosure, at: p)
+
+    // Allocate the witness to initialize.
+    let pointerToWitnessSize = ctx.llvm.insertGetElementPointerInBounds(
+      of: pointerToClosure, typed: ctx.llvm.i8,
+      indices: [ctx.llvm.layout.storageSize(of: fun)], indexType: i32, at: p)
+    let witnessSize = ctx.llvm.insertLoad(int, from: pointerToWitnessSize, at: p)
+    let w1 = ctx.llvm.insertAlloca(arrayOf: witnessSize, ctx.llvm.i8, at: p)
+    ctx.llvm.setAlignment(ctx.llvm.layout.preferredAlignment(of: ctx.typeWitnessHeader), for: w1)
+
+    // Apply the constructor to initialize the witness.
+    let arguments = ctx.llvm.insertGetElementPointerInBounds(
+      of: pointerToWitnessSize, typed: int, indices: [1], indexType: i32, at: p)
+    _ = ctx.llvm.insertCall(
+      constructor.v, typed: ctx.typeWitnessConstructor.t, on: [w1.v, arguments.v], at: p)
+    ctx.llvm.insertBr(to: conclusion, at: p)
+
+    // The result comes from either the `done` branch, in which case it is simply the result of
+    // converting the payload to a pointer, or the `lazy` branch, in which case it is an alloca
+    // that has been initialized by applying a closure.
+    p = ctx.llvm.endOf(conclusion)
+    let result = ctx.llvm.insertPhi(ctx.llvm.ptr, merging: [(w0.v, done), (w1.v, lazy)], at: p).v
+
+    witnesses[t] = (result, true)
+    return result
   }
 
   /// Generates the LLVM IR allocating a temporary array of `t` initializes with `xs`.
@@ -2134,6 +2222,21 @@ extension Program {
     default:
       return metadata(of: t, in: &ctx).llvm
     }
+  }
+
+  /// Returns the LLVM type of a witness of `t`.
+  ///
+  /// The result describes storage capable of containing a type witness header, followed by a tail
+  /// buffer encoding the stored member offsets iff that type is a record.
+  private mutating func rawType(
+    witnessOf t: AnyTypeIdentity, in ctx: inout ModuleGenerationContext
+  ) -> LLVMType {
+    let n = fields(of: t, visibleFrom: ctx.hylo)?.count ?? 0
+    let offsetsSize = ctx.llvm.layout.storageSize(of: ctx.llvm.iptr) * n
+    let witnessType = ctx.llvm.arrayType(
+        ctx.llvm.layout.storageSize(of: ctx.typeWitnessHeader) + offsetsSize,
+        ctx.llvm.i8)
+    return witnessType.t
   }
 
 }
