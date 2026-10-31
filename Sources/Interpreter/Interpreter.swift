@@ -357,7 +357,7 @@ public struct Interpreter {
     try memory.copy(s, to: d)
   }
 
-  /// Returns the value corresponding to `v` in the current execution state.
+  /// Accesses the value corresponding to `v` in the current execution state.
   ///
   /// - Precondition: `v` is a runtime value or a place obtained from an
   ///   access instruction.
@@ -384,7 +384,7 @@ public struct Interpreter {
     }
   }
 
-  /// Returns the function referred to by `f`.
+  /// Accesses the function referred to by `f`.
   private subscript(function f: IRValue) -> GlobalFunctionIdentity {
     switch f {
     case .function(let name, _):
