@@ -90,6 +90,9 @@ private enum InstructionEpilogue {
   /// Control is transferred to the given instruction.
   case jump(to: InstructionPointer)
 
+  /// Begins a call to the function on the given arguments, transferring control to the callee.
+  case call(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
+
   /// Control is transferred back to the caller.
   case `return`
 
@@ -122,11 +125,10 @@ private struct Stack {
   public mutating func enter(
     _ f: GlobalFunctionIdentity,
     definedIn p: Program,
-    withParameters ps: [Access<Memory.TypedAddress>]
+    passing ps: [Access<Memory.TypedAddress>]
   ) {
-    let s = InstructionPointer(interpreting: f, definedIn: p)
-    let f = StackFrame(currentStep: s, parameters: ps)
-    frames.append(f)
+    let p = InstructionPointer(interpreting: f, definedIn: p)
+    frames.append(.init(currentStep: p, parameters: ps))
   }
 
   /// Removes the top frame.
@@ -207,15 +209,20 @@ public struct Interpreter {
 
     // `main` takes a `set` access to a `Void` value, so create the
     // corresponding storage and access.
-    let l = memory.allocate(storageFor: .void)
-    let a = Access(to: l.asTypedAddress(.void), effect: .set)
-    callStack.enter(p.entry, definedIn: p, withParameters: [a])
+    let a = Access(
+      to: memory.allocate(storageFor: .void).asTypedAddress(.void),
+      effect: .set
+    )
+    callStack.enter(p.entry, definedIn: p, passing: [a])
   }
 
   /// Executes a single instruction.
   public mutating func step() throws {
     switch try applyCurrentInstruction() {
     case .jump(let pc): programCounter = pc
+    case .call(let callee, let arguments):
+      try advanceProgramCounter()
+      callStack.enter(callee, definedIn: program, passing: arguments)
     case .return: callStack.pop()
     case .register(let v):
       topOfStack.registers[programCounter.position] = v
@@ -242,7 +249,7 @@ public struct Interpreter {
       let p = allocate(storageFor: x.storage)
       return register(p)
     case let x as IRApply:
-      _ = x
+      return try apply(x.callee, passing: x.ioAddresses)
     case let x as IRApplyBuiltin:
       let v = try call(x.callee, passing: x.arguments)
       return register(v)
@@ -350,7 +357,7 @@ public struct Interpreter {
     try memory.copy(s, to: d)
   }
 
-  /// Returns the value corresponding to `v` in the current execution state.
+  /// Accesses the value corresponding to `v` in the current execution state.
   ///
   /// - Precondition: `v` is a runtime value or a place obtained from an
   ///   access instruction.
@@ -374,6 +381,19 @@ public struct Interpreter {
       default:
         preconditionFailure("\(program.show(v)) is not a RuntimeValue.")
       }
+    }
+  }
+
+  /// Accesses the function referred to by `f`.
+  private subscript(function f: IRValue) -> GlobalFunctionIdentity {
+    switch f {
+    case .function(let name, _):
+      let currentModule = programCounter.container.module
+      let d = program.definition(of: name, visibleFrom: currentModule)!
+      return .init(module: d.0, function: d.1)
+    case .parameter(_), .register(_):
+      unimplemented("Closures are not supported in emitter yet.")
+    default: fatalError("\(program.show(f)) is not a function.")
     }
   }
 
@@ -447,6 +467,25 @@ public struct Interpreter {
     } else {
       UInt8(memory.layout(t).size * 8)
     }
+  }
+
+  /// Returns an epilogue that calls the function `f` passing `arguments`.
+  private func apply(
+    _ f: IRValue,
+    passing arguments: ArraySlice<IRValue>
+  ) throws -> InstructionEpilogue {
+    let g = self[function: f]
+    let xs = arguments.map { access(of: $0) }
+    return .call(g, passing: xs)
+  }
+
+}
+
+extension IRApply {
+
+  /// The addresses of passed arguments and return value.
+  public var ioAddresses: ArraySlice<IRValue> {
+    operands.dropFirst()
   }
 
 }
