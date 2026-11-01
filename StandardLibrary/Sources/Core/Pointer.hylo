@@ -1,16 +1,106 @@
 /// A typed memory address whose contents can be read.
 public struct Pointer<Pointee> is Deinitializable {
 
-  /// The raw value of this instance.
+  /// The underlying builtin value.
   module var value: Builtin.ptr
 
-  /// Creates an instance with the given raw value.
-  module memberwise init
+  /// Creates an instance from its raw value.
+  memberwise init
+
+  /// The value pointed to by `self`.
+  ///
+  /// - Requires: the address stores an object of type Pointee.
+  @inline(always)
+  public subscript unsafe() auto -> Pointee {
+    /// - Requires: nothing mutates the value's storage during this projection's lifetime.
+    let { yield (self.value as* (let Pointee)) }
+
+    /// - Requires: the pointed-to object shall not have other bindings throughout the projection.
+    inout { yield &(self.value as* (inout Pointee)) }
+
+  }
+
+  /// Creates an instance referring to the same address as `p`.
+  ///
+  /// Note that dereferencing type-punned pointers will cause problems unless the rules of
+  /// `unsafe[]` are upheld.
+  @inline(always)
+  public init<Other>(type_punning p: Pointer<Other>) {
+    &self.value = p.value
+  }
+
+  /// Returns `self` offset forward by `n` array elements of `Pointee` type.
+  @inline(always)
+  public fun advanced(by n: Int) -> Self {
+    let offset_in_bytes = Metatype<Pointee>.stride() * n
+    return .new(value: Builtin.advanced_by_bytes_word(self.value, offset_in_bytes.value))
+  }
 
   /// Creates an instance that does not address any usable storage.
+  @inline(always)
   public static fun null() -> Self {
     .new(value: Builtin.zeroinitializer_ptr())
+  }
 
+  // MARK: Copyable conformance.
+
+  /// Returns an equivalent instance.
+  ///
+  /// Because we don't have a `nonmutating` keyword yet, writing to the pointee of a `let`-bound
+  /// `Pointer` is only possible by copying, e.g.  `&p.copy().unsafe[] = x`.
+  @inline(always)
+  public fun copy() -> Self {
+    Pointer(value: self.value)
+  }
+
+  // MARK: Conformance to Equatable.
+
+  /// Returns `true` iff `other` has an equivalent value.
+  @inline(always)
+  public fun infix== (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_eq_ptr(self.value, other.value))
+  }
+
+  /// Returns `false` iff `other` has an equivalent value.
+  @inline(always)
+  public fun infix!= (other: Self) -> Bool {
+    Bool(value: Builtin.icmp_ne_ptr(self.value, other.value))
+  }
+
+}
+
+public given <T> => Pointer<T> is Movable {}
+
+public given <T> => Pointer<T> is Copyable {}
+
+public given <T> => Pointer<T> is Equatable {}
+
+extension <Pointee is Movable> Pointer<Pointee> {
+
+  /// Returns the value pointed to by `self`, leaving the storage at this address
+  /// uninitialized.
+  @inline(always)
+  public fun unsafe_move_pointee() -> Pointee {
+    self.value as* (sink Pointee)
+  }
+
+  /// Initializes the value pointed to by `self` to `value`.
+  ///
+  /// - Requires: the `Metatype<Pointee>.size()` bytes starting at the address are uninitialized
+  ///   and suitably aligned for `Pointee`.
+  @inline(always)
+  public fun unsafe_initialize_pointee(value: sink Pointee) {
+    &(self.value as* (set Pointee)) = value
+  }
+
+}
+
+extension <Pointee is Deinitializable> Pointer<Pointee> {
+
+  /// Deinitializes the value pointed to by `self`.
+  @inline(always)
+  public fun unsafe_deinitialize_pointee() {
+    (self.value as* (sink Pointee)).deinit()
   }
 
 }
