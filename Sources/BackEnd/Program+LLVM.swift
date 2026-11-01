@@ -1301,8 +1301,12 @@ extension Program {
 
     // Declare the witness constructor.
     let constructor = ctx.llvm.declareFunction(name, ctx.typeWitnessConstructor)
+
+    // TODO: define a proper linking strategy.
     if let d = declaration(whereStructOrEnum: types[t].head), isPrivate(d, in: ctx.hylo) {
       ctx.llvm.setLinkage(.private, for: constructor)
+    } else {
+      ctx.llvm.setLinkage(.linkOnce, for: constructor)
     }
 
     let e = ctx.llvm.appendBlock(to: constructor)
