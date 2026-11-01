@@ -91,7 +91,7 @@ public fun __initialize_record_offsets(
   offsets: Pointer<Int>,
   aggregating members: Pointer<Pointer<TypeWitnessHeader>>,
   count n: Int
-) -> Int {
+) -> UInt64 {
   type W = Pointer<TypeWitnessHeader>
 
   // Allocate a temporary buffer for storing member indices.
@@ -149,7 +149,7 @@ public fun __initialize_record_offsets(
   }
 
   // Use of `layout` extends its lifetime.
-  return (size << 16) | __alignment(members, layout, count: n)
+  return .new((size << 16) | __alignment(members, layout, count: n))
 }
 
 /// Returns the alignment of a record having the `n` fields described in `members` and laid out

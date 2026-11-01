@@ -139,8 +139,8 @@ fun expect(
   _ = observed
 
   // Did the computed size and alignment satisfy the expectations?
-  if (r >> 16) != s { return 1 }
-  if (r & 0xffff) != a { return 2 }
+  if (r >> 16) != UInt64(s) { return 1 }
+  if (r & (0xffff as UInt64)) != UInt64(a) { return 2 }
 
   return 0
 }
