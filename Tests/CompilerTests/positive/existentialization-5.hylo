@@ -1,0 +1,64 @@
+struct NonGenericContents<T> {
+
+  let a: Int
+  let b: Int
+
+  init() {
+    &self.a = 0
+    &self.b = 1
+  }
+
+  fun deinit() sink {
+    _ = self.a
+    _ = self.b
+  }
+
+}
+
+struct OnlyOneMember<T> {
+
+  var contents: T
+
+  init<where T is Movable>(contents: sink T) {
+    &self.contents = contents
+  }
+
+  fun deinit<where T is Deinitializable>() sink {
+    &self.contents.deinit()
+  }
+
+}
+
+struct Small is Movable & Copyable & Deinitializable {
+
+  var value: Int16
+
+  memberwise init
+
+  fun take_value(from other: sink Self) auto {
+    set   { &self.value = other.value }
+    inout { &self.value = other.value }
+  }
+
+  fun copy() -> Self {
+    .new(value: self.value + (0 as Int16))
+  }
+
+}
+
+@inline(never)
+fun wrap<T is Movable & Copyable & Deinitializable>(x: T) {
+  // The type witness constructor of a generic record having only concrete members returns a
+  // constant value computed at compile-time.
+  sink let x0 = NonGenericContents<T>()
+  x0.deinit()
+
+  // The type witness constructor of a generic record having a single member reuses the size and
+  // alignment of that member directly.
+  sink let x1 = OnlyOneMember(x.copy())
+  x1.deinit()
+}
+
+public fun main() {
+  wrap(Small(value: 0xabc as Int16))
+}
