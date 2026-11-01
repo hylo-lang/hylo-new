@@ -29,6 +29,13 @@ public struct Pointer<Pointee> is Deinitializable {
     &self.value = p.value
   }
 
+  /// Returns `self` offset forward by `n` array elements of `Pointee` type.
+  @inline(always)
+  public fun advanced(by n: Int) -> Self {
+    let offset_in_bytes = Metatype<Pointee>.stride() * n
+    return .new(value: Builtin.advanced_by_bytes_word(self.value, offset_in_bytes.value))
+  }
+
   /// Creates an instance that does not address any usable storage.
   @inline(always)
   public static fun null() -> Self {
