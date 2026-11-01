@@ -1577,15 +1577,19 @@ extension Program {
   }
 
   /// Generates LLVM IR for applying the standard library function `callee` to the `xs`.
+  ///
+  /// - Requires: No argument or result is erased or passed by reference.
   private mutating func insertCallStandardLibraryFunction(
     _ callee: Program.StandardLibraryEntity, with xs: consuming [LLVMValue],
     at p: borrowing InsertionPoint, in ctx: inout ModuleGenerationContext
   ) -> LLVMValue {
     let f = demandStandardLibraryFunction(callee, in: &ctx)
-    let s = f.prototype.signature
+    precondition(f.prototype.mapping.inputs.count == xs.count)
+    precondition(f.prototype.mapping.output?.convention == .byValue(-1))
 
-    // TODO: Read passing conventions from the prototype
-    for i in xs.indices {
+    let s = f.prototype.signature
+    for (i, parameter) in f.prototype.mapping.inputs.enumerated() {
+      precondition(parameter.convention == .byValue(i))
       let v = ctx.llvm.poisonValue(of: s.unsafe[].parameters[i])
       xs[i] = ctx.llvm.insertInsertValue(xs[i], at: 0, into: v, at: p).v
     }
