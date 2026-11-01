@@ -1,26 +1,26 @@
-type Size = UInt32
+type Size = Int
 
-/// The base-2 logarithm of an alignment in bytes.
-type Log2Alignment = UInt16
+type Alignment = Int
 
-extension UInt32 {
+// Because the integer types are incomplete
+extension Int {
 
-  /// Returns the least n >= `self` that is a multiple of `2^k`.
   @inline(always)
-  public fun rounded_up(to_nearest_multiple_of_2_to_the k: Log2Alignment) -> Self {
-    let mask = ((1 as Self) << Int(k)) - (1 as Self)
-    return (self + mask) & ~mask
+  public fun infix% (other: Self) -> Self {
+    .new(value: Builtin.urem_word(self.value, other.value))
   }
 
-}
+  /// Returns the least n >= `self` that is a multiple of `a`.
+  @inline(always)
+  public fun rounded_up(to_nearest_multiple_of a: Alignment) -> Self {
+    // The distance from the nearest multiple of `a` <= `self` to `self`.
+    let excess = self % a
+    return if excess == 0 { self.copy() } else { self - excess + a }
+  }
 
-extension Pointer<UInt8> {
-
-  // Workaround for https://github.com/hylo-lang/hylo-new/issues/357
-  // and https://github.com/hylo-lang/hylo-new/issues/365
-  /// Initializes `self` to the null pointer.
-  public init() {
-    &self.value = Builtin.zeroinitializer_ptr()
+  @inline(always)
+  public fun copy() -> Int {
+    .new(value: self.value)
   }
 
 }
@@ -30,551 +30,142 @@ extension Pointer<UInt8> {
 /// See Sources/BackEnd/ModuleGenerationContext.swift for a complete description.
 public struct TypeWitnessHeader {
 
-  @inline(always)
-  public memberwise init
+  /// The size and alignment requirement of the type, in bytes.
+  ///
+  /// The 48 most significant bits encode the size whereas the 16 least significant bits encode the
+  /// alignment requirement.
+  let size_and_alignment: UInt64
 
-  // TODO: verify that the following is correct. See
-  // https://github.com/hylo-lang/hylo-new/issues/306
-  /// The type name in nul-terminated utf-8.
-  let description: Pointer<UInt8>
-
-  /// The size of the type in bytes.
-  let size: Size
-
-  /// The base-2 logarithm of the alignment of the type in bytes.
-  let log2_alignment: Log2Alignment
-
-  /// The number of type parameters or type arguments.
-  let type_argument_or_parameter_count: Int16
+  memberwise init
 
 }
 
 extension Pointer<TypeWitnessHeader> {
 
-  public type Pointee = TypeWitnessHeader
-
-  @inline(always)
-  public fun copy() -> Self {
-    .new(value: self.value)
-  }
-
   /// Returns the size of an instance.
-  @inline(always)
-  public fun size() -> Size {
-    (self.value as* let Self.Pointee).size.copy()
+  @exposed @inline(always)
+  fun size() -> Size {
+    let x = UInt64(value: Builtin.lshr_i64(
+      (self.value as* let TypeWitnessHeader).size_and_alignment.value,
+      (16 as UInt64).value))
+    return .new(value: Builtin.trunc_or_zext_i64_word(x.value))
   }
 
-  /// Returns the base-2 logarithm of the alignment of an instance in bytes.
-  @inline(always)
-  public fun log2_alignment() -> Log2Alignment {
-    (self.value as* let Self.Pointee).log2_alignment.copy()
-  }
-
-  @inline(always)
-  public fun infix+ (offset: Int) -> Self {
-    let byte_offset = Int(Metatype<TypeWitnessHeader>.stride()) * offset
-    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
-  }
-
-  @inline(always)
-  public fun infix+= (offset: Int) inout {
-    &self.value = (self + offset).value
+  /// Returns the alignment of an instance.
+  @exposed @inline(always)
+  fun alignment() -> Alignment {
+    let x = UInt64(value: Builtin.and_i64(
+      (self.value as* let TypeWitnessHeader).size_and_alignment.value,
+      (0xffff as UInt64).value))
+    return .new(value: Builtin.trunc_or_zext_i64_word(x.value))
   }
 
 }
 
-extension UInt {
+// TODO
+// The two following functions should be removed from the public API once we'll have implemented
+// testable imports. Currently they are used to test the run-time.
 
-  /// Creates an instance equal to `x`.
-  @inline(always)
-  public init(x: UInt32) {
-    &self.value = Builtin.zext_i32_word(x.value)
-  }
-
-}
-
-extension Int {
-
-  /// Creates an instance equal to `x`.
-  @inline(always)
-  public init(x: UInt32) {
-    &self.value = Builtin.zext_i32_word(x.value)
-  }
-
-  /// Creates an instance equal to `x`.
-  @inline(always)
-  public init(x: UInt16) {
-    &self.value = Builtin.zext_i16_word(x.value)
-  }
-
-}
-
-/// Notionally, the type of a member of a record type.
-type RecordMemberType = Pointer<TypeWitnessHeader>
-
-extension Pointer<RecordMemberType> {
-
-  public type Pointee = RecordMemberType
-
-  /// Returns the size of an instance.
-  @inline(always)
-  public fun size() -> Size {
-    self.pointee().size()
-  }
-
-  /// Returns the base-2 logarithm of the alignment of an instance in bytes.
-  @inline(always)
-  public fun log2_alignment() -> Log2Alignment {
-    self.pointee().log2_alignment()
-  }
-
-  @inline(always)
-  public fun pointee() -> Pointee {
-    (self.value as* let Self.Pointee).copy()
-  }
-
-  /// Replaces the pointee with `x`.
-  @inline(always)
-  public fun set_pointee(x: sink Self.Pointee) {
-    // Hack: can't seem to move x, even when take_value implemented manually.
-    &(self.value as* inout Self.Pointee).value = x.value
-  }
-
-  @inline(always)
-  public fun copy() -> Self {
-    .new(value: self.value)
-  }
-
-}
-
-extension Metatype<TypeWitnessHeader> {
-
-  type Subject = TypeWitnessHeader
-
-  /// Returns `self`, granting access to details.
-  @inline(always)
-  public static fun type_info() -> RecordMemberType {
-    return Pointer<RecordMemberType>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the size in bytes of the `Subject`.
-  @inline(always)
-  public static fun size() -> Size {
-    Self.type_info().size()
-  }
-
-  /// Returns the base-2 logarithm of the multiple of bytes to which all instances of `Subject`
-  /// are aligned.
-  @inline(always)
-  public static fun log2_alignment() -> Log2Alignment {
-    Self.type_info().log2_alignment()
-  }
-
-  /// Returns the number of bytes between elements in a buffer of `Subject`.
-  @inline(always)
-  public static fun stride() -> Size {
-    Self.size().rounded_up(to_nearest_multiple_of_2_to_the: Self.log2_alignment())
-  }
-
-}
-
-extension Metatype<RecordMemberType> {
-
-  public type Subject = RecordMemberType
-
-  /// Returns `self`, granting access to details.
-  @inline(always)
-  public static fun type_info() -> RecordMemberType {
-    return Pointer<RecordMemberType>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the size in bytes of the `Subject`.
-  @inline(always)
-  public static fun size() -> Size {
-    Self.type_info().size()
-  }
-
-  /// Returns the base-2 logarithm of the multiple of bytes to which all instances of `Subject`
-  /// are aligned.
-  @inline(always)
-  public static fun log2_alignment() -> Log2Alignment {
-    Self.type_info().log2_alignment()
-  }
-
-  /// Returns the number of bytes between elements in a buffer of `Subject`.
-  @inline(always)
-  public static fun stride() -> Size {
-    Self.size().rounded_up(to_nearest_multiple_of_2_to_the: Self.log2_alignment())
-  }
-
-}
-
-extension Pointer<RecordMemberType> {
-
-  /// Returns `self` advanced in memory by `offset` `Pointee`s.
-  @inline(always)
-  public fun infix+ (offset: Int) -> Self {
-    let byte_offset = Int(Metatype<Self.Pointee>.stride()) * offset
-    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
-  }
-
-  /// Returns `self` advanced in memory by `offset` `Pointee`s.
-  @inline(always)
-  public fun infix+ (offset: UInt32) -> Self {
-    self + Int(offset)
-  }
-
-  /// Advances `self` in memory by `offset` `Pointee`s.
-  @inline(always)
-  public fun infix+= (offset: Int) inout {
-    &self.value = (self + offset).value
-  }
-
-  /// Returns `self` advanced in memory by `-offset` `Pointee`s.
-  @inline(always)
-  public fun infix- (offset: Int) -> Self {
-    let byte_offset = Int(Metatype<Self.Pointee>.stride()) * (0 - offset)
-    return Self(value: Builtin.advanced_by_bytes_word(self.value, byte_offset.value))
-  }
-
-  /// Advances `self` in memory by `-offset` `Pointee`s.
-  @inline(always)
-  public fun infix-= (offset: Int) inout {
-    &self.value = (self - offset).value
-  }
-
-  /// Returns `true` iff `other` has an equivalent value.
-  @inline(always)
-  public fun infix== (other: Self) -> Bool {
-    Bool(value: Builtin.icmp_eq_ptr(self.value, other.value))
-  }
-
-  /// Returns `false` iff `other` has an equivalent value.
-  @inline(always)
-  public fun infix!= (other: Self) -> Bool {
-    !(self == other)
-  }
-
-  /// Returns `true` iff `other` follows `self` in memory.
-  @inline(always)
-  public fun infix< (other: Self) -> Bool {
-    Bool(value: Builtin.icmp_ult_ptr(self.value, other.value))
-  }
-
-}
-
-extension Metatype<Pointer<UInt8>> {
-
-  type Subject = Pointer<UInt8>
-
-  /// Returns `self`, granting access to details.
-  @inline(always)
-  public static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the base-2 logarithm of the multiple of bytes to which all instances of `Subject`
-  /// are aligned.
-  @inline(always)
-  public static fun log2_alignment() -> Log2Alignment {
-    Self.type_info().log2_alignment()
-  }
-
-}
-
-extension Metatype<UInt32> {
-
-  type Subject = UInt32
-
-  /// Returns `self`, granting access to details.
-  @inline(always)
-  public static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the base-2 logarithm of the multiple of bytes to which all instances of `Subject`
-  /// are aligned.
-  @inline(always)
-  public static fun log2_alignment() -> Log2Alignment {
-    Self.type_info().log2_alignment()
-  }
-
-}
-
-extension Metatype<UInt16> {
-
-  type Subject = UInt16
-
-  /// Returns `self`, granting access to details.
-  @inline(always)
-  public static fun type_info() -> Pointer<TypeWitnessHeader> {
-    return Pointer<Pointer<TypeWitnessHeader>>(value: Builtin.address(of: Subject)).pointee()
-  }
-
-  /// Returns the base-2 logarithm of the multiple of bytes to which all instances of `Subject`
-  /// are aligned.
-  @inline(always)
-  public static fun log2_alignment() -> Log2Alignment {
-    Self.type_info().log2_alignment()
-  }
-
-}
-
-/// Removes the contiguous elements at the tail of `start..<end` whose
-/// log2 alignment is less than `a`.
+/// Returns `base` advanced by `n` times the size of an instance of `T` in bytes.
 @inline(always)
-public fun drop_last(
-  of_range_from start: Pointer<RecordMemberType>,
-  until end: inout Pointer<RecordMemberType>,
-  while_its_log2_alignment_is_less_than a: Log2Alignment
-) {
-  while end != start {
-    if (end - 1).pointee().log2_alignment() >= a { return }
-    &end -= 1
-  }
+public fun __advanced<T>(base: Builtin.ptr, by n: Int) -> Builtin.ptr {
+  let layout = Pointer<TypeWitnessHeader>(value: Builtin.address(of: T))
+  let offset = layout.size() * n
+  return Builtin.advanced_by_bytes_word(base, offset.value)
 }
 
-/// Removes the contiguous elements at the head of `start..<end` whose
-/// pointees have log2 alignment less than `a`.
-@inline(always)
-public fun drop_first(
-  of_range_from start: inout Pointer<RecordMemberType>,
-  until end: Pointer<RecordMemberType>,
-  while_its_log2_alignment_is_less_than a: Log2Alignment
-) {
-  while start != end {
-    if start.pointee().log2_alignment() >= a {
-      return
-    }
-    &start += 1
-  }
-}
-
-/// Adds an unspecified value at `start`, shifting the contents of
-/// `start..<end` one element later in memory and replacing `end` with
-/// `end + 1`.
-@inline(always)
-public fun open_hole_at_start(
-  of_range_from start: Pointer<RecordMemberType>,
-  until end: inout Pointer<RecordMemberType>
-) {
-  var e = end.copy()
-  while e != start {
-    let e0 = e - 1
-    e.set_pointee(e0.pointee().copy())
-    &e.value = e0.value
-  }
-  &end += 1
-}
-
-/// Inserts `x` at the head of the `start..<end`, shifting the contents of
-/// `start..<end` one element later in memory and replacing `end` with
-/// `end + 1`.
-@inline(always)
-public fun insert(
-  x: RecordMemberType,
-  at_head_of_range_from start: Pointer<RecordMemberType>,
-  until end: inout Pointer<RecordMemberType>)
-{
-  open_hole_at_start(of_range_from: start, until: &end)
-  start.set_pointee(x.copy())
-}
-
-/// Inserts `x` at the latest position in `start..<end` such that any
-/// immediate successor has a log2 alignment less than `a`.
-@inline(always)
-public fun insert(
-  x: RecordMemberType,
-  into_range_from start: Pointer<RecordMemberType>,
-  until end: inout Pointer<RecordMemberType>,
-  before_max_suffix_whose_log2_alignment_is_less_than a: Log2Alignment)
-{
-  var i = end.copy()
-  drop_last(
-    of_range_from: start, until: &i,
-    while_its_log2_alignment_is_less_than: a)
-
-  insert(x, at_head_of_range_from: i, until: &end)
-}
-
-/// Inserts each pointee in `source_start_..<source_end` (in order)
-/// whose `log2_alignment()` is at least `a`, at the latest position in
-/// `destination_start...destination_end` such that all following
-/// elements are less aligned.
+/// Initializes `offsets` with the byte offsets of each of the `n` fields described in `members`
+/// and returns the size and alignment of a record having said fields.
 ///
-/// - Precondition: The source and initial destination ranges are
-///   non-overlapping.
+/// `members` points to a buffer initialized in the range `0 ..< n` with witnesses describing the
+/// stored members of some record type (e.g., a tuple), laid out in declaration order. `offsets`
+/// points to an uninitialized buffer capable of storing at least `n` elements. When the function
+/// returns, `offsets` is initialized in the range `0 ..< n` with the offset of each member at the
+/// corresponding position. That is, `offsets[i]` is the byte offset of the `i`-th member.
 ///
-/// - Note: may increase `destination_end` *and* mutate the `pointee`s
-///   of the final destination range in place.  If the source range
-///   overlaps the final destination, it may of course have been
-///   modified.
+/// The 48 most significant bits of the return value encode the size of a record composed of the
+/// given members, in bytes. The 16 least significant bits encode its alignment requirement.
 @inline(always)
-public fun insert_in_order_before_max_less_aligned_suffix(
-  range_from source_start: sink Pointer<RecordMemberType>,
-  until source_end: Pointer<RecordMemberType>,
-  where_log2_alignment_is_at_least a: Log2Alignment,
-  into_range_from destination_start: Pointer<RecordMemberType>,
-  until destination_end: inout Pointer<RecordMemberType>,
-) {
-  while source_start != source_end {
-    // Workaround for https://github.com/hylo-lang/hylo-new/issues/370
-    // Cannot hoist source_start.pointee() or its .log2_alignment() computation.
-    if source_start.pointee().log2_alignment() >= a {
-      insert(
-        source_start.pointee(),
-        into_range_from: destination_start, until: &destination_end,
-        before_max_suffix_whose_log2_alignment_is_less_than:
-          source_start.pointee().log2_alignment())
-    }
-    &source_start += 1
-  }
-}
+@_symbol("initialize_record_offsets(offsets:aggregating:count:)")
+public fun __initialize_record_offsets(
+  offsets: Pointer<Int>,
+  aggregating members: Pointer<Pointer<TypeWitnessHeader>>,
+  count n: Int
+) -> UInt64 {
+  type W = Pointer<TypeWitnessHeader>
 
-/// Replaces `start..<end` with its elements having `log2_alignment() > a`,
-/// or having `log2_alignment() == a` but occurring at a position < `p`,
-/// stably-sorted by decreasing alignment.
-///
-/// - Note: reduces `start..<end` to a subrange of its initial value
-///   *and* mutates the `pointee`s of `start..<end`.
-@inline(always)
-public fun stable_sort_by_decreasing_alignment(
-  from start: inout Pointer<RecordMemberType>,
-  until end: inout Pointer<RecordMemberType>,
-  keeping_only_log2_alignments_exceeding a: Log2Alignment,
-  or_equaling_but_positioned_before p: Pointer<RecordMemberType>
-) {
-  // Drop initial unretained elements before p
-  drop_first(
-    of_range_from: &start, until: p,
-    while_its_log2_alignment_is_less_than: a)
+  // Allocate a temporary buffer for storing member indices.
+  sink let layout = Pointer<Int>(value: Builtin.alloca_word(n.value))
+  var size = 0
 
-  var new_end: Pointer<RecordMemberType>
-  sink let tail_start: Pointer<RecordMemberType>
+  // Write in `layout` the index of the member laid out at the corresponding position.
+  var i = 0
+  while i < n {
+    // layout[i] = i
+    set o = __advanced<Int>(layout.value, by: i) as* set Int
+    &o = i.copy()
 
-  if start != p {
-    // insert elements up to p
-    &new_end = start + 1
+    var j = i.copy()
+    while j > 0 {
+      // (a, b) = (layout[j - 1], layout[j])
+      inout a = __advanced<Int>(layout.value, by: j - 1) as* inout Int
+      inout b = __advanced<Int>(layout.value, by: j) as* inout Int
 
-    insert_in_order_before_max_less_aligned_suffix(
-      range_from: start + 1, until: p,
-      where_log2_alignment_is_at_least: a,
-      into_range_from: start, until: &new_end)
+      // if members[a].alignment >= members[b].alignment() { break }
+      let x = __advanced<W>(members.value, by: a) as* let W
+      let y = __advanced<W>(members.value, by: b) as* let W
+      if x.alignment() >= y.alignment() { break }
 
-    &tail_start.value = (p + 1).value
-  }
-  else {
-    // Drop unretained elements after p
-    &start = p + 1
-    drop_first(
-      of_range_from: &start, until: end,
-      while_its_log2_alignment_is_less_than: a + (1 as Log2Alignment))
+      // layout.swap_at(j - 1, j)
+      sink let c = a
+      &a = b
+      &b = c
 
-    if start == end {
-      return
+      &j -= 1
     }
 
-    &new_end.value = (start + 1).value
-    &tail_start.value = new_end.value
+    &i += 1
   }
 
-  // insert elements after p
-  insert_in_order_before_max_less_aligned_suffix(
-    range_from: tail_start, until: end,
-    where_log2_alignment_is_at_least: a + (1 as Log2Alignment),
-    into_range_from: start, until: &new_end)
+  // Write in `offsets` the byte offset of each member.
+  &i = 0
+  while i < n {
+    // let s = members[layout[i]].size()
+    let a = __advanced<Int>(layout.value, by: i) as* let Int
+    let x = __advanced<W>(members.value, by: a) as* let W
+    let s = x.size()
 
-  &end.value = new_end.value
-}
+    // offsets[a] = ...
+    set o = __advanced<Int>(offsets.value, by: a) as* set Int
+    if s > 0 {
+      sink let n = size.rounded_up(to_nearest_multiple_of: x.alignment())
+      &size = n + s
+      &o = n
+    } else {
+      &o = 0
+    }
 
-/// Returns the size of a record type would have were its members given
-/// in storage order by the `pointee`s of `start_..<end`.
-@inline(always)
-public fun size_of_record_having_ordered_members(
-  in_the_range_from start_: Pointer<RecordMemberType>,
-  until end: Pointer<RecordMemberType>
-) -> Size {
-  var r: Size = 0
-  var start = start_.copy()
-  while start < end {
-    let w = start.pointee()
-    let position = r.rounded_up(to_nearest_multiple_of_2_to_the: w.log2_alignment())
-    &r = position + w.size()
-    &start += 1
+    &i += 1
   }
-  return r
+
+  // Use of `layout` extends its lifetime.
+  return .new((size << 16) | __alignment(members, layout, count: n))
 }
 
-/// Returns the offset of the `n`th member in declaration order of a
-/// record type having members given by the array of length `l` at
-/// `member_array`.
+/// Returns the alignment of a record having the `n` fields described in `members` and laid out
+/// according to `layout`.
 ///
-/// Mutates the elements in the array in arbitrary ways.
-@inline(always)
-public fun __hylo_offset_of_member(
-  n: UInt32,
-  in member_array: Pointer<RecordMemberType>, of_length l: UInt32) -> UInt32
-{
-  sink let p = member_array + Int(n)
-  sink let nth_log2_alignment = p.pointee().log2_alignment()
-  var start = member_array.copy()
-  var end = member_array + Int(l)
-
-  stable_sort_by_decreasing_alignment(
-    from: &start, until: &end,
-    keeping_only_log2_alignments_exceeding: nth_log2_alignment,
-    or_equaling_but_positioned_before: p)
-
-  let preceding_size = size_of_record_having_ordered_members(
-    in_the_range_from: start, until: end)
-  sink let r = preceding_size.rounded_up(to_nearest_multiple_of_2_to_the: nth_log2_alignment)
-  return r
-}
-
-/// Stably sorts `start..<end` by decreasing alignment.
-@inline(always)
-public fun sort_by_decreasing_alignment(
-  from start: Pointer<RecordMemberType>,
-  until end: Pointer<RecordMemberType>
-) {
-  if start == end { return }
-  // The first element is a trivially sorted range; insert the others into it, in order.
-  var sorted_end = start + 1
-  insert_in_order_before_max_less_aligned_suffix(
-    range_from: start + 1, until: end,
-    where_log2_alignment_is_at_least: 0 as Log2Alignment,
-    into_range_from: start, until: &sorted_end)
-}
-
-/// Returns the size of a record type having members given by the array of length `member_count` at
-/// `member_array`, in declaration order.
-///
-/// - Note: mutates the array pointed to by `member_array`.
-@inline(always)
-public fun __hylo_size_of_record(
-  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
-) -> Size {
-  let start = member_array
-  let end = member_array + member_count
-  sort_by_decreasing_alignment(from: start, until: end)
-  return size_of_record_having_ordered_members(in_the_range_from: start, until: end)
-}
-
-/// Returns the base-2 logarithm of the alignment in bytes of a record type having members given by
-/// the array of length `member_count` at `member_array`.
-///
-/// The result is the maximal log2 alignment of any member, or `0` if there are no members.
-@inline(always)
-public fun __hylo_log2_alignment_of_record(
-  in member_array: Pointer<RecordMemberType>, of_length member_count: UInt32
-) -> Log2Alignment {
-  var largest = 0 as Log2Alignment
-  var p = member_array.copy()
-  let end = member_array + member_count
-  while p < end {
-    sink let a = p.pointee().log2_alignment()
-    if a > largest { &largest = a }
-    &p += 1
+/// `layout` is a table mapping the index of a member to its position in the record.
+@exposed @inline(always)
+fun __alignment(
+  members: Pointer<Pointer<TypeWitnessHeader>>, layout: Pointer<Int>, count n: Int
+) -> Int {
+  if n == 0 {
+    return 1
+  } else {
+    type W = Pointer<TypeWitnessHeader>
+    let a = layout.value as* let Int
+    let x = __advanced<W>(members.value, by: a) as* let W
+    return x.alignment()
   }
-  return largest
 }

@@ -1,0 +1,146 @@
+type W = TypeWitnessHeader
+
+/// A data structure having the same layout as a type witness header.
+struct FakeTypeWitness is Deinitializable {
+
+  /// The size and alignment requirement of the type, in bytes.
+  let size_and_alignment: UInt64
+
+  /// Creates an instance describing a type whose instances have the given size and alignment
+  /// requirement, measured in bytes.
+  init(size s: Int, alignment a: Int) {
+    &self.size_and_alignment = UInt64((s << 16) | a)
+  }
+
+}
+
+/// A buffer of type witness, each of which represented by a pointer to its header.
+struct TypeWitnessBuffer is Deinitializable {
+
+  /// The start address of this buffer.
+  let start: Pointer<Pointer<W>>
+
+  /// The number of elements in this buffer.
+  let count: Int
+
+  memberwise init
+
+}
+
+public fun main() -> Int32 {
+  sink let s0a1 = FakeTypeWitness(size: 0, alignment: 1)
+  sink let s2a1 = FakeTypeWitness(size: 2, alignment: 1)
+  sink let s4a4 = FakeTypeWitness(size: 4, alignment: 4)
+  sink let s6a8 = FakeTypeWitness(size: 6, alignment: 8)
+
+  // Special case: {}
+  let r0 = expect(
+    TypeWitnessBuffer(start: Pointer<Pointer<W>>(value: Builtin.zeroinitializer_ptr()), count: 0),
+    have_offsets: Pointer<Int>(value: Builtin.zeroinitializer_ptr()),
+    size: 0, alignment: 1)
+  if r0 != 0 { return Int32(r0) }
+
+  var ms: Pointer<W>[3]
+  var os: Int[3]
+  var rs: Int
+
+  // { s0a1 , s0a1 , s0a1 }
+  &ms = (
+    Pointer<W>(value: Builtin.address(of: s0a1)),
+    Pointer<W>(value: Builtin.address(of: s0a1)),
+    Pointer<W>(value: Builtin.address(of: s0a1)))
+  &os = (0, 0, 0)
+  &rs = expect(
+    TypeWitnessBuffer(start: Pointer<Pointer<W>>(value: Builtin.address(of: ms)), count: 3),
+    have_offsets: Pointer<Int>(value: Builtin.address(of: os)),
+    size: 0, alignment: 1)
+  if rs != 0 { return Int32(rs) }
+
+  // { s0a1 , s2a1 , s0a1 }
+  &ms = (
+    Pointer<W>(value: Builtin.address(of: s0a1)),
+    Pointer<W>(value: Builtin.address(of: s2a1)),
+    Pointer<W>(value: Builtin.address(of: s0a1)))
+  &os = (0, 0, 0)
+  &rs = expect(
+    TypeWitnessBuffer(start: Pointer<Pointer<W>>(value: Builtin.address(of: ms)), count: 3),
+    have_offsets: Pointer<Int>(value: Builtin.address(of: os)),
+    size: 2, alignment: 1)
+  if rs != 0 { return Int32(rs) }
+
+  // { s0a1 , s2a1 , s4a4 }
+  &ms = (
+    Pointer<W>(value: Builtin.address(of: s0a1)),
+    Pointer<W>(value: Builtin.address(of: s2a1)),
+    Pointer<W>(value: Builtin.address(of: s4a4)))
+  &os = (0, 4, 0)
+  &rs = expect(
+    TypeWitnessBuffer(start: Pointer<Pointer<W>>(value: Builtin.address(of: ms)), count: 3),
+    have_offsets: Pointer<Int>(value: Builtin.address(of: os)),
+    size: 6, alignment: 4)
+  if rs != 0 { return Int32(rs) }
+
+  // { s2a1 , s6a8 , s4a4 }
+  &ms = (
+    Pointer<W>(value: Builtin.address(of: s2a1)),
+    Pointer<W>(value: Builtin.address(of: s6a8)),
+    Pointer<W>(value: Builtin.address(of: s4a4)))
+  &os = (12, 0, 8)
+  &rs = expect(
+    TypeWitnessBuffer(start: Pointer<Pointer<W>>(value: Builtin.address(of: ms)), count: 3),
+    have_offsets: Pointer<Int>(value: Builtin.address(of: os)),
+    size: 14, alignment: 8)
+  if rs != 0 { return Int32(rs) }
+
+  _ = ms
+  _ = os
+  _ = s0a1
+  _ = s2a1
+  _ = s4a4
+  _ = s6a8
+
+  return 0 as Int32
+}
+
+/// Checks that the run-time computes the layout of a record with given `members` with the given
+/// properties, returning a non-zero error code otherwise.
+///
+/// The function return 0 iff all expectations were met. Otherwise, it returns one of the following
+/// error codes:
+///   - `(1 << 7) | i` if the `i`-th offset does not match.
+///   - `1` if the size does not match.
+///   - `2` if the alignment does not match.
+///
+/// - Parameters:
+///   - members: A buffer containing a type witness for each stored member of the record, laid out
+///     in declaration order.
+///   - offsets: A pointer to a buffer of `members.count` element containing each member's expected
+///     offset, measured in bytes.
+///   - size: The expected size of a record, in bytes.
+///   - alignment: The alignment requirement of a record, in bytes.
+///
+/// - Requires: `members.count` is less than 128.
+fun expect(
+  members: TypeWitnessBuffer,
+  have_offsets offsets: Pointer<Int>, size s: Int, alignment a: Int,
+) -> Int {
+  sink let observed = Pointer<Int>(value: Builtin.alloca_word(members.count.value))
+  let r = __initialize_record_offsets(observed, aggregating: members.start, count: members.count)
+
+  // Did the computed offsets satisfy the expectations?
+  var i = 0
+  while i < members.count {
+    let a = __advanced<Int>(observed.value, by: i) as* let Int
+    let b = __advanced<Int>(offsets.value, by: i) as* let Int
+    if a != b { return (1 << 7) | i }
+    &i += 1
+  }
+
+  _ = observed
+
+  // Did the computed size and alignment satisfy the expectations?
+  if (r >> 16) != UInt64(s) { return 1 }
+  if (r & (0xffff as UInt64)) != UInt64(a) { return 2 }
+
+  return 0
+}

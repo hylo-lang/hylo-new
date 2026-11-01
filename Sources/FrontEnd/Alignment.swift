@@ -1,7 +1,7 @@
 import Utilities
 
 /// The alignment requirement of a memory location, which is a power of two number of bytes.
-public struct Alignment: Regular, Comparable {
+public struct Alignment: Hashable, Comparable, Sendable {
 
   /// The base-2 logarithm of the value of `self` in bytes.
   public let log2: UInt8

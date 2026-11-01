@@ -269,7 +269,7 @@ internal struct IREmitter {
     // If the conformance is a nested given, we can simply extract the witness from the parameter
     // accepting a witness of a conformance to the enclosing trait.
     if program.isRequirement(d) {
-      let x0 = _property(.init(d), of: .parameter(0), withType: witness)
+      let x0 = _implementation(.init(d), in: .parameter(0), as: witness)
       let x1 = _access([.let], from: x0)
       _yield(x1)
       _return()
@@ -537,7 +537,7 @@ internal struct IREmitter {
       let ms = program.declarations(of: ConformanceDeclaration.self, lexicallyIn: .init(node: t))
       for m in ms {
         let w = program.type(assignedTo: m)
-        let v = _property(.init(m), of: .parameter(0), withType: w)
+        let v = _implementation(.init(m), in: .parameter(0), as: w)
         insertionContext.function!.associate(.init(m), with: v)
       }
     }
@@ -865,7 +865,7 @@ internal struct IREmitter {
           me._assume_state(target, initialized: true)
         }
       } else {
-        let t = program.type(assignedTo: program[e].callee, assuming: Arrow.self)
+        let t = program.dealiasedType(assignedTo: program[e].callee, assuming: Arrow.self)
         lowering(e) { (me) in
           let x0 = me._emitApply(builtin: f, ofType: t, to: me.program[e].arguments)
           me._emitInitialize(target, with: x0)
@@ -1266,7 +1266,7 @@ internal struct IREmitter {
         let interface = program.withTyper(typing: module, { (tp) in tp.typeOfInterface(for: m) })
         return lowering(at: anchor) { (me) in
           let x0 = me._emit(witness: w)
-          let x1 = me._property(m, of: x0, withType: interface)
+          let x1 = me._implementation(m, in: x0, as: interface)
           return LoweredCallee(x1, appliedTo: [x0], boundTo: receiver, writingResultTo: r)
         }
       }
@@ -1376,7 +1376,7 @@ internal struct IREmitter {
     // Construct a mapping from type parameter to its argument.
     let ps = context.parameters.dropFirst(poly.typeArguments.count)
     let ts = zip(ps, program[e].arguments).map { (p, a) in
-      let t = program.type(assignedTo: a, assuming: Metatype.self)
+      let t = program.dealiasedType(assignedTo: a, assuming: Metatype.self)
       return (p, program.types[t].inhabitant)
     }
 
@@ -1508,7 +1508,7 @@ internal struct IREmitter {
     switch program[e].semantics.value {
     case .pointer:
       // The right-hand side is a remote type.
-      let t = program.type(assignedTo: program[e].target, assuming: Metatype.self)
+      let t = program.dealiasedType(assignedTo: program[e].target, assuming: Metatype.self)
       let u = program.types.cast(program.types[t].inhabitant, to: RemoteType.self)!
       let k = program.types[u].access
 
@@ -1539,34 +1539,32 @@ internal struct IREmitter {
 
   /// Implements `lower(lvalue:)` for name expressions.
   private mutating func lowered(lvalue e: NameExpression.ID) -> IRValue {
-    let t = program.type(assignedTo: e)
+    let t = program.dealiasedType(assignedTo: e)
 
     switch program.declaration(referredToBy: e) {
+    case .direct(let d) where program.isTypeDeclaration(d):
+      return lowering(e, { $0._emitAccessTypeWitness(expressedBy: .init(e)) })
+
     case .direct(let d):
-      if program.isTypeDeclaration(d) {
-        return lowering(e, { $0._emitTypeWitness(expressedBy: .init(e)) })
-      } else {
-        return lowering(e, { $0._emit(useOf: d, typed: t) })
-      }
+      return lowering(e, { $0._emit(useOf: d, typed: t) })
 
     case .member(let d):
       // Emit the receiver.
       let q = lowered(lvalue: program[e].qualification!)
-      return lowering(e, { $0._property(d, of: q, withType: t) })
+      return lowering(e, { $0._property(d, of: q, as: t) })
 
     case .builtin(.selfAlias):
-      return lowering(e, { $0._emitTypeWitness(of: t) })
+      return lowering(e, { $0._emitAccessTypeWitness(t) })
 
-    default:
-      fatalError(
-        "Lowering not implemented for \(program.show(program.declaration(referredToBy: e)))")
+    case let d:
+      unimplemented("lowering for \(program.show(d))")
     }
   }
 
   /// Implements `lower(lvalue:)` for static calls.
   private mutating func lowered(lvalue e: StaticCall.ID) -> IRValue {
     if program.isReferringToTypeDeclaration(program[e].callee) {
-      return lowering(e, { $0._emitTypeWitness(expressedBy: .init(e)) })
+      return lowering(e, { $0._emitAccessTypeWitness(expressedBy: .init(e)) })
     } else {
       unimplemented("static call")
     }
@@ -1711,15 +1709,15 @@ internal struct IREmitter {
     let ts = accumulatedGenericParameters(visibleFrom: .init(node: d))
     var ps: [IRParameter] = .init(minimumCapacity: program[d].parameters.count + 1)
     for p in program[d].parameters {
-      let t = program.type(assignedTo: p, assuming: RemoteType.self)
-      let u = program.types.dealiased(program.types[t].projectee)
-      ps.append(IRParameter(type: u, access: program.types[t].access, declaration: .init(p)))
+      let t = program.dealiasedType(assignedTo: p, assuming: RemoteType.self)
+      let u = program.types[t]
+      ps.append(IRParameter(type: u.projectee, access: u.access, declaration: .init(p)))
     }
 
     // The constructor returns an instance of the containing enum.
-    let e = program.type(assignedTo: program.parent(containing: d).node!, assuming: Metatype.self)
-    let o = program.types.dealiased(program.types[e].inhabitant)
-    ps.append(.init(type: o, access: .set, declaration: nil))
+    let s = program.parent(containing: d).node!
+    let e = program.dealiasedType(assignedTo: s, assuming: Metatype.self)
+    ps.append(.init(type: program.types[e].inhabitant, access: .set, declaration: nil))
 
     let newFunction = IRFunction(
       name: name,
@@ -1862,7 +1860,7 @@ internal struct IREmitter {
 
       // Explicit parameters come next.
       for p in parameters.explicit {
-        let t = program.type(assignedTo: p, assuming: RemoteType.self)
+        let t = program.dealiasedType(assignedTo: p, assuming: RemoteType.self)
         let u = program.types.dealiased(program.types[t].projectee)
         let k = program.types[t].access.unlessAuto(program.types[shape].effect)
         assert((k != .auto) || program.tag(of: d) == FunctionBundleDeclaration.self)
@@ -2320,6 +2318,16 @@ internal struct IREmitter {
     insert(IRGlobalAccess(source: source, anchor: currentAnchor))!
   }
 
+  /// Inserts an `implementation` instruction.
+  internal mutating func _implementation(
+    _ requirement: DeclarationIdentity, in table: IRValue, as interface: AnyTypeIdentity
+  ) -> IRValue {
+    let t = program.types.dealiased(interface)
+    let s = IRImplementation(
+      table: table, requirement: requirement, interface: t, anchor: currentAnchor)
+    return insert(s)!
+  }
+
   /// Inserts a `load` instruction.
   internal mutating func _load(_ source: IRValue) -> IRValue {
     assert(currentFunction.isPlace(source))
@@ -2386,10 +2394,11 @@ internal struct IREmitter {
 
   /// Inserts a `property` instruction.
   internal mutating func _property(
-    _ property: DeclarationIdentity, of record: IRValue, withType propertyType: AnyTypeIdentity
+    _ part: DeclarationIdentity, of whole: IRValue, as partType: AnyTypeIdentity
   ) -> IRValue {
-    let t = program.types.dealiased(propertyType)
-    let s = IRProperty(record: record, property: property, propertyType: t, anchor: currentAnchor)
+    let t = program.types.dealiased(partType)
+    let s = IRProperty(
+      whole: whole, wholeWitness: nil, part: part, partType: t, anchor: currentAnchor)
     return insert(s)!
   }
 
@@ -2404,19 +2413,22 @@ internal struct IREmitter {
   }
 
   /// Inserts a `subfield` instruction.
-  internal mutating func _subfield(_ base: IRValue, at path: IndexPath) -> IRValue {
+  internal mutating func _subfield(_ whole: IRValue, at path: IndexPath) -> IRValue {
     // The instruction is equivalent to the identity if the path is empty.
-    if path.isEmpty { return base }
+    if path.isEmpty { return whole }
 
-    let (root, _) = currentFunction.result(of: base) ?? badOperand()
-    let subfieldType = program.withTyper(typing: module) { (tp) in
-      tp.field(of: root, at: path)
+    let (root, _) = currentFunction.result(of: whole) ?? badOperand()
+    let ts = program.withTyper(typing: module) { (tp) in
+      path.reduce(into: [root]) { (t, p) in t.append(tp.fields(of: t.last!)![p]) }
     }
 
-    let s = IRSubfield(
-      base: base, path: path, subfieldType: subfieldType!,
-      anchor: currentAnchor)
-    return insert(s)!
+    var w = whole
+    for (t, p) in zip(ts[1...], path) {
+      let s = IRSubfield(whole: w, wholeWitness: nil, part: p, partType: t, anchor: currentAnchor)
+      w = insert(s)!
+    }
+
+    return w
   }
 
   /// Inserts a `switch` instruction.
@@ -2453,14 +2465,24 @@ internal struct IREmitter {
     return insert(s)!
   }
 
-  /// Inserts a `type_witness` application.
-  internal mutating func _type_witness(
-    _ callee: UniversalType.ID, _ arguments: [IRValue]
-  ) -> IRValue {
-    assert(program.types[callee].parameters.count == arguments.count)
-    let t = program.types.demand(TypeWitness())
+  /// Inserts a `type_witness` instruction projecting the witness of `t`.
+  internal mutating func _type_witness(_ t: AnyTypeIdentity) -> IRValue {
+    let w = program.types.demand(TypeWitness())
     let s = IRTypeWitness(
-      constructor: callee, arguments: arguments, typeOfApplication: t,
+      constructor: t, arguments: [], typeOfApplication: w,
+      anchor: currentAnchor)
+    return insert(s)!
+  }
+
+  /// Inserts a `type_witness` instruction projecting the witness of the type resulting from the
+  /// application of `constructor` to `arguments`.
+  internal mutating func _type_witness(
+    _ constructor: UniversalType.ID, _ arguments: [IRValue]
+  ) -> IRValue {
+    assert(program.types[constructor].parameters.count == arguments.count)
+    let w = program.types.demand(TypeWitness())
+    let s = IRTypeWitness(
+      constructor: constructor.erased, arguments: arguments, typeOfApplication: w,
       anchor: currentAnchor)
     return insert(s)!
   }
@@ -2732,24 +2754,6 @@ internal struct IREmitter {
     }
 
     _return()
-  }
-
-  /// Generates IR for storing the type witness expressed by `e` into a fresh alloca and returns
-  /// that alloca.
-  ///
-  /// - Requires: The evaluation of `e` has no side effects.
-  private mutating func _emitTypeWitness(expressedBy e: ExpressionIdentity) -> IRValue {
-    let t = program.type(assignedTo: e, assuming: Metatype.self)
-    return _emitTypeWitness(of: program.types[t].inhabitant)
-  }
-
-  /// Generates IR for storing a type witness of `t` into a fresh alloca and returns that alloca.
-  private mutating func _emitTypeWitness(of t: AnyTypeIdentity) -> IRValue {
-    let u = program.types.dealiased(t)
-    let w = program.types.demand(TypeWitness())
-    let x = _alloca(w.erased)
-    _emitInitialize(x, with: .type(u, w))
-    return x
   }
 
   /// Generates the IR for computing the lvalue referred to by `w`.
@@ -3024,7 +3028,7 @@ internal struct IREmitter {
     let interface = program.types.demand(
       Arrow((.let, w.type), (.sink, t), to: .void))
 
-    let x0 = _property(requirement, of: table, withType: interface.erased)
+    let x0 = _implementation(requirement, in: table, as: interface.erased)
     let x1 = _access([.let], from: x0)
     let x2 = _alloca(.void)
     _apply(x1, [table, s], into: x2, argumentAccesses: .formAndClose)
@@ -3111,7 +3115,7 @@ internal struct IREmitter {
   ) {
     var properties: [AnyTypeIdentity] = []
     program.forEachStoredProperty(of: d) { (m, _) in
-      let t = program.type(assignedTo: m, assuming: RemoteType.self)
+      let t = program.dealiasedType(assignedTo: m, assuming: RemoteType.self)
       let u = program.types.substitute(a, in: program.types[t].projectee)
       properties.append(program.types.dealiased(u))
     }
@@ -3219,7 +3223,7 @@ internal struct IREmitter {
     let interface = program.types.demand(
       Arrow((.let, w.type), (k, typeOfSource), (.sink, typeOfSource), to: .void))
 
-    let x0 = _property(.init(requirement), of: table, withType: interface.erased)
+    let x0 = _implementation(.init(requirement), in: table, as: interface.erased)
     let x1 = _access([.let], from: x0)
     let x2 = _alloca(.void)
     _apply(x1, [table, target, source], into: x2, argumentAccesses: .formAndClose)
@@ -3237,20 +3241,41 @@ internal struct IREmitter {
     _end(IRAccess.self, openedBy: x0)
   }
 
-  /// Generates the IR for accessing a run-time witness of `t`, caching results into `witnesses`.
+  /// Generates IR for accessing a witness of the type expressed by `e`.
+  ///
+  /// - Requires: The evaluation of `e` has no side effects.
+  private mutating func _emitAccessTypeWitness(expressedBy e: ExpressionIdentity) -> IRValue {
+    var empty: [AnyTypeIdentity: IRValue] = [:]
+    let t = program.dealiasedType(assignedTo: e, assuming: Metatype.self)
+    return _emitAccessTypeWitness(program.types[t].inhabitant, reusing: &empty)
+  }
+
+  /// Generates IR for accessing a witness of `t`.
+  ///
+  /// Instructions for allocating and initializing storage for new witnesses are emitted in the
+  /// entry of the current function whereas the return value is always an access emitted at the
+  /// current insertion point.
+  ///
+  /// - Requires: `t` is dealiased.
+  private mutating func _emitAccessTypeWitness(_ t: AnyTypeIdentity) -> IRValue {
+    var empty: [AnyTypeIdentity: IRValue] = [:]
+    return _emitAccessTypeWitness(t, reusing: &empty)
+  }
+
+  /// Generates IR for accessing a witness of `t`, using `witnesses` as a cache.
   ///
   /// `witnesses` is a table mapping a type to a place containing a corresponding witness. It is
   /// updated whenever generating a witness for `t` requires new IR. Instructions for allocating
   /// and initializing storage for new witnesses are emitted in the entry of the current function
   /// whereas the return value is always an access emitted at the current insertion point.
+  ///
+  /// - Requires: `t` is dealiased.
   internal mutating func _emitAccessTypeWitness(
-    of t: AnyTypeIdentity, reusing witnesses: inout [AnyTypeIdentity: IRValue]
+    _ t: AnyTypeIdentity, reusing witnesses: inout [AnyTypeIdentity: IRValue]
   ) -> IRValue {
     // Trivial if the witness is already available.
     if let a = witnesses[t] {
       return _access([.let], from: a)
-    } else {
-      assert(program.types.tag(of: t) != GenericParameter.self)
     }
 
     // Instructions for allocating/initializing the witness are emitted in the entry.
@@ -3258,35 +3283,44 @@ internal struct IREmitter {
     swap(&insertionContext.point, &p)
 
     let ps = program.types.parameters(freeIn: t)
+    var newWitness: IRValue
 
-    // If `t` has no free type parameter, then we can just use a constant value.
+    // If `t` is closed, then we can just use a constant value.
     if ps.isEmpty {
       let g = demandGlobalTypeWitness(t)
-      let a = _global_access(g)
-      witnesses[t.erased] = a
+      newWitness = _global_access(g)
+    }
 
-      swap(&insertionContext.point, &p)
-      return _access([.let], from: a)
+    // If `t` is a generic type parameter, then we'll get its witness after deploymorphization.
+    else if program.types.tag(of: t) == GenericParameter.self {
+      newWitness = _type_witness(t)
     }
 
     // Otherwise, we have to construct a new type witness.
     else {
-      let u = program.types.demand(UniversalType(parameters: Array(ps), head: t))
-      let v = ps.map({ (p) in _emitAccessTypeWitness(of: p.erased, reusing: &witnesses) })
-      let a = _type_witness(u, v)
-      witnesses[t.erased] = a
-
-      swap(&insertionContext.point, &p)
-      return _access([.let], from: a)
+      let u = program.types.constructor(binding: ps, in: t)
+      let v = ps.map({ (p) in _emitAccessTypeWitness(p.erased, reusing: &witnesses) })
+      newWitness = _type_witness(u, v)
     }
+
+    witnesses[t.erased] = newWitness
+    swap(&insertionContext.point, &p)
+    return _access([.let], from: newWitness)
   }
 
-  /// Generates IR for accessing run-time witnesses of each type argument in `a`, caching results
-  /// into `witnesses`.
+  /// Generates IR for accessing a witness of each argument in `a`, using `witnesses` as a cache.
+  ///
+  /// `witnesses` is a table mapping a type to a place containing a corresponding witness. It is
+  /// updated whenever generating a witness for `t` requires new IR. Instructions for allocating
+  /// and initializing storage for new witnesses are emitted in the entry of the current function
+  /// whereas the return value is always an access emitted at the current insertion point.
   internal mutating func _emitAccessTypeWitnesses(
-    for a: TypeArguments, reusing witnesses: inout [AnyTypeIdentity: IRValue]
+    _ a: TypeArguments, reusing witnesses: inout [AnyTypeIdentity: IRValue]
   ) -> [IRValue] {
-    a.values.map({ (t) in _emitAccessTypeWitness(of: t.erased, reusing: &witnesses) })
+    a.values.map { (t) in
+      let u = program.types.dealiased(t)
+      return _emitAccessTypeWitness(u, reusing: &witnesses)
+    }
   }
 
   /// Information necessary to emit the deinitialization of an instance.

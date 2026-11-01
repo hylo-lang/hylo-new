@@ -260,10 +260,17 @@ public struct TypeStore: Sendable {
   }
 
   /// Returns `n` as the head of a universal type introducing `ps`.
-  public mutating func introduce(
-    parameters ps: [GenericParameter.ID], into n: AnyTypeIdentity
+  ///
+  /// The result is `n` if `ps` is empty. Otherwise, it is a universal type binding the free
+  /// occurrences of type parameters in `n` that are also contained in `ps`.
+  public mutating func introduce<S: Collection<GenericParameter.ID>>(
+    parameters ps: S, into n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    ps.isEmpty ? n : demand(UniversalType(parameters: ps, head: n)).erased
+    if ps.isEmpty {
+      return n
+    } else {
+      return demand(UniversalType(parameters: Array(ps), head: n)).erased
+    }
   }
 
   /// Returns `n` without its first requirement.
@@ -308,6 +315,30 @@ public struct TypeStore: Sendable {
     }
 
     return result
+  }
+
+  /// Returns `n` as the head of a universal type introducing `ps`, which is the set of the type
+  /// parameters occurring free in `n`.
+  ///
+  /// - Requires: `ps` is not empty and contains exactly the parameters occurring free in `n`.
+  public mutating func constructor<S: Sequence<GenericParameter.ID>>(
+    binding ps: S, in n: AnyTypeIdentity
+  ) -> UniversalType.ID {
+    // Rename the parameters occurring free in `n` to avoid creating different constructors for
+    // alpha-equivalent types.
+    var ts: TypeArguments = [:]
+    for (i, p) in ps.enumerated() {
+      ts[p] = demand(any: GenericParameter.nth(i, self[p].kind))
+    }
+    assert(!ts.isEmpty)
+
+    let renamed = substitute(ts, in: n)
+    let qs = ps.map { (p) -> GenericParameter.ID in
+      ts[p].flatMap({ (q) in castUnchecked(q) }) ?? p
+    }
+
+    let result = introduce(parameters: qs, into: renamed)
+    return castUnchecked(result)
   }
 
   /// Returns the canonical representation of a tuple containing the given elements.
@@ -865,29 +896,55 @@ public struct TypeStore: Sendable {
     }
   }
 
-  /// Returns `n` with the keys in `substitutions` substituted with their corresponding values.
+  /// Returns `n` with the keys in `substitutions` substituted with their corresponding values,
+  /// ignoring bound parameters.
+  ///
+  /// Type parameters introduced by a type abstraction are not substituted. For example, the
+  /// substitution of `A` for `T` in `{T, <T> {T, B}}` yields `{A, <T> {T, B}}`.
+  ///
+  /// - Requires: The parameters occurring free in `substitutions` and in `in` are disjoint.
   public mutating func substitute(
     _ substitutions: [AnyTypeIdentity: AnyTypeIdentity], in n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    if substitutions.isEmpty {
-      return n
-    } else {
-      return self.map(n) { (s, t) in
-        if let u = substitutions[t] { .stepOver(u) } else { .stepInto(t) }
-      }
-    }
+    substituteImpl(substitutions, in: n)
   }
 
-  /// Returns `n` with the keys in `substitutions` substituted with their corresponding values.
+  /// Returns `n` with the keys in `substitutions` substituted with their corresponding values,
+  /// ignoring bound parameters.
+  ///
+  /// Type parameters introduced by a type abstraction are not substituted. For example, the
+  /// substitution of `A` for `T` in `{T, <T> {T, B}}` yields `{A, <T> {T, B}}`.
+  ///
+  /// - Requires: The parameters occurring free in `substitutions` and in `in` are disjoint.
   public mutating func substitute(
     _ substitutions: TypeArguments, in n: AnyTypeIdentity
   ) -> AnyTypeIdentity {
-    if substitutions.isEmpty {
-      return n
-    } else {
-      return self.map(n) { (s, t) in
-        // The unchecked cast is okay because the type of an identity is irrelevant to `Hashable`.
-        if let u = substitutions[.init(uncheckedFrom: t)] { .stepOver(u) } else { .stepInto(t) }
+    substituteImpl(substitutions, in: n)
+  }
+
+  /// Returns `n` with the keys in `substitutions` substituted with their corresponding values,
+  /// ignoring bound parameters.
+  ///
+  /// Type parameters introduced by a type abstraction are not substituted. For example, the
+  /// substitution of `A` for `T` in `{T, <T> {T, B}}` yields `{A, <T> {T, B}}`.
+  ///
+  /// - Requires: The parameters occurring free in `substitutions` and in `in` are disjoint.
+  private mutating func substituteImpl<S: Substitution>(
+    _ substitutions: S, in n: AnyTypeIdentity
+  ) -> AnyTypeIdentity {
+    // Trivial if the substitution table is empty.
+    if substitutions.isEmpty { return n }
+
+    // Otherwise, walk down the tree, making sure to remove bound parameters.
+    return self.map(n) { (s, t) in
+      if let u = s[t] as? UniversalType {
+        let r = substitutions.removing(keys: u.parameters)
+        let h = s.substituteImpl(r, in: u.head)
+        return .stepOver(s.demand(UniversalType(parameters: u.parameters, head: h)).erased)
+      } else if let u = substitutions[t] {
+        return .stepOver(u)
+      } else {
+        return .stepInto(t)
       }
     }
   }
@@ -1171,3 +1228,39 @@ public typealias CoercionHandler = (
   _ lhs: AnyTypeIdentity,
   _ rhs: AnyTypeIdentity
 ) -> Bool
+
+/// A type implementing a substitution table.
+private protocol Substitution {
+
+  /// `true` iff the table is empty.
+  var isEmpty: Bool { get }
+
+  /// Accesses the type assigned to `key`.
+  subscript(key: AnyTypeIdentity) -> AnyTypeIdentity? { get }
+
+  /// Returns a copy of `self` in which none of given keys are assigned.
+  func removing<S: Sequence<GenericParameter.ID>>(keys: S) -> Self
+
+}
+
+extension Dictionary<AnyTypeIdentity, AnyTypeIdentity>: Substitution {
+
+  func removing<S: Sequence<GenericParameter.ID>>(keys: S) -> Self {
+    let ks = SortedSet(keys.map(\.erased))
+    return filter({ (k, _) in !ks.contains(k) })
+  }
+
+}
+
+extension TypeArguments: Substitution {
+
+  subscript(key: AnyTypeIdentity) -> AnyTypeIdentity? {
+    // The unchecked cast is okay because the type of an identity is irrelevant to `Hashable`.
+    self[GenericParameter.ID(uncheckedFrom: key)]
+  }
+
+  func removing<S: Sequence<GenericParameter.ID>>(keys: S) -> Self {
+    filter({ (k, _) in !keys.contains(k) })
+  }
+
+}

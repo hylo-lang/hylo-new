@@ -39,6 +39,7 @@ public struct InstructionTag: Sendable {
     IRConditionalBranch.self,
     IREnumTag.self,
     IRGlobalAccess.self,
+    IRImplementation.self,
     IRLoad.self,
     IRMemoryCopy.self,
     IRMove.self,

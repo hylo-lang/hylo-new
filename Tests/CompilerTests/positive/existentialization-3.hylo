@@ -1,0 +1,74 @@
+// This test exercises the construction of type witnesses at compile-time and run-time. Since the
+// layout of pair depends on the size and alignment of its components, a type witness is required
+// in existentialized methods to determine the offset each member. For example, `Pair.init(_:_:)`
+// takes no witness of `Pair<T, U>` directly. Hence, is constructed at run-time from the witnesses
+// of `T` and `U`. In `main(:)`, however, the witness of `Pair<Small, Large>` is constructed at
+// compile-time and stored in the program's binary.
+//
+// Since the alignment requirement of `Large` is stricter than that of `Small`, the second member
+// of an instance of `Pair<Small, Large>` (or a tuple `{Small, Large}`) is laid out before the
+// first one. This configuration has to be computed consistently at compile-time and run-time.
+
+struct Pair<T, U> {
+
+  var lhs: T
+  var rhs: U
+
+  init<where T is Movable, U is Movable>(lhs: sink T, rhs: sink U) {
+    &self.lhs = lhs
+    &self.rhs = rhs
+  }
+
+  fun deinit<where T is Deinitializable, U is Deinitializable>() sink {
+    self.lhs.deinit()
+    self.rhs.deinit()
+  }
+
+}
+
+struct Small is Movable & Deinitializable {
+
+  var value: Int16
+
+  memberwise init
+
+  fun take_value(from other: sink Self) auto {
+    set   { &self.value = other.value }
+    inout { &self.value = other.value }
+  }
+
+}
+
+struct Large is Movable & Deinitializable {
+
+  var value: Int64
+
+  memberwise init
+
+  fun take_value(from other: sink Self) auto {
+    set   { &self.value = other.value }
+    inout { &self.value = other.value }
+  }
+
+}
+
+fun tuple<T is Movable, U is Movable>(x: sink T, y: sink U) -> {T, U} {
+  (x, y)
+}
+
+public fun main() {
+  sink let p = Pair(
+    Small(value: 0x3fff as Int16), // 2 leading zeros
+    Large(value: 0xffff as Int64)) // 48 leading zeros
+
+  precondition(p.lhs.value.leading_zero_bit_count() == 2)
+  precondition(p.rhs.value.leading_zero_bit_count() == 48)
+  p.deinit()
+
+  sink let q = tuple(
+    Small(value: 0x3fff as Int16), // 2 leading zeros
+    Large(value: 0xffff as Int64)) // 48 leading zeros
+
+  precondition(q.0.value.leading_zero_bit_count() == 2)
+  precondition(q.1.value.leading_zero_bit_count() == 48)
+}

@@ -1,0 +1,48 @@
+// This test exercises the construction of type witnesses at run-time involving recursive generic
+// types. Because `S` contains a property of a type instantiated with itself, computing a type
+// witness requires lazy evaluation to avoid infinite recursion.
+
+struct Small is Movable & Deinitializable {
+
+  var value: Int16
+
+  memberwise init
+
+  fun take_value(from other: sink Self) auto {
+    set   { &self.value = other.value }
+    inout { &self.value = other.value }
+  }
+
+}
+
+struct R<T> {
+
+  var x: Int
+
+  init() { &self.x = 123 }
+
+  fun release() sink -> Int { self.x }
+
+}
+
+struct S<A, B> {
+
+  var one: A
+  var two: R<S<A, B>>
+
+  init<where A is Movable>(a: sink A) {
+    &self.one = a
+    R<_>.init(self: &self.two)
+  }
+
+  fun release<where A is Deinitializable>() sink -> Int {
+    self.one.deinit()
+    return self.two.release()
+  }
+
+}
+
+public fun main() {
+  sink let s = S<_, Int>(Small(value: 0xabc as Int16))
+  precondition(s.release() == 123)
+}

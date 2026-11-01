@@ -126,7 +126,7 @@ private typealias Module = FrontEnd.Module
 
   /// The name of the module being compiled, if specified explicitly.
   ///
-  /// - See: `effectiveModuleName`.
+  /// - Seealso: `effectiveModuleName`.
   @Option(
     name: [.customLong("module-name")],
     help: ArgumentHelp(

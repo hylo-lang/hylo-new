@@ -84,6 +84,8 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   // MARK: Functions with a counterpart LLVM instruction.
 
+  case alloca(MachineType.ID)
+
   case add(OverflowBehavior, MachineType.ID)
 
   case sub(OverflowBehavior, MachineType.ID)
@@ -429,6 +431,8 @@ extension BuiltinFunction {
 
   /// Returns the type of the function, using `s` to create unique type identities.
   public func type(uniquingTypesWith s: inout TypeStore) -> AnyTypeIdentity {
+    let word = s.demand(MachineType.word)
+    let ptr = s.demand(MachineType.ptr)
     let i1 = s.demand(MachineType.i(1))
 
     switch self {
@@ -437,20 +441,21 @@ extension BuiltinFunction {
 
     case .addressOf:
       let t0 = s.demand(GenericParameter.nth(0, .proper))
-      let t1 = s.demand(MachineType.ptr).erased
-      let a = Arrow(inputs: [.init(label: "of", access: .let, type: t0.erased)], output: t1)
-
-      let t2 = s.demand(a).erased
+      let t1 = Arrow(
+        inputs: [.init(label: "of", access: .let, type: t0.erased)], output: ptr.erased)
+      let t2 = s.demand(t1).erased
       let t3 = s.demand(UniversalType(parameters: [t0], head: t2))
       return t3.erased
 
     case .assumeInitialized:
       let t0 = s.demand(GenericParameter.nth(0, .proper))
-      let a = Arrow(inputs: [.init(label: nil, access: .auto, type: t0.erased)], output: .void)
-      let t1 = s.demand(a).erased
-      let t2 = s.demand(UniversalType(parameters: [t0], head: t1))
-      return t2.erased
+      let t1 = Arrow(inputs: [.init(label: nil, access: .auto, type: t0.erased)], output: .void)
+      let t2 = s.demand(t1).erased
+      let t3 = s.demand(UniversalType(parameters: [t0], head: t2))
+      return t3.erased
 
+    case .alloca:
+      return s.demand(Arrow(word, to: ptr)).erased
     case .add(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .sub(_, let t):
@@ -544,8 +549,7 @@ extension BuiltinFunction {
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
     case .advancedByBytes(let byteOffset):
-      let p = s.demand(MachineType.ptr)
-      return s.demand(Arrow(p, byteOffset, to: p)).erased
+      return s.demand(Arrow(ptr, byteOffset, to: ptr)).erased
     //    case .atomic_store_relaxed(let t):
     //      return .init(.builtin(.ptr), ^t, to: .void)
     //    case .atomic_store_release(let t):
@@ -800,6 +804,8 @@ extension BuiltinFunction: Showable {
       return "address"
     case .assumeInitialized(let b):
       return "assume_\(b ? "" : "un")initialized"
+    case .alloca(let t):
+      return printer.format("alloca_%T", [t.erased])
     case .add(let p, let t):
       return (p != .ignore)
         ? printer.format("add_%S_%T", [p, t.erased])
@@ -1161,6 +1167,9 @@ extension BuiltinFunction {
       self = .assumeInitialized(true)
     case "assume" where tokens.first == "uninitialized":
       self = .assumeInitialized(false)
+    case "alloca":
+      guard let t = machineType(&tokens) else { return nil }
+      self = .alloca(s.demand(t))
     case "add":
       guard let (p, t) = integerArithmeticTail(&tokens) else { return nil }
       self = .add(p, s.demand(t))
