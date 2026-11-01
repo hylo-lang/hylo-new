@@ -1318,23 +1318,51 @@ extension Program {
       witnesses[argument.erased] = (ctx.llvm.insertLoad(int, from: v, at: p).v, false)
     }
 
+    // Are there fields of which we have to compute the offsets?
     if let rs = fields(of: types[t].head, visibleFrom: ctx.hylo) {
-      // Create a buffer with the witnesses of all stored members.
-      let membersType = ctx.llvm.arrayType(rs.count, ptr)
-      let members = ctx.llvm.insertAlloca(membersType, atEntryOf: constructor)
-      for (i, m) in rs.enumerated() {
-        let argument = insertTypeWitness(
-          m, reusing: &witnesses, at: &p, in: constructor, in: &ctx)
-        let parameter = ctx.llvm.insertGetElementPointerInBounds(
-          of: members, typed: membersType, indices: [0, i], indexType: i32, at: p)
-        ctx.llvm.insertStore(argument, to: parameter, at: p)
+      let offsets = insertGetRecordOffsets(receiver.v, at: p, in: &ctx)
+
+      // Can we compute the layout at compile-time?
+      if let layout = record(fields: rs, in: &ctx) {
+        let sizeAndAlignment = ctx.llvm.i64.unsafe[].constant(
+          UInt64((layout.size.fixed ?? 0) << 16) | UInt64(layout.alignment.bytes)).v
+        ctx.llvm.insertStore(sizeAndAlignment, to: receiver, at: p)
+
+        let d = ctx.llvm.structType(layout.fields, packed: true)
+        for i in layout.propertyToField {
+          let n = i > 0 ? ctx.llvm.layout.offset(of: i, in: d) : 0
+          let o = ctx.llvm.insertGetElementPointerInBounds(
+            of: offsets, typed: int, indices: [i], indexType: ctx.llvm.i32, at: p)
+          ctx.llvm.insertStore(int.unsafe[].constant(n), to: o, at: p)
+        }
       }
 
-      let length = int.unsafe[].constant(rs.count)
-      let offsets = insertGetRecordOffsets(receiver.v, at: p, in: &ctx)
-      let sizeAndAlignment = insertCallStandardLibraryFunction(
-        .initializeRecordOffsets, with: [offsets.v, members.v, length.v], at: p, in: &ctx)
-      ctx.llvm.insertStore(sizeAndAlignment, to: receiver, at: p)
+      // Is there just a single member?
+      else if let m = rs.uniqueElement {
+        let w = insertTypeWitness(m, reusing: &witnesses, at: &p, in: constructor, in: &ctx)
+        let sizeAndAlignment = ctx.llvm.insertLoad(int, from: w, at: p)
+        ctx.llvm.insertStore(sizeAndAlignment, to: receiver, at: p)
+        ctx.llvm.insertStore(int.unsafe[].constant(0), to: offsets, at: p)
+      }
+
+      // Otherwise, compute the layout at run-time.
+      else {
+        // Create a buffer with the witnesses of all stored members.
+        let membersType = ctx.llvm.arrayType(rs.count, ptr)
+        let members = ctx.llvm.insertAlloca(membersType, atEntryOf: constructor)
+        for (i, m) in rs.enumerated() {
+          let argument = insertTypeWitness(
+            m, reusing: &witnesses, at: &p, in: constructor, in: &ctx)
+          let parameter = ctx.llvm.insertGetElementPointerInBounds(
+            of: members, typed: membersType, indices: [0, i], indexType: i32, at: p)
+          ctx.llvm.insertStore(argument, to: parameter, at: p)
+        }
+
+        let length = int.unsafe[].constant(rs.count)
+        let sizeAndAlignment = insertCallStandardLibraryFunction(
+          .initializeRecordOffsets, with: [offsets.v, members.v, length.v], at: p, in: &ctx)
+        ctx.llvm.insertStore(sizeAndAlignment, to: receiver, at: p)
+      }
     } else {
       unimplemented("type witness constructor for \(show(t))")
     }
