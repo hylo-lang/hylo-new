@@ -148,15 +148,24 @@ public fun __initialize_record_offsets(
     &i += 1
   }
 
-  // Explicit deinitialization extends the lifetime of `layout`.
-  _ = layout
+  // Use of `layout` extends its lifetime.
+  return (size << 16) | __alignment(members, layout, count: n)
+}
 
-  // Return size and alignment.
+/// Returns the alignment of a record having the `n` fields described in `members` and laid out
+/// according to `layout`.
+///
+/// `layout` is a table mapping the index of a member to its position in the record.
+@exposed @inline(always)
+fun __alignment(
+  members: Pointer<Pointer<TypeWitnessHeader>>, layout: Pointer<Int>, count n: Int
+) -> Int {
   if n == 0 {
     return 1
   } else {
+    type W = Pointer<TypeWitnessHeader>
     let a = layout.value as* let Int
     let x = __advanced<W>(members.value, by: a) as* let W
-    return (size << 16) | x.alignment()
+    return x.alignment()
   }
 }
