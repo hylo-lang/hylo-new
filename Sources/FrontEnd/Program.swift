@@ -163,7 +163,7 @@ public struct Program: Sendable {
         typer.program[m].ir[work[i].id].take(definition: work[i].function)
       }
 
-      // Don't go any further if an error occured.
+      // Don't go any further if an error occurred.
       if typer.program[m].containsError { return }
 
       // New functions may have been introduced during the previous passes. Those that have been

@@ -986,7 +986,7 @@ extension Program {
       ctx.value[.register(i.erased)] = a.v
     }
 
-    // Otherwise we can compte the offset at compile-time.
+    // Otherwise we can compute the offset at compile-time.
     else {
       let a = insertGetFieldAddress(at: index, in: whole, instanceOf: wholeTypeInHylo, in: &ctx)
       ctx.value[.register(i.erased)] = a
@@ -1284,13 +1284,13 @@ extension Program {
     return symbol
   }
 
-  /// Returns a function implementing a type witness construtor for applications of `t`.
+  /// Returns a function implementing a type witness constructor for applications of `t`.
   private mutating func demandTypeWitnessConstructor(
     _ t: UniversalType.ID, in ctx: inout ModuleGenerationContext
   ) -> SwiftyLLVM.Function.UnsafeReference {
     let name = mangled(IRFunction.Name.typeWitnessConstructor(t))
 
-    // Did we already computed the type result?
+    // Did we already compute the type result?
     if let existing = ctx.llvm.function(named: name) {
       return existing
     }
@@ -1630,7 +1630,7 @@ extension Program {
   }
 
   /// Generates the LLVM IR computing the base address of the buffer containing the offsets of the
-  /// record type witnessed by `typeWItness`.
+  /// record type witnessed by `typeWitness`.
   private mutating func insertGetRecordOffsets(
     _ typeWitness: LLVMValue, at p: borrowing InsertionPoint, in ctx: inout ModuleGenerationContext
   ) -> LLVMValue {
