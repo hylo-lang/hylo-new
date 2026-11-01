@@ -76,8 +76,8 @@ internal struct ModuleGenerationContext: ~Copyable {
   ///
   /// A type witness constructor is a function returning type witnesses describing instantiations
   /// of a generic type from other type witnesses representing arguments of that type. For example,
-  /// the type witness constructor of `<T> {T, T}` is a function taking a single type witness and
-  /// returning the witness of a pair composed.
+  /// the type witness constructor of `<T> {T, T}` is a function returning witnesses of homogeneous
+  /// pairs given witnesses of their members.
   ///
   /// All constructors have the signature `(ptr, ptr) -> void`, where the first parameter takes a
   /// pointer to a type witness to initialize and the second pointer refers to an array containing
