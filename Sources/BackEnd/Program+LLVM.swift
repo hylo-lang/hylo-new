@@ -1666,8 +1666,7 @@ extension Program {
 
     // Initialize the constructor.
     var v = ctx.llvm.poisonValue(of: closure).v
-    let u = UniversalType.ID(
-      uncheckedFrom: types.introduce(parameters: ps, enumerated: true, into: t))
+    let u = types.constructor(binding: ps, in: t)
     let c = demandTypeWitnessConstructor(u, in: &ctx)
     v = ctx.llvm.insertInsertValue(c, at: 0, into: v, at: p).v
 

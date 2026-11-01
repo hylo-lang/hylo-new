@@ -3298,8 +3298,7 @@ internal struct IREmitter {
 
     // Otherwise, we have to construct a new type witness.
     else {
-      let u = UniversalType.ID(
-        uncheckedFrom: program.types.introduce(parameters: ps, enumerated: true, into: t))
+      let u = program.types.constructor(binding: ps, in: t)
       let v = ps.map({ (p) in _emitAccessTypeWitness(p.erased, reusing: &witnesses) })
       newWitness = _type_witness(u, v)
     }
