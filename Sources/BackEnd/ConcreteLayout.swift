@@ -24,7 +24,7 @@ internal struct ConcreteLayout {
 
     /// The size represented by `self` iff it is fixed.
     internal var fixed: Int? {
-      raw != -1 ? raw : nil
+      isDynamic ? nil : raw
     }
 
     /// An instance representing a size determined at runtime.
