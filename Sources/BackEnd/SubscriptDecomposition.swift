@@ -599,7 +599,7 @@ extension IRFunction {
   /// Returns the relevance of `i`, which is an instruction in the prologue of a slide or plateau.
   fileprivate func relevanceInSlideOrPlateau(_ i: AnyInstructionIdentity) -> InstructionRelevance {
     switch tag(of: i) {
-    case IRAlloca.self, IRProject.self, IRWitnessTable.self:
+    case IRAlloca.self, IRProject.self, IRTypeWitness.self, IRWitnessTable.self:
       return .captured
 
     case
