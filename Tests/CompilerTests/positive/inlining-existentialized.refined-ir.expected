@@ -1,0 +1,28 @@
+fun f(_:)(let %p0: S, set %p1: Int) {
+%b0:
+  %r11 = global_access #witness(S)
+  %r0 = project S.$<ConformanceDeclaration at inlining-existentialized:5.13>[]
+  %r12 = access [let] %r11
+  %r2 = access [let] %r0
+  %r3 = access [let] %p0
+  %r4 = access [set] %p1
+  %r13 = place_cast %r2 as let P<T>
+  %r14 = place_cast %r3 as let T
+  %r15 = access [set] %r4
+  %r16 = implementation "f" in %r13 as [Void](let P<Self>, self: let Self) let -> Int
+  %r17 = access [let] %r13
+  %r18 = access [let] %r14
+  %r19 = access [set] %r15
+  %r20 = apply %r16(%r17, %r18) => %r19
+  %r21 = end %r19
+  %r22 = end %r18
+  %r23 = end %r17
+  %r24 = br %b1
+%b1:
+  %r1 = end %r12
+  %r10 = end %r4
+  %r9 = end %r3
+  %r8 = end %r2
+  %r7 = end %r0
+  %r6 = return
+}
