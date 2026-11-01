@@ -1,0 +1,26 @@
+extension <T> Metatype<T> {
+
+  /// Returns the size of an instance of `T`, measured in bytes.
+  @inline(always)
+  public static fun size() -> Int {
+    Pointer<TypeWitnessHeader>(value: Builtin.address(of: T)).size()
+  }
+
+  /// Returns the preferred alignment requirement of `T`, measured in bytes.
+  ///
+  /// The alignment requirement of a type `T` is a constraint on the addresses to/from which an
+  /// instance of `T` can be written/read.
+  @inline(always)
+  public static fun alignment() -> Int {
+    Pointer<TypeWitnessHeader>(value: Builtin.address(of: T)).alignment()
+  }
+
+  /// Returns the distance between the start of two instances of `T` laid out contiguously in memory
+  /// (e.g., in an array), measured in bytes.
+  @inline(always)
+  public static fun stride() -> Int {
+    let w = Pointer<TypeWitnessHeader>(value: Builtin.address(of: T))
+    return w.size().rounded_up(to_nearest_multiple_of: w.alignment())
+  }
+
+}
