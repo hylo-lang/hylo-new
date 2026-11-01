@@ -1251,7 +1251,7 @@ extension Program {
     let m = metadata(of: t, in: &ctx)
     if !m.layout.size.isDynamic, let s = StructType.UnsafeReference(m.llvm) {
       for i in m.layout.propertyToField {
-        offsets.append(i > 0 ? ctx.llvm.layout.offset(of: i, in: s) : 0 )
+        offsets.append(i > 0 ? ctx.llvm.layout.offset(of: i, in: s) : 0)
       }
     } else {
       assert(m.layout.propertyToField.isEmpty)
@@ -2259,8 +2259,8 @@ extension Program {
     let n = fields(of: t, visibleFrom: ctx.hylo)?.count ?? 0
     let offsetsSize = ctx.llvm.layout.storageSize(of: ctx.llvm.iptr) * n
     let witnessType = ctx.llvm.arrayType(
-        ctx.llvm.layout.storageSize(of: ctx.typeWitnessHeader) + offsetsSize,
-        ctx.llvm.i8)
+      ctx.llvm.layout.storageSize(of: ctx.typeWitnessHeader) + offsetsSize,
+      ctx.llvm.i8)
     return witnessType.t
   }
 
