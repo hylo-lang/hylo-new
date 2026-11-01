@@ -1004,7 +1004,7 @@ extension Program {
 
   /// Returns the result of `demandFunction(_:in:)` with the identity of `f`, which is declared in
   /// the module being compiled.
-  internal mutating func demandFunction(
+  private mutating func demandFunction(
     _ f: IRFunction.ID, in ctx: inout ModuleGenerationContext
   ) -> FunctionMetadata {
     let g = self[ctx.hylo].ir[f]
@@ -1590,19 +1590,6 @@ extension Program {
     in ctx: inout ModuleGenerationContext
   ) -> LLVMValue {
     let function = demandStandardLibraryFunction(callee, in: &ctx)
-    return insertCall(function, with: xs, at: p, in: f, in: &ctx)
-  }
-
-  /// Generates LLVM IR for applying `function` to the `xs`, allocating storage at the entry of `f`
-  /// if the result is returned by reference.
-  ///
-  /// - Requires: No argument is erased or passed by reference.
-  internal mutating func insertCall(
-    _ function: FunctionMetadata, with xs: consuming [LLVMValue],
-    at p: borrowing InsertionPoint,
-    in f: Function.UnsafeReference,
-    in ctx: inout ModuleGenerationContext
-  ) -> LLVMValue {
     precondition(function.prototype.mapping.inputs.count == xs.count)
 
     let s = function.prototype.signature
@@ -1619,12 +1606,10 @@ extension Program {
 
     case .byReference:
       // Allocate memory for the result, which is returned by reference.
-      let t = function.prototype.mapping.output!.type
-      let r = ctx.llvm.insertAlloca(t.llvm, atEntryOf: f)
-      ctx.llvm.setAlignment(t.layout.alignment.bytes, for: r)
-      xs.append(r.v)
+      let t = s.unsafe[].parameters.last!
+      xs.append(ctx.llvm.insertAlloca(t, atEntryOf: f).v)
       _ = ctx.llvm.insertCall(function.value, on: xs, at: p).v
-      return ctx.llvm.insertLoad(t.llvm, from: r, at: p).v
+      return ctx.llvm.insertLoad(t, from: xs.last!, at: p).v
     }
   }
 
