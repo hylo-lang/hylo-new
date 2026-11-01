@@ -150,4 +150,9 @@ internal struct ModuleGenerationContext: ~Copyable {
     }
   }
 
+  /// Returns the minimal alignment of a type witness.
+  internal func typeWitnessAlignment() -> Alignment {
+    .init(bytes: llvm.layout.preferredAlignment(of: typeWitnessHeader))
+  }
+
 }

@@ -815,18 +815,16 @@ extension Program {
 
     let int = ctx.module.llvm.iptr
 
-    // Otherwise, we should compute the type of the witness.
+    // Otherwise, we have to construct a type witness by calling a constructor.
     let u = types.cast(s.constructor, to: UniversalType.self)!
     let witnessType = rawType(witnessOf: types[u].head, in: &ctx.module)
-
-    // Allocate and initialize the witness by calling its constructor. Arguments are converted to
-    // integers to satisfy the constructor's API.
     let constructor = demandTypeWitnessConstructor(u, in: &ctx.module)
     let arguments = s.operands.map { (x) in
       ctx.module.llvm.insertPtrToInt(ctx.value[x]!, to: int, at: ctx.insertionPoint!).v
     }
 
     let witness = ctx.module.llvm.insertAlloca(witnessType, atEntryOf: ctx.result.value)
+    ctx.module.llvm.setAlignment(ctx.module.typeWitnessAlignment().bytes, for: witness)
     let xs = insertTemporaryArray(of: int, initializedWith: arguments, in: &ctx)
     _ = ctx.module.llvm.insertCall(constructor, on: [witness.v, xs], at: ctx.insertionPoint!)
 
@@ -1263,19 +1261,18 @@ extension Program {
 
     // Declare the symbol.
     let int = ctx.llvm.iptr
-    let witnessFields = Array(
-      ctx.typeWitnessHeader.t, prependedTo: repeatElement(int.t, count: offsets.count))
-    let witnessType = ctx.llvm.structType(witnessFields)
+    let witnessType = ctx.llvm.structType(
+      Array(ctx.typeWitnessHeader.t, prependedTo: repeatElement(int.t, count: offsets.count)))
     let symbol = ctx.llvm.declareGlobalVariable(name, witnessType)
 
-    ctx.llvm.setAlignment(ctx.llvm.layout.preferredAlignment(of: witnessType), for: symbol)
+    ctx.llvm.setAlignment(ctx.typeWitnessAlignment().bytes, for: symbol)
     ctx.llvm.setLinkage(.private, for: symbol)
 
     // Build the value of the witness.
     let sizeAndAlignment = ctx.llvm.i64.unsafe[].constant(
-      UInt64((m.layout.size.fixed ?? 0) << 16) | UInt64(m.layout.alignment.bytes)).v
+      UInt64((m.layout.size.fixed ?? 0) << 16) | UInt64(m.layout.alignment.bytes))
     let head = ctx.llvm.structConstant(
-      of: ctx.typeWitnessHeader, aggregating: [sizeAndAlignment])
+      of: ctx.typeWitnessHeader, aggregating: [sizeAndAlignment.v])
     let tail = offsets.map({ (o) in int.unsafe[].constant(o).v })
 
     // Define the symbol.
@@ -1718,7 +1715,7 @@ extension Program {
       indices: [ctx.llvm.layout.storageSize(of: fun)], indexType: i32, at: p)
     let witnessSize = ctx.llvm.insertLoad(int, from: pointerToWitnessSize, at: p)
     let w1 = ctx.llvm.insertAlloca(arrayOf: witnessSize, ctx.llvm.i8, at: p)
-    ctx.llvm.setAlignment(ctx.llvm.layout.preferredAlignment(of: ctx.typeWitnessHeader), for: w1)
+    ctx.llvm.setAlignment(ctx.typeWitnessAlignment().bytes, for: w1)
 
     // Apply the constructor to initialize the witness.
     let arguments = ctx.llvm.insertGetElementPointerInBounds(
