@@ -1364,7 +1364,8 @@ extension Program {
 
         let length = int.unsafe[].constant(rs.count)
         let sizeAndAlignment = insertCallStandardLibraryFunction(
-          .initializeRecordOffsets, with: [offsets.v, members.v, length.v], at: p, in: &ctx)
+          .initializeRecordOffsets, with: [offsets.v, members.v, length.v],
+          at: p, in: constructor, in: &ctx)
         ctx.llvm.insertStore(sizeAndAlignment, to: receiver, at: p)
       }
     } else {
@@ -1524,15 +1525,14 @@ extension Program {
         callee.v, typed: shape.signature.t, on: xs, at: ctx.insertionPoint!)
 
     case .byValue:
+      let o = codegen(result, in: &ctx)
       let x = ctx.module.llvm.insertCall(
         callee.v, typed: shape.signature.t, on: xs, at: ctx.insertionPoint!)
-      let o = codegen(result, in: &ctx)
       ctx.module.llvm.insertStore(x, to: o, at: ctx.insertionPoint!)
       // TODO: Alignment
 
     case .byReference:
-      let o = codegen(result, in: &ctx)
-      xs.append(o)
+      xs.append(codegen(result, in: &ctx))
       _ = ctx.module.llvm.insertCall(
         callee.v, typed: shape.signature.t, on: xs, at: ctx.insertionPoint!)
     }
@@ -1582,23 +1582,35 @@ extension Program {
 
   /// Generates LLVM IR for applying the standard library function `callee` to the `xs`.
   ///
-  /// - Requires: No argument or result is erased or passed by reference.
+  /// - Requires: No argument is erased or passed by reference.
   private mutating func insertCallStandardLibraryFunction(
     _ callee: Program.StandardLibraryEntity, with xs: consuming [LLVMValue],
-    at p: borrowing InsertionPoint, in ctx: inout ModuleGenerationContext
+    at p: borrowing InsertionPoint,
+    in f: Function.UnsafeReference,
+    in ctx: inout ModuleGenerationContext
   ) -> LLVMValue {
-    let f = demandStandardLibraryFunction(callee, in: &ctx)
-    precondition(f.prototype.mapping.inputs.count == xs.count)
-    precondition(f.prototype.mapping.output?.convention == .byValue(-1))
+    let function = demandStandardLibraryFunction(callee, in: &ctx)
+    precondition(function.prototype.mapping.inputs.count == xs.count)
 
-    let s = f.prototype.signature
-    for (i, parameter) in f.prototype.mapping.inputs.enumerated() {
+    let s = function.prototype.signature
+    for (i, parameter) in function.prototype.mapping.inputs.enumerated() {
       precondition(parameter.convention == .byValue(i))
       let v = ctx.llvm.poisonValue(of: s.unsafe[].parameters[i])
       xs[i] = ctx.llvm.insertInsertValue(xs[i], at: 0, into: v, at: p).v
     }
 
-    return ctx.llvm.insertCall(f.value, on: xs, at: p).v
+    switch function.prototype.mapping.output!.convention {
+    case .erased, .byValue:
+      // Non-erased results define a register.
+      return ctx.llvm.insertCall(function.value, on: xs, at: p).v
+
+    case .byReference:
+      // Allocate memory for the result, which is returned by reference.
+      let t = s.unsafe[].parameters.last!
+      xs.append(ctx.llvm.insertAlloca(t, atEntryOf: f).v)
+      _ = ctx.llvm.insertCall(function.value, on: xs, at: p).v
+      return ctx.llvm.insertLoad(t, from: xs.last!, at: p).v
+    }
   }
 
   /// Generates the LLVM IR code for returning from the function being compiled.
