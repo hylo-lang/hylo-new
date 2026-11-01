@@ -66,7 +66,7 @@ internal struct ModuleGenerationContext: ~Copyable {
   /// `T`, potentially followed by a tail buffer describing the byte offsets of each stored member.
   ///
   /// The size of an instance is encoded in the 48 most significant bits of the header whereas the
-  /// alignment is encoded in the 16 least significant bits.
+  /// alignment is encoded in the 16 least significant bits. Both fields are unsigned.
   ///
   /// - Note: Changes to this structure requires the following sources to be modified accordingly:
   ///   - StandardLibrary/Sources/Core/Runtime/OffsetOfMember.hylo

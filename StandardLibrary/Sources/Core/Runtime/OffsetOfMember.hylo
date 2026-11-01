@@ -45,7 +45,7 @@ extension Pointer<TypeWitnessHeader> {
   /// Returns the size of an instance.
   @exposed @inline(always)
   fun size() -> Size {
-    let x = UInt64(value: Builtin.ashr_i64(
+    let x = UInt64(value: Builtin.lshr_i64(
       (self.value as* let TypeWitnessHeader).size_and_alignment.value,
       (16 as UInt64).value))
     return .new(value: Builtin.trunc_or_zext_i64_word(x.value))
