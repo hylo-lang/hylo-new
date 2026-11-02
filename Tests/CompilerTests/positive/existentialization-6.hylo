@@ -47,8 +47,8 @@ fun pair_alignment<T>() -> Int {
 
 public fun main() {
   precondition(one_size<Huge>() == 1 << 16)
-  precondition(one_alignment<Huge>() <= 8) // alignment may be smaller depending on the target.
+  precondition(one_alignment<Huge>() == Metatype<Int64>.alignment())
 
   precondition(pair_size<UInt8>() == (1 << 16) + 1)
-  precondition(pair_alignment<UInt8>() <= 8) // alignment may be smaller depending on the target.
+  precondition(pair_alignment<UInt8>() == Metatype<Int64>.alignment())
 }
