@@ -1,0 +1,33 @@
+// This test exercises the construction of type witnesses at run-time for records at least 64 KiB.
+//
+// The size and alignment of a type are packed into a 64-bit integer whose 48 most significant bits
+// encode the size, the least significant 16 bits the alignment, so a 17-bit size is the first that
+// wouldn't work on a 32-bit target if we incorrectly did some operation on a word-sized integer
+// rather than on UInt64.
+
+struct Pair<T, U> {
+  var a: T
+  var b: U
+}
+
+/// A type whose instances occupy 64 KiB.
+struct Huge {
+  var payload: Int64[32][16][16]
+}
+
+/// Returns the size of `Pair<T, Huge>`, using a witness constructed at run-time.
+@inline(never)
+fun pair_size<T>() -> Int {
+  Metatype<Pair<T, Huge>>.size()
+}
+
+/// Returns the alignment of `Pair<T, Huge>`, using a witness constructed at run-time.
+@inline(never)
+fun pair_alignment<T>() -> Int {
+  Metatype<Pair<T, Huge>>.alignment()
+}
+
+public fun main() {
+  precondition(pair_size<UInt8>() == (1 << 16) + 1)
+  precondition(pair_alignment<UInt8>() <= 8) // alignment may be smaller depending on the target.
+}
