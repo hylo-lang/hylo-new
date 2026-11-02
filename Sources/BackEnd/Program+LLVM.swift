@@ -1582,7 +1582,7 @@ extension Program {
 
   /// Generates LLVM IR for applying the standard library function `callee` to the `xs`.
   ///
-  /// - Requires: No argument is erased or passed by reference.
+  /// - Requires: No argument is erased or passed by reference, except possibly the output.
   private mutating func insertCallStandardLibraryFunction(
     _ callee: Program.StandardLibraryEntity, with xs: consuming [LLVMValue],
     at p: borrowing InsertionPoint,
@@ -1606,10 +1606,12 @@ extension Program {
 
     case .byReference:
       // Allocate memory for the result, which is returned by reference.
-      let t = s.unsafe[].parameters.last!
-      xs.append(ctx.llvm.insertAlloca(t, atEntryOf: f).v)
+      let t = function.prototype.mapping.output!.type
+      let r = ctx.llvm.insertAlloca(t.llvm, atEntryOf: f)
+      ctx.llvm.setAlignment(t.layout.alignment.bytes, for: r)
+      xs.append(r.v)
       _ = ctx.llvm.insertCall(function.value, on: xs, at: p).v
-      return ctx.llvm.insertLoad(t, from: xs.last!, at: p).v
+      return ctx.llvm.insertLoad(t.llvm, from: r, at: p).v
     }
   }
 
