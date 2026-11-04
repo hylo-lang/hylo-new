@@ -2,7 +2,7 @@ import FrontEnd
 import Utilities
 
 /// The identity of a concrete type.
-public struct MonomorphicTypeIdentity: Regular {
+public struct MonomorphicTypeIdentity: Hashable, Sendable {
 
   /// The underlying type identity having no generic parameters or
   /// unification variables.

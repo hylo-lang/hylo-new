@@ -548,7 +548,7 @@ extension IRAccess {
 extension Interpreter {
 
   /// An error in `Interpreter`.
-  public protocol Error: Swift.Error, Regular {}
+  public protocol Error: Swift.Error, Hashable, Sendable {}
 
   /// A trap occurred during program execution.
   public struct Trap: Error {

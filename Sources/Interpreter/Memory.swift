@@ -23,7 +23,7 @@ struct Memory {
   }
 
   /// An incorrect use of memory.
-  public enum Error: Swift.Error, Regular {
+  public enum Error: Swift.Error, Hashable, Sendable {
     case alignment(Address, for: TypeLayout)
     case bounds(Address, for: TypeLayout, allocationSize: Int)
     case deallocationNotAtStartOfAllocation(Address)
@@ -57,7 +57,7 @@ struct Memory {
 
     /// A region within an `Allocation`, identified by a starting offset
     /// and the type layout associated with that location.
-    public struct TypedRegion: Regular {
+    public struct TypedRegion: Hashable, Sendable {
 
       /// Where the region begins relative to an `Allocation`'s `baseOffset`.
       let offset: Offset
@@ -152,7 +152,7 @@ struct Memory {
   }
 
   /// A memory location.
-  public struct Address: Regular, CustomStringConvertible {
+  public struct Address: Hashable, Sendable, CustomStringConvertible {
 
     /// The containing allocation.
     public let allocation: Allocation.ID
@@ -179,7 +179,7 @@ struct Memory {
   }
 
   /// A typed location in memory.
-  public struct TypedAddress: Regular, CustomStringConvertible {
+  public struct TypedAddress: Hashable, Sendable, CustomStringConvertible {
 
     /// The containing allocation.
     public let allocation: Allocation.ID
