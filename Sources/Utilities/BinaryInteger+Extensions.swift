@@ -13,4 +13,12 @@ extension BinaryInteger {
   /// `true` iff there is an integer `n` such that `2 ** n == self`.
   public var isPowerOfTwo: Bool { (self > 0) && (self & (self - 1) == 0) }
 
+  /// Returns the digits of `self` in base `radix`, after its sign and as many zeros as needed to
+  /// be at least `width` characters long.
+  public func digits(radix: Int = 10, width: Int) -> String {
+    let s = self < 0 ? "-" : ""
+    let d = String(magnitude, radix: radix)
+    return s + String(repeating: "0", count: max(0, width - s.count - d.count)) + d
+  }
+
 }

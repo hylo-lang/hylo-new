@@ -21,6 +21,12 @@ final class SubstringTests: XCTestCase {
     XCTAssertEqual(t, "bc")
   }
 
+  func testNormalizedLineEndings() {
+    XCTAssertEqual("a\r\nb\r\n".normalizedLineEndings(), "a\nb\n")
+    XCTAssertEqual("a\nb\rc".normalizedLineEndings(), "a\nb\rc")
+    XCTAssertEqual("ab\r\ncd".dropFirst().normalizedLineEndings(), "b\ncd")
+  }
+
   func testSans() {
     let s = "vadalma"
     let t = s.sans("a")
