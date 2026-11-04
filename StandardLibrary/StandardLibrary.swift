@@ -27,28 +27,26 @@ package let cShimSource = "shims.c"
 
 #if os(Linux) || os(Windows)
 
-  /// The directory holding this target's resources, which SwiftPM, like the distributable bundles,
-  /// puts next to the executables.
-  private let resourceDirectory = executableURL().deletingLastPathComponent().appending(
-    component: "Hylo_StandardLibrary.resources", directoryHint: .isDirectory)
+  /// The directory holding this target's resources beside the executable.
+  private let resourceDirectory: URL = {
+    let d = executableURL().deletingLastPathComponent()
+    // For SPM's native build system:
+    let r = d.appending(component: "Hylo_StandardLibrary.resources", directoryHint: .isDirectory)
+    // For Swift Build:
+    return FileManager.default.fileExists(atPath: r.path)
+      ? r : d.appending(component: "Hylo_StandardLibrary.bundle", directoryHint: .isDirectory)
+  }()
 
-  /// Returns the location of the running executable (on Linux, with symbolic links resolved).
+  /// Returns the location of the running executable.
   private func executableURL() -> URL {
     #if os(Linux)
-      let p = try! FileManager.default.destinationOfSymbolicLink(atPath: "/proc/self/exe")
-      return URL(fileURLWithPath: p, isDirectory: false)
+      return URL(fileURLWithPath: "/proc/self/exe").resolvingSymlinksInPath()
     #else
-      var buffer = [WCHAR](repeating: 0, count: Int(MAX_PATH))
-      while true {
-        let n = Int(GetModuleFileNameW(nil, &buffer, DWORD(buffer.count)))
-        precondition(n != 0, "cannot locate the running executable")
-        if n < buffer.count {
-          return URL(
-            fileURLWithPath: String(decoding: buffer[..<n], as: UTF16.self), isDirectory: false)
-        }
-        // The path was truncated.
-        buffer = [WCHAR](repeating: 0, count: buffer.count * 2)
-      }
+      let maxPathLength = 32_768
+      var p = [WCHAR](repeating: 0, count: maxPathLength)
+      let n = Int(GetModuleFileNameW(nil, &p, DWORD(maxPathLength)))
+      precondition(n > 0, "cannot locate the running executable")
+      return URL(fileURLWithPath: String(decoding: p[..<n], as: UTF16.self), isDirectory: false)
     #endif
   }
 

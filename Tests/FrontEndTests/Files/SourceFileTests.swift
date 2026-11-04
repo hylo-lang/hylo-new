@@ -23,6 +23,26 @@ final class SourceFileTests: XCTestCase {
     }
   }
 
+  func testForEachURL() throws {
+    try FileManager.default.withUniqueTemporaryDirectory { (d) in
+      for p in ["a.hylo", "b.txt", ".c.hylo", "s/d.hylo", "s/.e.hylo", ".h/f.hylo", "s/.h/g.hylo"] {
+        let u = d.appendingPathComponent(p)
+        try FileManager.default.createDirectory(
+          at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "".write(to: u, atomically: true, encoding: .utf8)
+      }
+
+      var found: [String] = []
+      try SourceFile.forEachURL(in: d) { (u) in
+        XCTAssert(FileManager.default.fileExists(atPath: u.path))
+        found.append(
+          u.deletingLastPathComponent().lastPathComponent + "/" + u.lastPathComponent)
+      }
+      XCTAssertEqual(found.count, 2)
+      XCTAssertEqual(Set(found), [d.lastPathComponent + "/a.hylo", "s/d.hylo"])
+    }
+  }
+
   func testSpan() {
     let f: SourceFile = "Hello."
     XCTAssertEqual(f.span.region, f.text.startIndex ..< f.text.endIndex)
