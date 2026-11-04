@@ -3,7 +3,7 @@ import FrontEnd
 import Utilities
 
 /// An access to a `Region` occurring during execution.
-public struct Access<Region: Regular>: Regular, Equatable {
+public struct Access<Region: Hashable & Sendable>: Hashable, Sendable, Equatable {
 
   /// A unique `Access` identifier.
   public typealias ID = UUID

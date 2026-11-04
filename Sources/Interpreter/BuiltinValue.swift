@@ -4,7 +4,7 @@ import FrontEnd
 import Utilities
 
 /// The value of a `MachineType` instance.
-enum BuiltinValue: Regular {
+enum BuiltinValue: Hashable, Sendable {
 
   /// 1-bit builtin integer type.
   case i1(Bool)

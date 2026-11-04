@@ -2,10 +2,10 @@ import FrontEnd
 import Utilities
 
 /// The layout of a type in memory, including the positions of its parts.
-public struct TypeLayout: Regular {
+public struct TypeLayout: Hashable, Sendable {
 
   /// Memory layout of a type, without any detail about parts.
-  public struct StorageRequirements: Regular {
+  public struct StorageRequirements: Hashable, Sendable {
     /// The minimum alignment of an instance.
     let alignment: Alignment
 
@@ -18,7 +18,7 @@ public struct TypeLayout: Regular {
   }
 
   /// A (potential, in the case of enum types) named or unnambed member of a type.
-  public struct Member: Regular {
+  public struct Member: Hashable, Sendable {
     /// The name if any (i.e. tuple label or stored property name).
     public let name: String?
 
@@ -28,7 +28,7 @@ public struct TypeLayout: Regular {
 
   /// A (potential, in the case of enum types) part of `type` and
   /// where it is stored in a `type` instance.
-  public struct Part: Regular {
+  public struct Part: Hashable, Sendable {
     /// The name if any (i.e. tuple label or stored property name).
     public let name: String?
 
