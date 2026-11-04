@@ -53,18 +53,18 @@ extension URL {
       }
     #else
       let attributes = try FileManager.default.attributesOfItem(atPath: self.path)
-      guard var permissions = (attributes[.posixPermissions] as? NSNumber)?.uint16Value else {
+      guard var permissions = attributes[.posixPermissions] as? UInt else {
         throw FileError(description: "Failed to read file permissions of '\(self)'.")
       }
 
-      let ownerWrite: UInt16 = 0o200
+      let ownerWrite: UInt = 0o200
       if writable {
         permissions |= ownerWrite
       } else {
         permissions &= ~ownerWrite
       }
 
-      try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: permissions)],
+      try FileManager.default.setAttributes([.posixPermissions: permissions],
         ofItemAtPath: self.path)
     #endif
   }

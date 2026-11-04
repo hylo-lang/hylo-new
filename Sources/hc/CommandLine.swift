@@ -458,7 +458,7 @@ private typealias Module = FrontEnd.Module
   private func emitInterfaceHashIfNeeded(of module: Module.ID, from driver: Driver) throws {
     guard let u = writeModuleInterfaceHashAt else { return }
     let h = try driver.moduleInterfaceHash(of: module)
-    let contents = String(format: "%016llx\n", h)
+    let contents = h.digits(radix: 16, width: 16) + "\n"
     let existing = try? String(contentsOf: u, encoding: .utf8)
     if existing != contents {
       try contents.write(to: u, atomically: true, encoding: .utf8)
@@ -721,7 +721,20 @@ extension ContinuousClock.Instant.Duration {
     guard abs(ns) >= 1_000 else { return "\(ns)ns" }
     guard abs(μs) >= 1_000 else { return "\(μs)μs" }
     guard abs(ms) >= 1_000 else { return "\(ms)ms" }
-    return formatted()
+
+    // Hours, minutes and seconds.
+    let s = Int64((Double(ns) / 1_000_000_000).rounded(.toNearestOrEven))
+    return "\(s / 3_600):\((s / 60 % 60).digits(width: 2)):\((s % 60).digits(width: 2))"
+  }
+
+}
+
+extension BinaryInteger {
+
+  /// The digits of `self` in base `radix`, preceded by as many zeros as needed to make `width`.
+  fileprivate func digits(radix: Int = 10, width: Int) -> String {
+    let d = String(self, radix: radix)
+    return String(repeating: "0", count: max(0, width - d.count)) + d
   }
 
 }

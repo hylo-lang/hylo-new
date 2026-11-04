@@ -31,7 +31,7 @@ extension StringProtocol {
 
   /// Returns `self` with unix-style line endings.
   public func normalizedLineEndings() -> String {
-    replacingOccurrences(of: "\r\n", with: "\n")  // Windows
+    String(self).replacing("\r\n", with: "\n")  // Windows
   }
 
 }

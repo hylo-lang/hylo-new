@@ -34,10 +34,12 @@ public enum Host: Sendable {
     /// On Windows, the comparison is case-insensitive and takes linear time.
     public subscript(_ key: String) -> String? {
       #if os(Windows)
-        ProcessInfo.processInfo.environment
-          .first(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame })?.value
+        // Windows compares the names of environment variables by their upper case forms.
+        let k = key.uppercased()
+        return ProcessInfo.processInfo.environment
+          .first(where: { $0.key.uppercased() == k })?.value
       #else
-        ProcessInfo.processInfo.environment[key]
+        return ProcessInfo.processInfo.environment[key]
       #endif
     }
 

@@ -194,19 +194,22 @@ public struct SourceFile: Hashable, Sendable {
     return e ?? endIndex
   }
 
-  /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`.
+  /// Calls `action` on each source file URL in `directory` having the extension `pathExtension`,
+  /// skipping hidden files and the contents of hidden directories.
   public static func forEachURL(
     in directory: URL, withPathExtension pathExtension: String = "hylo",
     _ action: (URL) throws -> Void
-  ) rethrows {
-    let items = FileManager.default.enumerator(
-      at: directory,
-      includingPropertiesForKeys: [.isRegularFileKey],
-      options: [.skipsHiddenFiles, .skipsPackageDescendants])!
-
-    for case let f as URL in items where f.pathExtension == pathExtension {
-      try action(f)
+  ) throws {
+    for p in try FileManager.default.subpathsOfDirectory(atPath: directory.path)
+    where p.hasSuffix(".\(pathExtension)") && !isHidden(subpath: p) {
+      try action(directory.appendingPathComponent(p))
     }
+  }
+
+  /// Returns `true` iff a component of `p`, a relative path, names a hidden file or directory,
+  /// such as an editor's lock file (`.#main.hylo`) or a resource fork (`._main.hylo`).
+  private static func isHidden(subpath p: String) -> Bool {
+    p.split(whereSeparator: { ($0 == "/") || ($0 == "\\") }).contains(where: { $0.first == "." })
   }
 
   /// Calls `action` on each source file in `directory` having the extension `pathExtension`.
