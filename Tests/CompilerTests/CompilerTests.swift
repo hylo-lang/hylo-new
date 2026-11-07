@@ -467,12 +467,6 @@ struct CompilerTests {
     }
     if stage == .llvm { return }
 
-    // When the stdlib can be compiled, lower it to LLVM so generateExecutable can link it.
-    // let stdlibID = driver.program.demandModule(Module.standardLibraryName)
-    // if await driver.lower(stdlibID).containsError { return done() }
-    // if await driver.applyTransformationPasses(stdlibID).containsError { return done() }
-    // if (try driver.lowerToLLVM(stdlibID)).containsError { return done() }
-
     if stage == .execution {
       let outputDirectory = try FileManager.default.createUniqueTemporaryDirectory()
       let executable = outputDirectory.appendingPathComponent(driver.program[m].name)

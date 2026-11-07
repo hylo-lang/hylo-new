@@ -201,6 +201,8 @@ public struct Driver {
 
   /// Generates an executable from `module` and its dependencies.
   ///
+  /// The standard library is compiled to LLVM if it is used and hasn't been compiled yet.
+  ///
   /// - Requires: `module` has been lowered to LLVM.
   /// - Throws: if the parent folder of `output` doesn't exist.
   public mutating func generateExecutable(
@@ -208,17 +210,18 @@ public struct Driver {
     withCSources cSources: [URL] = [],
     writingTo output: URL
   ) async throws -> PhaseResult {
-    // FIXME: Enable this after we can lower the standard library
-    // modulesToLink.append(program.modules[.standardLibrary]!.identity)
-    let shimObject: URL? = if usesStandardLibrary {
-      try await StandardLibraryShimCache.shared.object(compiledWith: relocation, for: target)
-    } else {
-      nil
+    var modulesToLink = [module]
+    var shimObject: URL? = nil
+    if usesStandardLibrary {
+      let s = program.identity(module: Module.standardLibraryName)!
+      if llvmModules[s] == nil { _ = try compileToLLVM(s) }
+      modulesToLink.append(s)
+      shimObject = try await StandardLibraryShimCache.shared.object(
+        compiledWith: relocation, for: target)
     }
 
     let elapsed = try await ContinuousClock().measure {
-      let modulesToLink = [module]
-      // FIXME: link the dependencies of `module`.
+      // FIXME: link the other dependencies of `module`.
 
       try await FileManager.default.withUniqueTemporaryDirectory { (d) in
         let hyloObjects = try emitObjectFiles(for: modulesToLink, into: d)

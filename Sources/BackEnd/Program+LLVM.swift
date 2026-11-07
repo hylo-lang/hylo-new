@@ -1045,13 +1045,7 @@ extension Program {
 
     let standardLibrary = self.identity(module: Module.standardLibraryName)!
     let g = self[standardLibrary].ir.identity(function: demanded)!
-    let h = demandFunction(self[standardLibrary].ir[g], in: &ctx)
-
-    // TODO: Remove
-    // This is a temporary fix to ensure the function is compiled into the client module.
-    incorporate(contentsOf: self[standardLibrary].ir[g], into: h, in: &ctx)
-
-    return h
+    return demandFunction(self[standardLibrary].ir[g], in: &ctx)
   }
 
   /// Returns the prototype of a LLVM IR function corresponding to a Hylo IR function whose

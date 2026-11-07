@@ -1,0 +1,14 @@
+//! exit-status:1
+
+// `same` uses the standard library's witness of `Int is Equatable`, so the standard library
+// must be linked.
+
+fun same<T is Equatable>(x: T, y: T) -> Bool {
+  x == y
+}
+
+public fun main() -> Int32 {
+  let x: Int = 42
+  if same(x, x) { return 1 }
+  return 0
+}
