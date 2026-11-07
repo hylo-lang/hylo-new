@@ -1,7 +1,13 @@
 import Archivist
 import Utilities
 
-/// A type denoting the identity of a type tree.
+/// A value identifying a particular (abstract syntax) representation of
+/// some Hylo type.
+///
+/// Despite the name, it is important to remember that inequality of
+/// type identities does _not_ imply inequality of the represented
+/// semantic types.  (Of course equality of identities does imply
+/// imply semantic type equality).
 public protocol TypeIdentity: Comparable, Hashable, Showable, Archivable, Sendable {
 
   /// The type-erased value of this identity.
