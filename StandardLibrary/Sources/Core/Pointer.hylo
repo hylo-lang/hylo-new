@@ -1,4 +1,4 @@
-/// A typed memory address whose contents can be read.
+/// A typed memory address.
 public struct Pointer<Pointee> is Deinitializable {
 
   /// The underlying builtin value.
@@ -12,7 +12,8 @@ public struct Pointer<Pointee> is Deinitializable {
   /// - Requires: `self` points to a complete object of type `Pointee`.
   @inline(always)
   public subscript unsafe() auto -> Pointee {
-    /// - Requires: the pointee is not mutated during this projection's lifetime.
+    /// - Requires: while this projection is active, no `sink`, `set` or `inout` projection that
+    ///   includes the pointee is active.
     let { yield (self.value as* (let Pointee)) }
 
     /// - Requires: while this projection is active, no other projection that includes the pointee
@@ -22,7 +23,7 @@ public struct Pointer<Pointee> is Deinitializable {
 
   /// Creates an instance referring to the same address as `p`.
   ///
-  /// - Note: when accessing the pointee of the result, make sure its lifetime is upheld.
+  /// - Note: the result does not keep the object it points to alive.
   @inline(always)
   public init<Other>(type_punning p: Pointer<Other>) {
     &self.value = p.value
@@ -30,7 +31,7 @@ public struct Pointer<Pointee> is Deinitializable {
 
   /// Returns `self` offset by `n` elements, treating memory as an array of `Pointee`.
   ///
-  /// - Note: when accessing the pointee of the result, make sure its lifetime is upheld.
+  /// - Requires: the result points within, or just past the end of, the same allocation as `self`.
   @inline(always)
   public fun advanced(by n: Int) -> Self {
     let offset_in_bytes = Metatype<Pointee>.stride() * n
@@ -53,7 +54,7 @@ public struct Pointer<Pointee> is Deinitializable {
 
   /// Returns an equivalent instance.
   ///
-  /// - Note: when accessing the pointee of the result, make sure its lifetime is upheld.
+  /// - Note: the result does not keep the object it points to alive.
   @inline(always)
   public fun copy() -> Self {
     Pointer(value: self.value)
@@ -67,7 +68,7 @@ public struct Pointer<Pointee> is Deinitializable {
     Bool(value: Builtin.icmp_eq_ptr(self.value, other.value))
   }
 
-  /// Returns `true` iff `self is not equal to `other`.
+  /// Returns `true` iff `self` is not equal to `other`.
   @inline(always)
   public fun infix!= (other: Self) -> Bool {
     Bool(value: Builtin.icmp_ne_ptr(self.value, other.value))
@@ -85,7 +86,8 @@ extension <Pointee is Movable> Pointer<Pointee> {
 
   /// Returns the value pointed to by `self`, leaving the storage uninitialized.
   ///
-  /// - Requires: `self` points to a complete object of type `Pointee`.
+  /// - Requires: `self` points to a complete object of type `Pointee`, and no projection that
+  ///   includes that object is active.
   @inline(always)
   public fun unsafe_move_pointee() -> Pointee {
     self.value as* (sink Pointee)
@@ -93,8 +95,7 @@ extension <Pointee is Movable> Pointer<Pointee> {
 
   /// Initializes the storage pointed to by `self` to `value`.
   ///
-  /// - Requires: the `Metatype<Pointee>.size()` bytes starting at the address are uninitialized
-  ///   and suitably aligned for `Pointee`.
+  /// - Requires: `self` points to uninitialized storage suitably sized and aligned for `Pointee`.
   @inline(always)
   public fun unsafe_initialize_pointee(value: sink Pointee) {
     &(self.value as* (set Pointee)) = value
@@ -104,7 +105,10 @@ extension <Pointee is Movable> Pointer<Pointee> {
 
 extension <Pointee is Deinitializable> Pointer<Pointee> {
 
-  /// Deinitializes the value pointed to by `self`.
+  /// Deinitializes the value pointed to by `self`, leaving the storage uninitialized.
+  ///
+  /// - Requires: `self` points to a complete object of type `Pointee`, and no projection that
+  ///   includes that object is active.
   @inline(always)
   public fun unsafe_deinitialize_pointee() {
     (self.value as* (sink Pointee)).deinit()
