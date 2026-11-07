@@ -1,0 +1,11 @@
+// Synthesized implementations of `Copyable` and `Movable` must be defined for the program to link.
+
+struct S {
+  var x: Int
+  memberwise init
+}
+
+given S is Movable {}
+given S is Copyable {}
+
+public fun main() {}
