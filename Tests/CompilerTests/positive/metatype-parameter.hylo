@@ -1,0 +1,8 @@
+//! stage:llvm
+
+@inline(never)
+fun f(x: Metatype<Int>) {}
+
+public fun main() {
+  f(Int)
+}

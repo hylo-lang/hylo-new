@@ -1997,6 +1997,9 @@ extension Program {
       ctx.opaqueTypeMetadata
     case MachineType.self:
       metadata(of: types.castUnchecked(t, to: MachineType.self), in: &ctx)
+    case Metatype.self:
+      // Metatypes have no runtime information; type witnesses are passed separately.
+      metadata(of: .void, in: &ctx)
     case Struct.self:
       metadata(of: types.castUnchecked(t, to: Struct.self), in: &ctx)
     case Tuple.self:
