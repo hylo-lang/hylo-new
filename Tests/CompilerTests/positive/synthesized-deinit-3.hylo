@@ -1,0 +1,9 @@
+//! stage:llvm
+
+struct Box<T> {
+  var x: T
+}
+
+given <T is Deinitializable> => Box<T> is Deinitializable {}
+
+public fun main() {}

@@ -42,6 +42,13 @@ internal struct IREmitter {
     for f in program[module].ir.functions.values.indices {
       guard case .synthesized(let d, let a) =  program[module].ir[f].name else { continue }
 
+      // TODO: Synthesize implementations in generic contexts, which requires the witnesses of the
+      // conformance's context.
+      if !program[module].ir[f].signature.typeParameters.isEmpty {
+        implementTrap(f)
+        continue
+      }
+
       switch d {
       case program.standardLibraryDeclaration(.deinitializableDeinit):
         implementSynthesizedDeinitializer(f, for: a)
