@@ -12,7 +12,7 @@ discussion](https://github.com/orgs/hylo-lang/discussions/1868).
 - A **projection** is a `sink`, `set`, `inout` or `let` access. [^temporary] [^var]
 - A **projection of type `T`** is an access to an object of type `T`.
 - Projections are **active** when they are created.
-- A projection can become **inactive** during its lifetime.  For example, in `x: inout T = &y`, `y` becomes inactive, and if still alive, becomes active again when the lifetime of `x` ends.
+- A projection can become **inactive** during its lifetime.  For example, in `x: inout T = &y`, `y` becomes inactive, and becomes active again when the lifetime of `x` ends.
 - An object is **initialized** at the first completion of a `set` access on it (an `init` function is a `set` access on `self`).
 - An object is **complete** when all parts[^parts] are initialized.
 - An initialized or complete object becomes **incomplete** (and **uninitialized** [^init-complete]) when any part is accessed as `sink`, and returns to its prior state whenever all of its parts have returned to an initialized state.
