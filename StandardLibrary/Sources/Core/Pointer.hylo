@@ -4,32 +4,33 @@ public struct Pointer<Pointee> is Deinitializable {
   /// The underlying builtin value.
   module var value: Builtin.ptr
 
-  /// Creates an instance from its raw value.
+  /// Creates an instance from its underlying builtin value.
   memberwise init
 
   /// The value pointed to by `self`.
   ///
-  /// - Requires: the address stores an object of type Pointee.
+  /// - Requires: `self` points to a complete object of type `Pointee`.
   @inline(always)
   public subscript unsafe() auto -> Pointee {
-    /// - Requires: nothing mutates the value's storage during this projection's lifetime.
+    /// - Requires: the pointee is not mutated during this projection's lifetime.
     let { yield (self.value as* (let Pointee)) }
 
-    /// - Requires: the pointed-to object shall not have other bindings throughout the projection.
+    /// - Requires: while this projection is active, no other projection that includes the pointee
+    ///   is active.
     inout { yield &(self.value as* (inout Pointee)) }
-
   }
 
   /// Creates an instance referring to the same address as `p`.
   ///
-  /// Note that dereferencing type-punned pointers will cause problems unless the rules of
-  /// `unsafe[]` are upheld.
+  /// - Note: when accessing the pointee of the result, make sure its lifetime is upheld.
   @inline(always)
   public init<Other>(type_punning p: Pointer<Other>) {
     &self.value = p.value
   }
 
-  /// Returns `self` offset forward by `n` array elements of `Pointee` type.
+  /// Returns `self` offset by `n` elements, treating memory as an array of `Pointee`.
+  ///
+  /// - Note: when accessing the pointee of the result, make sure its lifetime is upheld.
   @inline(always)
   public fun advanced(by n: Int) -> Self {
     let offset_in_bytes = Metatype<Pointee>.stride() * n
@@ -42,12 +43,11 @@ public struct Pointer<Pointee> is Deinitializable {
     .new(value: Builtin.zeroinitializer_ptr())
   }
 
-  // MARK: Copyable conformance.
+  // MARK: Conformance to Copyable.
 
   /// Returns an equivalent instance.
   ///
-  /// Because we don't have a `nonmutating` keyword yet, writing to the pointee of a `let`-bound
-  /// `Pointer` is only possible by copying, e.g.  `&p.copy().unsafe[] = x`.
+  /// - Note: when accessing the pointee of the result, make sure its lifetime is upheld.
   @inline(always)
   public fun copy() -> Self {
     Pointer(value: self.value)
@@ -61,7 +61,7 @@ public struct Pointer<Pointee> is Deinitializable {
     Bool(value: Builtin.icmp_eq_ptr(self.value, other.value))
   }
 
-  /// Returns `false` iff `other` has an equivalent value.
+  /// Returns `true` iff `self is not equal to `other`.
   @inline(always)
   public fun infix!= (other: Self) -> Bool {
     Bool(value: Builtin.icmp_ne_ptr(self.value, other.value))
@@ -77,8 +77,9 @@ public given <T> => Pointer<T> is Equatable {}
 
 extension <Pointee is Movable> Pointer<Pointee> {
 
-  /// Returns the value pointed to by `self`, leaving the storage at this address
-  /// uninitialized.
+  /// Returns the value pointed to by `self`, leaving the storage uninitialized.
+  ///
+  /// - Requires: `self` points to a complete object of type `Pointee`.
   @inline(always)
   public fun unsafe_move_pointee() -> Pointee {
     self.value as* (sink Pointee)
