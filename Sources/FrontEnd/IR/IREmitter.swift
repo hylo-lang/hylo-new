@@ -36,9 +36,6 @@ internal struct IREmitter {
 
   /// Generates the definitions of synthesized functions.
   internal mutating func implementSynthesizedFunctions() {
-    // TODO: Remove once the standard library compiles.
-    if program[module].isStandardLibrary { return }
-
     for f in program[module].ir.functions.values.indices {
       guard case .synthesized(let d, let a) =  program[module].ir[f].name else { continue }
 
