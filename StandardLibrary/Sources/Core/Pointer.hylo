@@ -85,7 +85,7 @@ extension <Pointee is Movable> Pointer<Pointee> {
     self.value as* (sink Pointee)
   }
 
-  /// Initializes the value pointed to by `self` to `value`.
+  /// Initializes the storage pointed to by `self` to `value`.
   ///
   /// - Requires: the `Metatype<Pointee>.size()` bytes starting at the address are uninitialized
   ///   and suitably aligned for `Pointee`.
