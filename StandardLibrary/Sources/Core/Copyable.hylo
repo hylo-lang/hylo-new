@@ -11,5 +11,7 @@ public trait Copyable refines Movable {
 /// A witness that `Void` is `Copyable`.
 public given Void is Copyable {}
 
-/// A witness that a tuple is `Copyable` when its elements are too.
-public given <T is Copyable, U is Copyable> => {T, ...U} is Copyable {}
+// TODO: Restore once the lowering of generic conformances can access the witnesses of their
+// context (e.g., to get the witness of `{T, ...U} is Movable`).
+// /// A witness that a tuple is `Copyable` when its elements are too.
+// public given <T is Copyable, U is Copyable> => {T, ...U} is Copyable {}
