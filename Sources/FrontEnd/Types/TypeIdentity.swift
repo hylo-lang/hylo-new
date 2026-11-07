@@ -1,7 +1,7 @@
 import Archivist
 import Utilities
 
-/// A value identifying a particular (abstract syntax) representation of
+/// A type whose instances identify a particular (abstract syntax) representation of
 /// some Hylo type.
 ///
 /// Despite the name, it is important to remember that inequality of
