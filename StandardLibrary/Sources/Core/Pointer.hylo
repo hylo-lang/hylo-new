@@ -40,7 +40,13 @@ public struct Pointer<Pointee> is Deinitializable {
   /// Creates an instance that does not address any usable storage.
   @inline(always)
   public static fun null() -> Self {
-    .new(value: Builtin.zeroinitializer_ptr())
+    .new()
+  }
+
+  /// Creates an instance that does not address any usable storage, equal to `.null()`.
+  @inline(always)
+  public init() {
+    &self.value = Builtin.zeroinitializer_ptr()
   }
 
   // MARK: Conformance to Copyable.
