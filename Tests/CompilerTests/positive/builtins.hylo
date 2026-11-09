@@ -470,6 +470,16 @@ fun test_Builtin_sitofp() {
     (-9223372036854775808.0 as Float64).value))
 }
 
+// MARK: Testing Builtin.inttoptr and Builtin.ptrtoint
+
+fun test_Builtin_inttoptr() {
+  let p = Builtin.inttoptr(42.value)
+  let q = Builtin.inttoptr(42.value)
+  expect(Builtin.icmp_eq_ptr(p, q))
+  let r = Builtin.ptrtoint(p)
+  expect(Builtin.icmp_eq_word(r, 42.value))
+}
+
 // MARK: Testing Builtin.smul_with_overflow_*()
 
 fun test_Builtin_smul_with_overflow() {
@@ -731,6 +741,7 @@ public fun main() {
   test_Builtin_sdiv()
   test_Builtin_sext()
   test_Builtin_sitofp()
+  test_Builtin_inttoptr()
   test_Builtin_smul_with_overflow()
   test_Builtin_srem()
   test_Builtin_ssub_with_overflow()

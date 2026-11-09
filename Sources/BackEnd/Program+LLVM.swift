@@ -508,6 +508,16 @@ extension Program {
       let xs = insertLoad(s.arguments, instancesOf: from, in: &ctx)
       ctx.value[v] = ctx.module.llvm.insertSIToFP(
         xs[0], to: metadata(of: to, in: &ctx.module).llvm, at: ctx.insertionPoint!).v
+
+    case .inttoptr:
+      let x = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: ctx.module.llvm.iptr.t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertIntToPtr(
+        x, to: ctx.module.llvm.ptr, at: ctx.insertionPoint!).v
+
+    case .ptrtoint:
+      let x = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: ctx.module.llvm.ptr.t, in: &ctx)
+      ctx.value[v] = ctx.module.llvm.insertPtrToInt(
+        x, to: ctx.module.llvm.iptr, at: ctx.insertionPoint!).v
     }
 
     return ctx.ir.instruction(after: i.erased)
