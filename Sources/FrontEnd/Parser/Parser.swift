@@ -2617,8 +2617,14 @@ public struct Parser {
 
   /// Returns the next token without consuming it.
   private mutating func peek() -> Token? {
-    lookahead.orAssign(tokens.next())
-    return lookahead
+    // Did we already scan the next token?
+    if let n = lookahead { return n }
+
+    // Is there a next token to scan?
+    else if let n = tokens.next() { return lookahead.wrapIfEmpty(n) }
+
+    // We reached the end of the input.
+    else { return nil }
   }
 
   /// Consumes and returns the next token.
