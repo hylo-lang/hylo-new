@@ -37,7 +37,7 @@ public struct IRBlock: Sendable {
   /// the API of the containing `IRFunction`.
   internal mutating func setFirst(_ i: AnyInstructionIdentity) {
     first = i
-    last.orAssign(i)
+    last.wrapIfEmpty(i)
   }
 
   /// Assigns the last instruction of `self`.
@@ -46,7 +46,7 @@ public struct IRBlock: Sendable {
   /// the API of the containing `IRFunction`.
   internal mutating func setLast(_ i: AnyInstructionIdentity) {
     last = i
-    first.orAssign(i)
+    first.wrapIfEmpty(i)
   }
 
   /// Unassigns the first and last instructions of `self`.
