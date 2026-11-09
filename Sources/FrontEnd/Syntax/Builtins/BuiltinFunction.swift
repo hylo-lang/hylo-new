@@ -142,9 +142,9 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case sitofp(MachineType.ID, MachineType.ID)
 
-//  case inttoptr(MachineType.ID)
-//
-//  case ptrtoint(MachineType.ID)
+  case inttoptr
+
+  case ptrtoint
 
   /// In LLVM: `fadd`.
   case fadd(MathFlags, MachineType.ID)
@@ -516,10 +516,10 @@ extension BuiltinFunction {
       return s.demand(Arrow(f, to: d)).erased
     case .sitofp(let f, let d):
       return s.demand(Arrow(f, to: d)).erased
-    //    case .inttoptr(let t):
-    //      return .init(^t, to: .builtin(.ptr))
-    //    case .ptrtoint(let t):
-    //      return .init(.builtin(.ptr), to: ^t)
+    case .inttoptr:
+      return s.demand(Arrow(word, to: ptr)).erased
+    case .ptrtoint:
+      return s.demand(Arrow(ptr, to: word)).erased
     case .fadd(_, let t):
       return s.demand(Arrow(t, t, to: t)).erased
     case .fsub(_, let t):
@@ -866,10 +866,10 @@ extension BuiltinFunction: Showable {
       return printer.format("uitofp_%T_%T", [l.erased, r.erased])
     case .sitofp(let l, let r):
       return printer.format("sitofp_%T_%T", [l.erased, r.erased])
-    //    case .inttoptr(let t):
-    //      return "inttoptr_\(t)"
-    //    case .ptrtoint(let t):
-    //      return "ptrtoint_\(t)"
+    case .inttoptr:
+      return "inttoptr"
+    case .ptrtoint:
+      return "ptrtoint"
     case .fadd(let f, let t):
       return f.isEmpty ? "fadd_\(t)" : "fadd_\(f)_\(t)"
     case .fsub(let f, let t):
@@ -1260,13 +1260,11 @@ extension BuiltinFunction {
       guard let (f, d) = (machineType + machineType)(&tokens) else { return nil }
       self = .sitofp(s.demand(f), s.demand(d))
 
-    //    case "inttoptr":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .inttoptr(t)
-    //
-    //    case "ptrtoint":
-    //      guard let t = machineType(&tokens) else { return nil }
-    //      self = .ptrtoint(t)
+    case "inttoptr":
+      self = .inttoptr
+
+    case "ptrtoint":
+      self = .ptrtoint
 
     case "fadd":
       guard let (p, t) = floatingPointArithmeticTail(&tokens) else { return nil }
