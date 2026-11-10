@@ -6,8 +6,7 @@ import Archivist
 /// values can represent the same semantic type value.
 ///
 /// In fact, these syntactic types are all we have, beceause the computation of a single canonical
-/// type value for semantically-equivalent forms is
-/// [undecidable](https://en.wikipedia.org/wiki/Undecidable_problem).
+/// type value for semantically-equivalent forms [is undecidable](https://arxiv.org/pdf/2502.20546).
 public protocol TypeTree: Hashable, Showable, Archivable, Sendable {
 
   /// Properties about `self` and its children, which are types in `program`.
