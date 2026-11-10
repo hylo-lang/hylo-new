@@ -1,0 +1,15 @@
+subscript f(x: inout Int32) inout -> Int32 {
+  precondition(x == (0 as Int32))
+  &x = 1
+  yield &x
+  precondition(x == (2 as Int32))
+  &x = 3
+}
+
+fun main() {
+  var x: Int32 = 0
+  inout y = f[&x]
+  precondition(y == (1 as Int32))
+  &y = 2
+  precondition(x == (3 as Int32))
+}

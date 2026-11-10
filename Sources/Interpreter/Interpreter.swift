@@ -67,6 +67,8 @@ private struct Value {
       a.location
     } else if let a = storage as? Memory.TypedAddress {
       a
+    } else if let a = storage as? Projection {
+      a.projectee.location
     } else {
       nil
     }
@@ -93,6 +95,12 @@ private enum InstructionEpilogue {
   /// Begins a call to the function on the given arguments, transferring control to the callee.
   case call(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
 
+  /// Yields the given access to the caller, suspending the current function.
+  case yield(Access<Memory.TypedAddress>)
+
+  /// Resume execution from the given stack frame.
+  case resume(StackFrame)
+
   /// Control is transferred back to the caller.
   case `return`
 
@@ -115,6 +123,17 @@ private struct StackFrame {
 
 }
 
+/// A projected access and its suspended execution state.
+private struct Projection {
+
+  /// The value being projected.
+  public let projectee: Access<Memory.TypedAddress>
+
+  /// The continuation of the subscript that produced the projection.
+  public let continuation: StackFrame
+
+}
+
 /// A thread's call stack.
 private struct Stack {
 
@@ -129,6 +148,11 @@ private struct Stack {
   ) {
     let p = InstructionPointer(interpreting: f, definedIn: p)
     frames.append(.init(currentStep: p, parameters: ps))
+  }
+
+  /// Pushes `f` to the top of stack.
+  public mutating func push(_ f: StackFrame) {
+    frames.append(f)
   }
 
   /// Removes the top frame.
@@ -201,6 +225,13 @@ public struct Interpreter {
       .at(programCounter.position)
   }
 
+  /// The last instruction executed in the current stack frame.
+  private var previousStep: AnyInstructionIdentity {
+    program[programCounter.container.module]
+      .functions[programCounter.container.function]
+      .instruction(before: programCounter.position)!
+  }
+
   /// An instance executing `p`.
   ///
   /// - Precondition: `p.entry != nil`
@@ -224,6 +255,15 @@ public struct Interpreter {
       try advanceProgramCounter()
       callStack.enter(callee, definedIn: program, passing: arguments)
     case .return: callStack.pop()
+    case .yield(let projectee):
+      try advanceProgramCounter()
+      let continuation = callStack.top
+      callStack.pop()
+      topOfStack.registers[previousStep] =
+        Value(Projection(projectee: projectee, continuation: continuation))
+    case .resume(let continuation):
+      try advanceProgramCounter()
+      callStack.push(continuation)
     case .register(let v):
       topOfStack.registers[programCounter.position] = v
       try advanceProgramCounter()
@@ -279,9 +319,9 @@ public struct Interpreter {
     case let x as IRPlaceCast:
       _ = x
     case let x as IRProject:
-      _ = x
+      return try apply(x.callee, passing: x.arguments)
     case let x as IRRegionEnd<IRProject>:
-      _ = x
+      return resume(x.start)
     case let x as IRProperty:
       let l = x.whole.location(ofField: x.part, in: &self)
       return register(l)
@@ -305,7 +345,7 @@ public struct Interpreter {
     case let x as IRWitnessTable:
       _ = x
     case let x as IRYield:
-      _ = x
+      return yield(x.projectee)
     default:
       fatalError("Interpreter: unimplemented instruction")
     }
@@ -426,6 +466,18 @@ public struct Interpreter {
     }
   }
 
+  /// What should be here?
+  ///
+  /// - Precondition: `v` is a projection computed by `project` instruction.
+  private func projection(of v: IRValue) -> Projection {
+    switch v {
+    case .register(let r):
+      topOfStack.registers[r]!(as: Projection.self)!
+    default:
+      preconditionFailure("\(program.show(v)) is not an Access<Memory.TypedAddress>.")
+    }
+  }
+
   /// Returns the pointer to the first instruction of `b`.
   ///
   /// - Precondition: `b` is a basic block in `programCounter.container`.
@@ -458,6 +510,16 @@ public struct Interpreter {
       }
     default: unimplemented("\(program.show(f)) is not implemented yet.")
     }
+  }
+
+  /// Returns an epilogue that yields access `v` to the caller, suspending the current function.
+  private func yield(_ v: IRValue) -> InstructionEpilogue {
+    return .yield(access(of: v))
+  }
+
+  /// Returns an epilogue that resumes execution from the stack frame of `f`.
+  private func resume(_ f: IRValue) -> InstructionEpilogue {
+    return .resume(projection(of: f).continuation)
   }
 
   /// Returns the bit width of a value of type `t`.
