@@ -466,7 +466,7 @@ public struct Interpreter {
     }
   }
 
-  /// What should be here?
+  /// Returns the projection associated with `v` in the current execution context.
   ///
   /// - Precondition: `v` is a projection computed by `project` instruction.
   private func projection(of v: IRValue) -> Projection {
