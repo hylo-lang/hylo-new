@@ -806,18 +806,18 @@ extension BuiltinFunction: Showable {
       return "assume_\(b ? "" : "un")initialized"
     case .alloca(let t):
       return printer.format("alloca_%T", [t.erased])
+    case .add(let p, let t) where p == .ignore:
+      return printer.format("add_%T", [t.erased])
     case .add(let p, let t):
-      return (p != .ignore)
-        ? printer.format("add_%S_%T", [p, t.erased])
-        : printer.format("add_%T", [t.erased])
+      return printer.format("add_%S_%T", [p, t.erased])
+    case .sub(let p, let t) where p == .ignore:
+      return printer.format("sub_%T", [t.erased])
     case .sub(let p, let t):
-      return (p != .ignore)
-        ? printer.format("sub_%S_%T", [p, t.erased])
-        : printer.format("sub_%T", [t.erased])
+      return printer.format("sub_%S_%T", [p, t.erased])
+    case .mul(let p, let t) where p == .ignore:
+      return printer.format("mul_%T", [t.erased])
     case .mul(let p, let t):
-      return (p != .ignore)
-        ? printer.format("mul_%S_%T", [p, t.erased])
-        : printer.format("mul_%T", [t.erased])
+      return printer.format("mul_%S_%T", [p, t.erased])
     case .udiv(let e, let t):
       return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
     case .sdiv(let e, let t):
@@ -870,26 +870,38 @@ extension BuiltinFunction: Showable {
       return "inttoptr"
     case .ptrtoint:
       return "ptrtoint"
+    case .fadd(let f, let t) where f.isEmpty:
+      return printer.format("fadd_%T", [t.erased])
     case .fadd(let f, let t):
-      return f.isEmpty ? "fadd_\(t)" : "fadd_\(f)_\(t)"
+      return printer.format("fadd_\(f)_%T", [t.erased])
+    case .fsub(let f, let t) where f.isEmpty:
+      return printer.format("fsub_%T", [t.erased])
     case .fsub(let f, let t):
-      return f.isEmpty ? "fsub_\(t)" : "fsub_\(f)_\(t)"
+      return printer.format("fsub_\(f)_%T", [t.erased])
+    case .fmul(let f, let t) where f.isEmpty:
+      return printer.format("fmul_%T", [t.erased])
     case .fmul(let f, let t):
-      return f.isEmpty ? "fmul_\(t)" : "fmul_\(f)_\(t)"
+      return printer.format("fmul_\(f)_%T", [t.erased])
+    case .fdiv(let f, let t) where f.isEmpty:
+      return printer.format("fdiv_%T", [t.erased])
     case .fdiv(let f, let t):
-      return f.isEmpty ? "fdiv_\(t)" : "fdiv_\(f)_\(t)"
+      return printer.format("fdiv_\(f)_%T", [t.erased])
+    case .frem(let f, let t) where f.isEmpty:
+      return printer.format("frem_%T", [t.erased])
     case .frem(let f, let t):
-      return f.isEmpty ? "frem_\(t)" : "frem_\(f)_\(t)"
+      return printer.format("frem_\(f)_%T", [t.erased])
+    case .fcmp(let f, let p, let t) where f.isEmpty:
+      return printer.format("fcmp_\(p)_%T", [t.erased])
     case .fcmp(let f, let p, let t):
-      return f.isEmpty ? "fcmp_\(p)_\(t)" : "fcmp_\(f)_\(p)_\(t)"
+      return printer.format("fcmp_\(f)_\(p)_%T", [t.erased])
     case .fptrunc(let l, let r):
-      return "fptrunc_\(l)_\(r)"
+      return printer.format("fptrunc_%T_%T", [l.erased, r.erased])
     case .fpext(let l, let r):
-      return "fpext_\(l)_\(r)"
+      return printer.format("fpext_%T_%T", [l.erased, r.erased])
     case .fptoui(let l, let r):
-      return "fptoui_\(l)_\(r)"
+      return printer.format("fptoui_%T_%T", [l.erased, r.erased])
     case .fptosi(let l, let r):
-      return "fptosi_\(l)_\(r)"
+      return printer.format("fptosi_%T_%T", [l.erased, r.erased])
     case .ctpop(let t):
       return printer.format("ctpop_%T", [t.erased])
     case .ctlz(let t):
