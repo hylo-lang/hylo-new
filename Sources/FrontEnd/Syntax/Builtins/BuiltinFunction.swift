@@ -809,15 +809,15 @@ extension BuiltinFunction: Showable {
     case .add(let p, let t) where p == .ignore:
       return printer.format("add_%T", [t.erased])
     case .add(let p, let t):
-      return printer.format("add_%S_%T", [p, t.erased])
+      return printer.format("add_\(p)_%T", [t.erased])
     case .sub(let p, let t) where p == .ignore:
       return printer.format("sub_%T", [t.erased])
     case .sub(let p, let t):
-      return printer.format("sub_%S_%T", [p, t.erased])
+      return printer.format("sub_\(p)_%T", [t.erased])
     case .mul(let p, let t) where p == .ignore:
       return printer.format("mul_%T", [t.erased])
     case .mul(let p, let t):
-      return printer.format("mul_%S_%T", [p, t.erased])
+      return printer.format("mul_\(p)_%T", [t.erased])
     case .udiv(let e, let t):
       return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
     case .sdiv(let e, let t):
@@ -851,7 +851,7 @@ extension BuiltinFunction: Showable {
     case .unsignedMultiplicationWithOverflow(let t):
       return printer.format("umul_with_overflow_%T", [t.erased])
     case .icmp(let p, let t):
-      return printer.format("icmp_%S_%T", [p, t.erased])
+      return printer.format("icmp_\(p)_%T", [t.erased])
     case .trunc(let l, let r):
       return printer.format("trunc_%T_%T", [l.erased, r.erased])
     case .truncateOrZeroExtend(let l, let r):
