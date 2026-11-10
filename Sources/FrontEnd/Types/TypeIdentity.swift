@@ -1,12 +1,11 @@
 import Archivist
 import Utilities
 
-/// A type whose instances identify a particular (abstract syntax) representation of
-/// some Hylo type.
+/// A type whose instances identify a particular (abstract syntax) representation of some Hylo
+/// type.
 ///
-/// Despite the name, it is important to remember that inequality of
-/// type identities does _not_ imply inequality of the represented
-/// semantic types.  (Of course equality of identities does imply
+/// Despite the name, it is important to remember that inequality of type identities does _not_
+/// imply inequality of the represented semantic types.  (Of course equality of identities does
 /// imply semantic type equality).
 public protocol TypeIdentity: Comparable, Hashable, Showable, Archivable, Sendable {
 
