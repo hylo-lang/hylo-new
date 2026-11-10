@@ -98,7 +98,7 @@ private enum InstructionEpilogue {
   /// Yields the given access to the caller, suspending the current function.
   case yield(Access<Memory.TypedAddress>)
 
-  /// Resume execution from the given stack frame.
+  /// Resume execution from the given execution state.
   case resume(StackFrame)
 
   /// Control is transferred back to the caller.
@@ -129,7 +129,7 @@ private struct Projection {
   /// The value being projected.
   public let projectee: Access<Memory.TypedAddress>
 
-  /// The continuation of the subscript that produced the projection.
+  /// The stack frame of the suspended function, from which execution resumes.
   public let continuation: StackFrame
 
 }
