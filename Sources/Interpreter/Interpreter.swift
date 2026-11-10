@@ -129,7 +129,7 @@ private struct Projection {
   /// The value being projected.
   public let projectee: Access<Memory.TypedAddress>
 
-  /// The stack frame of the suspended function, from which execution resumes.
+  /// The execution state of the suspended function, from which execution resumes.
   public let continuation: StackFrame
 
 }
