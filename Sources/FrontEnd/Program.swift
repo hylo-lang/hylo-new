@@ -615,28 +615,6 @@ public struct Program: Sendable {
       || self[n].arguments.contains(where: { (a) in isMarkedForMutation(a.value) })
   }
 
-  /// Returns `true` iff `n` is a name expression of the form  `.new` or `q.new`, where `q` is any
-  /// arbitrary qualification.
-  public func isConstructorReference(_ n: NameExpression.ID) -> Bool {
-    if let m = cast(n, to: NameExpression.self) {
-      return self[m].name.value.identifier == "new"
-    } else {
-      return false
-    }
-  }
-
-  /// Returns `true` iff `n` is the application of a memberwise initializer.
-  public func isMemberwiseInitialization(_ n: Call.ID) -> Bool {
-    if
-      let f = cast(self[n].callee, to: New.self),
-      case .some(.direct(let d)) = declaration(maybeReferredToBy: self[f].target)
-    {
-      return isMemberwiseInitializer(d)
-    } else {
-      return false
-    }
-  }
-
   /// Returns `true` iff `w` denotes a synthetic conformance that does not involve any user code.
   ///
   /// The result is a conservative overapproximation which does not take arguments to conditional

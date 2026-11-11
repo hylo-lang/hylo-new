@@ -2487,7 +2487,7 @@ public struct Typer {
     let s = program.spanForDiagnostic(about: e)
 
     // Is `e` a constructor reference?
-    if program.isConstructorReference(e) {
+    if isUnelaboratedConstructorReference(e) {
       let n = program[e.module].insert(
         NameExpression(qualification: nil, name: .init("init", at: s), site: s),
         in: program.parent(containing: e))
@@ -2891,6 +2891,16 @@ public struct Typer {
       return program.types.tag(of: context.obligations.syntaxToType[e.erased]!) == Metatype.self
     } else if let n = program.cast(e, to: StaticCall.self) {
       return isTypeDeclarationReference(program[n].callee, in: context)
+    } else {
+      return false
+    }
+  }
+
+  /// Returns `true` iff `n` is a name expression of the form  `.new` or `q.new`, where `q` is any
+  /// arbitrary qualification.
+  private func isUnelaboratedConstructorReference(_ n: NameExpression.ID) -> Bool {
+    if let m = program.cast(n, to: NameExpression.self) {
+      return program[m].name.value.identifier == "new"
     } else {
       return false
     }
@@ -3362,54 +3372,6 @@ public struct Typer {
         Metakind(inhabitant: .arrow(program.types[l].inhabitant, program.types[r].inhabitant)))
       program[e.module].setType(k.erased, for: e)
       return k
-    }
-  }
-
-  /// Returns a denotation of `e` iff `e` represents an immutable value.
-  ///
-  /// - Requires: `e` has been type checked.
-  private func stableDenotation(_ e: ExpressionIdentity) -> Denotation? {
-    assert(program[e.module].type(assignedTo: e) != nil, "expression is not type checked")
-    switch program.tag(of: e) {
-    case NameExpression.self:
-      return stableDenotation(program.castUnchecked(e, to: NameExpression.self))
-    default:
-      return nil
-    }
-  }
-
-  /// Returns a denotation of `e` iff `e` represents an immutable value.
-  ///
-  /// - Requires: `e` has been type checked.
-  private func stableDenotation(_ e: NameExpression.ID) -> Denotation? {
-    guard
-      let t = program[e.module].type(assignedTo: e),
-      let r = program[e.module].declaration(referredToBy: e)
-    else { return nil }
-
-    if let d = r.target {
-      if !isStable(d) { return nil }
-      if let q = program[e].qualification {
-        return stableDenotation(q).flatMap({ (a) in .reference(a, r, t) })
-      } else {
-        return .reference(nil, r, t)
-      }
-    }
-
-    return nil
-  }
-
-  /// Returns `true` iff `d` introduces an immutable entity.
-  ///
-  /// - Requires: `d` has been type checked.
-  private func isStable(_ d: DeclarationIdentity) -> Bool {
-    switch program.tag(of: d) {
-    case ParameterDeclaration.self, VariableDeclaration.self:
-      let t = program[d.module].type(assignedTo: d)!
-      return (program.types[t] as? RemoteType)?.access == .let
-
-    default:
-      return false
     }
   }
 
