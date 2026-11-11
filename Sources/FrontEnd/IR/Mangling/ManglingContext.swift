@@ -22,6 +22,12 @@ internal struct ManglingContext {
   /// A table mapping known symbols to their reserved mangled identifier.
   private var reserved: [MangledSymbol: ReservedSymbol] = [:]
 
+  /// `true` iff the last symbol added to `output` was a declaration.
+  ///
+  /// Used to detect ambiguity when a declaration is followed by a symbol that may be the start of
+  /// another declaration.
+  private var afterDeclaration: Bool = false
+
   /// Creates an instance for mangling symbols in `program`.
   internal init(_ program: Program) {
     output = ""
@@ -51,10 +57,14 @@ internal struct ManglingContext {
   /// Writes `x` to `self.output`.
   private mutating func add<T: TextOutputStreamable>(_ x: T) {
     x.write(to: &output)
+    afterDeclaration = false
   }
 
   /// Writes `string` to `output`, prefixed by its length encoded as a variable-length integer.
   internal mutating func add<T: StringProtocol>(string: T) {
+    if afterDeclaration {
+      add(operator: .declarationEnd)
+    }
     let s = String(string)
 
     if s.isEmpty {
@@ -67,21 +77,25 @@ internal struct ManglingContext {
       add(string)
       stringPosition[s] = stringPosition.count
     }
+    afterDeclaration = false
   }
 
   /// Writes `v` encoded as a variable-length integer to `output`.
   internal mutating func add(integer v: Int) {
     Base64VarUInt(UInt(bitPattern: v)).write(to: &output)
+    afterDeclaration = false
   }
 
   /// Writes `v` encoded as a variable-length integer to `output`.
   internal mutating func add(integer v: UInt32) {
     Base64VarUInt(UInt64(v)).write(to: &output)
+    afterDeclaration = false
   }
 
   /// Writes `v` encoded as a variable-length integer to `output`.
   internal mutating func add(integer v: UInt64) {
     Base64VarUInt(v).write(to: &output)
+    afterDeclaration = false
   }
 
   /// Writes the raw value of `v` encoded as a base 64 digit to `output`.
@@ -97,6 +111,7 @@ internal struct ManglingContext {
   /// Writes `o` to `output`.
   internal mutating func add(operator o: ManglingOperator) {
     o.write(to: &output)
+    afterDeclaration = false
   }
 
   /// Writes the mangled representation of `items` to `output`, calling `addItem` to mangle each
@@ -109,6 +124,11 @@ internal struct ManglingContext {
     for i in items {
       addItem(&self, i)
     }
+  }
+
+  /// Marks the end of a declaration.
+  internal mutating func endDeclaration() {
+    afterDeclaration = true
   }
 
   /// Records `s` in the symbol lookup table if it is not reserved or already recorded.
