@@ -1,5 +1,7 @@
 //! exit-status:15
 
+// This test exercises the lowering of calls to generic memberwise initializers.
+
 struct Result is Movable & Deinitializable {
   var status: Int32
   memberwise init
