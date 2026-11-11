@@ -98,7 +98,7 @@ private enum InstructionEpilogue {
   /// Yields the given access to the caller, suspending the current function.
   case yield(Access<Memory.TypedAddress>)
 
-  /// Resume execution from the given execution state.
+  /// Resumes execution from the given execution state.
   case resume(StackFrame)
 
   /// Control is transferred back to the caller.
@@ -466,9 +466,7 @@ public struct Interpreter {
     }
   }
 
-  /// Returns the projection associated with `v` in the current execution context.
-  ///
-  /// - Precondition: `v` is a projection computed by `project` instruction.
+  /// Returns the projection of `v` in the current execution context.
   private func projection(of v: IRValue) -> Projection {
     switch v {
     case .register(let r):
