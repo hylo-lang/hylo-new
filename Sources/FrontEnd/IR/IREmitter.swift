@@ -2978,8 +2978,9 @@ internal struct IREmitter {
     }
   }
 
-  /// Generates IR deinitializing `s`, which is an instance of `t`, using `w`, which expresses a
-  /// witness of the conformance of `t` to `Deinitializable`.
+  /// Generates IR deinitializing `s`, which is an instance of `t`, using `w`, which witnesses how
+  /// `t` conforms to `Deinitializable`, and returns `true` iff `s` is deinitializable; otherwise,
+  /// inserts a trap and returns `false`.
   private mutating func _emitDeinitializeWhole(
     _ s: IRValue, instanceOf t: AnyTypeIdentity, usingNonTrivialConformance w: WitnessExpression
   ) -> Bool {
