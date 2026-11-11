@@ -3275,7 +3275,8 @@ public struct Typer {
     }
 
     // The witness refers to a given declaration?
-    else if let c = program.flatCast(witness.declaration, to: ConformanceDeclaration.self) {
+    let w = program.declaration(maybeReferredToBy: witness.value)
+    if let c = program.flatCast(w?.target, to: ConformanceDeclaration.self) {
       // Read the associated type definition.
       if let i = implementation(of: requirement, in: c) {
         return declaredType(of: i)
@@ -4358,7 +4359,7 @@ public struct Typer {
 
           // Strip the context defined by the extension, apply type arguments from the matching
           // witness, and substitute the extendee for the receiver.
-          if let arguments = w.typeArguments(appliedTo: e) {
+          if let arguments = typeArguments(instantiating: e, in: w.value) {
             member = program.types.substitute(arguments, in: member)
           }
           candidates.append(
@@ -4632,6 +4633,28 @@ public struct Typer {
       cache.scopeToExtensionApplies[scopeOfUse, default: [:]][key] = result
     }
     return result
+  }
+
+  /// Returns the arguments passed to the type parameters of `e` in `w`, which is an expression
+  /// witnessing a use of `e`.
+  private func typeArguments(
+    instantiating e: ExtensionDeclaration.ID, in w: WitnessExpression.Value
+  ) -> TypeArguments? {
+    var v = w
+    while true {
+      switch v {
+      case .termApplication(let f, _):
+        v = f.value
+
+      case .typeApplication(let r, let a):
+        return program.declaration(maybeReferredToBy: r.value)?.target.flatMap { (d) in
+          d == e ? a : nil
+        }
+
+      default:
+        return nil
+      }
+    }
   }
 
   /// Returns the modules that are imported by `f`, which is in the module being typed.
