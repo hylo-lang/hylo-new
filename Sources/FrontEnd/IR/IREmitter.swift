@@ -874,7 +874,7 @@ internal struct IREmitter {
     }
 
     // Are we lowering a memberwise initialization?
-    else if program.isMemberwiseInitialization(e) {
+    else if program.isMemberwiseInitializerReference(program[e].callee) {
       lower(memberwiseInitialization: e, of: target)
     }
 
@@ -3517,6 +3517,15 @@ extension Program {
     case .some(.direct(let d)):
       return isTypeDeclaration(d)
     default:
+      return false
+    }
+  }
+
+  /// Returns `true` iff `e` is referring to a memberwise initializer.
+  fileprivate func isMemberwiseInitializerReference(_ e: ExpressionIdentity) -> Bool {
+    if let d = declaration(maybeReferredToBy: e)?.target {
+      return isMemberwiseInitializer(d)
+    } else {
       return false
     }
   }

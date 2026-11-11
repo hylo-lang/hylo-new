@@ -920,15 +920,59 @@ public struct Program: Sendable {
 
   /// Returns the declaration referred to by `n`.
   ///
+  /// If the typing of a module succeeds, then all name expressions in that module are associated
+  /// with a declaration that may be in that module or in some of its dependencies.
+  ///
   /// - Requires: The module containing `n` is typed.
   public func declaration(referredToBy n: NameExpression.ID) -> DeclarationReference {
     self[n.module].declaration(referredToBy: n) ?? unreachable("untyped node at \(self[n].site)")
   }
 
-  /// Returns the declaration referred to by `n` iff the module containing `n` is typed; otherwise,
-  /// returns `nil`.
+  /// Returns the declaration referred to by `e`, if any.
+  ///
+  /// If `n` is a name expression or the elaboration of a name expression, this method returns the
+  /// declaration to which it refers iff the module containing `n` is typed. Otherwise, the result
+  /// is `nil` for any input.
+  public func declaration(maybeReferredToBy n: ExpressionIdentity) -> DeclarationReference? {
+    switch tag(of: n) {
+    case NameExpression.self:
+      return declaration(maybeReferredToBy: castUnchecked(n, to: NameExpression.self))
+    case New.self:
+      return declaration(maybeReferredToBy: castUnchecked(n, to: New.self))
+    case SyntheticExpression.self:
+      return declaration(maybeReferredToBy: castUnchecked(n, to: SyntheticExpression.self))
+    default:
+      return nil
+    }
+  }
+
+  /// Returns the declaration referred to by `n` iff the module containing `n` is typed.
   public func declaration(maybeReferredToBy n: NameExpression.ID) -> DeclarationReference? {
     self[n.module].declaration(referredToBy: n)
+  }
+
+  /// Returns the declaration referred to by `n` iff the module containing `n` is typed.
+  public func declaration(maybeReferredToBy n: New.ID) -> DeclarationReference? {
+    self[n.module].declaration(referredToBy: self[n].target)
+  }
+
+  /// Returns the declaration referred to by `n`, if any.
+  public func declaration(maybeReferredToBy n: SyntheticExpression.ID) -> DeclarationReference? {
+    declaration(maybeReferredToBy: self[n].value.value)
+  }
+
+  /// Returns the declaration referred to by `n`, if any.
+  public func declaration(maybeReferredToBy v: WitnessExpression.Value) -> DeclarationReference? {
+    switch v {
+    case .identity(let e):
+      return declaration(maybeReferredToBy: e)
+    case .reference(let d):
+      return .direct(d)
+    case .termApplication(let w, _), .typeApplication(let w, _), .nested(let w):
+      return declaration(maybeReferredToBy: w.value)
+    default:
+      return nil
+    }
   }
 
   /// Returns `true` iff `n` contains a reference to `d`.
