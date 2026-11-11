@@ -1,8 +1,8 @@
-subscript f(x: inout Int32) inout -> Int32 {
-  precondition(x == (0 as Int32))
+subscript f(x: inout Int) inout -> Int {
+  precondition(x == 0)
   &x = 1
   yield &x
-  precondition(x == (2 as Int32))
+  precondition(x == 2)
   &x = 3
 }
 
@@ -15,11 +15,11 @@ subscript nested_first(x: inout {{Int, Int}, Int}) inout -> Int {
 }
 
 fun main() {
-  var x: Int32 = 0
+  var x = 0
   inout y = f[&x]
-  precondition(y == (1 as Int32))
+  precondition(y == 1)
   &y = 2
-  precondition(x == (3 as Int32))
+  precondition(x == 3)
 
   var triple = ((1, 2), 3)
   inout first_element = nested_first[&triple]
