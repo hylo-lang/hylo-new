@@ -95,6 +95,9 @@ private enum InstructionEpilogue {
   /// Begins a call to the function on the given arguments, transferring control to the callee.
   case call(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
 
+  /// Begins a subscript call to the function with the given arguments, transferring control to the callee.
+  case project(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
+
   /// Yields the given access to the caller, suspending the current function.
   case yield(Access<Memory.TypedAddress>)
 
@@ -225,13 +228,6 @@ public struct Interpreter {
       .at(programCounter.position)
   }
 
-  /// The last instruction executed in the current stack frame.
-  private var previousStep: AnyInstructionIdentity {
-    program[programCounter.container.module]
-      .functions[programCounter.container.function]
-      .instruction(before: programCounter.position)!
-  }
-
   /// An instance executing `p`.
   ///
   /// - Precondition: `p.entry != nil`
@@ -254,13 +250,16 @@ public struct Interpreter {
     case .call(let callee, let arguments):
       try advanceProgramCounter()
       callStack.enter(callee, definedIn: program, passing: arguments)
+    case .project(let callee, let arguments):
+      callStack.enter(callee, definedIn: program, passing: arguments)
     case .return: callStack.pop()
     case .yield(let projectee):
       try advanceProgramCounter()
       let continuation = callStack.top
       callStack.pop()
-      topOfStack.registers[previousStep] =
+      topOfStack.registers[programCounter.position] =
         Value(Projection(projectee: projectee, continuation: continuation))
+      try advanceProgramCounter()
     case .resume(let continuation):
       try advanceProgramCounter()
       callStack.push(continuation)
@@ -319,7 +318,7 @@ public struct Interpreter {
     case let x as IRPlaceCast:
       _ = x
     case let x as IRProject:
-      return try apply(x.callee, passing: x.arguments)
+      return try project(x.callee, passing: x.arguments)
     case let x as IRRegionEnd<IRProject>:
       return resume(x.start)
     case let x as IRProperty:
@@ -537,6 +536,16 @@ public struct Interpreter {
     let g = self[function: f]
     let xs = arguments.map { access(of: $0) }
     return .call(g, passing: xs)
+  }
+
+  /// Returns an epilogue that calls the subscript `f` passing `arguments`.
+  private func project(
+    _ f: IRValue,
+    passing arguments: ArraySlice<IRValue>
+  ) throws -> InstructionEpilogue {
+    let g = self[function: f]
+    let xs = arguments.map { access(of: $0) }
+    return .project(g, passing: xs)
   }
 
 }
