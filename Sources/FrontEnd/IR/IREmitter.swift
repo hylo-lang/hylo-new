@@ -874,7 +874,7 @@ internal struct IREmitter {
     }
 
     // Are we lowering a memberwise initialization?
-    else if program.isMemberwiseInitialization(e) {
+    else if program.isMemberwiseInitializerReference(program[e].callee) {
       lower(memberwiseInitialization: e, of: target)
     }
 
@@ -1563,7 +1563,7 @@ internal struct IREmitter {
 
   /// Implements `lower(lvalue:)` for static calls.
   private mutating func lowered(lvalue e: StaticCall.ID) -> IRValue {
-    if program.isReferringToTypeDeclaration(program[e].callee) {
+    if program.isTypeDeclarationReference(program[e].callee) {
       return lowering(e, { $0._emitAccessTypeWitness(expressedBy: .init(e)) })
     } else {
       unimplemented("static call")
@@ -3511,12 +3511,20 @@ extension Program {
     return .init(explicit: self[d].parameters, usings: usings, captures: [])
   }
 
-  /// Returns `true` iff `e` is a name expressing referring to a type declaration.
-  fileprivate func isReferringToTypeDeclaration(_ e: ExpressionIdentity) -> Bool {
-    switch cast(e, to: NameExpression.self).flatMap(declaration(referredToBy:)) {
-    case .some(.direct(let d)):
+  /// Returns `true` iff `e` is referring to a type declaration.
+  fileprivate func isTypeDeclarationReference(_ e: ExpressionIdentity) -> Bool {
+    if let d = declaration(maybeReferredToBy: e)?.target {
       return isTypeDeclaration(d)
-    default:
+    } else {
+      return false
+    }
+  }
+
+  /// Returns `true` iff `e` is referring to a memberwise initializer.
+  fileprivate func isMemberwiseInitializerReference(_ e: ExpressionIdentity) -> Bool {
+    if let d = declaration(maybeReferredToBy: e)?.target {
+      return isMemberwiseInitializer(d)
+    } else {
       return false
     }
   }

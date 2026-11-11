@@ -1,10 +1,11 @@
 //! stage:llvm
 
-struct S is Deinitializable {
-  let x: Int
+struct Pair is Deinitializable {
+  let a: Int
+  let b: Int
   memberwise init
 }
 
 public fun main() {
-  _ = S(x: 123)
+  _ = Pair(a: 1, b: 2)
 }
