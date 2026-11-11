@@ -95,7 +95,8 @@ private enum InstructionEpilogue {
   /// Begins a call to the function on the given arguments, transferring control to the callee.
   case call(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
 
-  /// Begins a subscript call to the function with the given arguments, transferring control to the callee.
+  /// Begins a subscript call to the function with the given arguments,
+  /// transferring control to the callee.
   case project(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
 
   /// Yields the given access to the caller, suspending the current function.
