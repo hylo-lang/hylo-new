@@ -2939,10 +2939,13 @@ internal struct IREmitter {
   ///
   /// This method implements the specification of `_emitDeinitialize(_:)`, using `t` to determine
   /// whether it should apply membewise initialization or find an instance of `Deinitializable`.
+  ///
+  /// - Requires: `t` is dealiased.
   private mutating func _emitDeinitialize(
     _ s: IRValue, instanceOf t: AnyTypeIdentity
   ) -> Bool {
     assert(!t[.hasAliases])
+
     switch program.types.tag(of: t) {
     case Tuple.self:
       let u = program.types.castUnchecked(t, to: Tuple.self)
@@ -2956,6 +2959,8 @@ internal struct IREmitter {
   /// deinitializable; otherwise, inserts a trap and returns `false`.
   ///
   /// This method implements parts of `_emitDeinitialize(_:)`, covering whole deinitialization.
+  ///
+  /// - Requires: `t` is dealiased.
   private mutating func _emitDeinitializeWhole(
     _ s: IRValue, instanceOf t: AnyTypeIdentity
   ) -> Bool {
@@ -2969,52 +2974,7 @@ internal struct IREmitter {
       return true
 
     case .nontrivial(let w):
-      let r = program.standardLibraryDeclaration(.deinitializableDeinit)
-
-      // Can we dispatch statically?
-      if let (conformance, implementation) = program.implementation(of: r, in: w) {
-        // Make sure we're not applying the function being lowered recursively, which may happen
-        // if `s` is the receiver of a function implementing `Deinitializable.deinit` for the
-        // witness that's been resolved.
-        if let j = implementation.target, currentFunction.name.isLoweredForm(of: j) {
-          // Use memberwise deinitialization for structs and enums, so that one can write a custom
-          // deinitializer that does not have to explicitly consume its receiver.
-          let (x, _) = program.types.seenAsBaseTypeApplication(t)
-          if program.declaration(whereStructOrEnum: x) != nil {
-            _emitDeinitializeWhole(
-              structOrEnum: s,
-              applyingDeinitializerSynthesizedFor: w, declaredBy: conformance)
-            return true
-          }
-
-          // In other cases, complain about infinite recursion.
-          else {
-            let m = """
-              implicit deinitialization of instances of '\(program.show(t))' causes infinite \
-              recursion in this context
-              """
-            _report(.error, m)
-            _emitTrap()
-            return false
-          }
-        }
-
-        // Otherwise, if the implementation is not synthetic, we can apply it directly without
-        // constructing a witness table.
-        else if !implementation.isSynthetic {
-          let o = _alloca(.void)
-          let f = loweredCallee(
-            referringTo: implementation, qualifiedBy: nil, appliedBy: nil,
-            writingResultTo: o, at: currentAnchor)
-          let xs = Array(s, prependedTo: f.arguments)
-          _apply(f.value, xs, into: f.result, argumentAccesses: .formAndClose)
-          return true
-        }
-      }
-
-      // Emit a call to the witness.
-      _emitDeinitializeWhole(s, instanceOf: t, usingNonTrivialConformance: w)
-      return true
+      return _emitDeinitializeWhole(s, instanceOf: t, usingNonTrivialConformance: w)
     }
   }
 
@@ -3022,8 +2982,50 @@ internal struct IREmitter {
   /// witness of the conformance of `t` to `Deinitializable`.
   private mutating func _emitDeinitializeWhole(
     _ s: IRValue, instanceOf t: AnyTypeIdentity, usingNonTrivialConformance w: WitnessExpression
-  ) {
+  ) -> Bool {
     let requirement = program.standardLibraryDeclaration(.deinitializableDeinit)
+
+    // Can we dispatch statically?
+    if let (conformance, implementation) = program.implementation(of: requirement, in: w) {
+      // Make sure we're not applying the function being lowered recursively, which may happen
+      // if `s` is the receiver of a function implementing `Deinitializable.deinit` for the
+      // witness that's been resolved.
+      if let j = implementation.target, currentFunction.name.isLoweredForm(of: j) {
+        // Use memberwise deinitialization for structs and enums, so that one can write a custom
+        // deinitializer that does not have to explicitly consume its receiver.
+        let (x, _) = program.types.seenAsBaseTypeApplication(t)
+        if program.declaration(whereStructOrEnum: x) != nil {
+          _emitDeinitializeWhole(
+            structOrEnum: s,
+            applyingDeinitializerSynthesizedFor: w, declaredBy: conformance)
+          return true
+        }
+
+        // In other cases, complain about infinite recursion.
+        else {
+          let m = """
+            implicit deinitialization of instances of '\(program.show(t))' causes infinite \
+            recursion in this context
+            """
+          _report(.error, m)
+          _emitTrap()
+          return false
+        }
+      }
+
+      // Otherwise, if the implementation is not synthetic, we can apply it directly without
+      // constructing a witness table.
+      else if !implementation.isSynthetic {
+        let o = _alloca(.void)
+        let f = loweredCallee(
+          referringTo: implementation, qualifiedBy: nil, appliedBy: nil,
+          writingResultTo: o, at: currentAnchor)
+        let xs = Array(s, prependedTo: f.arguments)
+        _apply(f.value, xs, into: f.result, argumentAccesses: .formAndClose)
+        return true
+      }
+    }
+
     let (table, xs) = _recordingInsertions({ $0._emit(witness: w) })
     let interface = program.types.demand(
       Arrow((.let, w.type), (.sink, t), to: .void))
@@ -3034,6 +3036,7 @@ internal struct IREmitter {
     _apply(x1, [table, s], into: x2, argumentAccesses: .formAndClose)
     _end(IRAccess.self, openedBy: x1)
     insertionContext.function!.closeOpenEndedRegions(in: xs)
+    return true
   }
 
   /// Generates IR deinitializing `s`, applying a synthesized memberwise deinitializer associated

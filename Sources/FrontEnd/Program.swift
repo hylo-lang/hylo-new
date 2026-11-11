@@ -1011,8 +1011,7 @@ public struct Program: Sendable {
   public func implementation(
     of requirement: DeclarationIdentity, in witness: WitnessExpression
   ) -> (ConformanceDeclaration.ID, DeclarationReference)? {
-    let w = declaration(maybeReferredToBy: witness.value)
-    if let c = flatCast(w?.target, to: ConformanceDeclaration.self) {
+    if case .reference(let d) = witness.value, let c = cast(d, to: ConformanceDeclaration.self) {
       return implementations(definedBy: c).member(implementing: requirement).map({ (m) in (c, m) })
     } else {
       return nil

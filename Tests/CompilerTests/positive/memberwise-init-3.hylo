@@ -2,13 +2,9 @@
 
 // This test exercises the lowering of calls to generic memberwise initializers.
 
-struct Result is Movable & Deinitializable {
+struct Result is Deinitializable {
   var status: Int32
   memberwise init
-  fun take_value(from other: sink Result) auto {
-    set   { &self.status = other.status }
-    inout { &self.status = other.status }
-  }
 }
 
 struct Wrap<T> {
@@ -26,8 +22,5 @@ public fun main() -> Int32 {
   // Reference to memberwise initializer is a static call.
   sink let w1 = Wrap<Result>(value: .new(status: 0b1010 as Int32))
 
-  sink let x = w0.value.status | w1.value.status
-  w0.deinit()
-  w1.deinit()
-  return x
+  return w0.value.status | w1.value.status
 }
