@@ -1,0 +1,49 @@
+fun $implementation[Deinitializable.deinit for Self: S]<T>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = witness_table_capture %p0 at 0 as P<T>
+  %r1 = place_cast %p1 as sink S
+  %r2 = type_apply w.deinit<T>
+  %r3 = access [let] %r0
+  %r4 = access [sink] %r1
+  %r5 = access [set] %p2
+  %r6 = apply %r2(%r3, %r4) => %r5
+  %r11 = end %r5
+  %r10 = end %r4
+  %r9 = end %r3
+  %r8 = end %r1
+  %r7 = return
+}
+
+fun w.deinit<T>(let %p0: P<T>, sink %p1: S, set %p2: Void) {
+%b0:
+  %r0 = access [set] %p2
+  %r1 = assume_state %r0 initialized
+  %r2 = end %r0
+  %r4 = type_apply w<T>
+  %r5 = access [let] %p0
+  %r6 = project %r4[%r5]
+  %r7 = alloca Void, #preferred
+  %r8 = access [let] %r6
+  %r9 = access [sink] %p1
+  %r10 = access [set] %r7
+  %r11 = apply $synthesized[Deinitializable.deinit for Self: S](%r8, %r9) => %r10
+  %r12 = end %r10
+  %r13 = end %r9
+  %r14 = end %r8
+  %r16 = end %r6
+  %r15 = end %r5
+  %r3 = return
+}
+
+fun $synthesized[Deinitializable.deinit for Self: S](let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = place_cast %p1 as sink S
+  %r1 = place_cast %r0 as sink Void
+  %r2 = access [sink] %r1
+  %r3 = assume_state %r2 uninitialized
+  %r4 = end %r2
+  %r5 = access [set] %p2
+  %r6 = assume_state %r5 initialized
+  %r7 = end %r5
+  %r8 = return
+}

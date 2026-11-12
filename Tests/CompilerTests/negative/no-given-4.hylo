@@ -1,0 +1,4 @@
+struct S<T> is Deinitializable {
+  var part: T
+  fun deinit() sink {}
+}
