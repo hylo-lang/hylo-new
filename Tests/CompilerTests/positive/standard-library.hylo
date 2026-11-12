@@ -12,6 +12,32 @@ fun test_memory_layout() {
   precondition(Metatype<{UInt8, UInt16}>.stride() == 4)
 }
 
+fun test_pointer_advanced() {
+  let xs = (10, 20, 30) as Int32[3]
+  let p = Pointer<Int32>(value: Builtin.address(of: xs))
+  let b = Pointer<UInt8>(type_punning: p)
+
+  let i32_stride = Metatype<Int32>.stride()
+  precondition(p.advanced(by: 0) == p)
+  precondition(Pointer<UInt8>(type_punning: p.advanced(by: 1)) == b.advanced(by: i32_stride))
+  precondition(Pointer<UInt8>(type_punning: p.advanced(by: 2)) == b.advanced(by: i32_stride * 2))
+  precondition(p.advanced(by: 2).advanced(by: -1) == p.advanced(by: 1))
+
+  precondition((p.advanced(by: 0).value as* (let Int32)) == (10 as Int32))
+  precondition((p.advanced(by: 1).value as* (let Int32)) == (20 as Int32))
+  precondition((p.advanced(by: 2).value as* (let Int32)) == (30 as Int32))
+
+  type P = {UInt8, UInt16}
+  precondition(Metatype<P>.stride() != Metatype<P>.size()) // Platform assumption.
+  let pair_stride = Metatype<P>.stride()
+
+  // Advancing uses the stride, not the size.
+  let q = Pointer<P>()
+  precondition(
+    Pointer<UInt8>(type_punning: q.advanced(by: 1)) == Pointer<UInt8>().advanced(by: pair_stride))
+}
+
 public fun main() {
   test_memory_layout()
+  test_pointer_advanced()
 }
