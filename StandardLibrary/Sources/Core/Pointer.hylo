@@ -29,7 +29,7 @@ public struct Pointer<Pointee> is Deinitializable {
     &self.value = p.value
   }
 
-  /// Returns `self` offset by `n` elements, treating memory as an array of `Pointee`.
+  /// Returns `self` offset by `n` element positions in the storage for an array of `Pointee`.
   ///
   /// - Requires: the result points within, or just past the end of, the same allocation as `self`.
   @inline(always)
