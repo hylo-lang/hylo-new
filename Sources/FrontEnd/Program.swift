@@ -1000,24 +1000,6 @@ public struct Program: Sendable {
     self[d.module].implementations(definedBy: d) ?? unreachable("untyped node at \(self[d].site)")
   }
 
-  /// If `witness` expresses the application of some closed and concrete conformance declaration,
-  /// returns that conformance along with its implementation of `requirement`.
-  ///
-  /// `requirement` is the declaration of a requirement of the trait whose conformance is being
-  /// witnessed by the value computed by `witness`. The result is non-`nil` iff `witness` is an
-  /// application of a concrete conformance declaration that does not capture any local binding.
-  ///
-  /// - Requires: The module containing `d` is typed.
-  public func implementation(
-    of requirement: DeclarationIdentity, in witness: WitnessExpression
-  ) -> (ConformanceDeclaration.ID, DeclarationReference)? {
-    if case .reference(let d) = witness.value, let c = cast(d, to: ConformanceDeclaration.self) {
-      return implementations(definedBy: c).member(implementing: requirement).map({ (m) in (c, m) })
-    } else {
-      return nil
-    }
-  }
-
   /// If `n` is a requirement, returns the traits that introduces it. Otherwise, returns `nil`.
   ///
   /// - Requires: The module containing `n` is scoped.
