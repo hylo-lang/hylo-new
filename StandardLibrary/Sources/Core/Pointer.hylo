@@ -31,9 +31,12 @@ public struct Pointer<Pointee> is Deinitializable {
 
   /// Returns `self` offset by `n` element positions in the storage for an array of `Pointee`.
   ///
-  /// - Requires: the result points within, or just past the end of, the same allocation as `self`.
+  /// - Note: the behavior of accessing memory through the result is undefined unless it points to
+  ///   storage within the allocation of `self`.
   @inline(always)
   public fun advanced(by n: Int) -> Self {
+    // TODO: Investigate the cost of not using `inbounds`.
+    // https://github.com/hylo-lang/hylo-new/issues/659
     let offset_in_bytes = Metatype<Pointee>.stride() * n
     return .new(value: Builtin.advanced_by_bytes_word(self.value, offset_in_bytes.value))
   }

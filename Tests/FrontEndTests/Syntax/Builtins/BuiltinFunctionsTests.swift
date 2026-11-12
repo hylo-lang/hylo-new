@@ -69,7 +69,9 @@ struct BuiltinFunctionsTests {
     #expect(show(.ctpop(i64)) == "ctpop_i64")
     #expect(show(.ctlz(i64)) == "ctlz_i64")
     #expect(show(.zeroinitializer(i64)) == "zeroinitializer_i64")
-    #expect(show(.advancedByBytes(byteOffset: i64)) == "advanced_by_bytes_i64")
+    #expect(show(.advancedByBytes(byteOffset: i64, inBounds: false)) == "advanced_by_bytes_i64")
+    #expect(
+      show(.advancedByBytes(byteOffset: i64, inBounds: true)) == "advanced_by_bytes_inbounds_i64")
   }
 
   /// Returns the textual representation of `f`.
