@@ -466,8 +466,8 @@ public struct Interpreter {
     }
   }
 
-  /// Returns the projection of `v` in the current execution context.
-  private func projection(of v: IRValue) -> Projection {
+  /// Returns `v`'s value as a projection.
+  private func asProjection(_ v: IRValue) -> Projection {
     switch v {
     case .register(let r):
       topOfStack.registers[r]!(as: Projection.self)!
@@ -517,7 +517,7 @@ public struct Interpreter {
 
   /// Returns an epilogue that resumes execution from the stack frame of `f`.
   private func resume(_ f: IRValue) -> InstructionEpilogue {
-    return .resume(projection(of: f).continuation)
+    return .resume(asProjection(f).continuation)
   }
 
   /// Returns the bit width of a value of type `t`.
