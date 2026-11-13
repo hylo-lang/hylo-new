@@ -1,2 +1,2 @@
-/// An instance of a type witness.
+/// An instance of a `TypeWitness`.
 typealias TypeWitnessValue = MonomorphicTypeIdentity
