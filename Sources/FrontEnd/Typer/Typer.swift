@@ -3296,7 +3296,7 @@ public struct Typer {
     }
   }
 
-  /// Returns the type of `requirement` presented through a witness table.
+  /// Returns the type of `requirement` as presented through a witness table.
   ///
   /// In witness tables, implementations of function requirements are presented via interfaces
   /// that accept a witness table as their first parameter (the instance of `P.Self`) and where a

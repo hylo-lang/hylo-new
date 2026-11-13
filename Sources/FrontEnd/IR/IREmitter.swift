@@ -3105,7 +3105,7 @@ internal struct IREmitter {
   /// Generates IR deinitializing each individual part of `s`, which is an instance of `t` applied
   /// to `a`.
   ///
-  /// This method and its overloads generate the definition of a synthethic deinitializer. `t` is
+  /// This method and its overloads generate the definition of a synthetic deinitializer. `t` is
   /// either a structural type, or a struct/enum whose definition is visible from the module
   /// being lowered (i.e., not behind a resilience boundary).
   private mutating func _emitDeinitializeMemberwise(
