@@ -119,7 +119,8 @@ private struct StackFrame {
   /// The results of instructions.
   public var registers: [AnyInstructionIdentity: Value] = [:]
 
-  /// The next instruction to execute.
+  /// The instruction currently being executed, or the next instruction to
+  /// execute if no instruction is currently being executed.
   public var currentStep: InstructionPointer
 
   /// Location of values passed to the function.
