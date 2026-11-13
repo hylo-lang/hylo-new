@@ -1,0 +1,20 @@
+// This test exercises implicit deinitialization of monomorphic type using a generic conformance.
+
+trait P {}
+
+struct S {
+  memberwise init
+}
+
+given Int is P {}
+
+given w: <T is P> => S is Deinitializable {
+  fun deinit() sink {}
+}
+
+public fun main() {
+  // The resolution of `w` instantiates `T` with `Int` since that's the only type conforming to `P`
+  // in this scope. This type is then passed to `deinit(:)`, which is a generic function accepting
+  // the context parameters of `w`.
+  _ = S()
+}
