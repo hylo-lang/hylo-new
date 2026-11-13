@@ -3109,8 +3109,9 @@ internal struct IREmitter {
   /// either a structural type, or a struct/enum whose definition is visible from the module
   /// being lowered (i.e., not behind a resilience boundary).
   private mutating func _emitDeinitializeMemberwise(
-    _ s: IRValue, instanceOf t: AnyTypeIdentity, instantiatedWith a: TypeArguments
+    _ s: IRValue, instantiatedWith a: TypeArguments
   ) {
+    let t = currentFunction.result(of: s)!.type
     let u = program.types.substitute(a, in: t)
     if case .trivial = witnessOfDeinitializable(for: u) {
       _assume_state(s, initialized: false)
@@ -3203,18 +3204,17 @@ internal struct IREmitter {
     _ semantics: AccessEffectSet, _ source: IRValue, to target: IRValue
   ) {
     if let k = semantics.uniqueElement {
-      let (typeOfSource, _) = currentFunction.result(of: source) ?? badOperand()
-      _emitMove(k, source, of: typeOfSource, to: target)
+      _emitMove(k, source, to: target)
     } else {
       assert(semantics == [.set, .inout])
       _move(source, to: target)
     }
   }
 
-  /// Generates the IR for move-initializing or move-assigning `target` with `value`.
+  /// Generates the IR for move-initializing or move-assigning `target` with `source`.
   ///
-  /// `source` computes the address of some value instance of `typeOfSource` and `target` computes
-  /// the address of some storage capable of holding that value without any conversion.
+  /// `source` computes the address of some value instance and `target` computes the address of
+  /// some storage capable of holding that value without any conversion.
   ///
   /// The value of `semantics` defines the type of move to emit:
   /// - `.set` emits move-initialization, assuming `target` is uninitialized.
@@ -3225,20 +3225,22 @@ internal struct IREmitter {
   /// An error is reported at the current anchor if no such conformance can be resolved in the
   /// scope of that anchor and a call to `Builtin.trap` is generated.
   private mutating func _emitMove(
-    _ k: AccessEffect, _ source: IRValue, of typeOfSource: AnyTypeIdentity, to target: IRValue
+    _ k: AccessEffect, _ source: IRValue, to target: IRValue
   ) {
     assert((k == .set) || (k == .inout))
     assert(currentFunction.isPlace(source))
     assert(currentFunction.isPlace(target))
 
+    let (sourceType, _) = currentFunction.result(of: source) ?? badOperand()
+
     // Machine types are always copied.
-    if program.types.tag(of: typeOfSource) == MachineType.self {
+    if program.types.tag(of: sourceType) == MachineType.self {
       _emitMoveBuiltin(source, to: target)
       return
     }
 
     // Other types require a conformance to `Hylo.Movable`.
-    guard let w = conformanceWitness(of: typeOfSource, is: .movable) else {
+    guard let w = conformanceWitness(of: sourceType, is: .movable) else {
       _emitTrap()
       return
     }
