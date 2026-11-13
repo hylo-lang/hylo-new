@@ -67,6 +67,8 @@ private struct Value {
       a.location
     } else if let a = storage as? Memory.TypedAddress {
       a
+    } else if let a = storage as? Projection {
+      a.projectee.location
     } else {
       nil
     }
@@ -93,6 +95,16 @@ private enum InstructionEpilogue {
   /// Begins a call to the function on the given arguments, transferring control to the callee.
   case call(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
 
+  /// Begins a subscript call to the function with the given arguments,
+  /// transferring control to the callee.
+  case project(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
+
+  /// Yields the given access to the caller, suspending the current function.
+  case yield(Access<Memory.TypedAddress>)
+
+  /// Resumes execution from the given execution state.
+  case resume(StackFrame)
+
   /// Control is transferred back to the caller.
   case `return`
 
@@ -107,11 +119,23 @@ private struct StackFrame {
   /// The results of instructions.
   public var registers: [AnyInstructionIdentity: Value] = [:]
 
-  /// The next instruction to execute.
+  /// The instruction currently being executed, or the next instruction to
+  /// execute if no instruction is currently being executed.
   public var currentStep: InstructionPointer
 
   /// Location of values passed to the function.
   var parameters: [Access<Memory.TypedAddress>]
+
+}
+
+/// A projected access and its suspended execution state.
+private struct Projection {
+
+  /// The value being projected.
+  public let projectee: Access<Memory.TypedAddress>
+
+  /// The execution state of the suspended function, from which execution resumes.
+  public let continuation: StackFrame
 
 }
 
@@ -129,6 +153,11 @@ private struct Stack {
   ) {
     let p = InstructionPointer(interpreting: f, definedIn: p)
     frames.append(.init(currentStep: p, parameters: ps))
+  }
+
+  /// Pushes `f` to the top of stack.
+  public mutating func push(_ f: StackFrame) {
+    frames.append(f)
   }
 
   /// Removes the top frame.
@@ -223,7 +252,19 @@ public struct Interpreter {
     case .call(let callee, let arguments):
       try advanceProgramCounter()
       callStack.enter(callee, definedIn: program, passing: arguments)
+    case .project(let callee, let arguments):
+      callStack.enter(callee, definedIn: program, passing: arguments)
     case .return: callStack.pop()
+    case .yield(let projectee):
+      try advanceProgramCounter()
+      let continuation = callStack.top
+      callStack.pop()
+      topOfStack.registers[programCounter.position] =
+        Value(Projection(projectee: projectee, continuation: continuation))
+      try advanceProgramCounter()
+    case .resume(let continuation):
+      try advanceProgramCounter()
+      callStack.push(continuation)
     case .register(let v):
       topOfStack.registers[programCounter.position] = v
       try advanceProgramCounter()
@@ -279,9 +320,9 @@ public struct Interpreter {
     case let x as IRPlaceCast:
       _ = x
     case let x as IRProject:
-      _ = x
+      return try project(x.callee, passing: x.arguments)
     case let x as IRRegionEnd<IRProject>:
-      _ = x
+      return resume(x.start)
     case let x as IRProperty:
       let l = x.whole.location(ofField: x.part, in: &self)
       return register(l)
@@ -305,7 +346,7 @@ public struct Interpreter {
     case let x as IRWitnessTable:
       _ = x
     case let x as IRYield:
-      _ = x
+      return yield(x.projectee)
     default:
       fatalError("Interpreter: unimplemented instruction")
     }
@@ -426,6 +467,16 @@ public struct Interpreter {
     }
   }
 
+  /// Returns `v`'s value as a projection.
+  private func asProjection(_ v: IRValue) -> Projection {
+    switch v {
+    case .register(let r):
+      topOfStack.registers[r]!(as: Projection.self)!
+    default:
+      preconditionFailure("\(program.show(v)) is not an Access<Memory.TypedAddress>.")
+    }
+  }
+
   /// Returns the pointer to the first instruction of `b`.
   ///
   /// - Precondition: `b` is a basic block in `programCounter.container`.
@@ -460,6 +511,16 @@ public struct Interpreter {
     }
   }
 
+  /// Returns an epilogue that yields access `v` to the caller, suspending the current function.
+  private func yield(_ v: IRValue) -> InstructionEpilogue {
+    return .yield(access(of: v))
+  }
+
+  /// Returns an epilogue that resumes execution from the stack frame of `f`.
+  private func resume(_ f: IRValue) -> InstructionEpilogue {
+    return .resume(asProjection(f).continuation)
+  }
+
   /// Returns the bit width of a value of type `t`.
   private mutating func bitWidth(_ t: MachineType.ID) -> UInt8 {
     if program.types[t].equals(MachineType.i(1)) {
@@ -477,6 +538,16 @@ public struct Interpreter {
     let g = self[function: f]
     let xs = arguments.map { access(of: $0) }
     return .call(g, passing: xs)
+  }
+
+  /// Returns an epilogue that calls the subscript `f` passing `arguments`.
+  private func project(
+    _ f: IRValue,
+    passing arguments: ArraySlice<IRValue>
+  ) throws -> InstructionEpilogue {
+    let g = self[function: f]
+    let xs = arguments.map { access(of: $0) }
+    return .project(g, passing: xs)
   }
 
 }

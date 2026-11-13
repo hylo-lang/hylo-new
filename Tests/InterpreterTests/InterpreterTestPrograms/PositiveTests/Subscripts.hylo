@@ -1,0 +1,30 @@
+subscript f(x: inout Int) inout -> Int {
+  precondition(x == 0)
+  &x = 1
+  yield &x
+  precondition(x == 2)
+  &x = 3
+}
+
+subscript first(x: inout {Int, Int}) inout -> Int {
+  yield &x.0
+}
+
+subscript nested_first(x: inout {{Int, Int}, Int}) inout -> Int {
+  yield &first[&x.0]
+}
+
+fun main() {
+  var x = 0
+  inout y = f[&x]
+  precondition(y == 1)
+  &y = 2
+  precondition(x == 3)
+
+  var triple = ((1, 2), 3)
+  inout first_element = nested_first[&triple]
+  precondition(first_element == 1)
+  &first_element = 2
+  let pair = triple.0
+  precondition(pair.0 == 2)
+}
