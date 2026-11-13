@@ -1,0 +1,11 @@
+fun g<T>(x: T) {
+  Builtin.trap()
+}
+
+fun f<T>(x: T) {
+  g(x)
+}
+
+fun main() {
+  f(2)
+}

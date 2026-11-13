@@ -196,6 +196,9 @@ public struct Interpreter {
   /// The stack- and dynamically-allocated memory in use.
   fileprivate var memory: Memory
 
+  /// The addresses of global variables.
+  fileprivate var globals: [IRGlobal.Name: Memory.TypedAddress] = [:]
+
   /// The program being executed.
   fileprivate var program: Program { memory.program }
 
@@ -306,7 +309,19 @@ public struct Interpreter {
         return .jump(to: start(x.onFailure))
       }
     case let x as IRGlobalAccess:
-      _ = x
+      if let address = globals[x.source.name] {
+        return register(address)
+      } else {
+        let address = allocate(storageFor: x.source.storageType)
+        switch x.source.initializer {
+        case .typeWitness(let type):
+          try memory.store(
+            .typeWitness(TypeWitnessValue(type)), at: Access(to: address, effect: .set)
+          )
+          return register(address)
+        case .function(_): unimplemented("lazy globals are not supported yet.")
+        }
+      }
     case let x as IRLoad:
       let v = try load(from: x.source)
       return register(v)
@@ -318,7 +333,7 @@ public struct Interpreter {
     case let x as IRPartialApply:
       _ = x
     case let x as IRPlaceCast:
-      _ = x
+      return register(access(of: x.source))
     case let x as IRProject:
       return try project(x.callee, passing: x.arguments)
     case let x as IRRegionEnd<IRProject>:

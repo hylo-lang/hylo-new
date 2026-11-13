@@ -15,11 +15,15 @@ enum RuntimeValue {
   /// discriminator.
   case composite([RuntimeValue], ofType: MonomorphicTypeIdentity)
 
+  /// An instance of a `TypeWitness`.
+  case typeWitness(TypeWitnessValue)
+
   /// Returns the type of the stored value in `program`.
   public func type(in program: inout Program) -> MonomorphicTypeIdentity {
     switch self {
     case .scalar(let value): .init(program.types.demand(value.type).erased)
     case .composite(_, let type): type
+    case .typeWitness(let type): type
     }
   }
 
@@ -29,6 +33,7 @@ enum RuntimeValue {
     switch self {
     case .scalar(let value): value
     case .composite(_, _): nil
+    case .typeWitness(_): nil
     }
   }
 
@@ -37,6 +42,7 @@ enum RuntimeValue {
     switch self {
     case .scalar(_): []
     case .composite(let components, _): components
+    case .typeWitness(_): []
     }
   }
 
@@ -97,9 +103,16 @@ extension RuntimeValue {
       self = .init(record: storage, type: t, definedIn: &p, layouts: &layouts)
     } else if typeTag == Enum.self {
       self = .init(enum: storage, type: t, definedIn: &p, layouts: &layouts)
+    } else if typeTag == TypeWitness.self {
+      self = .typeWitness(t)
     } else {
       unreachable()
     }
+  }
+
+  /// Creates a type witness of `t`.
+  public init(witness t: MonomorphicTypeIdentity) {
+    self = .typeWitness(t)
   }
 
   /// Creates a value for record type `t`, defined in `p`, by interpreting its
@@ -175,6 +188,7 @@ extension RuntimeValue {
       } else {
         unreachable("A composite type must be a struct, tuple, or enum.")
       }
+    case .typeWitness(let w): return withUnsafeBytes(of: w) { Array($0) }
     }
   }
 
