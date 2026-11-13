@@ -40,6 +40,16 @@ struct LayoutComputer {
       return computeLayout(recordType: t, in: &p)
     } else if s == Enum.self {
       return computeLayout(enum: t, in: &p)
+    } else if s == TypeWitness.self {
+      return .init(
+        footprint: .init(
+          alignment: Alignment(bytes: MemoryLayout<TypeWitnessValue>.alignment),
+          size: MemoryLayout<TypeWitnessValue>.size
+        ),
+        type: t,
+        parts: [],
+        isEnumLayout: false
+      )
     } else {
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
     }
