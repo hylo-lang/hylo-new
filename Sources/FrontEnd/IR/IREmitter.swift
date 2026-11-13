@@ -44,27 +44,31 @@ internal struct IREmitter {
 
       switch d {
       case program.standardLibraryDeclaration(.deinitializableDeinit):
-        implementSynthesizedDeinitializer(f, for: a)
+        // The first parameter of `f` is a witness of `Deinitializable` and the second parameter is
+        // the instance to deinitialize.
+        implementSynthesizedDeinitializer(f, deinitializing: .parameter(1), instantiatedWith: a)
+
       default:
         continue // TODO
       }
     }
   }
 
-  /// Generates the body of `f`, which is a synthetic implementation of `Deinitializable.deinit` in
-  /// some conformance declaration.
+  /// Generates the body of `f`, which is a synthetic implementation of `Deinitializable.deinit`
+  /// deinitializing `s`, whose type has been instantiated with `a`.
+  ///
+  /// The object to deinitialize is an instance of some struct or enum `T` bound to `s`, which is
+  /// a parameter of `f`. The declaration of `T` is visible from `self.module`. If it is generic,
+  /// then `a` contains the type arguments with which it has been instantiated.
   private mutating func implementSynthesizedDeinitializer(
-    _ f: IRFunction.ID, for a: TypeArguments
+    _ f: IRFunction.ID, deinitializing s: IRValue, instantiatedWith a: TypeArguments
   ) {
     // Nothing to do if the function has already been defined.
     if program[module].ir[f].isDefined { return }
 
     // Otherwise, generate an implementation.
     defining(f, at: program[module].ir[f].anchor) { (me) in
-      // The first parameter of `f` is a witness of `Deinitializable` and the second parameter is
-      // the instance to deinitialize.
-      let t = me.currentFunction.signature.termParameters[1].type
-      me._emitDeinitializeMemberwise(.parameter(1), instanceOf: t, instantiatedWith: a)
+      me._emitDeinitializeMemberwise(s, instantiatedWith: a)
       me._return()
     }
   }
@@ -1241,7 +1245,9 @@ internal struct IREmitter {
       // The member is declared in a type or conformance declaration and it implements a trait
       // requirement for a conformance declaration.
       else {
-        let interface = program.withTyper(typing: module, { (tp) in tp.typeOfInterface(for: m) })
+        let interface = program.withTyper(typing: module) { (tp) in
+          tp.typeOfInterface(presenting: m)
+        }
         return lowering(at: anchor) { (me) in
           let x0 = me._emit(witness: w)
           let x1 = me._implementation(m, in: x0, as: interface)
@@ -1657,7 +1663,9 @@ internal struct IREmitter {
     if let i = program[module].ir.functions.index(forKey: name) { return i }
 
     // The signature of the function is defined as the signature of the requirement as though it
-    // had been declared in the scope of the conformance declaration.
+    // had been declared in the scope of the conformance declaration. We do not instantiate that
+    // signature with the conformance's type arguments to keep it abstract, which is necessary to
+    // provide a uniform calling convention in existentialized functions.
     let us = accumulatedGenericParameters(visibleFrom: .init(node: conformance))
     let ts = program.withTyper(typing: requirement.module) { (tp) in
       tp.genericParameters(requirement) + us
@@ -3019,10 +3027,11 @@ internal struct IREmitter {
     // We got here if we are unable to perform static dispatch, meaning that we have to get the
     // deinitializer's implementation through a witness table.
     let (table, xs) = _recordingInsertions({ $0._emit(witness: w) })
-    let interface = program.types.demand(
-      Arrow((.let, w.type), (.sink, s.type), to: .void))
+    let interface = program.withTyper(typing: module) { (tp) in
+      tp.typeOfInterface(presenting: requirement)
+    }
 
-    let x0 = _implementation(requirement, in: table, as: interface.erased)
+    let x0 = _implementation(requirement, in: table, as: interface)
     let x1 = _access([.let], from: x0)
     let x2 = _alloca(.void)
     _apply(x1, [table, s.value], into: x2, argumentAccesses: .formAndClose)
@@ -3041,32 +3050,35 @@ internal struct IREmitter {
     structOrEnum s: IRValue,
     applyingDeinitializerSynthesizedFor w: WitnessExpression
   ) {
+    assert(s.parameter != nil)
     let requirement = program.standardLibraryDeclaration(.deinitializableDeinit)
+
+    // The type of the witness has the form `Deinitializable<T>`.
     let witness = program.types.dealiased(w.type)
     let witnessArguments = program.types.select(witness, \TypeApplication.arguments)!
     let name = IRFunction.Name.synthesized(requirement, witnessArguments)
 
-    // The deinitializer may be generic, in which case its type parameters can be retrieved by
-    // looking at the conforming type.
-    let ts = argumentsFromConformanceWitness(witness)
-
-    let signature = prototype(functionOrConformance: requirement)
-    let signatureWithContext = IRFunction.Signature(
-      typeParameters: Array(ts.parameters),
-      termParameters: signature.termParameters,
-      output: signature.output)
-
+    // The signature of the synthesized deinitializer the same as that of the current function.
+    let current = insertionContext.function!
     let deinitializer = program[module].ir.addFunction(
-      IRFunction(name: name, anchor: currentAnchor, signature: signatureWithContext))
-    implementSynthesizedDeinitializer(deinitializer, for: witnessArguments)
+      IRFunction(name: name, anchor: currentAnchor, signature: current.signature))
+    modify(&program[module].ir[deinitializer]) { (f) in
+      for (i, p) in current.signature.termParameters.enumerated() {
+        if let d = p.declaration { f.associate(d, with: .parameter(i)) }
+      }
+    }
 
-    let (table, xs) = _recordingInsertions({ $0._emit(witness: w) })
-    let implementation = functionReference(to: deinitializer)
+    // The synthesized deinitializer is generic if `s` is an instance of a generic type. In this
+    // case, the type of `s` must be an application of a struct or enum constructor and we can
+    // reuse its arguments to instantiate the deinitializer.
+    let us = program.types.select(witnessArguments.values[0], \TypeApplication.arguments) ?? [:]
+    implementSynthesizedDeinitializer(deinitializer, deinitializing: s, instantiatedWith: us)
+    let f = functionReference(to: deinitializer)
+    let g = _type_apply(f, to: .init(mapping: current.signature.typeParameters, to: \.erased))
 
-    let x0 = _alloca(.void)
-    let x1 = _type_apply(implementation, to: ts)
-    _apply(x1, [table, s], into: x0, argumentAccesses: .formAndClose)
-    insertionContext.function!.closeOpenEndedRegions(in: xs)
+    // Forward the arguments of the current function.
+    let xs = (0 ..< current.signature.termParameters.count).map(IRValue.parameter(_:))
+    _apply(g, xs.dropLast(), into: xs.last!, argumentAccesses: .formAndClose)
   }
 
   /// Generates IR deinitializing `s` and returns `true` iff each part of `s` is deinitializable;
@@ -3244,8 +3256,9 @@ internal struct IREmitter {
     let bundle = program.standardLibraryDeclaration(.movableTakeValue)
     let requirement = program.variant(k, of: bundle)!
     let table = _emit(witness: w)
-    let interface = program.types.demand(
-      Arrow((.let, w.type), (k, typeOfSource), (.sink, typeOfSource), to: .void))
+    let interface = program.withTyper(typing: module) { (tp) in
+      tp.typeOfInterface(presenting: .init(requirement))
+    }
 
     let x0 = _implementation(.init(requirement), in: table, as: interface.erased)
     let x1 = _access([.let], from: x0)
