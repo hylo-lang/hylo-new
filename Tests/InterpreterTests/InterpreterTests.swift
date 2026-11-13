@@ -35,8 +35,8 @@ final class InterpreterRunTests: XCTestCase {
   func testTrapOnGenericFunctionCallUsingGlobalTypeWitness() async throws {
     await check(throws: Interpreter.Trap()) {
       try await interpretProgram(
-        at:
-          "InterpreterTestPrograms/NegativeTests/TrapOnGenericFunctionCallUsingGlobalTypeWitness.hylo"
+        at: "InterpreterTestPrograms/NegativeTests/"
+          + "TrapOnGenericFunctionCallUsingGlobalTypeWitness.hylo"
       )
     }
   }
