@@ -1,16 +1,16 @@
-// This test exercises the construction of type witnesses at run-time for records at least 64 KiB.
+// This test exercises the run-time construction of type witnesses for records of at least 64 KiB.
 //
 // The size and alignment of a type are packed into a 64-bit integer whose 48 most significant bits
-// encode the size, the least significant 16 bits the alignment, so a 17-bit size is the first that
-// wouldn't work on a 32-bit target if we incorrectly did some operation on a word-sized integer
-// rather than on UInt64.
+// encode the former and least significant 16 bits encode the latter. Given this encoding, a size
+// whose value occupies 17 bits would demonstrate a bug on a 32-bit target if we interpreted the
+// integer as `Int` rather than `UInt64`.
 
-// The type witness of a record with a single member copies the size and alignment of that member.
+/// A type whose type witness reuses the size and alignment of its single member.
 struct One<T> {
   var a: T
 }
 
-// The type witness of a record with several members is computed by `__initialize_record_offsets`.
+/// A type whose type witness is built using `__initialize_record_offsets`.
 struct Pair<T, U> {
   var a: T
   var b: U

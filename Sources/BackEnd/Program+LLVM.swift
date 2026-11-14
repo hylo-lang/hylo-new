@@ -1583,7 +1583,7 @@ extension Program {
 
   /// Generates LLVM IR for applying the standard library function `callee` to the `xs`.
   ///
-  /// - Requires: No argument is erased or passed by reference, except possibly the output.
+  /// - Requires: No input argument is erased or passed by reference.
   private mutating func insertCallStandardLibraryFunction(
     _ callee: Program.StandardLibraryEntity, with xs: consuming [LLVMValue],
     at p: borrowing InsertionPoint,
