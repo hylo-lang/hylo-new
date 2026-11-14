@@ -299,12 +299,17 @@ extension Program {
     case .zeroinitializer(let t):
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
 
-    case .advancedByBytes(let t):
+    case .advancedByBytes(let t, let inBounds):
       let p = metadata(of: types.demand(MachineType.ptr), in: &ctx.module)
       let b = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: p.llvm, in: &ctx)
       let offsets = insertLoad([s.arguments[1]], instancesOf: t, in: &ctx)
-      ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: b, typed: ctx.module.llvm.i8, indices: offsets , at: ctx.insertionPoint!).v
+      ctx.value[v] = if inBounds {
+        ctx.module.llvm.insertGetElementPointerInBounds(
+          of: b, typed: ctx.module.llvm.i8, indices: offsets, at: ctx.insertionPoint!).v
+      } else {
+        ctx.module.llvm.insertGetElementPointer(
+          of: b, typed: ctx.module.llvm.i8, indices: offsets, at: ctx.insertionPoint!).v
+      }
 
     case .alloca(let t):
       let n = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: ctx.module.llvm.iptr.t, in: &ctx)

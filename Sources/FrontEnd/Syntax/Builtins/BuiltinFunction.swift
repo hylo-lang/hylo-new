@@ -184,8 +184,14 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case zeroinitializer(MachineType.ID)
 
-  /// In LLVM: `getelementptr inbounds` on a base of type `i8`.
-  case advancedByBytes(byteOffset: MachineType.ID)
+  /// In LLVM: `getelementptr` on a base of type `i8`, with the `inbounds` attribute iff `inBounds`
+  /// is `true`.
+  ///
+  /// The offset is added with wrapping two's-complement arithmetic, but accessing memory through
+  /// the result is undefined unless it points into the allocation of the base. Moreover, if
+  /// `inBounds` is `true`, the result is a poison value unless it points within, or just past the
+  /// end of, that allocation.
+  case advancedByBytes(byteOffset: MachineType.ID, inBounds: Bool)
 
   //  case atomic_store_relaxed(MachineType.ID)
   //
@@ -548,7 +554,7 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, to: t)).erased
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
-    case .advancedByBytes(let byteOffset):
+    case .advancedByBytes(let byteOffset, _):
       return s.demand(Arrow(ptr, byteOffset, to: ptr)).erased
     //    case .atomic_store_relaxed(let t):
     //      return .init(.builtin(.ptr), ^t, to: .void)
@@ -910,8 +916,8 @@ extension BuiltinFunction: Showable {
       return printer.format("cttz_%T", [t.erased])
     case .zeroinitializer(let t):
       return printer.format("zeroinitializer_%T", [t.erased])
-    case .advancedByBytes(let t):
-      return printer.format("advanced_by_bytes_%T", [t.erased])
+    case .advancedByBytes(let t, let inBounds):
+      return printer.format("advanced_by_bytes_\(inBounds ? "inbounds_" : "")%T", [t.erased])
     //    case .atomic_store_relaxed(let t):
     //      return "atomic_store_relaxed_\(t)"
     //    case .atomic_store_release(let t):
@@ -1173,8 +1179,8 @@ extension BuiltinFunction {
       if !tokens.isEmpty { return nil }
       self = .addressOf
     case "advanced":
-      guard let (_, t) = advancedByBytesTail(&tokens) else { return nil }
-      self = .advancedByBytes(byteOffset: s.demand(t))
+      guard let ((_, b), t) = advancedByBytesTail(&tokens) else { return nil }
+      self = .advancedByBytes(byteOffset: s.demand(t), inBounds: b != nil)
     case "assume" where tokens.first == "initialized":
       self = .assumeInitialized(true)
     case "assume" where tokens.first == "uninitialized":
@@ -1727,7 +1733,7 @@ private func integerTruncationTail(
 
 /// Parses the parameters and type of `advanced_by_bytes`.
 private let advancedByBytesTail =
-  exactly("by") + exactly("bytes") + machineType
+  exactly("by") + exactly("bytes") + maybe("inbounds") + machineType
 
 /// Parses the parameters and type of an integer arithmetic instruction.
 private let integerArithmeticTail =
