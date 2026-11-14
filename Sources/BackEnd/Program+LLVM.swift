@@ -1308,6 +1308,7 @@ extension Program {
     let ptr = ctx.llvm.ptr
     let int = ctx.llvm.iptr
     let i32 = ctx.llvm.i32
+    let i64 = ctx.llvm.i64
 
     // Declare the witness constructor.
     let constructor = ctx.llvm.declareFunction(name, ctx.typeWitnessConstructor)
@@ -1354,7 +1355,7 @@ extension Program {
       // Is there just a single member?
       else if let m = rs.uniqueElement {
         let w = insertTypeWitness(m, reusing: &witnesses, at: &p, in: constructor, in: &ctx)
-        let sizeAndAlignment = ctx.llvm.insertLoad(int, from: w, at: p)
+        let sizeAndAlignment = ctx.llvm.insertLoad(i64, from: w, at: p)
         ctx.llvm.insertStore(sizeAndAlignment, to: receiver, at: p)
         ctx.llvm.insertStore(int.unsafe[].constant(0), to: offsets, at: p)
       }
@@ -1592,7 +1593,7 @@ extension Program {
 
   /// Generates LLVM IR for applying the standard library function `callee` to the `xs`.
   ///
-  /// - Requires: No argument is erased or passed by reference.
+  /// - Requires: No input argument is erased or passed by reference.
   private mutating func insertCallStandardLibraryFunction(
     _ callee: Program.StandardLibraryEntity, with xs: consuming [LLVMValue],
     at p: borrowing InsertionPoint,
@@ -1616,10 +1617,12 @@ extension Program {
 
     case .byReference:
       // Allocate memory for the result, which is returned by reference.
-      let t = s.unsafe[].parameters.last!
-      xs.append(ctx.llvm.insertAlloca(t, atEntryOf: f).v)
+      let t = function.prototype.mapping.output!.type
+      let r = ctx.llvm.insertAlloca(t.llvm, atEntryOf: f)
+      ctx.llvm.setAlignment(t.layout.alignment.bytes, for: r)
+      xs.append(r.v)
       _ = ctx.llvm.insertCall(function.value, on: xs, at: p).v
-      return ctx.llvm.insertLoad(t, from: xs.last!, at: p).v
+      return ctx.llvm.insertLoad(t.llvm, from: r, at: p).v
     }
   }
 

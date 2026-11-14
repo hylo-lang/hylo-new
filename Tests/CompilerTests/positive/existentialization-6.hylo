@@ -1,0 +1,54 @@
+// This test exercises the run-time construction of type witnesses for records of at least 64 KiB.
+//
+// The size and alignment of a type are packed into a 64-bit integer whose 48 most significant bits
+// encode the former and least significant 16 bits encode the latter. Given this encoding, a size
+// whose value occupies 17 bits would demonstrate a bug on a 32-bit target if we interpreted the
+// integer as `Int` rather than `UInt64`.
+
+/// A type whose type witness reuses the size and alignment of its single member.
+struct One<T> {
+  var a: T
+}
+
+/// A type whose type witness is built using `__initialize_record_offsets`.
+struct Pair<T, U> {
+  var a: T
+  var b: U
+}
+
+/// A type whose instances occupy 64 KiB.
+struct Huge {
+  var payload: Int64[32][16][16]
+}
+
+/// Returns the size of `One<T>`, using a witness constructed at run-time.
+@inline(never)
+fun one_size<T>() -> Int {
+  Metatype<One<T>>.size()
+}
+
+/// Returns the alignment of `One<T>`, using a witness constructed at run-time.
+@inline(never)
+fun one_alignment<T>() -> Int {
+  Metatype<One<T>>.alignment()
+}
+
+/// Returns the size of `Pair<T, Huge>`, using a witness constructed at run-time.
+@inline(never)
+fun pair_size<T>() -> Int {
+  Metatype<Pair<T, Huge>>.size()
+}
+
+/// Returns the alignment of `Pair<T, Huge>`, using a witness constructed at run-time.
+@inline(never)
+fun pair_alignment<T>() -> Int {
+  Metatype<Pair<T, Huge>>.alignment()
+}
+
+public fun main() {
+  precondition(one_size<Huge>() == 1 << 16)
+  precondition(one_alignment<Huge>() == Metatype<Int64>.alignment())
+
+  precondition(pair_size<UInt8>() == (1 << 16) + 1)
+  precondition(pair_alignment<UInt8>() == Metatype<Int64>.alignment())
+}

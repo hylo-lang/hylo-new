@@ -149,7 +149,7 @@ public fun __initialize_record_offsets(
   }
 
   // Use of `layout` extends its lifetime.
-  return .new((size << 16) | __alignment(members, layout, count: n))
+  return (UInt64(size) << 16) | UInt64(__alignment(members, layout, count: n))
 }
 
 /// Returns the alignment of a record having the `n` fields described in `members` and laid out
