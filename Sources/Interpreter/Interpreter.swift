@@ -196,6 +196,9 @@ public struct Interpreter {
   /// The stack- and dynamically-allocated memory in use.
   fileprivate var memory: Memory
 
+  /// The addresses of global variables.
+  fileprivate var globals: [IRGlobal.Name: Memory.TypedAddress] = [:]
+
   /// The program being executed.
   fileprivate var program: Program { memory.program }
 
@@ -239,7 +242,7 @@ public struct Interpreter {
     // `main` takes a `set` access to a `Void` value, so create the
     // corresponding storage and access.
     let a = Access(
-      to: memory.allocate(storageFor: .void).asTypedAddress(.void),
+      to: memory.allocate(.void).asTypedAddress(.void),
       effect: .set
     )
     callStack.enter(p.entry, definedIn: p, passing: [a])
@@ -287,7 +290,7 @@ public struct Interpreter {
       if x.witness != nil {
         unimplemented("dynamically sized stack allocation is not supported yet.")
       }
-      let p = allocate(storageFor: x.storage)
+      let p = allocate(x.storage)
       return register(p)
     case let x as IRApply:
       return try apply(x.callee, passing: x.ioAddresses)
@@ -306,7 +309,18 @@ public struct Interpreter {
         return .jump(to: start(x.onFailure))
       }
     case let x as IRGlobalAccess:
-      _ = x
+      if let address = globals[x.source.name] {
+        return register(address)
+      }
+      let address = allocate(x.source.storageType)
+      switch x.source.initializer {
+      case .typeWitness(let type):
+        try memory.store(
+          .typeWitness(TypeWitnessValue(type)), at: Access(to: address, effect: .set)
+        )
+        return register(address)
+      case .function(_): unimplemented("lazy globals are not supported yet.")
+      }
     case let x as IRLoad:
       let v = try load(from: x.source)
       return register(v)
@@ -318,7 +332,7 @@ public struct Interpreter {
     case let x as IRPartialApply:
       _ = x
     case let x as IRPlaceCast:
-      _ = x
+      return register(access(of: x.source))
     case let x as IRProject:
       return try project(x.callee, passing: x.arguments)
     case let x as IRRegionEnd<IRProject>:
@@ -373,8 +387,8 @@ public struct Interpreter {
   /// and returns its address.
   ///
   /// - Precondition: `t` is a monomorphic type.
-  private mutating func allocate(storageFor t: AnyTypeIdentity) -> Memory.TypedAddress {
-    let a = memory.allocate(storageFor: t)
+  private mutating func allocate(_ t: AnyTypeIdentity) -> Memory.TypedAddress {
+    let a = memory.allocate(t)
     topOfStack.allocations.append(a)
     return a.asTypedAddress(t)
   }
