@@ -31,17 +31,17 @@ struct LayoutComputer {
     _ t: MonomorphicTypeIdentity,
     in p: inout Program
   ) -> TypeLayout {
-    let u = p.underlyingType(t.underlying)
-    let s = p.tag(u)
-    if s == MachineType.self {
-      let v = p.type(u, as: MachineType.self)
+    let unwrappedType = p.underlyingType(t.underlying)
+    switch p.tag(unwrappedType) {
+    case MachineType.self:
+      let v = p.type(unwrappedType, as: MachineType.self)
       return TypeLayout(footprint: abi.footprint(v), type: t, parts: [], isEnumLayout: false)
-    } else if s == Struct.self || s == Tuple.self {
+    case Struct.self, Tuple.self:
       return computeLayout(recordType: t, in: &p)
-    } else if s == Enum.self {
+    case Enum.self:
       return computeLayout(enum: t, in: &p)
-    } else if s == TypeWitness.self {
-      return .init(
+    case TypeWitness.self:
+      return TypeLayout(
         footprint: .init(
           alignment: Alignment(bytes: MemoryLayout<TypeWitnessValue>.alignment),
           size: MemoryLayout<TypeWitnessValue>.size
@@ -50,7 +50,7 @@ struct LayoutComputer {
         parts: [],
         isEnumLayout: false
       )
-    } else {
+    default:
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
     }
   }

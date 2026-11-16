@@ -242,7 +242,7 @@ public struct Interpreter {
     // `main` takes a `set` access to a `Void` value, so create the
     // corresponding storage and access.
     let a = Access(
-      to: memory.allocate(storageFor: .void).asTypedAddress(.void),
+      to: memory.allocate(.void).asTypedAddress(.void),
       effect: .set
     )
     callStack.enter(p.entry, definedIn: p, passing: [a])
@@ -290,7 +290,7 @@ public struct Interpreter {
       if x.witness != nil {
         unimplemented("dynamically sized stack allocation is not supported yet.")
       }
-      let p = allocate(storageFor: x.storage)
+      let p = allocate(x.storage)
       return register(p)
     case let x as IRApply:
       return try apply(x.callee, passing: x.ioAddresses)
@@ -311,16 +311,15 @@ public struct Interpreter {
     case let x as IRGlobalAccess:
       if let address = globals[x.source.name] {
         return register(address)
-      } else {
-        let address = allocate(storageFor: x.source.storageType)
-        switch x.source.initializer {
-        case .typeWitness(let type):
-          try memory.store(
-            .typeWitness(TypeWitnessValue(type)), at: Access(to: address, effect: .set)
-          )
-          return register(address)
-        case .function(_): unimplemented("lazy globals are not supported yet.")
-        }
+      }
+      let address = allocate(x.source.storageType)
+      switch x.source.initializer {
+      case .typeWitness(let type):
+        try memory.store(
+          .typeWitness(TypeWitnessValue(type)), at: Access(to: address, effect: .set)
+        )
+        return register(address)
+      case .function(_): unimplemented("lazy globals are not supported yet.")
       }
     case let x as IRLoad:
       let v = try load(from: x.source)
@@ -388,8 +387,8 @@ public struct Interpreter {
   /// and returns its address.
   ///
   /// - Precondition: `t` is a monomorphic type.
-  private mutating func allocate(storageFor t: AnyTypeIdentity) -> Memory.TypedAddress {
-    let a = memory.allocate(storageFor: t)
+  private mutating func allocate(_ t: AnyTypeIdentity) -> Memory.TypedAddress {
+    let a = memory.allocate(t)
     topOfStack.allocations.append(a)
     return a.asTypedAddress(t)
   }

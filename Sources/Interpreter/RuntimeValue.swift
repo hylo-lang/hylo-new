@@ -94,19 +94,17 @@ extension RuntimeValue {
     layouts: inout LayoutComputer
   ) {
     let unwrappedType = p.underlyingType(t.underlying)
-    let typeTag = p.tag(unwrappedType)
-
-    if typeTag == MachineType.self {
+    switch p.tag(unwrappedType) {
+    case MachineType.self:
       let v = p.type(unwrappedType, as: MachineType.self)
       self = .scalar(.init(storage, type: v, layouts: &layouts))
-    } else if typeTag == Struct.self || typeTag == Tuple.self {
+    case Struct.self, Tuple.self:
       self = .init(record: storage, type: t, definedIn: &p, layouts: &layouts)
-    } else if typeTag == Enum.self {
+    case Enum.self:
       self = .init(enum: storage, type: t, definedIn: &p, layouts: &layouts)
-    } else if typeTag == TypeWitness.self {
+    case TypeWitness.self:
       self = .typeWitness(t)
-    } else {
-      unreachable()
+    default: unreachable()
     }
   }
 
@@ -180,12 +178,12 @@ extension RuntimeValue {
     case .scalar(let value):
       return value.bytes(laidOutUsing: &typeLayouts)
     case .composite(_, let type):
-      let typeTag = program.tag(type.underlying)
-      if typeTag == Struct.self || typeTag == Tuple.self {
+      switch program.tag(type.underlying) {
+      case Struct.self, Tuple.self:
         return bytes(ofStoredRecord: type, definedIn: &program, laidOutUsing: &typeLayouts)
-      } else if typeTag == Enum.self {
+      case Enum.self:
         return bytes(ofStoredEnum: type, definedIn: &program, laidOutUsing: &typeLayouts)
-      } else {
+      default:
         unreachable("A composite type must be a struct, tuple, or enum.")
       }
     case .typeWitness(let w): return withUnsafeBytes(of: w) { Array($0) }
