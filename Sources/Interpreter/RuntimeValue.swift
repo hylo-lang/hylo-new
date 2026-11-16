@@ -85,7 +85,7 @@ extension RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Creates a value of type `t`, defined in `p`, by interpreting its byte
+  /// Creates a value of type `t` (as defined in `p`) by interpreting its byte
   /// representation `storage` according to the layout provided by `layouts`.
   public init(
     _ storage: ArraySlice<UInt8>,
