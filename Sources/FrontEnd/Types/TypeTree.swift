@@ -9,7 +9,7 @@ import Archivist
 /// type value for semantically-equivalent forms [is undecidable](https://arxiv.org/pdf/2502.20546).
 public protocol TypeTree: Hashable, Showable, Archivable, Sendable {
 
-  /// Properties about `self` and its children, which are types in `program`.
+  /// Cached results of queries on `self` such as whether it contains a generic parameter.
   var properties: TypeProperties { get }
 
   /// Returns `self`, which is in `store`, with its parts transformed by `transform(_:_:)`.
