@@ -2,6 +2,16 @@
 //
 // All values are exactly representable in binary floating-point so that the comparisons are exact.
 
+/// Returns `true` iff every comparison operator considers `a` and `b` unordered.
+fun unordered(a: Float32, b: Float32) -> Bool {
+  !(a == b) && (a != b) && !(a < b) && !(a <= b) && !(a > b) && !(a >= b)
+}
+
+/// Returns `true` iff every comparison operator considers `a` and `b` unordered.
+fun unordered(a: Float64, b: Float64) -> Bool {
+  !(a == b) && (a != b) && !(a < b) && !(a <= b) && !(a > b) && !(a >= b)
+}
+
 fun test_f32() {
   var x: Float32 = 1.5
   &x += 2.0 as Float32  // 3.5
@@ -33,6 +43,18 @@ fun test_f32() {
   precondition(n * (-1.0 as Float32) == x)
   precondition(n <= (-12.0 as Float32))
   precondition(n >= (-12.0 as Float32))
+
+  // Signed zeros are equal.
+  precondition((-0.0 as Float32) == Float32.zero())
+  precondition(!((-0.0 as Float32) < Float32.zero()))
+
+  // NaN is unordered with respect to every value, including itself.
+  let inf = (1.0e38 as Float32) * (10.0 as Float32)
+  let nan = inf - inf
+  precondition(x < inf)
+  precondition(unordered(nan, x))
+  precondition(unordered(x, nan))
+  precondition(unordered(nan, nan))
 }
 
 fun test_f64() {
@@ -49,6 +71,18 @@ fun test_f64() {
   precondition(x < y)
   precondition(y > x)
   precondition(x - x == Float64.zero())
+
+  // Signed zeros are equal.
+  precondition(-0.0 == Float64.zero())
+  precondition(!(-0.0 < Float64.zero()))
+
+  // NaN is unordered with respect to every value, including itself.
+  let inf = 1.0e308 * 10.0
+  let nan = inf - inf
+  precondition(x < inf)
+  precondition(unordered(nan, x))
+  precondition(unordered(x, nan))
+  precondition(unordered(nan, nan))
 }
 
 public fun main() {
