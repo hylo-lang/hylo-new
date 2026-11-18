@@ -9,6 +9,10 @@ public struct S is Movable & Deinitializable {
   }
 }
 
+public struct Empty is Movable {
+  public memberwise init
+}
+
 @inline(never)
 public fun move<T is Movable>(k: sink T) -> T {
   return k

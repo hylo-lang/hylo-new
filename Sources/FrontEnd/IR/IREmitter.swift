@@ -170,12 +170,23 @@ internal struct IREmitter {
     source: IRValue, destination: IRValue, instanceOf d: StructDeclaration.ID,
     instantiatedWith a: TypeArguments
   ) {
+    var isEmpty = true
     program.forEachStoredProperty(of: d) { (m, _) in
       let t = program.dealiasedType(assignedTo: m, assuming: RemoteType.self)
       let u = program.types.substitute(a, in: program.types[t].projectee)
       let s = _property(DeclarationIdentity(m), of: source, as: u)
       let d = _property(DeclarationIdentity(m), of: destination, as: u)
       _move(s, to: d)
+      isEmpty = false
+    }
+
+    if isEmpty {
+      if currentFunction.signature.termParameters[1].access == .set {
+        _assume_state(.parameter(1), initialized: true)
+      } else {
+        // `%p1` is already initialized (it's an `inout` parameter).
+      }
+      _assume_state(.parameter(2), initialized: false)
     }
   }
 
