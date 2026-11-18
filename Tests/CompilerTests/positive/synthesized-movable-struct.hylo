@@ -1,0 +1,23 @@
+public struct S is Movable & Deinitializable {
+  public var x: Int
+  public var y: Int
+
+  @inline(always)
+  public init(x: sink Int, y: sink Int) {
+    &self.x = x
+    &self.y = y
+  }
+}
+
+@inline(never)
+public fun move<T is Movable>(k: sink T) -> T {
+  return k
+}
+
+public fun main() {
+  var s = S(1, 2)
+  var m = move(&s)
+
+  precondition(m.x == 1)
+  precondition(m.y == 2)
+}

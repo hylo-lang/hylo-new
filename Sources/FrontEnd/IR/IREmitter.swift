@@ -45,10 +45,146 @@ internal struct IREmitter {
       switch d {
       case program.standardLibraryDeclaration(.deinitializableDeinit):
         implementSynthesizedDeinitializer(f, for: a)
+      case _ where program.parent(containing: d).node
+          == program.standardLibraryDeclaration(.movableTakeValue).erased:
+        implementSynthesizedTakeValue(f, for: a)
       default:
         continue // TODO
       }
     }
+  }
+
+  /// Generates the body of `f` to move the value of its `%p2` to its `%p1`.
+  ///
+  /// - Requires: `f` is a function with the following signature:
+  ///     fun take_value(
+  ///       let %p0: Movable<Self>, // witness of `Movable` 
+  ///       {set|inout} %p1: Self,  // destination
+  ///       sink %p2: Self,         // source
+  ///       set %p3: Void
+  ///     )
+  private mutating func implementSynthesizedTakeValue(_ f: IRFunction.ID, for a: TypeArguments) {
+    assert(program[module].ir[f].signature.termParameters.count == 4)
+    assert(program[module].ir[f].signature.termParameters[1].type
+      == program[module].ir[f].signature.termParameters[2].type,
+      "source and destination types must equal")
+
+    // Nothing to do if the function has already been defined.
+    if program[module].ir[f].isDefined { return }
+
+    // Otherwise, generate the implementation.
+    defining(f, at: program[module].ir[f].anchor) { (me) in
+      let abstractDestination = me.currentFunction.signature.termParameters[1].type
+      let concreteDestination = me.program.types.substitute(a, in: abstractDestination)
+
+      // Is the receiver an instance of a struct or enum?
+      if let d = me.program.declaration(whereStructOrEnum: concreteDestination) {
+        // `%p1` and `%p2` are typed by `Self`, whose layout is opaque; cast them to the concrete
+        // type so their stored properties can be accessed.
+        let k = me.currentFunction.signature.termParameters[1].access
+        let source = me._place_cast(.parameter(2), as: .sink, concreteDestination)
+        let destination = me._place_cast(.parameter(1), as: k, concreteDestination)
+        me._emitTakeValueMemberwise(source: source, destination: destination,
+          instanceOf: d, instantiatedWith: a)
+      }
+      else if let d = me.program.types.cast(concreteDestination, to: Tuple.self) {
+        // `%p1` and `%p2` are typed by `Self`, whose layout is opaque; cast them to the concrete
+        // type so their stored properties can be accessed.
+        let k = me.currentFunction.signature.termParameters[1].access
+        let source = me._place_cast(.parameter(2), as: .sink, concreteDestination)
+        let destination = me._place_cast(.parameter(1), as: k, concreteDestination)
+        me._emitTakeValueMemberwise(source: source, destination: destination, 
+          instanceOf: d, instantiatedWith: a)
+      }
+      // Give up if it's none of the above.
+      else {
+        unimplemented(
+          """
+          synthetic implementation of 'Movable.take_value(:)' for \
+          '\(me.program.show(concreteDestination))'
+          """)
+      }
+
+      me._assume_state(me.currentFunction.returnRegister!, initialized: true)
+      me._return()
+    }
+  }
+
+  /// Generates the body of `f` to move the value of `%p2` to `%p1` member-wise.
+  ///
+  /// - Requires:
+  ///   - `f` is a function with the following signature:
+  ///       fun take_value(
+  ///         let %p0: Movable<Self>, // witness of `Movable` 
+  ///         {set|inout} %p1: Self,  // destination
+  ///         sink %p2: Self,         // source
+  ///         set %p3: Void
+  ///       )
+  ///   - `%1` and `%2` are instances of the same concrete type.
+  private mutating func _emitTakeValueMemberwise(
+    source: IRValue, destination: IRValue, 
+    instanceOf d: DeclarationIdentity,
+    instantiatedWith a: TypeArguments
+  ) {
+    switch program.tag(of: d) {
+    case StructDeclaration.self:
+      _emitTakeValueMemberwise(
+        source: source, destination: destination, 
+        instanceOf: program.castUnchecked(d, to: StructDeclaration.self), instantiatedWith: a)
+
+    case EnumDeclaration.self:
+      _emitTakeValueMemberwise(
+        source: source, destination: destination, 
+        instanceOf: program.castUnchecked(d, to: EnumDeclaration.self), instantiatedWith: a)
+
+    default:
+      program.unexpected(d)
+    }
+  }
+
+  /// Generates the body of `f` to move the value of `%p2` to `%p1` member-wise.
+  private mutating func _emitTakeValueMemberwise(
+    source: IRValue, destination: IRValue, 
+    instanceOf d: Tuple.ID,
+    instantiatedWith a: TypeArguments
+  ) {
+    // Moving an empty tuple only transfers the initialization state.
+    if program.types[d] == .empty {
+      if currentFunction.signature.termParameters[1].access == .set {
+        _assume_state(.parameter(1), initialized: true)
+      } else {
+        // `%p1` is already initialized (it's an `inout` parameter).
+      }
+      _assume_state(.parameter(2), initialized: false)
+    } else {
+      // We can probably express this in the standard library, but we may want to special case it to
+      // speed up compilation of buffers.
+      unimplemented("synthetic implementation of 'Movable.take_value(:)' for '\(program.show(d))'")
+    }
+  }
+
+  /// Generates the body of `f` to move the value of `%p2` to `%p1` member-wise.
+  ///
+  /// - Requires: `source` and `destination` are instances of the same concrete struct.
+  private mutating func _emitTakeValueMemberwise(
+    source: IRValue, destination: IRValue, instanceOf d: StructDeclaration.ID,
+    instantiatedWith a: TypeArguments
+  ) {
+    program.forEachStoredProperty(of: d) { (m, _) in
+      let t = program.dealiasedType(assignedTo: m, assuming: RemoteType.self)
+      let u = program.types.substitute(a, in: program.types[t].projectee)
+      let s = _property(DeclarationIdentity(m), of: source, as: u)
+      let d = _property(DeclarationIdentity(m), of: destination, as: u)
+      _move(s, to: d)
+    }
+  }
+
+  /// Generates the body of `f` to move the value of `%p2` to `%p1` member-wise.
+  private mutating func _emitTakeValueMemberwise(
+    source: IRValue, destination: IRValue, instanceOf d: EnumDeclaration.ID,
+    instantiatedWith a: TypeArguments
+  ) {
+    unimplemented("synthesized memberwise movable conformance for enums")
   }
 
   /// Generates the body of `f`, which is a synthetic implementation of `Deinitializable.deinit` in

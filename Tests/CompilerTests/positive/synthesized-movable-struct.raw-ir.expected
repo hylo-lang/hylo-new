@@ -1,0 +1,31 @@
+fun $synthesized[Movable.take_value.take_value@set for Self: S](let %p0: Movable<Self>, set %p1: Self, sink %p2: Self, set %p3: Void) {
+%b0:
+  %r0 = place_cast %p2 as sink S
+  %r1 = place_cast %p1 as set S
+  %r2 = property "x" of %r0 as Int
+  %r3 = property "x" of %r1 as Int
+  %r4 = move %r2 to %r3
+  %r5 = property "y" of %r0 as Int
+  %r6 = property "y" of %r1 as Int
+  %r7 = move %r5 to %r6
+  %r8 = access [set] %p3
+  %r9 = assume_state %r8 initialized
+  %r10 = end %r8
+  %r11 = return
+}
+
+fun $synthesized[Movable.take_value.take_value@inout for Self: S](let %p0: Movable<Self>, inout %p1: Self, sink %p2: Self, set %p3: Void) {
+%b0:
+  %r0 = place_cast %p2 as sink S
+  %r1 = place_cast %p1 as inout S
+  %r2 = property "x" of %r0 as Int
+  %r3 = property "x" of %r1 as Int
+  %r4 = move %r2 to %r3
+  %r5 = property "y" of %r0 as Int
+  %r6 = property "y" of %r1 as Int
+  %r7 = move %r5 to %r6
+  %r8 = access [set] %p3
+  %r9 = assume_state %r8 initialized
+  %r10 = end %r8
+  %r11 = return
+}
