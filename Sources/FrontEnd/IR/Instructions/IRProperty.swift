@@ -1,7 +1,28 @@
 import Archivist
 import Utilities
 
-/// Accesses a part identified by its declaration in a record.
+/// Accesses a part of a record given the declaration of that part.
+///
+///    property "<part : declaration>" of <whole : value> as <partType : type>
+///
+/// `property` defines a place of type `partType` representing the part declared by `part` within
+/// the place `whole`. The type of `whole` must be a record type containing that part, and
+/// `partType` must be the type of the part in that record, with the record's generic arguments
+/// substituted. The lifetime of `whole` is extended by that of the resulting place.
+///
+/// Unlike `subfield`, which identifies a part by its position, `property` identifies it by its
+/// declaration and does not require the layout of the record to be visible where the instruction
+/// occurs. If that layout is visible and `part` declares a stored property of a struct, `property`
+/// behaves like `subfield` at the position of that property: the resulting place is the
+/// corresponding part of `whole`, sharing its initialization state. Otherwise, the resulting place
+/// is opaque and considered initialized, and `whole` must be initialized.
+///
+///    property "<part : declaration>" of (<whole : value> : <witness : value>) as <partType : type>
+///
+/// This form is used when the type of `whole` depends on type parameters, so the offset of the
+/// part is not known statically. That offset is read from `witness`, the run-time type witness of
+/// `whole`'s type, whose lifetime is also extended by that of the resulting place. This form is
+/// emitted during depolymorphization.
 @Archivable
 public struct IRProperty: IRPart {
 
