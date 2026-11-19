@@ -1,0 +1,12 @@
+public given Void is Movable {}
+// todo public given {Int, Int} is Movable {}
+
+@inline(never)
+public fun move<T is Movable>(k: sink T) -> T {
+  return k
+}
+
+public fun main() {
+  var a = ()
+  var k = move(&a)
+}
