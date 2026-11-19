@@ -468,10 +468,15 @@ public struct Typer {
 
     // The expected types of implementations satisfying the concept's requirements are computed by
     // substituting the abstract types of the concept by their corresponding assignments.
-    var substitutions = Dictionary(
-      uniqueKeysWithValues: witness.arguments.elements.map({ (k, v) in (k.erased, v) }))
+    var substitutions: [AnyTypeIdentity: AnyTypeIdentity] = [:]
+    var tableArguments: TypeArguments = [:]
+    for (k, v) in witness.arguments.elements {
+      let a = program.types.dealiased(v)
+      substitutions[k.erased] = a
+      tableArguments[k] = a
+    }
 
-    var implementations = WitnessTable(concept: witness.concept, arguments: witness.arguments)
+    var implementations = WitnessTable(concept: witness.concept, arguments: tableArguments)
     let requirements = program.requirements(of: witness.concept)
 
     // Find the implementations of associated types in the conformance declaration itself.
@@ -3291,7 +3296,7 @@ public struct Typer {
     }
   }
 
-  /// Returns the type of `requirement` presented through a witness table.
+  /// Returns the type of `requirement` as presented through a witness table.
   ///
   /// In witness tables, implementations of function requirements are presented via interfaces
   /// that accept a witness table as their first parameter (the instance of `P.Self`) and where a
@@ -3299,14 +3304,16 @@ public struct Typer {
   /// ensures that abstract parts are properly existentialized during lowering.
   ///
   /// - Requires: `requirement` is a function requirement in a trait declaration.
-  internal mutating func typeOfInterface(for requirement: DeclarationIdentity) -> AnyTypeIdentity {
+  internal mutating func typeOfInterface(
+    presenting requirement: DeclarationIdentity
+  ) -> AnyTypeIdentity {
     assert(program.isFunctionRequirement(requirement))
 
-    let t = typeOfTraitSelf(in: program.traitRequiring(requirement)!)
     let implementation = declaredType(of: requirement)
     let (c, h) = program.types.contextAndHead(implementation)
+    let s = typeOfTraitSelf(in: program.traitRequiring(requirement)!)
     let a = (program.types[h] as! Arrow).withInputsModified { (ps) in
-      .init(Parameter(access: .let, type: t), prependedTo: ps)
+      .init(Parameter(access: .let, type: s), prependedTo: ps)
     }
 
     let sansContext = program.types.demand(a)

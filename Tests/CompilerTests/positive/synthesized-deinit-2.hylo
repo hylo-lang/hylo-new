@@ -1,11 +1,25 @@
-struct S0<T> is Deinitializable {
+// This test exercises implicit deinitialization of generic types. Two situations are considered:
+// - `S0`'s deinitializer is defined together with the type.
+// - `S1`'s deinitializer is defined in the conformance declaration.
+
+struct S0<T> {
+  var i: Int
+  memberwise init
   fun deinit() sink {}
 }
 
-struct S1<T> {}
+given w0: <U> => S0<U> is Deinitializable {}
 
-given S1<Int> is Deinitializable {
+struct S1<T> {
+  var i: Int
+  memberwise init
+}
+
+given w1: <U> => S1<U> is Deinitializable {
   fun deinit() sink {}
 }
 
-public fun main() {}
+public fun main() {
+  _ = S0<Bool>(i: 2).i
+  _ = S1<Bool>(i: 6).i
+}

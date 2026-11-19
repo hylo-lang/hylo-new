@@ -1,0 +1,3 @@
+negative/no-given-4.hylo:3.22: error: no given instance of 'Deinitializable<T>' in this scope
+  fun deinit() sink {}
+                     ^
