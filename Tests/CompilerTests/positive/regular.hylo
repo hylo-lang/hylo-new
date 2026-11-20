@@ -1,0 +1,11 @@
+struct SR is Deinitializable & Movable & Equatable {
+  memberwise init
+}
+
+given SR is SemiRegular { }
+
+/*public fun main() -> Int32 {
+  var sr0 = SR()
+  var sr1 = SR()
+  &sr0.take_value(from: sr1)
+}*/
