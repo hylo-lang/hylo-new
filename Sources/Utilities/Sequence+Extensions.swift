@@ -45,7 +45,19 @@ extension Sequence {
   /// Returns the least element in `self` according to `compare`, or `nil` if `self` contains no
   /// such element.
   public func least(by compare: (Element, Element) -> StrictOrdering) -> Element? {
-    minimalElements(by: compare).uniqueElement
+    var it = makeIterator()
+    guard var min = it.next() else { return nil }
+    var unique = true
+    while let x = it.next() {
+      switch compare(min, x) {
+      case .ascending: break
+      case .equal: unique = false
+      case .descending:
+        min = x
+        unique = true
+      }
+    }
+    return unique ? min : nil
   }
 
   /// Returns the result of applying `transform` to each element in `self`, joined by the given
