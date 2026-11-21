@@ -1130,7 +1130,7 @@ public struct Program: Sendable {
   /// - Requires: The module containing `s` is scoped.
   public func compareLexicalDistances<T: SyntaxIdentity, U: SyntaxIdentity>(
     _ m: T, _ n: U, relativeTo s: ScopeIdentity
-  ) -> StrictOrdering {
+  ) -> ThreeWayComparisonResult {
     // Are `m` and `n` the same tree.
     if m == n { return .equal }
 
@@ -1141,7 +1141,7 @@ public struct Program: Sendable {
       } else if inSameFile(n, s) {
         return .descending
       } else {
-        return .init(from: depth(m), to: depth(n))
+        return depth(m) <=> depth(n)
       }
     }
 
@@ -1150,22 +1150,22 @@ public struct Program: Sendable {
 
     // Are `m`/`n` and `s` in separate files?
     if !inSameFile(lca!, s) {
-      return .init(from: xs.count, to: ys.count)
+      return xs.count <=> ys.count
     }
 
     // Are `m` and `n` contained in `s`?
     if scopes(from: lca!).contains(s) {
-      return .init(from: xs.count, to: ys.count)
+      return xs.count <=> ys.count
     }
 
     // Is `m` contained in `s`.
     if let i = xs.firstIndex(of: s) {
-      return .init(from: i, to: (xs.count - i) + ys.count)
+      return i <=> (xs.count - i) + ys.count
     }
 
     // Is `n` contained in `s`.
     if let i = ys.firstIndex(of: s) {
-      return .init(from: (ys.count - i) + xs.count, to: i)
+      return (ys.count - i) + xs.count <=> i
     }
 
     // `s` is nested in the innermost scope containing either `m` or `n`, or it does not share a
@@ -1178,7 +1178,7 @@ public struct Program: Sendable {
       if origin == q { return .descending }
       origin = parent(containing: o)
     }
-    return .init(from: xs.count, to: ys.count)
+    return xs.count <=> ys.count
   }
 
   /// Returns the declarations directly contained in `s`.

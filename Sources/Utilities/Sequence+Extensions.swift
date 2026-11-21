@@ -15,7 +15,7 @@ extension Sequence {
 
   /// Returns the elements in `self` that are ordered (by `compare`) less than all other elements,
   /// in their original order.
-  public func minimalElements(by compare: (Element, Element) -> StrictOrdering) -> [Element] {
+  public func minimalElements(by compare: ThreeWayComparison<Element>) -> [Element] {
     var it = makeIterator()
     guard var min = it.next() else { return [] }
     var r = [min]
@@ -34,7 +34,7 @@ extension Sequence {
 
   /// Returns the least element in `self` according to `compare`, or `nil` if `self` contains no
   /// such element.
-  public func least(by compare: (Element, Element) -> StrictOrdering) -> Element? {
+  public func least(by compare: ThreeWayComparison<Element>) -> Element? {
     var it = makeIterator()
     guard var min = it.next() else { return nil }
     var unique = true

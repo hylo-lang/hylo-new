@@ -3770,7 +3770,7 @@ public struct Typer {
       swap(&next, &work)
     }
 
-    return done.minimalElements(by: StrictOrdering.descriptor(ofChangeIn: \SummonResult.penalties))
+    return done.minimalElements(by: threeWayComparison(of: \SummonResult.penalties))
   }
 
   /// Returns the givens whose definitions are at the top-level of `m`.
