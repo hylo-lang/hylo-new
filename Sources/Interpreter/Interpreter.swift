@@ -312,7 +312,7 @@ public struct Interpreter {
       if let address = globals[x.source.name] {
         return register(address)
       }
-      let address = allocate(x.source.storageType)
+      let address = memory.allocate(x.source.storageType).asTypedAddress(x.source.storageType)
       switch x.source.initializer {
       case .typeWitness(let type):
         try memory.store(
