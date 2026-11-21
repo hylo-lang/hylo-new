@@ -13,33 +13,23 @@ extension Sequence {
     self.sorted(by: { (a, b) in areInIncreasingOrder(a[keyPath: path], b[keyPath: path]) })
   }
 
-  /// Returns the set of elements in `self` that are not greater than any other element in `self`
-  /// according to `compare`.
+  /// Returns the elements in `self` that are ordered (by `compare`) less than all other elements,
+  /// in their original order.
   public func minimalElements(by compare: (Element, Element) -> StrictOrdering) -> [Element] {
     var it = makeIterator()
-    var leaves: [Element] = []
+    guard var min = it.next() else { return [] }
+    var r = [min]
 
     while let x = it.next() {
-      if let e = leaves.uniqueElement {
-        switch compare(e, x) {
-        case .ascending:
-          continue
-        case .equal:
-          leaves.append(x)
-          continue
-        case .descending:
-          break
-        }
-      }
-
-      if leaves.allSatisfy({ (y) in compare(x, y) == .ascending }) {
-        leaves = [x]
-      } else {
-        leaves.append(x)
+      switch compare(min, x) {
+      case .ascending: break
+      case .equal: r.append(x)
+      case .descending:
+        min = x
+        r = [x]
       }
     }
-
-    return leaves
+    return r
   }
 
   /// Returns the least element in `self` according to `compare`, or `nil` if `self` contains no
