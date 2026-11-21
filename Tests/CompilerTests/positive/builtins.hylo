@@ -73,15 +73,14 @@ fun test_Builtin_advanced_by_bytes() {
   let p = Builtin.address(of: q)
 
   // Advancing by zero bytes is the identity.
-  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_word(p, (0 as Int).value), p))
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_word(p, 0.value), p))
 
   // Offsets are measured in bytes.
-  expect(Builtin.icmp_eq_ptr(
-    Builtin.advanced_by_bytes_word(p, (3 as Int).value), Builtin.address(of: q.d)))
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_word(p, 3.value), Builtin.address(of: q.d)))
 
   // Offsets are signed.
   let e = Builtin.address(of: q.d)
-  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_word(e, (-3 as Int).value), p))
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_word(e, -3.value), p))
 
   // The offset may have any builtin integer type.
   expect(Builtin.icmp_eq_ptr(
@@ -90,12 +89,39 @@ fun test_Builtin_advanced_by_bytes() {
     Builtin.advanced_by_bytes_i32(e, (-1 as Int32).value), Builtin.address(of: q.c)))
 
   // The storage addressed by an advanced address is that of the corresponding property.
-  let x = Builtin.advanced_by_bytes_word(p, (2 as Int).value) as* (let UInt8)
+  let x = Builtin.advanced_by_bytes_word(p, 2.value) as* (let UInt8)
   precondition(x == (3 as UInt8))
 
-  inout y = Builtin.advanced_by_bytes_word(p, (1 as Int).value) as* (inout UInt8)
+  inout y = Builtin.advanced_by_bytes_word(p, 1.value) as* (inout UInt8)
   &y = 7 as UInt8
   precondition(q.b == (7 as UInt8))
+
+  // Without `inbounds`, the result may be outside the allocation of the base.
+  let z = Builtin.zeroinitializer_ptr()
+  let a = Builtin.advanced_by_bytes_word(z, 8.value)
+  expect(Builtin.icmp_ne_ptr(a, z))
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_word(a, -8.value), z))
+}
+
+fun test_Builtin_advanced_by_bytes_inbounds() {
+  let q = Quad(a: 1 as UInt8, b: 2 as UInt8, c: 3 as UInt8, d: 4 as UInt8)
+  let p = Builtin.address(of: q)
+
+  // Advancing by zero bytes is the identity.
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_inbounds_word(p, 0.value), p))
+
+  // Offsets are measured in bytes and are signed.
+  let e = Builtin.advanced_by_bytes_inbounds_word(p, 3.value)
+  expect(Builtin.icmp_eq_ptr(e, Builtin.address(of: q.d)))
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_inbounds_word(e, -3.value), p))
+
+  // The result may point just past the end of the allocation of the base.
+  let f = Builtin.advanced_by_bytes_inbounds_word(p, 4.value)
+  expect(Builtin.icmp_eq_ptr(Builtin.advanced_by_bytes_inbounds_word(f, -4.value), p))
+
+  // The offset may have any builtin integer type.
+  expect(Builtin.icmp_eq_ptr(
+    Builtin.advanced_by_bytes_inbounds_i32(p, (2 as Int32).value), Builtin.address(of: q.c)))
 }
 
 // MARK: Testing Builtin.shl_*()
@@ -689,7 +715,7 @@ fun test_Builtin_zeroinitializer() {
   expect_not(Builtin.zeroinitializer_i1())
   expect(Builtin.icmp_eq_i8(Builtin.zeroinitializer_i8(), (0 as Int8).value))
   expect(Builtin.icmp_eq_i64(Builtin.zeroinitializer_i64(), (0 as Int64).value))
-  expect(Builtin.icmp_eq_word(Builtin.zeroinitializer_word(), (0 as Int).value))
+  expect(Builtin.icmp_eq_word(Builtin.zeroinitializer_word(), 0.value))
   expect(Builtin.fcmp_oeq_float32(Builtin.zeroinitializer_float32(), (0.0 as Float32).value))
   expect(Builtin.fcmp_oeq_float64(Builtin.zeroinitializer_float64(), (0.0 as Float64).value))
   expect(Builtin.icmp_eq_ptr(Builtin.zeroinitializer_ptr(), Builtin.zeroinitializer_ptr()))
@@ -718,6 +744,7 @@ public fun main() {
   test_Builtin_add()
   test_Builtin_address()
   test_Builtin_advanced_by_bytes()
+  test_Builtin_advanced_by_bytes_inbounds()
   test_Builtin_shl()
   test_Builtin_ashr()
   test_Builtin_lshr()

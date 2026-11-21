@@ -9,7 +9,7 @@ struct FakeTypeWitness is Deinitializable {
   /// Creates an instance describing a type whose instances have the given size and alignment
   /// requirement, measured in bytes.
   init(size s: Int, alignment a: Int) {
-    &self.size_and_alignment = UInt64((s << 16) | a)
+    &self.size_and_alignment = (UInt64(s) << 16) | UInt64(a)
   }
 
 }
