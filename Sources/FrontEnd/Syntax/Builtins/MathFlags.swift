@@ -78,7 +78,10 @@ extension MathFlags: LosslessStringConvertible {
 
   /// The contribution this set of flags makes to name of a function in the `Builtin` module.
   public var description: String {
+    // `fast` means all flags at once.
     if self.contains(.fast) { return "fast" }
+
+    // Enumerate all flags.
     var result: [String] = []
     if self.contains(.afn) { result.append("afn") }
     if self.contains(.arcp) { result.append("arcp") }

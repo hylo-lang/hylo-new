@@ -1,16 +1,19 @@
 //! stage:typing no-std
 
+// A struct with two members.
 struct A {
   public memberwise init
   public let m0 = ()
   public let m1: Void
 }
 
+// A struct with two members declared with a single pattern.
 struct B {
   public memberwise init
   public let (m0, _, m1): {Void, Void, Void}
 }
 
+// A struct with only one non-static member.
 struct C {
   public memberwise init
   public let m0: Void

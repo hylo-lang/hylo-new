@@ -81,18 +81,18 @@ private struct Value {
 
 /// The part of one instruction's execution that follows any memory and I/O effects.
 ///
-/// Each instruction ends by either initializing a constant register associated
-/// with the instruction's address and current stack frame, or transfer control
+/// Each instruction ends by initializing a constant register associated with
+/// the instruction's address and current stack frame or by transferring control
 /// to another instruction.
 private enum InstructionEpilogue {
 
-  /// Initialize instruction register to the given value.
-  case register(Value)
+  /// Initialize the current instruction's register to the given value.
+  case initializeRegister(Value)
 
-  /// Control is transferred to the given instruction.
+  /// Transfer control to the given instruction in the current function.
   case jump(to: InstructionPointer)
 
-  /// Begins a call to the function on the given arguments, transferring control to the callee.
+  /// Begin a function call passing the given arguments (transferring control to the callee).
   case call(GlobalFunctionIdentity, passing: [Access<Memory.TypedAddress>])
 
   /// Begins a subscript call to the function with the given arguments,
@@ -105,7 +105,7 @@ private enum InstructionEpilogue {
   /// Resumes execution from the given execution state.
   case resume(StackFrame)
 
-  /// Control is transferred back to the caller.
+  /// Transfer control back to the caller.
   case `return`
 
 }
@@ -268,7 +268,7 @@ public struct Interpreter {
     case .resume(let continuation):
       try advanceProgramCounter()
       callStack.push(continuation)
-    case .register(let v):
+    case .initializeRegister(let v):
       topOfStack.registers[programCounter.position] = v
       try advanceProgramCounter()
     }
@@ -380,7 +380,7 @@ public struct Interpreter {
 
   /// Returns an epilogue that initializes the instruction's register to `v`.
   private func register(_ v: Any) -> InstructionEpilogue {
-    return .register(.init(v))
+    return .initializeRegister(.init(v))
   }
 
   /// Allocates storage on `callStack` for a value of type `t`, ready to be initialized,
