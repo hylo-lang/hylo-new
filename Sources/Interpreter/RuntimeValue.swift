@@ -23,7 +23,7 @@ enum RuntimeValue {
     switch self {
     case .scalar(let value): .init(program.types.demand(value.type).erased)
     case .composite(_, let type): type
-    case .typeWitness(let type): type
+    case .typeWitness(_): .init(program.types.demand(TypeWitness()).erased)
     }
   }
 
@@ -103,7 +103,11 @@ extension RuntimeValue {
     case Enum.self:
       self = .init(enum: storage, type: t, definedIn: &p, layouts: &layouts)
     case TypeWitness.self:
-      self = .typeWitness(t)
+      self = .typeWitness(
+        storage.withUnsafeBytes {
+          $0.assumingMemoryBound(to: TypeWitnessValue.self).baseAddress!.pointee
+        }
+      )
     default: unreachable()
     }
   }
