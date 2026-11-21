@@ -299,12 +299,17 @@ extension Program {
     case .zeroinitializer(let t):
       ctx.value[v] = metadata(of: t, in: &ctx.module).llvm.unsafe[].null
 
-    case .advancedByBytes(let t):
+    case .advancedByBytes(let t, let inBounds):
       let p = metadata(of: types.demand(MachineType.ptr), in: &ctx.module)
       let b = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: p.llvm, in: &ctx)
       let offsets = insertLoad([s.arguments[1]], instancesOf: t, in: &ctx)
-      ctx.value[v] = ctx.module.llvm.insertGetElementPointerInBounds(
-        of: b, typed: ctx.module.llvm.i8, indices: offsets , at: ctx.insertionPoint!).v
+      ctx.value[v] = if inBounds {
+        ctx.module.llvm.insertGetElementPointerInBounds(
+          of: b, typed: ctx.module.llvm.i8, indices: offsets, at: ctx.insertionPoint!).v
+      } else {
+        ctx.module.llvm.insertGetElementPointer(
+          of: b, typed: ctx.module.llvm.i8, indices: offsets, at: ctx.insertionPoint!).v
+      }
 
     case .alloca(let t):
       let n = insertLoad(ctx.value[s.arguments[0]]!, instanceOf: ctx.module.llvm.iptr.t, in: &ctx)
@@ -1308,6 +1313,7 @@ extension Program {
     let ptr = ctx.llvm.ptr
     let int = ctx.llvm.iptr
     let i32 = ctx.llvm.i32
+    let i64 = ctx.llvm.i64
 
     // Declare the witness constructor.
     let constructor = ctx.llvm.declareFunction(name, ctx.typeWitnessConstructor)
@@ -1354,7 +1360,7 @@ extension Program {
       // Is there just a single member?
       else if let m = rs.uniqueElement {
         let w = insertTypeWitness(m, reusing: &witnesses, at: &p, in: constructor, in: &ctx)
-        let sizeAndAlignment = ctx.llvm.insertLoad(int, from: w, at: p)
+        let sizeAndAlignment = ctx.llvm.insertLoad(i64, from: w, at: p)
         ctx.llvm.insertStore(sizeAndAlignment, to: receiver, at: p)
         ctx.llvm.insertStore(int.unsafe[].constant(0), to: offsets, at: p)
       }
@@ -1592,7 +1598,7 @@ extension Program {
 
   /// Generates LLVM IR for applying the standard library function `callee` to the `xs`.
   ///
-  /// - Requires: No argument is erased or passed by reference.
+  /// - Requires: No input argument is erased or passed by reference.
   private mutating func insertCallStandardLibraryFunction(
     _ callee: Program.StandardLibraryEntity, with xs: consuming [LLVMValue],
     at p: borrowing InsertionPoint,
@@ -1616,10 +1622,12 @@ extension Program {
 
     case .byReference:
       // Allocate memory for the result, which is returned by reference.
-      let t = s.unsafe[].parameters.last!
-      xs.append(ctx.llvm.insertAlloca(t, atEntryOf: f).v)
+      let t = function.prototype.mapping.output!.type
+      let r = ctx.llvm.insertAlloca(t.llvm, atEntryOf: f)
+      ctx.llvm.setAlignment(t.layout.alignment.bytes, for: r)
+      xs.append(r.v)
       _ = ctx.llvm.insertCall(function.value, on: xs, at: p).v
-      return ctx.llvm.insertLoad(t, from: xs.last!, at: p).v
+      return ctx.llvm.insertLoad(t.llvm, from: r, at: p).v
     }
   }
 

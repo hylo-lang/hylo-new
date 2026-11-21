@@ -88,15 +88,13 @@ jobs:
       - name: Run tests
         run: swift test --skip-build -Xswiftc -enable-testing -Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED -c ${{ matrix.config }} --verbose ${{ matrix.export-coverage && '--enable-code-coverage' || '' }}
 
-      - name: Export code coverage
+      - name: Set aside the coverage data of the native run
         if: ${{ matrix.export-coverage }}
-        # The merge picks up the .profraw files written by 'hc' subprocesses spawned from the
-        # end-to-end command-line tests.
-        # '-object' includes the 'hc' binary's coverage mapping in the export.
+        # 'swift test --enable-code-coverage' wipes the codecov directory before running, so the
+        # cross-compiled run below would otherwise discard this data.
         run: |
           BIN_PATH=$(swift build --show-bin-path)
-          llvm-profdata merge -sparse $BIN_PATH/codecov/*.profraw -o $BIN_PATH/codecov/merged.profdata
-          llvm-cov export $BIN_PATH/HyloPackageTests.xctest -object $BIN_PATH/hc --format="lcov" --instr-profile $BIN_PATH/codecov/merged.profdata > info.lcov
+          mv $BIN_PATH/codecov $BIN_PATH/codecov-native
 
       - name: Install qemu and the cross toolchains
         if: ${{ runner.os == 'Linux' && runner.arch == 'X64' }}
@@ -110,7 +108,19 @@ jobs:
           HYLO_TEST_TARGET: armv7-unknown-linux-gnueabihf
           HYLO_TEST_RUNNER: qemu-arm
           QEMU_LD_PREFIX: /usr/arm-linux-gnueabihf
-        run: swift test --skip-build -Xswiftc -enable-testing -Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED -c ${{ matrix.config }} --filter 'CompilerTests\.CompilerTests/'
+        run: swift test --skip-build -Xswiftc -enable-testing -Xswiftc -DSWIFTY_LLVM_CROSS_COMPILATION_ENABLED -c ${{ matrix.config }} ${{ matrix.export-coverage && '--enable-code-coverage' || '' }} --filter 'CompilerTests\.CompilerTests/'
+
+      - name: Export code coverage
+        if: ${{ matrix.export-coverage }}
+        # The merge picks up the .profraw files written by 'hc' subprocesses spawned from the
+        # end-to-end command-line tests.
+        # '-object' includes the 'hc' binary's coverage mapping in the export.
+        # 'codecov' only exists if the cross-compiled run happened; nullglob drops it otherwise.
+        run: |
+          shopt -s nullglob
+          BIN_PATH=$(swift build --show-bin-path)
+          llvm-profdata merge -sparse $BIN_PATH/codecov-native/*.profraw $BIN_PATH/codecov/*.profraw -o $BIN_PATH/merged.profdata
+          llvm-cov export $BIN_PATH/HyloPackageTests.xctest -object $BIN_PATH/hc --format="lcov" --instr-profile $BIN_PATH/merged.profdata > info.lcov
 
       - name: Upload coverage report to Codecov
         if: ${{ matrix.export-coverage }}

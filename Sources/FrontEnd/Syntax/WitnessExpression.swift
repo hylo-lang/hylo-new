@@ -115,18 +115,6 @@ public struct WitnessExpression: Hashable, Sendable {
     }
   }
 
-  /// The declaration of the witness evaluated by this expression, if any.
-  public var declaration: DeclarationIdentity? {
-    switch value {
-    case .identity, .abstract, .synthetic, .assumed, .builtin:
-      return nil
-    case .reference(let d):
-      return d
-    case .termApplication(let w, _), .typeApplication(let w, _), .nested(let w):
-      return w.declaration
-    }
-  }
-
   /// Returns a copy of `self` in which occurrences of `m` have been substituted with `n`.
   internal func substituting(_ m: ExpressionIdentity, with n: ExpressionIdentity) -> Self {
     .init(value: value.substituting(m, with: n), type: type)
@@ -136,21 +124,6 @@ public struct WitnessExpression: Hashable, Sendable {
   /// substituted with `new`.
   internal func substituting(assumed i: Int, with new: Value) -> Self {
     .init(value: value.substituting(assumed: i, with: new), type: type)
-  }
-
-  /// If `self` is a type application of `e`, returns the its type arguments.
-  internal func typeArguments(appliedTo e: ExtensionDeclaration.ID) -> TypeArguments? {
-    var w = self
-    while true {
-      switch w.value {
-      case .termApplication(let f, _):
-        w = f
-      case .typeApplication(let r, let a) where r.declaration == .init(e):
-        return a
-      default:
-        return nil
-      }
-    }
   }
 
 }

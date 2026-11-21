@@ -184,8 +184,14 @@ public enum BuiltinFunction: Hashable, Sendable {
 
   case zeroinitializer(MachineType.ID)
 
-  /// In LLVM: `getelementptr inbounds` on a base of type `i8`.
-  case advancedByBytes(byteOffset: MachineType.ID)
+  /// In LLVM: `getelementptr` on a base of type `i8`, with the `inbounds` attribute iff `inBounds`
+  /// is `true`.
+  ///
+  /// The offset is added with wrapping two's-complement arithmetic, but accessing memory through
+  /// the result is undefined unless it points into the allocation of the base. Moreover, if
+  /// `inBounds` is `true`, the result is a poison value unless it points within, or just past the
+  /// end of, that allocation.
+  case advancedByBytes(byteOffset: MachineType.ID, inBounds: Bool)
 
   //  case atomic_store_relaxed(MachineType.ID)
   //
@@ -548,7 +554,7 @@ extension BuiltinFunction {
       return s.demand(Arrow(t, to: t)).erased
     case .zeroinitializer(let t):
       return s.demand(Arrow(inputs: [], output: t.erased)).erased
-    case .advancedByBytes(let byteOffset):
+    case .advancedByBytes(let byteOffset, _):
       return s.demand(Arrow(ptr, byteOffset, to: ptr)).erased
     //    case .atomic_store_relaxed(let t):
     //      return .init(.builtin(.ptr), ^t, to: .void)
@@ -806,18 +812,18 @@ extension BuiltinFunction: Showable {
       return "assume_\(b ? "" : "un")initialized"
     case .alloca(let t):
       return printer.format("alloca_%T", [t.erased])
+    case .add(let p, let t) where p == .ignore:
+      return printer.format("add_%T", [t.erased])
     case .add(let p, let t):
-      return (p != .ignore)
-        ? printer.format("add_%S_%T", [p, t.erased])
-        : printer.format("add_%T", [t.erased])
+      return printer.format("add_\(p)_%T", [t.erased])
+    case .sub(let p, let t) where p == .ignore:
+      return printer.format("sub_%T", [t.erased])
     case .sub(let p, let t):
-      return (p != .ignore)
-        ? printer.format("sub_%S_%T", [p, t.erased])
-        : printer.format("sub_%T", [t.erased])
+      return printer.format("sub_\(p)_%T", [t.erased])
+    case .mul(let p, let t) where p == .ignore:
+      return printer.format("mul_%T", [t.erased])
     case .mul(let p, let t):
-      return (p != .ignore)
-        ? printer.format("mul_%S_%T", [p, t.erased])
-        : printer.format("mul_%T", [t.erased])
+      return printer.format("mul_\(p)_%T", [t.erased])
     case .udiv(let e, let t):
       return printer.format(e ? "udiv_exact_%T" : "udiv_%T", [t.erased])
     case .sdiv(let e, let t):
@@ -851,7 +857,7 @@ extension BuiltinFunction: Showable {
     case .unsignedMultiplicationWithOverflow(let t):
       return printer.format("umul_with_overflow_%T", [t.erased])
     case .icmp(let p, let t):
-      return printer.format("icmp_%S_%T", [p, t.erased])
+      return printer.format("icmp_\(p)_%T", [t.erased])
     case .trunc(let l, let r):
       return printer.format("trunc_%T_%T", [l.erased, r.erased])
     case .truncateOrZeroExtend(let l, let r):
@@ -870,26 +876,38 @@ extension BuiltinFunction: Showable {
       return "inttoptr"
     case .ptrtoint:
       return "ptrtoint"
+    case .fadd(let f, let t) where f.isEmpty:
+      return printer.format("fadd_%T", [t.erased])
     case .fadd(let f, let t):
-      return f.isEmpty ? "fadd_\(t)" : "fadd_\(f)_\(t)"
+      return printer.format("fadd_\(f)_%T", [t.erased])
+    case .fsub(let f, let t) where f.isEmpty:
+      return printer.format("fsub_%T", [t.erased])
     case .fsub(let f, let t):
-      return f.isEmpty ? "fsub_\(t)" : "fsub_\(f)_\(t)"
+      return printer.format("fsub_\(f)_%T", [t.erased])
+    case .fmul(let f, let t) where f.isEmpty:
+      return printer.format("fmul_%T", [t.erased])
     case .fmul(let f, let t):
-      return f.isEmpty ? "fmul_\(t)" : "fmul_\(f)_\(t)"
+      return printer.format("fmul_\(f)_%T", [t.erased])
+    case .fdiv(let f, let t) where f.isEmpty:
+      return printer.format("fdiv_%T", [t.erased])
     case .fdiv(let f, let t):
-      return f.isEmpty ? "fdiv_\(t)" : "fdiv_\(f)_\(t)"
+      return printer.format("fdiv_\(f)_%T", [t.erased])
+    case .frem(let f, let t) where f.isEmpty:
+      return printer.format("frem_%T", [t.erased])
     case .frem(let f, let t):
-      return f.isEmpty ? "frem_\(t)" : "frem_\(f)_\(t)"
+      return printer.format("frem_\(f)_%T", [t.erased])
+    case .fcmp(let f, let p, let t) where f.isEmpty:
+      return printer.format("fcmp_\(p)_%T", [t.erased])
     case .fcmp(let f, let p, let t):
-      return f.isEmpty ? "fcmp_\(p)_\(t)" : "fcmp_\(f)_\(p)_\(t)"
+      return printer.format("fcmp_\(f)_\(p)_%T", [t.erased])
     case .fptrunc(let l, let r):
-      return "fptrunc_\(l)_\(r)"
+      return printer.format("fptrunc_%T_%T", [l.erased, r.erased])
     case .fpext(let l, let r):
-      return "fpext_\(l)_\(r)"
+      return printer.format("fpext_%T_%T", [l.erased, r.erased])
     case .fptoui(let l, let r):
-      return "fptoui_\(l)_\(r)"
+      return printer.format("fptoui_%T_%T", [l.erased, r.erased])
     case .fptosi(let l, let r):
-      return "fptosi_\(l)_\(r)"
+      return printer.format("fptosi_%T_%T", [l.erased, r.erased])
     case .ctpop(let t):
       return printer.format("ctpop_%T", [t.erased])
     case .ctlz(let t):
@@ -898,8 +916,8 @@ extension BuiltinFunction: Showable {
       return printer.format("cttz_%T", [t.erased])
     case .zeroinitializer(let t):
       return printer.format("zeroinitializer_%T", [t.erased])
-    case .advancedByBytes(let t):
-      return printer.format("advanced_by_bytes_%T", [t.erased])
+    case .advancedByBytes(let t, let inBounds):
+      return printer.format("advanced_by_bytes_\(inBounds ? "inbounds_" : "")%T", [t.erased])
     //    case .atomic_store_relaxed(let t):
     //      return "atomic_store_relaxed_\(t)"
     //    case .atomic_store_release(let t):
@@ -1161,8 +1179,8 @@ extension BuiltinFunction {
       if !tokens.isEmpty { return nil }
       self = .addressOf
     case "advanced":
-      guard let (_, t) = advancedByBytesTail(&tokens) else { return nil }
-      self = .advancedByBytes(byteOffset: s.demand(t))
+      guard let ((_, b), t) = advancedByBytesTail(&tokens) else { return nil }
+      self = .advancedByBytes(byteOffset: s.demand(t), inBounds: b != nil)
     case "assume" where tokens.first == "initialized":
       self = .assumeInitialized(true)
     case "assume" where tokens.first == "uninitialized":
@@ -1715,7 +1733,7 @@ private func integerTruncationTail(
 
 /// Parses the parameters and type of `advanced_by_bytes`.
 private let advancedByBytesTail =
-  exactly("by") + exactly("bytes") + machineType
+  exactly("by") + exactly("bytes") + maybe("inbounds") + machineType
 
 /// Parses the parameters and type of an integer arithmetic instruction.
 private let integerArithmeticTail =

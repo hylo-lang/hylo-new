@@ -2487,7 +2487,7 @@ public struct Typer {
     let s = program.spanForDiagnostic(about: e)
 
     // Is `e` a constructor reference?
-    if program.isConstructorReference(e) {
+    if isUnelaboratedConstructorReference(e) {
       let n = program[e.module].insert(
         NameExpression(qualification: nil, name: .init("init", at: s), site: s),
         in: program.parent(containing: e))
@@ -2896,6 +2896,16 @@ public struct Typer {
     }
   }
 
+  /// Returns `true` iff `n` is a name expression of the form  `.new` or `q.new`, where `q` is any
+  /// arbitrary qualification.
+  private func isUnelaboratedConstructorReference(_ n: NameExpression.ID) -> Bool {
+    if let m = program.cast(n, to: NameExpression.self) {
+      return program[m].name.value.identifier == "new"
+    } else {
+      return false
+    }
+  }
+
   /// Returns the declaration to which `e` refers in `context`, if any.
   private func declaration(
     referredToBy e: ExpressionIdentity, in context: InferenceContext
@@ -3265,7 +3275,8 @@ public struct Typer {
     }
 
     // The witness refers to a given declaration?
-    else if let c = program.flatCast(witness.declaration, to: ConformanceDeclaration.self) {
+    let w = program.declaration(maybeReferredToBy: witness.value)
+    if let c = program.flatCast(w?.target, to: ConformanceDeclaration.self) {
       // Read the associated type definition.
       if let i = implementation(of: requirement, in: c) {
         return declaredType(of: i)
@@ -3362,54 +3373,6 @@ public struct Typer {
         Metakind(inhabitant: .arrow(program.types[l].inhabitant, program.types[r].inhabitant)))
       program[e.module].setType(k.erased, for: e)
       return k
-    }
-  }
-
-  /// Returns a denotation of `e` iff `e` represents an immutable value.
-  ///
-  /// - Requires: `e` has been type checked.
-  private func stableDenotation(_ e: ExpressionIdentity) -> Denotation? {
-    assert(program[e.module].type(assignedTo: e) != nil, "expression is not type checked")
-    switch program.tag(of: e) {
-    case NameExpression.self:
-      return stableDenotation(program.castUnchecked(e, to: NameExpression.self))
-    default:
-      return nil
-    }
-  }
-
-  /// Returns a denotation of `e` iff `e` represents an immutable value.
-  ///
-  /// - Requires: `e` has been type checked.
-  private func stableDenotation(_ e: NameExpression.ID) -> Denotation? {
-    guard
-      let t = program[e.module].type(assignedTo: e),
-      let r = program[e.module].declaration(referredToBy: e)
-    else { return nil }
-
-    if let d = r.target {
-      if !isStable(d) { return nil }
-      if let q = program[e].qualification {
-        return stableDenotation(q).flatMap({ (a) in .reference(a, r, t) })
-      } else {
-        return .reference(nil, r, t)
-      }
-    }
-
-    return nil
-  }
-
-  /// Returns `true` iff `d` introduces an immutable entity.
-  ///
-  /// - Requires: `d` has been type checked.
-  private func isStable(_ d: DeclarationIdentity) -> Bool {
-    switch program.tag(of: d) {
-    case ParameterDeclaration.self, VariableDeclaration.self:
-      let t = program[d.module].type(assignedTo: d)!
-      return (program.types[t] as? RemoteType)?.access == .let
-
-    default:
-      return false
     }
   }
 
@@ -4396,7 +4359,7 @@ public struct Typer {
 
           // Strip the context defined by the extension, apply type arguments from the matching
           // witness, and substitute the extendee for the receiver.
-          if let arguments = w.typeArguments(appliedTo: e) {
+          if let arguments = typeArguments(instantiating: e, in: w.value) {
             member = program.types.substitute(arguments, in: member)
           }
           candidates.append(
@@ -4670,6 +4633,28 @@ public struct Typer {
       cache.scopeToExtensionApplies[scopeOfUse, default: [:]][key] = result
     }
     return result
+  }
+
+  /// Returns the arguments passed to the type parameters of `e` in `w`, which is an expression
+  /// witnessing a use of `e`.
+  private func typeArguments(
+    instantiating e: ExtensionDeclaration.ID, in w: WitnessExpression.Value
+  ) -> TypeArguments? {
+    var v = w
+    while true {
+      switch v {
+      case .termApplication(let f, _):
+        v = f.value
+
+      case .typeApplication(let r, let a):
+        return program.declaration(maybeReferredToBy: r.value)?.target.flatMap { (d) in
+          d == e ? a : nil
+        }
+
+      default:
+        return nil
+      }
+    }
   }
 
   /// Returns the modules that are imported by `f`, which is in the module being typed.
