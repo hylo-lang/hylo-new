@@ -44,7 +44,7 @@ extension Sequence {
 
   /// Returns the unique least element in `self` according to `compare`, or `nil` if `self` does not
   /// contain exactly one such element.
-  public func uniqueLeast(by compare: (Element, Element) -> StrictOrdering) -> Element? {
+  public func uniqueMin(by compare: (Element, Element) -> StrictOrdering) -> Element? {
     var it = makeIterator()
     guard var min = it.next() else { return nil }
     var unique = true

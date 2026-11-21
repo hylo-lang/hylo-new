@@ -588,7 +588,7 @@ internal struct Solver {
 
     // Otherwise, identify the right choice.
     let scopeOfUse = program.parent(containing: k.name)
-    let least = viable.uniqueLeast { (a, b) in
+    let least = viable.uniqueMin { (a, b) in
       program.isPreferred(a.choice, over: b.choice, in: scopeOfUse)
     }
 
