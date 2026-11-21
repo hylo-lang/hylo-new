@@ -16,6 +16,8 @@ discussion](https://github.com/orgs/hylo-lang/discussions/1868).
 - An object is **initialized** at the first completion of a `set` access on it (an `init` function is a `set` access on `self`).
 - An object is **complete** when all parts[^parts] are initialized.
 - An initialized or complete object becomes **incomplete** (and **uninitialized** [^init-complete]) when any part is accessed as `sink`, and returns to its prior state whenever all of its parts have returned to an initialized state.
+- A projection of an object *w* **overlaps** an object *y* when *w* = *y*, *y* is a part of *w*, or
+  *w* is a part of *y*. [^parts]
 
 [^temporary]: Projections can be bound to names but may also be the temporary unnamed results of expressions.
 [^var]:  A `var` declaration creates a bound `sink` projection.
@@ -26,7 +28,7 @@ discussion](https://github.com/orgs/hylo-lang/discussions/1868).
 
 In entirely safe code, the compiler upholds these properties:
 - An active non-`set` projection of type `T` always refers to a complete object of type `T`.
-- if *x* is an active `sink`, `set`, or `inout` projection of an object *y*, no other projection that includes *y* is active.
+- if *x* is an active `sink`, `set`, or `inout` projection of an object *y*, no other active projection overlaps *y*.
 
 **Note:** the compiler also ensures that only active projections of complete objects are used in expressions other than those that narrow active projections of incomplete objects to their stored parts, e.g. in `x.y`, `x` may project an incomplete object.
 
@@ -36,6 +38,6 @@ The behavior of a program that violates either property (e.g., using pointers) i
 let i = 3
 let p = pointer[to: i] // i becomes inactive
 let q = p.copy()       // projection of p ends; i becomes active
-let j = q.unsafe[]     // UB: active projection `j` includes the object bound to active `sink` projection `i`
+let j = q.unsafe[]     // UB: active projection `j` overlaps the object bound to active `sink` projection `i`
 ```
 
