@@ -105,7 +105,8 @@ extension RuntimeValue {
     case TypeWitness.self:
       self = .typeWitness(
         storage.withUnsafeBytes {
-          $0.assumingMemoryBound(to: TypeWitnessValue.self).baseAddress!.pointee
+          assert($0.isAligned(to: MemoryLayout<TypeWitnessValue>.alignment))
+          return $0.assumingMemoryBound(to: TypeWitnessValue.self).baseAddress!.pointee
         }
       )
     default: unreachable()
@@ -234,6 +235,16 @@ extension RuntimeValue {
     bytes[activeCaseOffset..<activeCaseOffset + activeCaseBytes.count] = activeCaseBytes[...]
 
     return bytes
+  }
+
+}
+
+extension UnsafeRawBufferPointer {
+
+  /// Returns `true` iff the buffer's base address is aligned to `alignment`.
+  fileprivate func isAligned(to alignment: Int) -> Bool {
+    precondition(alignment > 0)
+    return Int(bitPattern: baseAddress!) % alignment == 0
   }
 
 }
