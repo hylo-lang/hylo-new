@@ -318,6 +318,7 @@ public struct Interpreter {
         try memory.store(
           .typeWitness(TypeWitnessValue(type)), at: Access(to: address, effect: .set)
         )
+        globals[x.source.name] = address
         return register(address)
       case .function(_): unimplemented("lazy globals are not supported yet.")
       }
