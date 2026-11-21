@@ -42,9 +42,9 @@ extension Sequence {
     return leaves
   }
 
-  /// Returns the least element in `self` according to `compare`, or `nil` if `self` contains no
-  /// such element.
-  public func least(by compare: (Element, Element) -> StrictOrdering) -> Element? {
+  /// Returns the unique least element in `self` according to `compare`, or `nil` if `self` does not
+  /// contain exactly one such element.
+  public func uniqueMin(by compare: (Element, Element) -> StrictOrdering) -> Element? {
     var it = makeIterator()
     guard var min = it.next() else { return nil }
     var unique = true
