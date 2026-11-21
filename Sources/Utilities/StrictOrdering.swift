@@ -5,24 +5,26 @@ public enum ThreeWayComparisonResult: CaseIterable, Hashable {
   case ascending
 
   /// The LHS is neither ordered before nor ordered after the RHS.
-  case equal
+  case equivalent
 
   /// The LHS is ordered after the RHS.
   case descending
 
 }
 
+/// The [spaceship operator](https://en.wikipedia.org/wiki/Three-way_comparison).
 infix operator <=>: ComparisonPrecedence
 
 extension Comparable {
 
   /// Returns the direction of change from `a` to `b`.
   public static func <=> (a: Self, b: Self) -> ThreeWayComparisonResult {
-    a < b ? .ascending : b < a ? .descending : .equal
+    a < b ? .ascending : b < a ? .descending : .equivalent
   }
 
 }
 
+/// A strict weak ordering expressed as a three-way comparison.
 public typealias ThreeWayComparison<T> = (T, T) -> ThreeWayComparisonResult
 
 /// Returns a function ordering `T` instances `x` and `y` per `f(x) <=> f(y)`.

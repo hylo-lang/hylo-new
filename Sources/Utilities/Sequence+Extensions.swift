@@ -23,7 +23,7 @@ extension Sequence {
     while let x = it.next() {
       switch compare(min, x) {
       case .ascending: break
-      case .equal: r.append(x)
+      case .equivalent: r.append(x)
       case .descending:
         min = x
         r = [x]
@@ -41,7 +41,7 @@ extension Sequence {
     while let x = it.next() {
       switch compare(min, x) {
       case .ascending: break
-      case .equal: unique = false
+      case .equivalent: unique = false
       case .descending:
         min = x
         unique = true

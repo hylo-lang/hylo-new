@@ -1132,7 +1132,7 @@ public struct Program: Sendable {
     _ m: T, _ n: U, relativeTo s: ScopeIdentity
   ) -> ThreeWayComparisonResult {
     // Are `m` and `n` the same tree.
-    if m == n { return .equal }
+    if m == n { return .equivalent }
 
     // Are `m` and `n` in separate files?
     if !inSameFile(m, n) {

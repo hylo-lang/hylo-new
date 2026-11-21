@@ -32,11 +32,11 @@ extension Program {
       if let a = lhs.reference.target, let b = rhs.reference.target {
         compareLexicalDistances(a, b, relativeTo: scopeOfUse)
       } else {
-        .equal
+        .equivalent
       }
     }
 
-    return d != .equal ? d
+    return d != .equivalent ? d
       : threeWayComparison(of: \.reference.elaborationCost)(lhs, rhs)
   }
 
