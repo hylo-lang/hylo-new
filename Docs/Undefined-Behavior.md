@@ -11,8 +11,11 @@ discussion](https://github.com/orgs/hylo-lang/discussions/1868).
 
 - A **projection** is a `sink`, `set`, `inout` or `let` access. [^temporary] [^var]
 - A **projection of type `T`** is an access to an object of type `T`.
+- A projection's **lifetime** starts when it is created and ends immediately after its last use.
 - Projections are **active** when they are created.
-- A projection can become **inactive** during its lifetime.  For example, in `x: inout T = &y`, `y` becomes inactive, and becomes active again when the lifetime of `x` ends.
+- Projections are subject to two kinds of **transition** during their lifetimes:
+  - An active projection can temporarily become **inactive**.
+  - The **kind** (`sink`, `set`, `inout` or `let`) of a projection can change to `let`.
 - An object is **initialized** at the first completion of a `set` access on it (an `init` function is a `set` access on `self`).
 - An object is **complete** when all parts[^parts] are initialized.
 - An initialized or complete object becomes **incomplete** (and **uninitialized** [^init-complete]) when any part is accessed as `sink`, and returns to its prior state whenever all of its parts have returned to an initialized state.
@@ -21,6 +24,41 @@ discussion](https://github.com/orgs/hylo-lang/discussions/1868).
 [^var]:  A `var` declaration creates a bound `sink` projection.
 [^parts]: An object's parts all follow from its type declaration and do not depend on the  user-defined semantics of operations.  For example, they do not include “logical parts” that can only be reached via declared pointers, such as the elements of a dynamic array, even though its `==` operation implies that they are parts.
 [^init-complete]: Every initialized object is complete, so every incomplete object is uninitialized.
+
+## Transitions
+
+### Initialization and deinitialization
+
+- A `set` projection becomes an `inout` projection when the accessed object is complete.
+- An `inout` projection becomes a `set` projection when the accessed object is incomplete (and must
+  return to `inout` before its lifetime ends).
+
+### Re-Projection
+
+There are four ways to produce a new projection from a projection `p`:
+- Binding declaration, e.g. `let q = p`, where `q` is produced.
+- Passing `p` as an argument to a function or subscript, where the corresponding parameter is produced.
+- Subscripting, e.g. `p[0]`
+- Member access, e.g. `p.x`
+
+In the first two cases, the kind of the new projection is explicitly declared.  In the latter two it
+is the same as the kind of `p`, except when `p` is a `set` projection and the accessed part is
+initialized, in which case the new projection's kind is `inout`.
+
+Depending on the kind of the original and new projections, the original projection may make a
+temporary transition from active to inactive, or from one kind to another.
+
+| original / new | `sink`   | `set`    | `inout`  | `let`    | 
+| -------------- | -------- | -------- | -------- | -------- |
+| **`sink`**     | inactive | n/a      | inactive | `let`    |
+| **`set`**      | n/a      | inactive | n/a      | n/a      |
+| **`inout`**    | inactive | n/a      | inactive | `let`    |
+| **`let`**      | n/a      | n/a      | n/a      | *none*   | 
+
+**Note:** a `sink let` declaration creates a `sink` binding on which mutation is disallowed.
+
+The transition of a projection `p` ends when no re-projections of `p` remain, when it reverts to its
+earlier kind and becomes active.
 
 ## Laws
 
