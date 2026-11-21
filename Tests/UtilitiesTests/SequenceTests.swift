@@ -8,13 +8,13 @@ final class SequenceTests: XCTestCase {
     XCTAssert(xs.sorted(by: \.b).elementsEqual(xs.reversed(), by: { (a, b) in a == b }))
   }
 
-  func testLeast() {
+  func testUniqueLeast() {
     let x0: [Int] = []
-    XCTAssertNil(x0.least(by: StrictOrdering.comparing(\.self)))
+    XCTAssertNil(x0.uniqueLeast(by: StrictOrdering.comparing(\.self)))
     let x1: [Int] = [1, 2, 1, 3]
-    XCTAssertNil(x1.least(by: StrictOrdering.comparing(\.self)))
+    XCTAssertNil(x1.uniqueLeast(by: StrictOrdering.comparing(\.self)))
     let x2: [Int] = [1, 2, 0, 3]
-    XCTAssertEqual(x2.least(by: StrictOrdering.comparing(\.self)), 0)
+    XCTAssertEqual(x2.uniqueLeast(by: StrictOrdering.comparing(\.self)), 0)
   }
 
   func testMin() {
