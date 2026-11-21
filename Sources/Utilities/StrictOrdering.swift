@@ -1,4 +1,4 @@
-/// The result of a three-way comparison implementing a strict total order.
+/// The result of a three-way comparison implementing a strict weak order.
 public enum ThreeWayComparisonResult: CaseIterable, Hashable {
 
   /// The LHS is ordered before the RHS.
