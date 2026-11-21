@@ -1,7 +1,7 @@
 import Utilities
 import XCTest
 
-final class StrictOrderingTests: XCTestCase {
+final class ThreeWayComparisonTests: XCTestCase {
 
   func testInitFromComparable() {
     XCTAssertEqual(3 <=> 5, .ascending)
