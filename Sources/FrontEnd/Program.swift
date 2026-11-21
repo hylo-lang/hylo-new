@@ -1141,7 +1141,7 @@ public struct Program: Sendable {
       } else if inSameFile(n, s) {
         return .descending
       } else {
-        return .init(between: depth(m), and: depth(n))
+        return .init(from: depth(m), to: depth(n))
       }
     }
 
@@ -1150,22 +1150,22 @@ public struct Program: Sendable {
 
     // Are `m`/`n` and `s` in separate files?
     if !inSameFile(lca!, s) {
-      return .init(between: xs.count, and: ys.count)
+      return .init(from: xs.count, to: ys.count)
     }
 
     // Are `m` and `n` contained in `s`?
     if scopes(from: lca!).contains(s) {
-      return .init(between: xs.count, and: ys.count)
+      return .init(from: xs.count, to: ys.count)
     }
 
     // Is `m` contained in `s`.
     if let i = xs.firstIndex(of: s) {
-      return .init(between: i, and: (xs.count - i) + ys.count)
+      return .init(from: i, to: (xs.count - i) + ys.count)
     }
 
     // Is `n` contained in `s`.
     if let i = ys.firstIndex(of: s) {
-      return .init(between: (ys.count - i) + xs.count, and: i)
+      return .init(from: (ys.count - i) + xs.count, to: i)
     }
 
     // `s` is nested in the innermost scope containing either `m` or `n`, or it does not share a
@@ -1178,7 +1178,7 @@ public struct Program: Sendable {
       if origin == q { return .descending }
       origin = parent(containing: o)
     }
-    return .init(between: xs.count, and: ys.count)
+    return .init(from: xs.count, to: ys.count)
   }
 
   /// Returns the declarations directly contained in `s`.

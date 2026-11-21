@@ -36,8 +36,8 @@ extension Program {
       }
     }
 
-    return d.inequalElse(
-      .init(between: lhs.reference.elaborationCost, and: rhs.reference.elaborationCost))
+    return d != .equal ? d
+      : StrictOrdering.descriptor(ofChangeIn: \.reference.elaborationCost)(lhs, rhs)
   }
 
 }
