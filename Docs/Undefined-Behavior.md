@@ -40,3 +40,4 @@ let p = pointer[to: i] // i becomes inactive
 let q = p.copy()       // projection of p ends; i becomes active
 let j = q.unsafe[]     // UB: active projection `j` overlaps the object bound to active `sink` projection `i`
 ```
+
