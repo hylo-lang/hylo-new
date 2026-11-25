@@ -12,6 +12,6 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Run pre-commit hook
-        uses: j178/prek-action@5337cb91e0fa35a7ff31b9ca345126d8bbbcdf16
+        uses: j178/prek-action@7b101f8338a08d2bd6fdb3625e4e7692428763a3
         with:
           prek-version: '0.5.0'
