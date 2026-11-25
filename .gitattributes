@@ -1,8 +1,6 @@
 # Automatically detect and normalize text files.
 * text=auto eol=lf
 
-*.pbxproj merge=union
-
 *.swift text diff=swift
 *.c text diff=c
 *.hylo text diff=hylo
