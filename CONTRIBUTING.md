@@ -11,7 +11,7 @@ Spell checking is performed by [`typos`](https://github.com/crate-ci/typos) in t
 To run it locally, install `typos` from its [prebuilt releases](https://github.com/crate-ci/typos/releases), then use:
 
 ```sh
-typos -c .typos.toml 
+typos -c .typos.toml
 typos -c .typos.toml --write-changes
 ```
 

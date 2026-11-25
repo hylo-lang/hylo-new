@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/github/hylo-lang/hylo-new/graph/badge.svg?token=2auHoqmMSq)](https://codecov.io/github/hylo-lang/hylo-new)
 
-Hylo is a safe systems programming language leveraging mutable value semantics and generic programming. To learn more, 
+Hylo is a safe systems programming language leveraging mutable value semantics and generic programming. To learn more,
 visit https://hylo-lang.org/.
 
 ## Building Instructions
@@ -12,7 +12,7 @@ built using the Swift Package Manager from the Swift 6.3.2 toolchain or later. F
 see [Building Instructions](https://hylo-lang.org/docs/contributing/building-the-compiler/) on our website.
 
 ## The Hylo Compiler's Runtime Dependencies
-`hc` uses `clang` for linking, resolving them from PATH. On macOS, you will need `xcrun` 
+`hc` uses `clang` for linking, resolving them from PATH. On macOS, you will need `xcrun`
 on PATH so the compiler can find the SDK.
 
 ## Environment Variables

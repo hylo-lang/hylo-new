@@ -15,7 +15,7 @@ An enum's record representation is composed of its discriminator and payload, wh
 with 0 or 1 cases have no discriminator.
 
 A record's members are laid out in decreasing order of alignment, or when equal, in declaration
-order. 
+order.
 
 - The offset of each member is such that
   - `(member_byte_offset + member_size) <= record_size`.
@@ -29,7 +29,7 @@ order.
 - Functions return their result indirectly except when the return type's layout is known and doesn't
   exceed the size of a pointer.
   - Directly: through an LLVM function return value.
-  - Indirectly: through a new pointer parameter added at the end of the signature, which points to 
+  - Indirectly: through a new pointer parameter added at the end of the signature, which points to
     uninitialized storage allocated by the caller.
 - Parameters are passed indirectly, except `sink` and `let` parameters that don't exceed the size of
   a pointer.
@@ -45,7 +45,7 @@ intptr_t f(intptr_t p1, int32_t* p2, LargeStruct const*);
 
 ```cpp
 fun g(a: let Vector2, b: let Vector2) -> Vector2
-// roughly translates to: 
+// roughly translates to:
 void g(Vector2 const* a, Vector2 const* b, Vector2* result);
 ```
 
@@ -64,7 +64,7 @@ TODO
 
 ### Indirect C Calling Convention
 
-For C interoperability, we pass every parameter and the return value indirectly through the language boundary. For the detailed motivations, see 
+For C interoperability, we pass every parameter and the return value indirectly through the language boundary. For the detailed motivations, see
 https://github.com/orgs/hylo-lang/discussions/1122#discussioncomment-17090235.
 
 We can declare an `@extern_c_indirect`-annotated function in Hylo, and implement it in C. In the indirect C calling convention:

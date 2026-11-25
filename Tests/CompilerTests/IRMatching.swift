@@ -74,7 +74,7 @@ enum IRMatching {
 
       let nextName = renaming.count
       let renamedAs = renaming[originalSpelling].wrapIfEmpty(nextName)
-      
+
       return "\((m.register == nil) ? "" : "%")\(renamedAs)"
     })
   }
