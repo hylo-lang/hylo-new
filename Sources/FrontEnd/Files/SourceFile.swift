@@ -4,9 +4,9 @@ import Foundation
 import Utilities
 
 /// A source file.
-/// 
+///
 /// - Invariant: `name` contains an absolute path.
-/// - Note: A local file name doesn't imply that the file actually exists on disk or that we can 
+/// - Note: A local file name doesn't imply that the file actually exists on disk or that we can
 ///   re-read its contents. It might be supplied by the LSP without having the file saved.
 public struct SourceFile: Hashable, Sendable {
 
@@ -173,7 +173,7 @@ public struct SourceFile: Hashable, Sendable {
   public func index(line: Int, extendedGraphemeClusterOffset offset: Int) -> Index {
     guard line >= 0 else { return startIndex }
     guard line < lineCount else { return endIndex }
-    
+
     let lineStart = properties.lineStarts[line]
     return text.index(lineStart, offsetBy: offset, limitedBy: text.endIndex) ?? endIndex
   }
@@ -186,7 +186,7 @@ public struct SourceFile: Hashable, Sendable {
   public func index(line: Int, utf16Offset: Int) -> Index {
     guard line >= 0 else { return startIndex }
     guard line < lineCount else { return endIndex }
-    
+
     let lineStart = properties.lineStarts[line]
     let utf16Line = text[lineStart...].utf16
 

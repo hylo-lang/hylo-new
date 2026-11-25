@@ -270,11 +270,11 @@ final class StableDictionaryTests: XCTestCase {
 /// `StableDictionary` only ever reads `key.hashValue` (never `hash(into:)`) to place and look up
 /// buckets, so overriding `hashValue` gives complete control over where each key lands.
 private struct DistinctlyHashed: Hashable {
-  
+
   /// The hash of `self`.
   let hashValue: Int
 
-  /// Creates an instance that hashes as `hashValue`. 
+  /// Creates an instance that hashes as `hashValue`.
   init(as hashValue: Int) {
     self.hashValue = hashValue
   }

@@ -21,5 +21,3 @@ fun f4()
 // Symbol name must not be empty.
 @extern_c_indirect("")
 fun f5()
-
-

@@ -200,7 +200,7 @@ extension SortedSet: SetAlgebra {
   }
 
   /// Returns all elements that are in `self` or `other`.
-  /// 
+  ///
   /// - Complexity: O(self.count + other.count)
   public func union(_ other: SortedSet) -> SortedSet {
     if self.isEmpty {

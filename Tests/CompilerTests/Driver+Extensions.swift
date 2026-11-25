@@ -57,7 +57,7 @@ private func sharedModuleCachePath() throws -> URL {
   let root = URL(filePath: #filePath)
     .deletingLastPathComponent()
     .deletingLastPathComponent()
-    .deletingLastPathComponent()  
+    .deletingLastPathComponent()
     .appending(components: ".build", "hylo-test-module-cache")
   let key = try compilerFingerprint()
   let path = root.appending(component: key)

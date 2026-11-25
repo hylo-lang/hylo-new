@@ -265,7 +265,7 @@ final class SourceFileTests: XCTestCase {
     XCTAssertEqual(f.name, .local(URL(string: "file:///tmp/test.hylo")!))
   }
 
-  /// Tests that when a file is created with a relative URL, it is equivalent 
+  /// Tests that when a file is created with a relative URL, it is equivalent
   /// to creating it with an absolute URL.
   func testRelativePath() {
     let nonCanonical = URL(fileURLWithPath: "a/../README.md")
