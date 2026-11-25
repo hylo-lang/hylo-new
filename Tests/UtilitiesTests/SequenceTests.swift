@@ -19,15 +19,14 @@ final class SequenceTests: XCTestCase {
     XCTAssertNil(x3.least(by: <=>))
 
     var g = SeedableRandomNumberGenerator(seed: 1)
-    for _ in 1..<1000 {
-      let xs = (0..<20).map({ _ in g.next(upperBound: 30 as UInt8) })
+    for _ in 1 ..< 1000 {
+      let xs = (0 ..< 20).map({ _ in g.next(upperBound: 30 as UInt8) })
       let l = xs.least(by: threeWayComparison(of: { $0 / 3 }))
       let m = xs.min()!
       let unique = xs.count(where: { $0 / 3 == m / 3 }) == 1
       if l == nil {
         XCTAssertFalse(unique, "min: \(m), input: \(xs)")
-      }
-      else {
+      } else {
         XCTAssert(unique, "min: \(m), input: \(xs)")
         XCTAssertEqual(l, m, "least: \(l!), min: \(m), input: \(xs)")
       }
