@@ -42,4 +42,19 @@ final class SequenceTests: XCTestCase {
     XCTAssertEqual(xs.min(measuredBy: { (x) in -x }), 4)
   }
 
+  func testMinimalElements() {
+    var g = SeedableRandomNumberGenerator(seed: 0)
+    for _ in 1 ..< 1000 {
+      let xs = (0 ..< 20).map({ _ in g.next(upperBound: 30 as UInt8) })
+      let minimal = xs.minimalElements(
+        by: { (x, y) in StrictOrdering(between: x / 3, and: y / 3) })
+      let least = xs.min()!
+
+      XCTAssertEqual(
+        minimal, xs.filter({ (x) in x / 3 == least / 3 }),
+        "input: \(xs)"
+      )
+    }
+  }
+
 }
