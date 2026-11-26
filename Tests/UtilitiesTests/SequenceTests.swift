@@ -10,18 +10,18 @@ final class SequenceTests: XCTestCase {
 
   func testUniqueMin() {
     let x0: [Int] = []
-    XCTAssertNil(x0.uniqueMin(by: <=>))
+    XCTAssertNil(x0.leastElement(by: <=>))
     let x1: [Int] = [1, 2, 1, 3]
-    XCTAssertNil(x1.uniqueMin(by: <=>))
+    XCTAssertNil(x1.leastElement(by: <=>))
     let x2: [Int] = [1, 2, 0, 3]
-    XCTAssertEqual(x2.uniqueMin(by: <=>), 0)
+    XCTAssertEqual(x2.leastElement(by: <=>), 0)
     let x3: [Int] = []
-    XCTAssertNil(x3.uniqueMin(by: <=>))
+    XCTAssertNil(x3.leastElement(by: <=>))
 
     var g = SeedableRandomNumberGenerator(seed: 1)
     for _ in 1 ..< 1000 {
       let xs = (0 ..< 20).map({ _ in g.next(upperBound: 30 as UInt8) })
-      let l = xs.uniqueMin(by: threeWayComparison(of: { $0 / 3 }))
+      let l = xs.leastElement(by: threeWayComparison(of: { $0 / 3 }))
       let m = xs.min()!
       let unique = xs.count(where: { $0 / 3 == m / 3 }) == 1
       if l == nil {
