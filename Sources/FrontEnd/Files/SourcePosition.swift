@@ -14,7 +14,7 @@ public struct SourcePosition: Hashable {
   }
 
   /// The 0-based line and offset of this position.
-  /// 
+  ///
   /// Offsets are counted in Unicode extended grapheme clusters from line start.
   public var lineAndOffset: (line: Int, offset: Int) {
     let r = source.lineAndOffset(index)

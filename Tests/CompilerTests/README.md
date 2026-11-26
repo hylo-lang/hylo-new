@@ -7,7 +7,7 @@ A use case is either a single Hylo source file or a directory representing a pac
 A single-file test is compiled to a binary executable, just as if it was passed as an argument to `hc`.
 A package test is built according to the configuration specified by its manifest.
 The generated binary is invoked with working directory set to the package test's root directory or
-the parent of a single-file test case. 
+the parent of a single-file test case.
 
 ## Test attributes
 
@@ -21,7 +21,7 @@ For instance, the following test will compile the program, execute it, and check
 public fun main() -> Int32 { 42 }
 ```
 
-For a package test, settings are written by adding an `options` entry to the manifest, whole value is an array of flags and options expressed as character strings. 
+For a package test, settings are written by adding an `options` entry to the manifest, whole value is an array of flags and options expressed as character strings.
 
 ### Testing without the standard library
 

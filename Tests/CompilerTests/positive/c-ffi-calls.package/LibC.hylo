@@ -6,7 +6,7 @@
 public fun malloc(size: Int) -> Pointer<Never> // TODO use MemoryAddress
 
 /// Deallocates the block of memory pointed at by `pointer`.
-/// 
+///
 /// - Requires: there is a live heap allocation starting at `address`.
 @extern_c_indirect("c_free_indirect")
 public fun unsafe_free(pointer: Pointer<Never>) // TODO use MemoryAddress
