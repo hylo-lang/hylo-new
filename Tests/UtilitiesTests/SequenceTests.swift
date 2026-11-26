@@ -10,25 +10,23 @@ final class SequenceTests: XCTestCase {
 
   func testLeast() {
     let x0: [Int] = []
-    XCTAssertNil(x0.least(by: StrictOrdering.comparing(\.self)))
+    XCTAssertNil(x0.least(by: <=>))
     let x1: [Int] = [1, 2, 1, 3]
-    XCTAssertNil(x1.least(by: StrictOrdering.comparing(\.self)))
+    XCTAssertNil(x1.least(by: <=>))
     let x2: [Int] = [1, 2, 0, 3]
-    XCTAssertEqual(x2.least(by: StrictOrdering.comparing(\.self)), 0)
+    XCTAssertEqual(x2.least(by: <=>), 0)
     let x3: [Int] = []
-    XCTAssertNil(x3.least(by: StrictOrdering.comparing(\.self)))
+    XCTAssertNil(x3.least(by: <=>))
 
     var g = SeedableRandomNumberGenerator(seed: 1)
-    for _ in 1..<1000 {
-      let xs = (0..<20).map({ _ in g.next(upperBound: 30 as UInt8) })
-      let l = xs.least(
-        by: { (x, y) in StrictOrdering(between: x / 3, and: y / 3) })
+    for _ in 1 ..< 1000 {
+      let xs = (0 ..< 20).map({ _ in g.next(upperBound: 30 as UInt8) })
+      let l = xs.least(by: threeWayComparison(of: { $0 / 3 }))
       let m = xs.min()!
       let unique = xs.count(where: { $0 / 3 == m / 3 }) == 1
       if l == nil {
         XCTAssertFalse(unique, "min: \(m), input: \(xs)")
-      }
-      else {
+      } else {
         XCTAssert(unique, "min: \(m), input: \(xs)")
         XCTAssertEqual(l, m, "least: \(l!), min: \(m), input: \(xs)")
       }
@@ -46,8 +44,7 @@ final class SequenceTests: XCTestCase {
     var g = SeedableRandomNumberGenerator(seed: 0)
     for _ in 1 ..< 1000 {
       let xs = (0 ..< 20).map({ _ in g.next(upperBound: 30 as UInt8) })
-      let minimal = xs.minimalElements(
-        by: { (x, y) in StrictOrdering(between: x / 3, and: y / 3) })
+      let minimal = xs.minimalElements(by: threeWayComparison(of: { $0 / 3 }))
       let least = xs.min()!
 
       XCTAssertEqual(

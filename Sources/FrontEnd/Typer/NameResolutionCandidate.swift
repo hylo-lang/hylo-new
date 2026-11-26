@@ -17,8 +17,8 @@ extension Program {
   internal func isPreferred(
     _ lhs: NameResolutionCandidate, over rhs: NameResolutionCandidate,
     in scopeOfUse: ScopeIdentity
-  ) -> StrictOrdering {
-    let d: StrictOrdering = switch (lhs.reference, rhs.reference) {
+  ) -> ThreeWayComparisonResult {
+    let d: ThreeWayComparisonResult = switch (lhs.reference, rhs.reference) {
     case (.inherited(_, let a, _), .inherited(_, let b, _)):
       // Members declared in extension are preferred over members inherited by conformance. The
       // rationale is that the former may serve as implementations for the latter.
@@ -32,12 +32,12 @@ extension Program {
       if let a = lhs.reference.target, let b = rhs.reference.target {
         compareLexicalDistances(a, b, relativeTo: scopeOfUse)
       } else {
-        .equal
+        .equivalent
       }
     }
 
-    return d.inequalElse(
-      .init(between: lhs.reference.elaborationCost, and: rhs.reference.elaborationCost))
+    return d != .equivalent ? d
+      : threeWayComparison(of: \.reference.elaborationCost)(lhs, rhs)
   }
 
 }
