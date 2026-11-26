@@ -32,9 +32,9 @@ extension Sequence {
     return r
   }
 
-  /// Returns the least element in `self` according to `compare`, or `nil` if `self` contains no
-  /// such element.
-  public func least(by compare: ThreeWayComparison<Element>) -> Element? {
+  /// Returns the element ordered less than all others by `compare`, or `nil` if there is no such
+  /// element.
+  public func leastElement(by compare: ThreeWayComparison<Element>) -> Element? {
     var it = makeIterator()
     guard var min = it.next() else { return nil }
     var unique = true
