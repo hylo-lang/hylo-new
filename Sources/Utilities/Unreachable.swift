@@ -18,7 +18,7 @@ public func unimplemented(
     file: file, line: line)
 }
 
-/// Iff `c` is `true`, reports that a feature is not yet implemented and halts the program's 
+/// Iff `c` is `true`, reports that a feature is not yet implemented and halts the program's
 /// execution.
 public func unimplemented(
   if c: Bool,

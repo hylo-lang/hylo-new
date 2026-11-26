@@ -242,7 +242,7 @@ final class ProgramTests: XCTestCase {
 
     await p.assignScopes(m)
     p.assignTypes(m, loggingInferenceWhere: { _, _ in false })
-    
+
     // `ill` should not have a type; it's not assigned.
     let e = try XCTUnwrap(p.select(.name("ill")).first)
     XCTAssertNil(p.type(maybeAssignedTo: e))
@@ -255,11 +255,11 @@ final class ProgramTests: XCTestCase {
       """
       @extern_c_indirect("f_indirect")
       fun f()
-      
+
       @extern_c_indirect()
       fun g()
       """)
-    
+
     let f = p.castToDeclaration(try XCTUnwrap(p.select(.name("f")).first))!
     XCTAssertEqual(p.externCName(of: f), "f_indirect")
 

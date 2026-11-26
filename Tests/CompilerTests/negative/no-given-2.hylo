@@ -12,4 +12,3 @@ fun f<T where T is P, A is P>(x: T) {}
 fun main() {
   f(B())
 }
-

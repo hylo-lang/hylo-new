@@ -32,7 +32,7 @@ public enum FileName: Hashable, Sendable {
       return .virtual(url.absoluteURL)
     }
   }
-  
+
   /// Returns `true` iff `self` is ordered before `other` in a dictionary.
   public func lexicographicallyPrecedes(_ other: Self) -> Bool {
     let s = self.url.standardizedFileURL.absoluteString
@@ -78,7 +78,7 @@ public enum FileName: Hashable, Sendable {
 }
 
 extension URL {
-  
+
   /// Returns the drive letter of an absolute file URL on Windows, nil otherwise.
   fileprivate var windowsDriveLetter: Character? {
     #if os(Windows)

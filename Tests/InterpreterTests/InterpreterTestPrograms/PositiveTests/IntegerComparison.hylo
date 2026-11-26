@@ -104,7 +104,7 @@ public fun main() {
   if !((3 as UInt) >= (2 as UInt)) { Builtin.trap() }
   if !((3 as UInt) >= (3 as UInt)) { Builtin.trap() }
   if (2 as UInt) >= (3 as UInt) { Builtin.trap() }
-  
+
   // Int8
   if !((-2 as Int8) == (-2 as Int8)) { Builtin.trap() }
   if !((2 as Int8) == (2 as Int8)) { Builtin.trap() }
@@ -147,7 +147,7 @@ public fun main() {
   if !((-2 as Int8) >= (-3 as Int8)) { Builtin.trap() }
   if !((2 as Int8) >= (2 as Int8)) { Builtin.trap() }
   if !((-2 as Int8) >= (-2 as Int8)) { Builtin.trap() }
-  
+
   // Int16
   if !((-2 as Int16) == (-2 as Int16)) { Builtin.trap() }
   if !((2 as Int16) == (2 as Int16)) { Builtin.trap() }
@@ -190,7 +190,7 @@ public fun main() {
   if !((-2 as Int16) >= (-3 as Int16)) { Builtin.trap() }
   if !((2 as Int16) >= (2 as Int16)) { Builtin.trap() }
   if !((-2 as Int16) >= (-2 as Int16)) { Builtin.trap() }
-  
+
   // Int32
   if !((-2 as Int32) == (-2 as Int32)) { Builtin.trap() }
   if !((2 as Int32) == (2 as Int32)) { Builtin.trap() }
@@ -233,7 +233,7 @@ public fun main() {
   if !((-2 as Int32) >= (-3 as Int32)) { Builtin.trap() }
   if !((2 as Int32) >= (2 as Int32)) { Builtin.trap() }
   if !((-2 as Int32) >= (-2 as Int32)) { Builtin.trap() }
-  
+
   // Int64
   if !((-2 as Int64) == (-2 as Int64)) { Builtin.trap() }
   if !((2 as Int64) == (2 as Int64)) { Builtin.trap() }

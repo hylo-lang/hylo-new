@@ -13,45 +13,35 @@ extension Sequence {
     self.sorted(by: { (a, b) in areInIncreasingOrder(a[keyPath: path], b[keyPath: path]) })
   }
 
-  /// Returns the set of elements in `self` that are not greater than any other element in `self`
-  /// according to `compare`.
-  public func minimalElements(by compare: (Element, Element) -> StrictOrdering) -> [Element] {
+  /// Returns the elements in `self` that are ordered (by `compare`) less than all other elements,
+  /// in their original order.
+  public func minimalElements(by compare: ThreeWayComparison<Element>) -> [Element] {
     var it = makeIterator()
-    var leaves: [Element] = []
+    guard var min = it.next() else { return [] }
+    var r = [min]
 
     while let x = it.next() {
-      if let e = leaves.uniqueElement {
-        switch compare(e, x) {
-        case .ascending:
-          continue
-        case .equal:
-          leaves.append(x)
-          continue
-        case .descending:
-          break
-        }
-      }
-
-      if leaves.allSatisfy({ (y) in compare(x, y) == .ascending }) {
-        leaves = [x]
-      } else {
-        leaves.append(x)
+      switch compare(min, x) {
+      case .ascending: break
+      case .equivalent: r.append(x)
+      case .descending:
+        min = x
+        r = [x]
       }
     }
-
-    return leaves
+    return r
   }
 
   /// Returns the unique least element in `self` according to `compare`, or `nil` if `self` does not
   /// contain exactly one such element.
-  public func uniqueMin(by compare: (Element, Element) -> StrictOrdering) -> Element? {
+  public func uniqueMin(by compare: ThreeWayComparison<Element>) -> Element? {
     var it = makeIterator()
     guard var min = it.next() else { return nil }
     var unique = true
     while let x = it.next() {
       switch compare(min, x) {
       case .ascending: break
-      case .equal: unique = false
+      case .equivalent: unique = false
       case .descending:
         min = x
         unique = true

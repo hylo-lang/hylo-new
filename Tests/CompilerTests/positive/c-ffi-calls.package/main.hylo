@@ -48,10 +48,10 @@ public fun main() -> Int32 {
   &p.set_x(3)
   &q.set_y(2)
   let r = p + q // == Point(6, 4)
-  
+
   let pointer = malloc(1)
   set_value_to_3(of_byte_at: pointer)
   let three = get_value(of_byte_at: pointer)
-  
+
   return (r.x() + r.y() + three).to_i32() // 6 + 4 + 3 == 13
 }

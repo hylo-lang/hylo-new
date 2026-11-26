@@ -1,4 +1,6 @@
 /// A 32-bit floating point number.
+///
+/// Per IEEE 754, comparisons involving NaN are `false`, except `!=`, which is `true`.
 @_symbol("Float32")
 public struct Float32 is Deinitializable {
 
@@ -20,7 +22,7 @@ public struct Float32 is Deinitializable {
   /// Returns `true` iff `self` is equal to `other`.
   @inline(always)
   public fun infix== (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_ueq_float32(self.value, other.value))
+    .new(value: Builtin.fcmp_oeq_float32(self.value, other.value))
   }
 
   /// Returns `true` iff `self` is not equal to `other`.
@@ -34,25 +36,25 @@ public struct Float32 is Deinitializable {
   /// Returns `true` iff `self` is less than `other`.
   @inline(always)
   public fun infix< (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_ult_float32(self.value, other.value))
+    .new(value: Builtin.fcmp_olt_float32(self.value, other.value))
   }
 
   /// Returns `true` iff `self` is less than or equal to `other`.
   @inline(always)
   public fun infix<= (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_ule_float32(self.value, other.value))
+    .new(value: Builtin.fcmp_ole_float32(self.value, other.value))
   }
 
   /// Returns `true` iff `self` is greater than `other`.
   @inline(always)
   public fun infix> (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_ugt_float32(self.value, other.value))
+    .new(value: Builtin.fcmp_ogt_float32(self.value, other.value))
   }
 
   /// Returns `true` iff `self` is greater than or equal to `other`.
   @inline(always)
   public fun infix>= (other: Self) -> Bool {
-    .new(value: Builtin.fcmp_uge_float32(self.value, other.value))
+    .new(value: Builtin.fcmp_oge_float32(self.value, other.value))
   }
 
   // MARK: AdditiveArithmetic conformance
