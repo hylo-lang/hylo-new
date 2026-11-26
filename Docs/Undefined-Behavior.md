@@ -36,7 +36,7 @@ discussion](https://github.com/orgs/hylo-lang/discussions/1868).
 ### Re-Projection
 
 There are four ways to produce a new projection from a projection `p`:
-- Binding declaration, e.g. `let q = p`, where `q` is produced.
+- Pattern matching, e.g. `let q = p`, where `q` is produced, or `for (inout x, let y) in foo { ... }` where `x` and `y` are produced.
 - Passing `p` as an argument to a function or subscript, where the corresponding parameter is produced.
 - Subscripting, e.g. `p[0]`
 - Member access, e.g. `p.x`
@@ -48,12 +48,15 @@ initialized, in which case the new projection's kind is `inout`.
 Depending on the kind of the original and new projections, the original projection may make a
 temporary transition from active to inactive, or from one kind to another.
 
-| original / new | `sink`   | `set`    | `inout`  | `let`    | 
-| -------------- | -------- | -------- | -------- | -------- |
-| **`sink`**     | inactive | n/a      | inactive | `let`    |
-| **`set`**      | n/a      | inactive | n/a      | n/a      |
-| **`inout`**    | inactive | n/a      | inactive | `let`    |
-| **`let`**      | n/a      | n/a      | n/a      | *none*   | 
+| new ⬇ \ original ➡ | **`sink`** | **`set`** | **`inout`** | **`let`** |
+|--------------------|------------|-----------|-------------|-----------|
+| `sink`             | inactive   | n/a       | inactive    | n/a       |
+| `set`              | n/a        | inactive  | n/a         | n/a       |
+| `inout`            | inactive   | n/a       | inactive    | n/a       |
+| `let`              | `let`      | n/a       | `let`       | *none*    |
+
+
+When pattern matching binds multiple parts at once, if any of the new bindings calls for the original binding to become inactive, it becomes inactive rather than changing its kind.
 
 **Note:** a `sink let` declaration creates a `sink` binding on which mutation is disallowed.
 
