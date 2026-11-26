@@ -34,7 +34,10 @@ extension Diagnostic {
     // Write the column indication for that line, followed by a newline.
     let startColumn = firstMarkedLine.distance(
       from: firstMarkedLine.startIndex, to: site.start.index)
-    output.write(String(repeating: " ", count: startColumn))
+    for i in 0..<startColumn {
+      let index = firstMarkedLine.index(firstMarkedLine.startIndex, offsetBy: i)
+      output.write(firstMarkedLine[index] == "\t" ? "\t" : " ")
+    }
     let markWidth = firstMarkedLine.distance(
       from: site.start.index, to: min(site.end.index, firstMarkedLine.endIndex))
     output.write(markWidth <= 1 ? "^" : String(repeating: "~", count: markWidth))
