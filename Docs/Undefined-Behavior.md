@@ -57,12 +57,13 @@ temporary transition from active to inactive, or from one kind to another.
 | `inout`            | inactive   | n/a       | inactive    | n/a       |
 | `let`              | `let`      | n/a       | `let`       | *none*    |
 
-
-When pattern matching binds multiple parts at once, if any of the new bindings calls for the original binding to become inactive, it becomes inactive rather than changing its kind.
-
 **Note:** a `sink let` declaration creates a `sink` binding on which mutation is disallowed.
 
-The transition of a projection `p` ends when no re-projections of `p` remain, when it reverts to its
+When pattern matching creates multiple re-projections of `p` at once and the table specifies 
+different transitions for some of the new projections, it is as if all the re-projections calling
+for a change in kind precede those calling for deactivation, and thus two transitions are created.
+
+A transition of a projection `p` ends when no re-projections of `p` remain, when `p` reverts to its 
 earlier kind and becomes active.
 
 ## Laws
