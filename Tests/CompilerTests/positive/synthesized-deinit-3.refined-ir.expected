@@ -1,0 +1,54 @@
+fun w.deinit<T>(let %p0: P<T>, sink %p1: S, set %p2: Void) {
+%b0:
+  %r0 = access [set] %p2
+  %r1 = assume_state %r0 initialized
+  %r2 = end %r0
+  %r4 = type_apply $synthesized[Deinitializable.deinit for Self: S]<T>
+  %r5 = access [let] %p0
+  %r6 = access [sink] %p1
+  %r7 = access [set] %p2
+  %r8 = apply %r4(%r5, %r6) => %r7
+  %r9 = end %r7
+  %r10 = end %r6
+  %r11 = end %r5
+  %r3 = return
+}
+
+fun w<T>(let %p0: P<T>) let <: Deinitializable<S> {
+%b0:
+  %r0 = access [let] %p0
+  %r1 = witness_table <T>{$implementation[Deinitializable.deinit for Self: S]}+[%r0] as Deinitializable<S>
+  %r2 = access [let] %r1
+  %r3 = yield %r2
+  %r4 = end %r2
+  %r6 = end %r0
+  %r5 = return
+}
+
+fun $implementation[Deinitializable.deinit for Self: S]<T>(let %p0: Deinitializable<Self>, sink %p1: Self, set %p2: Void) {
+%b0:
+  %r0 = witness_table_capture %p0 at 0 as P<T>
+  %r1 = place_cast %p1 as sink S
+  %r2 = type_apply w.deinit<T>
+  %r3 = access [let] %r0
+  %r4 = access [sink] %r1
+  %r5 = access [set] %p2
+  %r6 = apply %r2(%r3, %r4) => %r5
+  %r11 = end %r5
+  %r10 = end %r4
+  %r9 = end %r3
+  %r8 = end %r1
+  %r7 = return
+}
+
+fun $synthesized[Deinitializable.deinit for Self: S]<T>(let %p0: P<T>, sink %p1: S, set %p2: Void) {
+%b0:
+  %r0 = place_cast %p1 as sink Void
+  %r1 = access [sink] %r0
+  %r2 = assume_state %r1 uninitialized
+  %r3 = end %r1
+  %r4 = access [set] %p2
+  %r5 = assume_state %r4 initialized
+  %r6 = end %r4
+  %r7 = return
+}
