@@ -18,6 +18,10 @@ internal enum ManglingOperator: String, CaseIterable, Sendable {
   /// Starts a reserved type identifier.
   case reservedType = "tR"
 
+  /// Symbol placed after a declaration end to ensure that whatever comes next does not appear to be
+  /// part of the same qualification.
+  case declarationEnd = "E"
+
   /// Starts an associated type declaration symbol.
   case associatedTypeDeclaration = "taD"
 
