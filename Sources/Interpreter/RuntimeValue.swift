@@ -15,7 +15,7 @@ enum RuntimeValue {
   /// discriminator.
   case composite([RuntimeValue], ofType: MonomorphicTypeIdentity)
 
-  /// An instance of a `TypeWitness`.
+  /// A runtime type witness identifying a concrete Hylo type.
   case typeWitness(TypeWitnessValue)
 
   /// Returns the type of the stored value in `program`.
