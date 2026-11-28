@@ -26,6 +26,23 @@ final class DiagnosticTests: XCTestCase {
       """)
   }
 
+  func testRenderWithTabsAndSpaces() {
+    let f: SourceFile = "\t\t   \tHello."
+    let s = SourceSpan(f.index(f.startIndex, offsetBy: 6) ..< f.index(f.startIndex, offsetBy: 11), in: f)
+    let e = Diagnostic(.error, "bang", at: s)
+
+    var rendered = ""
+    e.render(into: &rendered, style: .unstyled)
+    XCTAssertEqual(
+      rendered,
+      """
+      virtual:///26wgdqb5r806g:1.7-12: error: bang
+      \t\t   \tHello.
+      \t\t   \t~~~~~
+
+      """)
+  }
+
   func testRenderWithNotes() {
     let f: SourceFile = "Hello."
     let s = SourceSpan(f.startIndex ..< f.index(f.startIndex, offsetBy: 2), in: f)
