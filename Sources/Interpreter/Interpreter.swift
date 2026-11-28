@@ -315,6 +315,8 @@ public struct Interpreter {
       let address = memory.allocate(x.source.storageType).asTypedAddress(x.source.storageType)
       switch x.source.initializer {
       case .typeWitness(let type):
+        // TODO: pass a real access using `memory.beginAccess(to: )` once
+        // runtime memory safety is implemented.
         try memory.store(
           .typeWitness(TypeWitnessValue(type)), at: Access(to: address, effect: .set)
         )
