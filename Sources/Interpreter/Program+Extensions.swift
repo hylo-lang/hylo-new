@@ -3,8 +3,8 @@ import FrontEnd
 extension Program {
 
   /// Returns the tag of `t`.
-  internal func tag(_ t: AnyTypeIdentity) -> any TypeTree.Type {
-    types.tag(of: t).value
+  internal func tag(_ t: AnyTypeIdentity) -> TypeTag {
+    types.tag(of: t)
   }
 
   /// Returns the type identified by `t`, cast to `U`.

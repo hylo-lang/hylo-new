@@ -1,6 +1,6 @@
 import FrontEnd
-import XCTest
 import Utilities
+import XCTest
 
 @testable import Interpreter
 
@@ -520,7 +520,7 @@ final class TypeLayoutTests: XCTestCase {
     let i16 = id(MachineType.i(16))
 
     var m = Memory(forRunning: p, on: UnrealABI())
-    let a = m.allocate(storageFor: t).asTypedAddress(t)
+    let a = m.allocate(t).asTypedAddress(t)
 
     XCTAssertGreaterThan(m.layout(i16).alignment, m.layout(i8).alignment)
 

@@ -154,6 +154,14 @@ final class RuntimeValueTests: XCTestCase {
     )
   }
 
+  func testTypeWitness() async throws {
+    let i1 = id(MachineType.i(1))
+    let witness = id(TypeWitness())
+    let w = RuntimeValue(witnessOf: i1)
+    let bs = w.bytes(laidOutUsing: &l, for: &p)
+    XCTAssertEqual(w, RuntimeValue(bs[...], type: witness, definedIn: &p, layouts: &l))
+  }
+
   /// Returns the type erased identity of `t`.
   private func id<T: TypeTree>(_ t: T) -> MonomorphicTypeIdentity {
     .init(p.types.demand(t).erased)

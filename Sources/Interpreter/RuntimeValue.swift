@@ -3,7 +3,7 @@ import FrontEnd
 import Utilities
 
 /// A value occurring during program execution.
-enum RuntimeValue {
+enum RuntimeValue: Hashable, Sendable {
 
   /// An instance of a `MachineType`.
   case scalar(BuiltinValue)
@@ -15,11 +15,15 @@ enum RuntimeValue {
   /// discriminator.
   case composite([RuntimeValue], ofType: MonomorphicTypeIdentity)
 
+  /// A runtime type witness identifying a concrete Hylo type.
+  case typeWitness(TypeWitnessValue)
+
   /// Returns the type of the stored value in `program`.
   public func type(in program: inout Program) -> MonomorphicTypeIdentity {
     switch self {
     case .scalar(let value): .init(program.types.demand(value.type).erased)
     case .composite(_, let type): type
+    case .typeWitness(_): .init(program.types.demand(TypeWitness()).erased)
     }
   }
 
@@ -29,6 +33,7 @@ enum RuntimeValue {
     switch self {
     case .scalar(let value): value
     case .composite(_, _): nil
+    case .typeWitness(_): nil
     }
   }
 
@@ -37,6 +42,7 @@ enum RuntimeValue {
     switch self {
     case .scalar(_): []
     case .composite(let components, _): components
+    case .typeWitness(_): []
     }
   }
 
@@ -79,7 +85,7 @@ extension RuntimeValue {
 
 extension RuntimeValue {
 
-  /// Creates a value of type `t`, defined in `p`, by interpreting its byte
+  /// Creates a value of type `t` (as defined in `p`) by interpreting its byte
   /// representation `storage` according to the layout provided by `layouts`.
   public init(
     _ storage: ArraySlice<UInt8>,
@@ -88,18 +94,24 @@ extension RuntimeValue {
     layouts: inout LayoutComputer
   ) {
     let unwrappedType = p.underlyingType(t.underlying)
-    let typeTag = p.tag(unwrappedType)
-
-    if typeTag == MachineType.self {
+    switch p.tag(unwrappedType) {
+    case MachineType.self:
       let v = p.type(unwrappedType, as: MachineType.self)
       self = .scalar(.init(storage, type: v, layouts: &layouts))
-    } else if typeTag == Struct.self || typeTag == Tuple.self {
+    case Struct.self, Tuple.self:
       self = .init(record: storage, type: t, definedIn: &p, layouts: &layouts)
-    } else if typeTag == Enum.self {
+    case Enum.self:
       self = .init(enum: storage, type: t, definedIn: &p, layouts: &layouts)
-    } else {
-      unreachable()
+    case TypeWitness.self:
+      let v = BuiltinValue(storage, type: .i(64), layouts: &layouts)
+      self = .typeWitness(MonomorphicTypeIdentity(bits: v.i64!))
+    default: unreachable()
     }
+  }
+
+  /// Creates a type witness of `t`.
+  public init(witnessOf t: MonomorphicTypeIdentity) {
+    self = .typeWitness(t)
   }
 
   /// Creates a value for record type `t`, defined in `p`, by interpreting its
@@ -167,14 +179,16 @@ extension RuntimeValue {
     case .scalar(let value):
       return value.bytes(laidOutUsing: &typeLayouts)
     case .composite(_, let type):
-      let typeTag = program.tag(type.underlying)
-      if typeTag == Struct.self || typeTag == Tuple.self {
+      switch program.tag(type.underlying) {
+      case Struct.self, Tuple.self:
         return bytes(ofStoredRecord: type, definedIn: &program, laidOutUsing: &typeLayouts)
-      } else if typeTag == Enum.self {
+      case Enum.self:
         return bytes(ofStoredEnum: type, definedIn: &program, laidOutUsing: &typeLayouts)
-      } else {
+      default:
         unreachable("A composite type must be a struct, tuple, or enum.")
       }
+    case .typeWitness(let typeIdentity):
+      return BuiltinValue.i64(typeIdentity.bits).bytes(laidOutUsing: &typeLayouts)
     }
   }
 
@@ -218,6 +232,16 @@ extension RuntimeValue {
     bytes[activeCaseOffset..<activeCaseOffset + activeCaseBytes.count] = activeCaseBytes[...]
 
     return bytes
+  }
+
+}
+
+extension UnsafeRawBufferPointer {
+
+  /// Returns `true` iff the buffer's base address is aligned to `alignment`.
+  fileprivate func isAligned(to alignment: Int) -> Bool {
+    precondition(alignment > 0)
+    return Int(bitPattern: baseAddress!) % alignment == 0
   }
 
 }
