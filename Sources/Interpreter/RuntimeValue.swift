@@ -3,7 +3,7 @@ import FrontEnd
 import Utilities
 
 /// A value occurring during program execution.
-enum RuntimeValue {
+enum RuntimeValue: Hashable, Sendable {
 
   /// An instance of a `MachineType`.
   case scalar(BuiltinValue)
@@ -110,7 +110,7 @@ extension RuntimeValue {
   }
 
   /// Creates a type witness of `t`.
-  public init(witness t: MonomorphicTypeIdentity) {
+  public init(witnessOf t: MonomorphicTypeIdentity) {
     self = .typeWitness(t)
   }
 
