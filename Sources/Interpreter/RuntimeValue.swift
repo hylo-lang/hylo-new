@@ -18,15 +18,6 @@ enum RuntimeValue: Hashable, Sendable {
   /// A runtime type witness identifying a concrete Hylo type.
   case typeWitness(TypeWitnessValue)
 
-  /// Returns the type of the stored value in `program`.
-  public func type(in program: inout Program) -> MonomorphicTypeIdentity {
-    switch self {
-    case .scalar(let value): .init(program.types.demand(value.type).erased)
-    case .composite(_, let type): type
-    case .typeWitness(_): .init(program.types.demand(TypeWitness()).erased)
-    }
-  }
-
   /// The stored `MachineType` value, or `nil` if `self` is not an instance of
   /// a `MachineType`.
   fileprivate var builtin: BuiltinValue? {
@@ -199,7 +190,7 @@ extension RuntimeValue {
     definedIn p: inout Program,
     laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
-    assert(t == type(in: &p))
+    assert(t == p.type(self))
     let l = typeLayouts.layout(t, in: &p)
     var bytes = [UInt8](repeating: 0, count: l.size)
 
@@ -218,7 +209,7 @@ extension RuntimeValue {
     definedIn p: inout Program,
     laidOutUsing typeLayouts: inout LayoutComputer
   ) -> [UInt8] {
-    assert(t == type(in: &p))
+    assert(t == p.type(self))
     let l = typeLayouts.layout(t, in: &p)
     var bytes = [UInt8](repeating: 0, count: l.size)
 
@@ -242,6 +233,19 @@ extension UnsafeRawBufferPointer {
   fileprivate func isAligned(to alignment: Int) -> Bool {
     precondition(alignment > 0)
     return Int(bitPattern: baseAddress!) % alignment == 0
+  }
+
+}
+
+extension Program {
+
+  /// Returns the type of `v` in `self`.
+  fileprivate mutating func type(_ v: RuntimeValue) -> MonomorphicTypeIdentity {
+    switch v {
+    case .scalar(let value): .init(types.demand(value.type).erased)
+    case .composite(_, let type): type
+    case .typeWitness(_): .init(types.demand(TypeWitness()).erased)
+    }
   }
 
 }
