@@ -1,0 +1,11 @@
+fun g<T>(x: T) -> Int {
+  1
+}
+
+fun f<T>(x: T) -> Int {
+  g(x)
+}
+
+fun main() {
+  precondition(f(2) == 1)
+}
