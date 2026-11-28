@@ -280,7 +280,7 @@ public struct Interpreter {
     case let x as IRAccess:
       // TODO: add a real implementation, validating new access in memory and
       // storing the access into register.
-      let p = address(of: x.source)
+      let p = asAddress(x.source)
       let a = Access(to: p, effect: x.finalCapability)
       return register(a)
     case is IRRegionEnd<IRAccess>:
@@ -335,7 +335,7 @@ public struct Interpreter {
     case let x as IRPartialApply:
       _ = x
     case let x as IRPlaceCast:
-      return register(access(of: x.source))
+      return register(asAccess(x.source))
     case let x as IRProject:
       return try project(x.callee, passing: x.arguments)
     case let x as IRRegionEnd<IRProject>:
@@ -398,20 +398,20 @@ public struct Interpreter {
 
   /// Returns the value stored at address `p`.
   private mutating func load(from p: IRValue) throws -> RuntimeValue {
-    try memory.read(from: access(of: p))
+    try memory.read(from: asAccess(p))
   }
 
   /// Stores `v` at the address `p`.
   private mutating func store(_ v: IRValue, at p: IRValue) throws {
-    try memory.store(self[v], at: access(of: p))
+    try memory.store(self[v], at: asAccess(p))
   }
 
   /// Copies the bytes of the object at `source` to `destination`.
   ///
   /// - Precondition: `source` and `destination` are non-overlapping places.
   private mutating func copy(_ source: IRValue, to destination: IRValue) throws {
-    let s = access(of: source)
-    let d = access(of: destination)
+    let s = asAccess(source)
+    let d = asAccess(destination)
     try memory.copy(s, to: d)
   }
 
@@ -455,10 +455,8 @@ public struct Interpreter {
     }
   }
 
-  /// Returns the memory location pointed to by `v` in the current execution context.
-  ///
-  /// - Precondition: `v` is a place.
-  fileprivate func address(of v: IRValue) -> Memory.TypedAddress {
+  /// Returns `v` as a `Memory.TypedAddress` in the current execution context.
+  fileprivate func asAddress(_ v: IRValue) -> Memory.TypedAddress {
     switch v {
     case .parameter(let i):
       topOfStack.parameters[i].location
@@ -469,11 +467,8 @@ public struct Interpreter {
     }
   }
 
-  /// Returns the memory location pointed to by `v`, together with its
-  /// permissions and obligations, in the current execution state.
-  ///
-  /// - Precondition: `v` is a place computed by `access` instruction.
-  private func access(of v: IRValue) -> Access<Memory.TypedAddress> {
+  /// Returns `v` as an `Access<Memory.TypedAddress>` in the current execution context.
+  private func asAccess(_ v: IRValue) -> Access<Memory.TypedAddress> {
     switch v {
     case .parameter(let i):
       topOfStack.parameters[i]
@@ -530,7 +525,7 @@ public struct Interpreter {
 
   /// Returns an epilogue that yields access `v` to the caller, suspending the current function.
   private func yield(_ v: IRValue) -> InstructionEpilogue {
-    return .yield(access(of: v))
+    return .yield(asAccess(v))
   }
 
   /// Returns an epilogue that resumes execution from the stack frame of `f`.
@@ -553,7 +548,7 @@ public struct Interpreter {
     passing arguments: ArraySlice<IRValue>
   ) throws -> InstructionEpilogue {
     let g = self[function: f]
-    let xs = arguments.map { access(of: $0) }
+    let xs = arguments.map { asAccess($0) }
     return .call(g, passing: xs)
   }
 
@@ -563,7 +558,7 @@ public struct Interpreter {
     passing arguments: ArraySlice<IRValue>
   ) throws -> InstructionEpilogue {
     let g = self[function: f]
-    let xs = arguments.map { access(of: $0) }
+    let xs = arguments.map { asAccess($0) }
     return .project(g, passing: xs)
   }
 
@@ -588,7 +583,7 @@ extension IRValue {
     ofPart p: Int,
     in executor: inout Interpreter
   ) -> Memory.TypedAddress {
-    let a = executor.address(of: self)
+    let a = executor.asAddress(self)
     return executor.memory.location([p], in: a)
   }
 
@@ -600,7 +595,7 @@ extension IRValue {
     ofField f: DeclarationIdentity,
     in executor: inout Interpreter
   ) -> Memory.TypedAddress {
-    let a = executor.address(of: self)
+    let a = executor.asAddress(self)
     let n = executor.program.name(of: f)!.identifier
     return executor.memory.location(ofField: n, in: a)
   }
