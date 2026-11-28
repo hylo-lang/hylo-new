@@ -153,12 +153,18 @@ extension DominatorTree: Sequence {
     private let children: [IRBlock.ID: SortedSet<IRBlock.ID>]
 
     /// A stack with the nodes left to visit.
-    private var work: [IRBlock.ID]
+    fileprivate var work: [IRBlock.ID]
 
     /// Creates an iterator over the subtree of `tree` rooted at `root`.
     public init(_ tree: DominatorTree, root: IRBlock.ID) {
       self.children = tree.children()
       self.work = [root]
+    }
+
+    /// Creates an instance that produces no elements.
+    public init(empty _: Void) {
+      self.children = [:]
+      self.work = []
     }
 
     /// Returns the next element, if any.
@@ -179,6 +185,65 @@ extension DominatorTree: Sequence {
   /// Returns an iterator over the basic blocks in `self`.
   public func makeIterator() -> Iterator {
     .init(self, root: root)
+  }
+
+}
+
+extension DominatorTree: Collection {
+
+  /// A position in the preorder traversal of a dominator tree.
+  public struct Index: Comparable {
+
+    /// The position for purposes of element extraction.
+    fileprivate var base: Iterator
+
+    /// The offset from the beginning of the traversal, or `Int.max`
+    /// for the end iterator.
+    fileprivate var offset: Int
+
+    /// Returns `true` iff `lhs` precedes `rhs`.
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+      lhs.offset < rhs.offset
+    }
+
+    /// Returns `true` iff `lhs` is equivalent to `rhs`.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+      lhs.offset == rhs.offset
+    }
+
+  }
+
+  /// Replaces `i` with its immediate successor.
+  public func formIndex(after i: inout Index) {
+    _ = i.base.next()
+    if i.base.work.isEmpty {
+      i.offset = Int.max
+    }
+    else {
+      i.offset += 1
+    }
+  }
+
+  /// Returns the immediate successor of `i`.
+  public func index(after i: Index) -> Index {
+    var j = i
+    formIndex(after: &j)
+    return j
+  }
+
+  /// The first position in a preorder traversal.
+  public var startIndex: Index {
+    Index(base: makeIterator(), offset: 0)
+  }
+
+  /// The past-the-end position in a preorder traversal.
+  public var endIndex: Index {
+    Index(base: Iterator.init(empty: ()), offset: Int.max)
+  }
+
+  /// Accesses the element at `position`.
+  public subscript(position: Index) -> IRBlock.ID {
+    position.base.work.last!
   }
 
 }
