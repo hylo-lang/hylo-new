@@ -103,12 +103,8 @@ extension RuntimeValue {
     case Enum.self:
       self = .init(enum: storage, type: t, definedIn: &p, layouts: &layouts)
     case TypeWitness.self:
-      self = .typeWitness(
-        storage.withUnsafeBytes {
-          assert($0.isAligned(to: MemoryLayout<TypeWitnessValue>.alignment))
-          return $0.assumingMemoryBound(to: TypeWitnessValue.self).baseAddress!.pointee
-        }
-      )
+      let v = BuiltinValue(storage, type: .i(64), layouts: &layouts)
+      self = .typeWitness(MonomorphicTypeIdentity(bits: v.i64!))
     default: unreachable()
     }
   }
@@ -191,7 +187,8 @@ extension RuntimeValue {
       default:
         unreachable("A composite type must be a struct, tuple, or enum.")
       }
-    case .typeWitness(let w): return withUnsafeBytes(of: w) { Array($0) }
+    case .typeWitness(let typeIdentity):
+      return BuiltinValue.i64(typeIdentity.bits).bytes(laidOutUsing: &typeLayouts)
     }
   }
 

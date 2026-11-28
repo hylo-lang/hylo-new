@@ -17,3 +17,15 @@ public struct MonomorphicTypeIdentity: Hashable, Sendable {
   }
 
 }
+
+extension MonomorphicTypeIdentity {
+
+  /// Creates an instance with the given bit representation.
+  public init(bits: UInt64) {
+    self = .init(AnyTypeIdentity(bits: bits))
+  }
+
+  /// The bit representation of `self`.
+  public var bits: UInt64 { self.underlying.bits }
+
+}

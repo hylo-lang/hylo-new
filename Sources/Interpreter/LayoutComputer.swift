@@ -42,13 +42,8 @@ struct LayoutComputer {
       return computeLayout(enum: t, in: &p)
     case TypeWitness.self:
       return TypeLayout(
-        footprint: .init(
-          alignment: Alignment(bytes: MemoryLayout<TypeWitnessValue>.alignment),
-          size: MemoryLayout<TypeWitnessValue>.size
-        ),
-        type: t,
-        parts: [],
-        isEnumLayout: false
+        footprint: abi.footprint(.i(64)),
+        type: t, parts: [], isEnumLayout: false
       )
     default:
       unreachable("\(p.show(t.underlying)) doesn't have any layout)")
